@@ -72,12 +72,29 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
     fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
-        unsafe {
+        let ret = unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
         }
         .get_space()
-        .initialize_object_metadata(refer, true)
+        .initialize_object_metadata(refer, true);
+
+        use crate::mmtk::SFT_MAP;
+        #[cfg(debug_asssertions)]
+        if !SFT_MAP.is_in_space::<VM>(refer) {
+            use crate::plan::marksweep::MarkSweep;
+            use crate::vm::{ActivePlan, ObjectModel};
+            use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+            info!("heap range: {}, {}", HEAP_START, HEAP_END);
+            let plan = VM::VMActivePlan::global().downcast_ref::<MarkSweep<VM>>().unwrap();
+            warn!("calling post_alloc with object {} ({:?}) that are not in our heap", refer, allocator);
+            if plan.ms_space().active_mem.lock().unwrap().contains_key(&VM::VMObjectModel::object_start_ref(refer)) {
+                info!("{:?}", plan.ms_space().active_mem.lock().unwrap());
+                panic!("Object {} (addr {}) is in active_mem, but SFT_MAP.is_in_space returns false", refer, VM::VMObjectModel::object_start_ref(refer));
+            }
+        }
+
+        ret
     }
 
     fn get_tls(&self) -> VMMutatorThread {

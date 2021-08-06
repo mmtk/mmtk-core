@@ -76,7 +76,12 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
-    is_chunk_mapped(chunk_start) && is_chunk_marked(chunk_start)
+    let mapped = is_chunk_mapped(chunk_start);
+    let marked = is_chunk_marked(chunk_start);
+
+    // info!("is_meta_space_mapped({}): mapped = {}, marked = {}", chunk_start, mapped, marked);
+
+    mapped && marked
 }
 
 // Eagerly map the active chunk metadata surrounding `chunk_start`
@@ -134,20 +139,29 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
 }
 
 // Check if a given object was allocated by malloc
-pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    is_meta_space_mapped(object.to_address()) && is_alloced(object)
+pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
+    let mapped = is_meta_space_mapped(VM::VMObjectModel::object_start_ref(object));
+    if !mapped {
+        return false;
+    }
+    let alloced = is_alloced::<VM>(object);
+
+    // info!("is_alloced_by_malloc({}): mapped = {}, alloced = {}", object, mapped, alloced);
+
+    mapped && alloced
 }
 
-pub fn is_alloced(object: ObjectReference) -> bool {
-    is_alloced_object(object.to_address())
+pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
+    is_alloced_object::<VM>(object)
 }
 
-pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+pub fn is_alloced_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), Ordering::SeqCst) == 1
 }
 
-pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
-    side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, address) == 1
+/// Check if an address is an object (with alloc bit).
+pub unsafe fn is_alloced_object_unsafe(possible_object: Address) -> bool {
+    side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, possible_object) == 1
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
@@ -181,7 +195,8 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
     side_metadata::load(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
 }
 
-pub fn set_alloc_bit(object: ObjectReference) {
+pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    // info!("set_alloc_bit (obj = {}, addr = {}", object, VM::VMObjectModel::object_start_ref(object));
     side_metadata::store_atomic(
         &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
@@ -213,7 +228,7 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
     );
 }
 
-pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
+pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
     side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
 }
 

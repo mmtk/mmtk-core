@@ -30,7 +30,7 @@ use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
-const ASSERT_ALLOCATION: bool = false;
+const ASSERT_ALLOCATION: bool = true;
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
@@ -41,7 +41,7 @@ pub struct MallocSpace<VM: VMBinding> {
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
-    active_mem: Mutex<HashMap<Address, usize>>,
+    pub active_mem: Mutex<HashMap<Address, usize>>,
     // The following fields are used for checking correctness of the parallel sweep implementation
     // as we need to check how many live bytes exist against `active_bytes` when the last sweep
     // work packet is executed
@@ -73,9 +73,16 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        let page_addr = conversions::page_align_down(object.to_address());
+        let page_addr = conversions::page_align_down(VM::VMObjectModel::object_start_ref(object));
+
+        #[cfg(debug_assertions)]
+        if ASSERT_ALLOCATION {
+            let addr = VM::VMObjectModel::object_start_ref(object);
+            assert!(self.active_mem.lock().unwrap().contains_key(&addr), "The obj {} to initialize is not in active_mem", object);
+        }
+
         set_page_mark(page_addr);
-        set_alloc_bit(object);
+        set_alloc_bit::<VM>(object);
     }
 }
 
@@ -107,7 +114,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        let ret = is_alloced_by_malloc(object);
+        let ret = is_alloced_by_malloc::<VM>(object);
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
@@ -115,7 +122,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
-                debug_assert!(
+                assert!(
                     *active_mem.get(&addr).unwrap() != 0,
                     "active mem check failed for {} (object {}) - was freed",
                     addr,
@@ -123,7 +130,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
                 );
             } else {
                 // The alloc bit tells that the object is not in space. It could never be allocated, or have been freed.
-                debug_assert!(
+                assert!(
                     (!active_mem.contains_key(&addr))
                         || (active_mem.contains_key(&addr) && *active_mem.get(&addr).unwrap() == 0),
                     "mem check failed for {} (object {}): allocated = {}, size = {:?}",
@@ -215,7 +222,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
-                debug_assert!(actual_size != 0);
+                assert!(actual_size != 0);
                 self.active_mem.lock().unwrap().insert(address, actual_size);
             }
         }
@@ -393,7 +400,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             // Free object
                             self.free(obj_start, bytes);
                             trace!("free object {}", object);
-                            unsafe { unset_alloc_bit_unsafe(object) };
+                            unsafe { unset_alloc_bit_unsafe::<VM>(object) };
                         } else {
                             // Live object
                             // This chunk and page are still active.
@@ -441,12 +448,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
-                        debug_assert!(
+                        assert!(
                             self.active_mem.lock().unwrap().contains_key(&obj_start),
                             "Address {} with alloc bit is not in active_mem",
                             obj_start
                         );
-                        debug_assert_eq!(
+                        assert_eq!(
                             self.active_mem.lock().unwrap().get(&obj_start),
                             Some(&bytes),
                             "Address {} size in active_mem does not match the size from malloc_usable_size",
@@ -543,12 +550,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 #[cfg(debug_assertions)]
                 if ASSERT_ALLOCATION {
-                    debug_assert!(
+                    assert!(
                         self.active_mem.lock().unwrap().contains_key(&obj_start),
                         "Address {} with alloc bit is not in active_mem",
                         obj_start
                     );
-                    debug_assert_eq!(
+                    assert_eq!(
                         self.active_mem.lock().unwrap().get(&obj_start),
                         Some(&bytes),
                         "Address {} size in active_mem does not match the size from malloc_usable_size",
@@ -563,7 +570,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     // Free object
                     self.free(obj_start, bytes);
                     trace!("free object {}", object);
-                    unsafe { unset_alloc_bit_unsafe(object) };
+                    unsafe { unset_alloc_bit_unsafe::<VM>(object) };
                 } else {
                     // Live object. Unset mark bit
                     unset_mark_bit::<VM>(object, None);
