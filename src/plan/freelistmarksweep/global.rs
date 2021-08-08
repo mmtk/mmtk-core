@@ -1,16 +1,16 @@
 use crate::mmtk::MMTK;
-use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::freelistmarksweep::mutator::ALLOCATOR_MAPPING;
-use crate::plan::{AllocationSemantics, GcStatus};
+use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::plan::{AllocationSemantics, GcStatus};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::{EndOfGC, Prepare, Release, StopMutators};
-use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::MMTkScheduler;
+use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -18,7 +18,9 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
-use crate::util::metadata::side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataSanity, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_ADDRESS,
+};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
