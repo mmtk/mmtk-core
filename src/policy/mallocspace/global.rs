@@ -33,7 +33,7 @@ use std::sync::Mutex;
 #[cfg(debug_assertions)]
 const ASSERT_ALLOCATION: bool = false;
 
-pub struct  MallocSpace<VM: VMBinding> {
+pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
