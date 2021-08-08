@@ -41,9 +41,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_ref()
             }
-            AllocatorSelector::Malloc(index) => {
-                self.malloc[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::FreeList(index) => {
                 &**self.free_list[index as usize].assume_init_ref()
             }
@@ -63,9 +61,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
-            AllocatorSelector::Malloc(index) => {
-                self.malloc[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::FreeList(index) => {
                 &mut **self.free_list[index as usize].assume_init_mut()
             }
