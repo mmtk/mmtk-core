@@ -42,19 +42,19 @@ pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod generational;
 mod immix;
+mod freelistmarksweep;
 mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
-mod freelistmarksweep;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.
 
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
+pub use freelistmarksweep::FLMS_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
-pub use freelistmarksweep::FLMS_CONSTRAINTS;
