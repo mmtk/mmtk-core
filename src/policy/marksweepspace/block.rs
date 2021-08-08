@@ -24,8 +24,7 @@ use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, B
 use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-pub struct Block (Address);
-
+pub struct Block(Address);
 
 impl Block {
     /// Align the address to a block boundary.
@@ -112,24 +111,29 @@ impl Block {
             }
             BlockState::Marked => {
                 // The block is live.
-                let tls = space.load_block_tls(self.0);
-                let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls) };
-                eprintln!("block level sweep");
-                let mut marked_blocks = space.marked_blocks.lock().unwrap();
-                let blocks = marked_blocks.get_mut(&tls);
-                match blocks {
-                    Some(blocks) => {
-                        let size = space.load_block_cell_size(self.0);
-                        let bin = crate::util::alloc::FreeListAllocator::<VM>::mi_bin(size);
-                        let block_queue = blocks.get_mut(bin as usize).unwrap();
-                        store_metadata::<VM>(&MetadataSpec::OnSide(space.get_next_metadata_spec()), unsafe{ self.0.to_object_reference() }, block_queue.first.as_usize(), None, None);
-                        block_queue.first = self.0;
-                    },
-                    None => {
-                        marked_blocks.insert(tls, free_list_allocator::BLOCK_QUEUES_EMPTY.to_vec());
-                    },
-                }
-                // incorrect, need to add the block to the marked list
+                // let tls = space.load_block_tls(self.0);
+                // let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls) };
+                // eprintln!("block level sweep");
+                // let mut marked_blocks = space.marked_blocks.lock().unwrap();
+                // let blocks = marked_blocks.get_mut(&tls);
+                // match blocks {
+                //     Some(blocks) => {
+                //         let size = space.load_block_cell_size(self.0);
+                //         let bin = crate::util::alloc::FreeListAllocator::<VM>::mi_bin(size);
+                //         let block_queue = blocks.get_mut(bin as usize).unwrap();
+                //         store_metadata::<VM>(
+                //             &MetadataSpec::OnSide(space.get_next_metadata_spec()),
+                //             unsafe { self.0.to_object_reference() },
+                //             block_queue.first.as_usize(),
+                //             None,
+                //             None,
+                //         );
+                //         block_queue.first = self.0;
+                //     }
+                //     None => {
+                //         marked_blocks.insert(tls, free_list_allocator::BLOCK_LISTS_EMPTY.to_vec());
+                //     }
+                // }
                 false
             }
             _ => unreachable!(),

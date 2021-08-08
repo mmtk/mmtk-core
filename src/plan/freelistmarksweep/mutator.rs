@@ -1,13 +1,13 @@
 use crate::plan::barriers::NoBarrier;
+use crate::plan::freelistmarksweep::FreeListMarkSweep;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::freelistmarksweep::FreeListMarkSweep;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::policy::marksweepspace::MarkSweepSpace;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::Allocator;
 use crate::util::alloc::FreeListAllocator;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use enum_map::enum_map;
@@ -29,10 +29,10 @@ pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWo
     .unwrap();
     free_list_allocator.rebind(
         mutator
-                .plan
-                .downcast_ref::<FreeListMarkSweep<VM>>()
-                .unwrap()
-                .ms_space()
+            .plan
+            .downcast_ref::<FreeListMarkSweep<VM>>()
+            .unwrap()
+            .ms_space(),
     )
 }
 
@@ -46,14 +46,22 @@ pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![(
-            AllocatorSelector::FreeList(0),
-            &plan.downcast_ref::<FreeListMarkSweep<VM>>().unwrap().ms_space,
-        ),
-        (
-            AllocatorSelector::BumpPointer(0),
-            &plan.downcast_ref::<FreeListMarkSweep<VM>>().unwrap().im_space,
-        )],
+        space_mapping: box vec![
+            (
+                AllocatorSelector::FreeList(0),
+                &plan
+                    .downcast_ref::<FreeListMarkSweep<VM>>()
+                    .unwrap()
+                    .ms_space,
+            ),
+            (
+                AllocatorSelector::BumpPointer(0),
+                &plan
+                    .downcast_ref::<FreeListMarkSweep<VM>>()
+                    .unwrap()
+                    .im_space,
+            ),
+        ],
         prepare_func: &flms_mutator_prepare,
         release_func: &flms_mutator_release,
     };
