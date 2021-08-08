@@ -203,20 +203,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let actual_size = unsafe { malloc_usable_size(raw) };
             // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the address.
             if !is_meta_space_mapped(address) {
-                // In order to prevent race conditions, we synchronize on the lock
-                let _lock = CHUNK_MAP_LOCK.lock().unwrap();
-
-                // Check it once more just in case we have mapped it by other threads before we can acquire the lock.
-                if !is_meta_space_mapped(address) {
-                    let chunk_start = conversions::chunk_align_down(address);
-                    debug!(
-                        "Add malloc chunk {} to {}",
-                        chunk_start,
-                        chunk_start + BYTES_IN_CHUNK
-                    );
-                    // Map the metadata space for the associated chunk
-                    self.map_metadata_and_update_bound(chunk_start);
-                }
+                let chunk_start = conversions::chunk_align_down(address);
+                debug!(
+                    "Add malloc chunk {} to {}",
+                    chunk_start,
+                    chunk_start + BYTES_IN_CHUNK
+                );
+                // Map the metadata space for the associated chunk
+                self.map_metadata_and_update_bound(chunk_start);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
