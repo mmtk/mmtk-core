@@ -80,7 +80,6 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
         if self.modbuf.is_empty() { return }
-        println!("BARRIE FLUSH");
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
@@ -92,7 +91,6 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
-        // println!("BARRIE FLUSH END");
     }
 
     #[inline(always)]
