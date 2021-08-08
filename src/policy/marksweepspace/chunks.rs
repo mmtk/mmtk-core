@@ -1,7 +1,7 @@
 // all from Wenyu's Immix
 
-use super::MarkSweepSpace;
 use super::block::{Block, BlockState};
+use super::MarkSweepSpace;
 use crate::util::alloc::free_list_allocator::{BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK};
 use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
@@ -135,8 +135,7 @@ pub struct ChunkMap {
 
 impl ChunkMap {
     /// Chunk alloc table
-    pub const ALLOC_TABLE: SideMetadataSpec = 
-    SideMetadataSpec {
+    pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Block::TLS_TABLE),
         log_num_of_bits: 3,
