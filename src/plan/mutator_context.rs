@@ -80,7 +80,11 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         offset: isize,
         allocator: AllocationSemantics,
     ) -> Address {
-        let allocator = if size > crate::util::alloc::free_list_allocator::BYTES_IN_BLOCK {AllocationType::Immortal} else {allocator};
+        let allocator = if size > crate::util::alloc::free_list_allocator::BYTES_IN_BLOCK {
+            AllocationType::Immortal
+        } else {
+            allocator
+        };
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
