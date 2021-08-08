@@ -1,14 +1,43 @@
 use crate::{TransitiveClosure, util::{Address, ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
 
-use crate::{TransitiveClosure, policy::marksweepspace::{block::{Block, BlockState}, metadata::{ALLOC_SIDE_METADATA_SPEC, is_marked, set_mark_bit, unset_mark_bit}}, scheduler::{MMTkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, BLOCK_QUEUES_EMPTY, BYTES_IN_BLOCK, FreeListAllocator}, constants::LOG_BYTES_IN_PAGE, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
+use crate::{
+    policy::marksweepspace::{
+        block::{Block, BlockState},
+        metadata::{is_marked, set_mark_bit, unset_mark_bit, ALLOC_SIDE_METADATA_SPEC},
+    },
+    scheduler::{MMTkScheduler, WorkBucketStage},
+    util::{
+        alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK},
+        constants::LOG_BYTES_IN_PAGE,
+        heap::{
+            layout::heap_layout::{Mmapper, VMMap},
+            FreeListPageResource, HeapMeta, VMRequest,
+        },
+        metadata::{
+            self, compare_exchange_metadata, load_metadata,
+            side_metadata::{
+                SideMetadataContext, SideMetadataOffset, SideMetadataSpec,
+                LOCAL_SIDE_METADATA_BASE_ADDRESS,
+            },
+            store_metadata, MetadataSpec,
+        },
+        Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread,
+    },
+    vm::VMBinding,
+    TransitiveClosure,
+};
 
-use super::{super::space::{CommonSpace, SFT, Space, SpaceOptions}, chunks::ChunkMap, metadata::{is_alloced, unset_alloc_bit_unsafe}};
+use super::{
+    super::space::{CommonSpace, Space, SpaceOptions, SFT},
+    chunks::ChunkMap,
+    metadata::{is_alloced, unset_alloc_bit_unsafe},
+};
 use crate::vm::ObjectModel;
 
 // const NATIVE_MALLOC_SPECS: Vec<SideMetadataSpec> = [
 //     SideMetadataSpec {
 //         is_global: false,
-//         offset: 
+//         offset:
 //         log_num_of_bits: 6,
 //         log_min_obj_size: 16,
 //     },
@@ -17,7 +46,7 @@ use crate::vm::ObjectModel;
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    pub marked_blocks: Mutex<HashMap<usize, Vec<free_list_allocator::BlockQueue>>>,
+    // pub marked_blocks: Mutex<HashMap<usize, Vec<free_list_allocator::BlockList>>>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
@@ -89,12 +118,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
         ]);
 
-        // let side_metadata_marked = SideMetadataSpec {
-        //     is_global: false,
-        //     offset: SideMetadataOffset::layout_after(&side_metadata_tls),
-        //     log_num_of_bits: 6,
-        //     log_min_obj_size: 16,
-        // };
         let mut local_specs = {
             vec![
                 Block::NEXT_BLOCK_TABLE,
@@ -119,7 +142,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: vec![],
-                    local: local_specs
+                    local: local_specs,
                 },
             },
             vm_map,
@@ -133,7 +156,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            marked_blocks: Mutex::default(),
             chunk_map: ChunkMap::new(),
             scheduler,
         }

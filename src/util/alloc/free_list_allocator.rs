@@ -117,25 +117,87 @@ const MI_BIN_HUGE: usize = 73;
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
 pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
-const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX/MI_INTPTR_SIZE;
-const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE*8;
+const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
+const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
 
 // mimalloc init.c:46
-pub(crate) const BLOCK_QUEUES_EMPTY: [BlockQueue; 74] = [
-    BlockQueue::new(     1*4),
-    BlockQueue::new(     1*4), BlockQueue::new(     2*4), BlockQueue::new(     3*4), BlockQueue::new(     4*4), BlockQueue::new(     5*4), BlockQueue::new(     6*4), BlockQueue::new(     7*4), BlockQueue::new(     8*4), /* 8 */ 
-    BlockQueue::new(    10*4), BlockQueue::new(    12*4), BlockQueue::new(    14*4), BlockQueue::new(    16*4), BlockQueue::new(    20*4), BlockQueue::new(    24*4), BlockQueue::new(    28*4), BlockQueue::new(    32*4), /* 16 */ 
-    BlockQueue::new(    40*4), BlockQueue::new(    48*4), BlockQueue::new(    56*4), BlockQueue::new(    64*4), BlockQueue::new(    80*4), BlockQueue::new(    96*4), BlockQueue::new(   112*4), BlockQueue::new(   128*4), /* 24 */ 
-    BlockQueue::new(   160*4), BlockQueue::new(   192*4), BlockQueue::new(   224*4), BlockQueue::new(   256*4), BlockQueue::new(   320*4), BlockQueue::new(   384*4), BlockQueue::new(   448*4), BlockQueue::new(   512*4), /* 32 */ 
-    BlockQueue::new(   640*4), BlockQueue::new(   768*4), BlockQueue::new(   896*4), BlockQueue::new(  1024*4), BlockQueue::new(  1280*4), BlockQueue::new(  1536*4), BlockQueue::new(  1792*4), BlockQueue::new(  2048*4), /* 40 */ 
-    BlockQueue::new(  2560*4), BlockQueue::new(  3072*4), BlockQueue::new(  3584*4), BlockQueue::new(  4096*4), BlockQueue::new(  5120*4), BlockQueue::new(  6144*4), BlockQueue::new(  7168*4), BlockQueue::new(  8192*4), /* 48 */ 
-    BlockQueue::new( 10240*4), BlockQueue::new( 12288*4), BlockQueue::new( 14336*4), BlockQueue::new( 16384*4), BlockQueue::new( 20480*4), BlockQueue::new( 24576*4), BlockQueue::new( 28672*4), BlockQueue::new( 32768*4), /* 56 */ 
-    BlockQueue::new( 40960*4), BlockQueue::new( 49152*4), BlockQueue::new( 57344*4), BlockQueue::new( 65536*4), BlockQueue::new( 81920*4), BlockQueue::new( 98304*4), BlockQueue::new(114688*4), BlockQueue::new(131072*4), /* 64 */ 
-    BlockQueue::new(163840*4), BlockQueue::new(196608*4), BlockQueue::new(229376*4), BlockQueue::new(262144*4), BlockQueue::new(327680*4), BlockQueue::new(393216*4), BlockQueue::new(458752*4), BlockQueue::new(524288*4), /* 72 */ 
-    BlockQueue::new(MI_LARGE_OBJ_WSIZE_MAX + 1  /* 655360, Huge queue */),
+pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
+    BlockList::new(1 * 4),
+    BlockList::new(1 * 4),
+    BlockList::new(2 * 4),
+    BlockList::new(3 * 4),
+    BlockList::new(4 * 4),
+    BlockList::new(5 * 4),
+    BlockList::new(6 * 4),
+    BlockList::new(7 * 4),
+    BlockList::new(8 * 4), /* 8 */
+    BlockList::new(10 * 4),
+    BlockList::new(12 * 4),
+    BlockList::new(14 * 4),
+    BlockList::new(16 * 4),
+    BlockList::new(20 * 4),
+    BlockList::new(24 * 4),
+    BlockList::new(28 * 4),
+    BlockList::new(32 * 4), /* 16 */
+    BlockList::new(40 * 4),
+    BlockList::new(48 * 4),
+    BlockList::new(56 * 4),
+    BlockList::new(64 * 4),
+    BlockList::new(80 * 4),
+    BlockList::new(96 * 4),
+    BlockList::new(112 * 4),
+    BlockList::new(128 * 4), /* 24 */
+    BlockList::new(160 * 4),
+    BlockList::new(192 * 4),
+    BlockList::new(224 * 4),
+    BlockList::new(256 * 4),
+    BlockList::new(320 * 4),
+    BlockList::new(384 * 4),
+    BlockList::new(448 * 4),
+    BlockList::new(512 * 4), /* 32 */
+    BlockList::new(640 * 4),
+    BlockList::new(768 * 4),
+    BlockList::new(896 * 4),
+    BlockList::new(1024 * 4),
+    BlockList::new(1280 * 4),
+    BlockList::new(1536 * 4),
+    BlockList::new(1792 * 4),
+    BlockList::new(2048 * 4), /* 40 */
+    BlockList::new(2560 * 4),
+    BlockList::new(3072 * 4),
+    BlockList::new(3584 * 4),
+    BlockList::new(4096 * 4),
+    BlockList::new(5120 * 4),
+    BlockList::new(6144 * 4),
+    BlockList::new(7168 * 4),
+    BlockList::new(8192 * 4), /* 48 */
+    BlockList::new(10240 * 4),
+    BlockList::new(12288 * 4),
+    BlockList::new(14336 * 4),
+    BlockList::new(16384 * 4),
+    BlockList::new(20480 * 4),
+    BlockList::new(24576 * 4),
+    BlockList::new(28672 * 4),
+    BlockList::new(32768 * 4), /* 56 */
+    BlockList::new(40960 * 4),
+    BlockList::new(49152 * 4),
+    BlockList::new(57344 * 4),
+    BlockList::new(65536 * 4),
+    BlockList::new(81920 * 4),
+    BlockList::new(98304 * 4),
+    BlockList::new(114688 * 4),
+    BlockList::new(131072 * 4), /* 64 */
+    BlockList::new(163840 * 4),
+    BlockList::new(196608 * 4),
+    BlockList::new(229376 * 4),
+    BlockList::new(262144 * 4),
+    BlockList::new(327680 * 4),
+    BlockList::new(393216 * 4),
+    BlockList::new(458752 * 4),
+    BlockList::new(524288 * 4), /* 72 */
+    BlockList::new(MI_LARGE_OBJ_WSIZE_MAX + 1 /* 655360, Huge queue */),
 ];
-
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
@@ -348,12 +410,17 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             ))
         }
     }
-    
+
     #[inline]
-    pub fn cas_thread_free_list(&self, block: Address, old_thread_free: Address, new_thread_free: Address) -> bool {
+    pub fn cas_thread_free_list(
+        &self,
+        block: Address,
+        old_thread_free: Address,
+        new_thread_free: Address,
+    ) -> bool {
         compare_exchange_metadata::<VM>(
             &MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
-            unsafe{block.to_object_reference()}, 
+            unsafe { block.to_object_reference() },
             old_thread_free.as_usize(),
             new_thread_free.as_usize(),
             None,
@@ -712,6 +779,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(not(feature = "lazy_sweeping"))]
     pub fn reset(&mut self) {
+        // eprintln!("reset");
         trace!("reset");
         // eprintln!("reset");
         self.print_blocklists();
