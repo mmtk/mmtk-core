@@ -10,15 +10,16 @@ and prepare the new spaces, and a copy context.
 
 Firstly, change the plan constraints. Some of these constraints are not used 
 at the moment, but it's good to set them properly regardless.
-1. Look in `plan/plan_constraints.rs`. `PlanConstraints` lists all the possible
+
+Look in `plan/plan_constraints.rs`. `PlanConstraints` lists all the possible
 options for plan-specific constraints. At the moment, `MYGC_CONSTRAINTS` in `mygc/global.rs` should be using
-the default value for `PlanConstraints`. We will make the following changes.
+the default value for `PlanConstraints`. We will make the following changes:
 
 1. Initialize `gc_header_bits` to 2. We reserve 2 bits in the header for GC use.
 1. Initialize `moves_objects` to `true`.
 1. Initialize `num_specialized_scans` to 1.
 
-Finished Code (Step 1-4):
+Finished code (step 1-3):
 ```
 {{#include ../../../code/mygc_semispace/global.rs:constraints}}
 ```
@@ -41,7 +42,7 @@ To the import statement block:
    to be used to store an indicator of which copyspace is the tospace.
    4. Delete `#[allow(unused_imports)]`.
 
-Finished Code(Step 1):
+Finished code (step 1):
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:imports}}
 ```
@@ -188,9 +189,17 @@ space in `space_mapping`. Note that the space allocation is formatted as a list
 of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is 
 bound with `tospace`.
 
+Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in `MyGC`.
+
+```rust
+{{#include ../../../code/mygc_semispace/mutator.rs:plan_downcast}}
+```
+
+Then, use `mygc` to access the spaces in `MyGC`.
+
    1. `BumpPointer(0)` should map to the tospace.
-   2. `BumpPointer(1)` should map to `plan.common.get_immortal()`.
-   3. `LargeObject(0)` should map to `plan.common.get_los()`.
+   2. `BumpPointer(1)` should map to `mygc.common.get_immortal()`.
+   3. `LargeObject(0)` should map to `mygc.common.get_los()`.
    4. None of the above should be dereferenced (ie, they should not have 
    the `&` prefix).
 

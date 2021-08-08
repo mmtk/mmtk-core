@@ -202,6 +202,8 @@ impl<VM: VMBinding> MyGC<VM> {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.common.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.copyspace0.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);

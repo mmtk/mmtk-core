@@ -52,7 +52,7 @@ jobs:
   # JikesRVM
   jikesrvm-binding-test:
     runs-on: ubuntu-18.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
       - name: Checkout MMTk Core
@@ -183,7 +183,7 @@ jobs:
   # OpenJDK
   openjdk-binding-test:
     runs-on: ubuntu-18.04
-    timeout-minutes: 180
+    timeout-minutes: 240
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
       - name: Checkout MMTk Core

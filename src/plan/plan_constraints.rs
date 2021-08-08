@@ -21,6 +21,10 @@ pub struct PlanConstraints {
     pub max_non_los_copy_bytes: usize,
     /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
     pub needs_log_bit: bool,
+    /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same edges
+    /// multiple times. If a plan allows tracing duplicate edges, we will not run duplicate edge check
+    /// in extreme_assertions.
+    pub may_trace_duplicate_edges: bool,
     pub barrier: BarrierSelector,
     // the following seems unused for now
     pub needs_linear_scan: bool,
@@ -41,6 +45,7 @@ impl PlanConstraints {
             needs_linear_scan: SUPPORT_CARD_SCANNING || LAZY_SWEEP,
             needs_concurrent_workers: false,
             generate_gc_trace: false,
+            may_trace_duplicate_edges: false,
             needs_forward_after_liveness: false,
             needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
