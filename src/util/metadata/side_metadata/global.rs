@@ -362,7 +362,6 @@ pub fn store_atomic(
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    info!("{:?}: store for {}, to addr {}", metadata_spec, data_addr, meta_addr);
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
