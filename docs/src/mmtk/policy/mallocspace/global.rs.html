@@ -623,6 +623,7 @@
 <span id="620">620</span>
 <span id="621">621</span>
 <span id="622">622</span>
+<span id="623">623</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
@@ -827,6 +828,7 @@
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">address</span>.<span class="ident">is_zero</span>() {
             <span class="kw">let</span> <span class="ident">actual_size</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">malloc_usable_size</span>(<span class="ident">raw</span>) };
+            <span class="comment">// If the side metadata for the address has not yet been mapped, we will map all the side metadata for the address.</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped</span>(<span class="ident">address</span>) {
                 <span class="kw">let</span> <span class="ident">chunk_start</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">address</span>);
                 <span class="macro">debug!</span>(
