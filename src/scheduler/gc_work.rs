@@ -617,17 +617,17 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
-            // for obj in &self.modbuf {
-            //     compare_exchange_metadata::<E::VM>(
-            //         &self.meta,
-            //         *obj,
-            //         0b0,
-            //         0b1,
-            //         None,
-            //         Ordering::SeqCst,
-            //         Ordering::SeqCst,
-            //     );
-            // }
+            for obj in &self.modbuf {
+                compare_exchange_metadata::<E::VM>(
+                    &self.meta,
+                    *obj,
+                    0b1,
+                    0b0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                );
+            }
         }
         if !mmtk.plan.base().control_collector_context.concurrent.load(Ordering::SeqCst) {
             println!("Skip REMSET");

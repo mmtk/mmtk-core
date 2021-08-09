@@ -59,20 +59,20 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
         if !*crate::IN_CONCURRENT_GC.lock() {
             return;
         }
-        // if compare_exchange_metadata::<E::VM>(
-        //     &self.meta,
-        //     obj,
-        //     0b1,
-        //     0b0,
-        //     None,
-        //     Ordering::SeqCst,
-        //     Ordering::SeqCst,
-        // ) {
+        if compare_exchange_metadata::<E::VM>(
+            &self.meta,
+            obj,
+            0b0,
+            0b1,
+            None,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
             }
-        // }
+        }
     }
 }
 
