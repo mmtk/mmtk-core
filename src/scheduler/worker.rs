@@ -3,30 +3,42 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
+use crate::vm::{VMBinding, Collection};
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
 
+/// Thread-local data for each worker thread.
+///
+/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
+pub trait GCWorkerLocal {
+    fn init(&mut self, _tls: VMWorkerThread) {}
+}
+
+/// A default implementation for scheduling systems that does not require a worker-local context.
+impl GCWorkerLocal for () {}
+
 /// This struct will be accessed during trace_object(), which is performance critical.
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
 /// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
 #[derive(Copy, Clone)]
-pub struct WorkerLocalPtr {
+pub struct GCWorkerLocalPtr {
     data: *mut c_void,
     // Save the type name for debug builds, so we can later do type check
     #[cfg(debug_assertions)]
     ty: &'static str,
 }
-impl WorkerLocalPtr {
-    pub const UNINITIALIZED: Self = WorkerLocalPtr {
+
+impl GCWorkerLocalPtr {
+    pub const UNINITIALIZED: Self = GCWorkerLocalPtr {
         data: std::ptr::null_mut(),
         #[cfg(debug_assertions)]
         ty: "uninitialized",
     };
 
-    pub fn new<W: WorkerLocal>(worker_local: W) -> Self {
-        WorkerLocalPtr {
+    pub fn new<W: GCWorkerLocal>(worker_local: W) -> Self {
+        GCWorkerLocalPtr {
             data: Box::into_raw(Box::new(worker_local)) as *mut c_void,
             #[cfg(debug_assertions)]
             ty: std::any::type_name::<W>(),
@@ -35,7 +47,7 @@ impl WorkerLocalPtr {
 
     /// # Safety
     /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
-    pub unsafe fn as_type<W: WorkerLocal>(&mut self) -> &mut W {
+    pub unsafe fn as_type<W: GCWorkerLocal>(&mut self) -> &mut W {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.ty, std::any::type_name::<W>());
         &mut *(self.data as *mut W)
@@ -44,38 +56,36 @@ impl WorkerLocalPtr {
 
 const LOCALLY_CACHED_WORKS: usize = 1;
 
-pub struct Worker<C: Context> {
+pub struct GCWorker<VM: VMBinding> {
     pub tls: VMWorkerThread,
     pub ordinal: usize,
     pub parked: AtomicBool,
-    scheduler: Arc<Scheduler<C>>,
-    local: WorkerLocalPtr,
-    pub local_work_bucket: WorkBucket<C>,
-    pub sender: Sender<CoordinatorMessage<C>>,
-    pub stat: WorkerLocalStat<C>,
-    context: Option<&'static C>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
+    local: GCWorkerLocalPtr,
+    pub local_work_bucket: WorkBucket<VM>,
+    pub sender: Sender<CoordinatorMessage<VM>>,
+    pub stat: WorkerLocalStat<VM>,
+    context: Option<&'static MMTK<VM>>,
     is_coordinator: bool,
-    local_work_buffer: Vec<(WorkBucketStage, Box<dyn Work<C>>)>,
+    local_work_buffer: Vec<(WorkBucketStage, Box<dyn GCWork<VM>>)>,
 }
 
-unsafe impl<C: Context> Sync for Worker<C> {}
-unsafe impl<C: Context> Send for Worker<C> {}
+unsafe impl<VM: VMBinding> Sync for GCWorker<VM> {}
+unsafe impl<VM: VMBinding> Send for GCWorker<VM> {}
 
-pub type GCWorker<VM> = Worker<MMTK<VM>>;
-
-impl<C: Context> Worker<C> {
+impl<VM: VMBinding> GCWorker<VM> {
     pub fn new(
         ordinal: usize,
-        scheduler: Weak<Scheduler<C>>,
+        scheduler: Weak<GCWorkScheduler<VM>>,
         is_coordinator: bool,
-        sender: Sender<CoordinatorMessage<C>>,
+        sender: Sender<CoordinatorMessage<VM>>,
     ) -> Self {
         let scheduler = scheduler.upgrade().unwrap();
         Self {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
             ordinal,
             parked: AtomicBool::new(true),
-            local: WorkerLocalPtr::UNINITIALIZED,
+            local: GCWorkerLocalPtr::UNINITIALIZED,
             local_work_bucket: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender,
             scheduler,
@@ -87,7 +97,7 @@ impl<C: Context> Worker<C> {
     }
 
     #[inline]
-    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl Work<C>) {
+    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated() {
             self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
             return;
@@ -115,18 +125,18 @@ impl<C: Context> Worker<C> {
         self.is_coordinator
     }
 
-    pub fn scheduler(&self) -> &Scheduler<C> {
+    pub fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }
 
     /// # Safety
     /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
     #[inline]
-    pub unsafe fn local<W: 'static + WorkerLocal>(&mut self) -> &mut W {
+    pub unsafe fn local<W: 'static + GCWorkerLocal>(&mut self) -> &mut W {
         self.local.as_type::<W>()
     }
 
-    pub fn set_local(&mut self, local: WorkerLocalPtr) {
+    pub fn set_local(&mut self, local: GCWorkerLocalPtr) {
         self.local = local;
     }
 
@@ -134,11 +144,11 @@ impl<C: Context> Worker<C> {
         self.tls = tls;
     }
 
-    pub fn do_work(&'static mut self, mut work: impl Work<C>) {
+    pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
         work.do_work(self, self.context.unwrap());
     }
 
-    pub fn run(&mut self, context: &'static C) {
+    pub fn run(&mut self, context: &'static MMTK<VM>) {
         self.context = Some(context);
         self.parked.store(false, Ordering::SeqCst);
         loop {
@@ -153,19 +163,19 @@ impl<C: Context> Worker<C> {
     }
 }
 
-pub struct WorkerGroup<C: Context> {
-    pub workers: Vec<Worker<C>>,
+pub struct WorkerGroup<VM: VMBinding> {
+    pub workers: Vec<GCWorker<VM>>,
 }
 
-impl<C: Context> WorkerGroup<C> {
+impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn new(
         workers: usize,
-        scheduler: Weak<Scheduler<C>>,
-        sender: Sender<CoordinatorMessage<C>>,
+        scheduler: Weak<GCWorkScheduler<VM>>,
+        sender: Sender<CoordinatorMessage<VM>>,
     ) -> Arc<Self> {
         Arc::new(Self {
             workers: (0..workers)
-                .map(|i| Worker::new(i, scheduler.clone(), false, sender.clone()))
+                .map(|i| GCWorker::new(i, scheduler.clone(), false, sender.clone()))
                 .collect(),
         })
     }
@@ -182,10 +192,10 @@ impl<C: Context> WorkerGroup<C> {
         self.parked_workers() == self.worker_count()
     }
 
-    pub fn spawn_workers(&'static self, tls: VMThread, context: &'static C) {
+    pub fn spawn_workers(&'static self, tls: VMThread, _mmtk: &'static MMTK<VM>) {
         for i in 0..self.worker_count() {
             let worker = &self.workers[i];
-            C::spawn_worker(worker, tls, context);
+            VM::VMCollection::spawn_worker_thread(tls, Some(worker));
         }
     }
 }

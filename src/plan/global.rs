@@ -107,7 +107,7 @@ impl<VM: VMBinding> NoCopy<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
+impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
@@ -181,7 +181,7 @@ pub trait Plan: 'static + Sync + Downcast {
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -197,7 +197,7 @@ pub trait Plan: 'static + Sync + Downcast {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<Self::VM>>,
+        scheduler: &Arc<GCWorkScheduler<Self::VM>>,
     );
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
@@ -501,7 +501,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
@@ -793,7 +793,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
         self.immortal.init(vm_map);
@@ -835,7 +835,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
         &self,
         constraints: &'static PlanConstraints,
-        scheduler: &MMTkScheduler<VM>,
+        scheduler: &GCWorkScheduler<VM>,
     ) {
         // Schedule finalization
         if !self.base.options.no_finalizer {

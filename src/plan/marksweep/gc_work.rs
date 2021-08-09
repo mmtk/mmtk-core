@@ -5,7 +5,7 @@ use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{GCWork, GCWorker, Work, WorkBucketStage};
+use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -90,7 +90,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         let ms = self.plan.ms_space();
-        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
         let mut chunk = unsafe { Address::from_usize(ms.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
         let end = unsafe { Address::from_usize(ms.chunk_addr_max.load(Ordering::Relaxed)) }
             + BYTES_IN_CHUNK;

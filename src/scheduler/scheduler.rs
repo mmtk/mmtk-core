@@ -1,7 +1,6 @@
 use super::stat::SchedulerStat;
-use super::work::Work;
 use super::work_bucket::*;
-use super::worker::{Worker, WorkerGroup};
+use super::worker::{GCWorker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -12,29 +11,29 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 
-pub enum CoordinatorMessage<C: Context> {
-    Work(Box<dyn CoordinatorWork<C>>),
+pub enum CoordinatorMessage<VM: VMBinding> {
+    Work(Box<dyn CoordinatorWork<VM>>),
     AllWorkerParked,
     BucketDrained,
 }
 
-pub struct Scheduler<C: Context> {
-    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<C>>,
+pub struct GCWorkScheduler<VM: VMBinding> {
+    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Work for the coordinator thread
-    pub coordinator_work: WorkBucket<C>,
+    pub coordinator_work: WorkBucket<VM>,
     /// workers
-    worker_group: Option<Arc<WorkerGroup<C>>>,
+    worker_group: Option<Arc<WorkerGroup<VM>>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    context: Option<&'static C>,
-    coordinator_worker: Option<RwLock<Worker<C>>>,
+    context: Option<&'static MMTK<VM>>,
+    coordinator_worker: Option<RwLock<GCWorker<VM>>>,
     /// A message channel to send new coordinator work and other actions to the coordinator thread
     channel: (
-        Sender<CoordinatorMessage<C>>,
-        Receiver<CoordinatorMessage<C>>,
+        Sender<CoordinatorMessage<VM>>,
+        Receiver<CoordinatorMessage<VM>>,
     ),
-    startup: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
-    finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
+    startup: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
+    finalizer: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
     /// A callback to be fired after the `Closure` bucket is drained.
     /// This callback should return `true` if it adds more work packets to the
     /// `Closure` bucket. `WorkBucket::can_open` then consult this return value
@@ -52,9 +51,9 @@ pub struct Scheduler<C: Context> {
 // 2. Only the coordinator can use Receiver.
 // TODO: We should remove channel from Scheduler, and directly send Sender/Receiver when creating the coordinator and
 // the workers.
-unsafe impl<C: Context> Sync for Scheduler<C> {}
+unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
-impl<C: Context> Scheduler<C> {
+impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new() -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
@@ -87,7 +86,7 @@ impl<C: Context> Scheduler<C> {
     pub fn initialize(
         self: &'static Arc<Self>,
         num_workers: usize,
-        context: &'static C,
+        context: &'static MMTK<VM>,
         tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
@@ -101,7 +100,7 @@ impl<C: Context> Scheduler<C> {
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
         self_mut.context = Some(context);
-        self_mut.coordinator_worker = Some(RwLock::new(Worker::new(
+        self_mut.coordinator_worker = Some(RwLock::new(GCWorker::new(
             0,
             Arc::downgrade(&self),
             true,
@@ -158,19 +157,19 @@ impl<C: Context> Scheduler<C> {
         coordinator_worker.init(tls);
     }
 
-    pub fn set_initializer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
-        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
+    pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
+        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
     }
 
-    pub fn set_finalizer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
-        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
+    pub fn set_finalizer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
+        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
         *self.closure_end.lock().unwrap() = Some(f);
     }
 
-    pub fn worker_group(&self) -> Arc<WorkerGroup<C>> {
+    pub fn worker_group(&self) -> Arc<WorkerGroup<VM>> {
         self.worker_group.as_ref().unwrap().clone()
     }
 
@@ -195,7 +194,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     /// Execute coordinator work, in the controller thread
-    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
+    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<VM>>) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
         let context = self.context.unwrap();
         work.do_work_with_stat(&mut coordinator_worker, context);
@@ -262,7 +261,7 @@ impl<C: Context> Scheduler<C> {
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
-    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>, worker: &Worker<C>) {
+    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
         worker
             .sender
             .send(CoordinatorMessage::Work(box work))
@@ -270,7 +269,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     #[inline]
-    fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<(Box<dyn Work<C>>, bool)> {
+    fn pop_scheduable_work(&self, worker: &GCWorker<VM>) -> Option<(Box<dyn GCWork<VM>>, bool)> {
         if let Some(work) = worker.local_work_bucket.poll() {
             return Some((work, worker.local_work_bucket.is_empty()));
         }
@@ -284,7 +283,7 @@ impl<C: Context> Scheduler<C> {
 
     /// Get a scheduable work. Called by workers
     #[inline]
-    pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
+    pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         let work = if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
             if bucket_is_empty {
                 worker
@@ -300,7 +299,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     #[cold]
-    fn poll_slow(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
+    fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         debug_assert!(!worker.is_parked());
         let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
@@ -345,6 +344,14 @@ impl<C: Context> Scheduler<C> {
         let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
         summary.merge(&coordinator_worker.stat);
         summary.harness_stat()
+    }
+
+    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
+        mmtk.plan.base().control_collector_context.clear_request();
+        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
+        self.work_buckets[WorkBucketStage::Prepare].activate();
+        let _guard = self.worker_monitor.0.lock().unwrap();
+        self.worker_monitor.1.notify_all();
     }
 }
 
@@ -448,17 +455,5 @@ mod tests {
         assert!(data.is_sorted());
 
         let _data = unsafe { Box::from_raw(data) };
-    }
-}
-
-pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
-
-impl<VM: VMBinding> MMTkScheduler<VM> {
-    pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.base().control_collector_context.clear_request();
-        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
-        self.work_buckets[WorkBucketStage::Prepare].activate();
-        let _guard = self.worker_monitor.0.lock().unwrap();
-        self.worker_monitor.1.notify_all();
     }
 }

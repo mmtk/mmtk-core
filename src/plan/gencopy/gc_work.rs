@@ -5,7 +5,7 @@ use crate::plan::PlanConstraints;
 use crate::plan::{barriers::BarrierSelector, CopyContext};
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::WorkerLocal;
+use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
 use crate::util::metadata::store_metadata;
 use crate::util::object_forwarding;
@@ -79,7 +79,7 @@ impl<VM: VMBinding> GenCopyCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for GenCopyCopyContext<VM> {
+impl<VM: VMBinding> GCWorkerLocal for GenCopyCopyContext<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
