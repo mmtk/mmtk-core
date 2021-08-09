@@ -20,6 +20,9 @@
 <span id="17">17</span>
 <span id="18">18</span>
 <span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
 </pre><pre class="rust">
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::fill_alignment_gap</span>;
@@ -36,6 +39,9 @@
 
 <span class="kw">mod</span> <span class="ident">malloc_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">malloc_allocator::MallocAllocator</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immix_allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="self">self</span><span class="ident">::immix_allocator::ImmixAllocator</span>;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">dump_linear_scan</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">embedded_meta_data</span>;

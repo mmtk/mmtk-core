@@ -57,6 +57,8 @@
 <span id="54">54</span>
 <span id="55">55</span>
 <span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
 </pre><pre class="rust">
 <span class="doccomment">//! GC algorithms from the MMTk suite.</span>
 <span class="doccomment">//!</span>
@@ -98,9 +100,10 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracelocal::TraceLocal</span>;
 
 <span class="kw">mod</span> <span class="ident">transitive_closure</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">transitive_closure::TransitiveClosure</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">transitive_closure</span>::{<span class="ident">ObjectsClosure</span>, <span class="ident">TransitiveClosure</span>};
 
 <span class="kw">mod</span> <span class="ident">gencopy</span>;
+<span class="kw">mod</span> <span class="ident">immix</span>;
 <span class="kw">mod</span> <span class="ident">marksweep</span>;
 <span class="kw">mod</span> <span class="ident">nogc</span>;
 <span class="kw">mod</span> <span class="ident">pageprotect</span>;
@@ -110,6 +113,7 @@
 <span class="comment">// it is possible for performance reasons that they want the constraints as constants.</span>
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gencopy::GENCOPY_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immix::IMMIX_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">marksweep::MS_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">nogc::NOGC_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pageprotect::PP_CONSTRAINTS</span>;

@@ -891,6 +891,11 @@
 <span id="888">888</span>
 <span id="889">889</span>
 <span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
 </pre><pre class="rust">
 <span class="doccomment">//! The global part of a plan implementation.</span>
 
@@ -1020,6 +1025,7 @@
         <span class="ident">PlanSelector::MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="kw">crate</span><span class="ident">::plan::marksweep::mutator::create_ms_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
         }
+        <span class="ident">PlanSelector::Immix</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw">crate</span><span class="ident">::plan::immix::mutator::create_immix_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>),
         <span class="ident">PlanSelector::PageProtect</span> <span class="op">=</span><span class="op">&gt;</span> {
             <span class="kw">crate</span><span class="ident">::plan::pageprotect::mutator::create_pp_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
         }
@@ -1031,6 +1037,7 @@
     <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
     <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+    <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="ident">plan</span> {
         <span class="ident">PlanSelector::NoGC</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::nogc::NoGC::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>)),
@@ -1042,6 +1049,9 @@
         }
         <span class="ident">PlanSelector::MarkSweep</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::marksweep::MarkSweep::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
+        )),
+        <span class="ident">PlanSelector::Immix</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::immix::Immix::new</span>(
+            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )),
         <span class="ident">PlanSelector::PageProtect</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::pageprotect::PageProtect::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
@@ -1543,7 +1553,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">gc_status</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">GcStatus::GcProper</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">is_user_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_user_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">user_triggered_collection</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
     }
 

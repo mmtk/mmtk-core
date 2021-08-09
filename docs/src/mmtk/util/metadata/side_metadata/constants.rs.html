@@ -109,6 +109,13 @@
 <span id="106">106</span>
 <span id="107">107</span>
 <span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
@@ -210,14 +217,21 @@
 <span class="comment">//      - Offset LOCAL_SIDE_METADATA_BASE_OFFSET</span>
 <span class="comment">//  2 - MarkSweep Active Page byte:</span>
 <span class="comment">//      - Offset after Alloc bit</span>
+<span class="comment">//  3 - Immix line mark byte:</span>
+<span class="comment">//      - Offset after MS alloc bit</span>
+<span class="comment">//  4 - Immix block defrag byte:</span>
+<span class="comment">//      - Offset after Immix block defrag byte</span>
+<span class="comment">//  5 - Immix block mark byte:</span>
+<span class="comment">//      - Offset after Immix block mark byte</span>
+<span class="comment">//  6 - Immix chumk-map mark byte:</span>
+<span class="comment">//      - Offset after Immix chumk-map mark byte</span>
 <span class="comment">//</span>
 <span class="comment">// --------------------------------------------------</span>
 
 <span class="doccomment">/// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.</span>
 <span class="doccomment">/// VM bindings must use this to avoid overlap with core internal local side metadata.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_VM_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(
-    <span class="kw-2">&amp;</span><span class="kw">crate</span><span class="ident">::policy::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC</span>,
-);
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_VM_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
+    <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="kw">crate</span><span class="ident">::policy::immix::LAST_LOCAL_SIDE_METADATA</span>);
 </pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../../" data-current-crate="mmtk" data-search-index-js="../../../../../search-index.js" data-search-js="../../../../../search.js"></div>
     <script src="../../../../../main.js"></script><script src="../../../../../source-script.js"></script><script src="../../../../../source-files.js"></script></body></html>
