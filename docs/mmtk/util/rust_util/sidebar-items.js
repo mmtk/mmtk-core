@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["min_of_usize","Const funciton for min value of two usize numbers."]]});

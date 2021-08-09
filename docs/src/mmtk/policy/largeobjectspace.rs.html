@@ -284,6 +284,13 @@
 <span id="281">281</span>
 <span id="282">282</span>
 <span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -356,6 +363,10 @@
             <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
         );
 
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
+            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
+        }
+
         <span class="kw">let</span> <span class="ident">cell</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
         <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">add_to_treadmill</span>(<span class="ident">cell</span>, <span class="ident">alloc</span>);
     }
@@ -371,7 +382,9 @@
     <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pr</span>
     }
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {}
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">init</span>(<span class="self">self</span>.<span class="ident">as_space</span>());
+    }
 
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
@@ -392,7 +405,7 @@
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">_constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
         <span class="ident">protect_memory_on_release</span>: <span class="ident">bool</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
@@ -401,6 +414,7 @@
                 <span class="ident">movable</span>: <span class="bool-val">false</span>,
                 <span class="ident">immortal</span>: <span class="bool-val">false</span>,
                 <span class="ident">zeroed</span>,
+                <span class="ident">needs_log_bit</span>: <span class="ident">constraints</span>.<span class="ident">needs_log_bit</span>,
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
                     <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,

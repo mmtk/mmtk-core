@@ -340,28 +340,6 @@
 <span id="337">337</span>
 <span id="338">338</span>
 <span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -435,32 +413,10 @@
     <span class="comment">// Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their</span>
     <span class="comment">// side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.</span>
 
-    <span class="comment">// --------------------------------------------------</span>
-    <span class="comment">//</span>
-    <span class="comment">// Global Metadata</span>
-    <span class="comment">//</span>
-    <span class="comment">// MMTk reserved Global side metadata offsets:</span>
-    <span class="comment">//</span>
-    <span class="comment">//  1 - MarkSweep Active Chunk byte:</span>
-    <span class="comment">//      - Offset `GLOBAL_SIDE_METADATA_BASE_ADDRESS`</span>
-    <span class="comment">//</span>
-    <span class="comment">// --------------------------------------------------</span>
-
     <span class="doccomment">/// The metadata specification of the global log bit. 1 bit.</span>
+    <span class="doccomment">/// Note that for this bit, 0 represents logged (default), and 1 represents unlogged.</span>
+    <span class="doccomment">/// This bit is also referred to as unlogged bit in Java MMTk for this reason.</span>
     <span class="kw">const</span> <span class="ident">GLOBAL_LOG_BIT_SPEC</span>: <span class="ident">VMGlobalLogBitSpec</span>;
-
-    <span class="comment">// --------------------------------------------------</span>
-    <span class="comment">// PolicySpecific Metadata</span>
-    <span class="comment">//</span>
-    <span class="comment">// MMTk reserved PolicySpecific side metadata offsets:</span>
-    <span class="comment">//</span>
-    <span class="comment">//  1 - MarkSweep Alloc bit:</span>
-    <span class="comment">//      - Offset `0x0` on 32-bits</span>
-    <span class="comment">//      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits</span>
-    <span class="comment">//  2 - MarkSweep Active Page byte:</span>
-    <span class="comment">//      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()</span>
-    <span class="comment">//</span>
-    <span class="comment">// --------------------------------------------------</span>
 
     <span class="doccomment">/// The metadata specification for the forwarding pointer, used by copying plans. Word size.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_FORWARDING_POINTER_SPEC</span>: <span class="ident">VMLocalForwardingPointerSpec</span>;

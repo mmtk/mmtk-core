@@ -226,6 +226,7 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
+<span id="226">226</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -236,7 +237,6 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::WorkerLocal</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::metadata::store_metadata</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -286,13 +286,7 @@
     ) {
         <span class="ident">object_forwarding::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="kw">super</span><span class="ident">::NO_SLOW</span> <span class="op">&amp;&amp;</span> <span class="kw">super</span><span class="ident">::ACTIVE_BARRIER</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BarrierSelector::ObjectBarrier</span> {
-            <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>,
-                <span class="ident">obj</span>,
-                <span class="number">0b1</span>,
-                <span class="prelude-val">None</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
-            );
+            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>, <span class="ident">Ordering::SeqCst</span>);
         }
     }
 }
@@ -348,6 +342,14 @@
                     <span class="kw">super</span><span class="ident">::global::ALLOC_SS</span>,
                     <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">worker</span>().<span class="ident">local</span>::<span class="op">&lt;</span><span class="ident">GenCopyCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>() },
                 );
+        }
+        <span class="comment">// We may alloc large object into LOS as nursery objects. Trace them here.</span>
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">gencopy</span>().<span class="ident">common</span>.<span class="ident">get_los</span>().<span class="ident">in_space</span>(<span class="ident">object</span>) {
+            <span class="kw">return</span> <span class="self">self</span>
+                .<span class="ident">gencopy</span>()
+                .<span class="ident">common</span>
+                .<span class="ident">get_los</span>()
+                .<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">object</span>);
         }
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">gencopy</span>().<span class="ident">fromspace</span>().<span class="ident">in_space</span>(<span class="ident">object</span>));
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">gencopy</span>().<span class="ident">tospace</span>().<span class="ident">in_space</span>(<span class="ident">object</span>));

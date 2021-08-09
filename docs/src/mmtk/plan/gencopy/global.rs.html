@@ -322,7 +322,6 @@
 <span id="319">319</span>
 <span id="320">320</span>
 <span id="321">321</span>
-<span id="322">322</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>, <span class="ident">GenCopyNurseryProcessEdges</span>};
 <span class="kw">use</span> <span class="kw">super</span><span class="ident">::mutator::ALLOCATOR_MAPPING</span>;
@@ -374,15 +373,12 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
+    <span class="ident">needs_log_bit</span>: <span class="bool-val">true</span>,
     <span class="ident">barrier</span>: <span class="kw">super</span><span class="ident">::ACTIVE_BARRIER</span>,
-    <span class="comment">// TODO: We should use MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN which will allocate</span>
-    <span class="comment">// large objects directly to LOS. However, there are bugs in gencopy that prevents us doing it.</span>
-    <span class="comment">// I will do a separate PR to fix it.</span>
-    <span class="comment">// max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(</span>
-    <span class="comment">//     crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,</span>
-    <span class="comment">//     crate::util::options::NURSERY_SIZE,</span>
-    <span class="comment">// ),</span>
-    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="kw">crate</span><span class="ident">::util::options::NURSERY_SIZE</span>,
+    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="kw">crate</span><span class="ident">::util::rust_util::min_of_usize</span>(
+        <span class="kw">crate</span><span class="ident">::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN</span>,
+        <span class="kw">crate</span><span class="ident">::util::options::NURSERY_SIZE</span>,
+    ),
     ..<span class="ident">PlanConstraints::default</span>()
 };
 
@@ -479,9 +475,10 @@
     }
 
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
+        <span class="kw">let</span> <span class="ident">full_heap</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_current_gc_nursery</span>();
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">prepare</span>(<span class="bool-val">true</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_current_gc_nursery</span>() {
+        <span class="kw">if</span> <span class="ident">full_heap</span> {
             <span class="self">self</span>.<span class="ident">hi</span>
                 .<span class="ident">store</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>), <span class="ident">Ordering::SeqCst</span>); <span class="comment">// flip the semi-spaces</span>
         }
@@ -491,9 +488,10 @@
     }
 
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
+        <span class="kw">let</span> <span class="ident">full_heap</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_current_gc_nursery</span>();
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">release</span>();
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_current_gc_nursery</span>() {
+        <span class="kw">if</span> <span class="ident">full_heap</span> {
             <span class="self">self</span>.<span class="ident">fromspace</span>().<span class="ident">release</span>();
         }
 

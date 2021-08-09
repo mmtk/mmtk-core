@@ -220,6 +220,7 @@
 <span id="217">217</span>
 <span id="218">218</span>
 <span id="219">219</span>
+<span id="220">220</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan</span>::{<span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>};
@@ -319,6 +320,7 @@
                 <span class="ident">name</span>,
                 <span class="ident">movable</span>: <span class="bool-val">true</span>,
                 <span class="ident">immortal</span>: <span class="bool-val">false</span>,
+                <span class="ident">needs_log_bit</span>: <span class="bool-val">false</span>,
                 <span class="ident">zeroed</span>,
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {

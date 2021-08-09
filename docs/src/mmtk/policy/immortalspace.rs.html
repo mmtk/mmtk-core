@@ -187,6 +187,11 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -259,6 +264,10 @@
             <span class="prelude-val">None</span>,
             <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
         );
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
+            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
+        }
     }
 }
 
@@ -294,13 +303,14 @@
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">_constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
             <span class="ident">SpaceOptions</span> {
                 <span class="ident">name</span>,
                 <span class="ident">movable</span>: <span class="bool-val">false</span>,
                 <span class="ident">immortal</span>: <span class="bool-val">true</span>,
+                <span class="ident">needs_log_bit</span>: <span class="ident">constraints</span>.<span class="ident">needs_log_bit</span>,
                 <span class="ident">zeroed</span>,
                 <span class="ident">vmrequest</span>,
                 <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
