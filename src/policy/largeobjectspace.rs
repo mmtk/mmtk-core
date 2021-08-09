@@ -69,6 +69,10 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             Some(Ordering::SeqCst),
         );
 
+        if self.common.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        }
+
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
@@ -84,7 +88,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {}
+    fn init(&mut self, _vm_map: &'static VMMap) {
+        self.common().init(self.as_space());
+    }
 
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
@@ -105,7 +111,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        _constraints: &'static PlanConstraints,
+        constraints: &'static PlanConstraints,
         protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
@@ -114,6 +120,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 movable: false,
                 immortal: false,
                 zeroed,
+                needs_log_bit: constraints.needs_log_bit,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,

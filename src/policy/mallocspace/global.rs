@@ -201,6 +201,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if !address.is_zero() {
             let actual_size = unsafe { malloc_usable_size(raw) };
+            // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the address.
             if !is_meta_space_mapped(address) {
                 let chunk_start = conversions::chunk_align_down(address);
                 debug!(

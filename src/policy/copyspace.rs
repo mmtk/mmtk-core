@@ -96,6 +96,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 name,
                 movable: true,
                 immortal: false,
+                needs_log_bit: false,
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {

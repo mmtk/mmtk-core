@@ -7,7 +7,6 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::metadata::store_metadata;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
@@ -57,13 +56,7 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     ) {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
         if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            store_metadata::<VM>(
-                &VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-                obj,
-                0b1,
-                None,
-                Some(Ordering::SeqCst),
-            );
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
         }
     }
 }
@@ -119,6 +112,14 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
                     super::global::ALLOC_SS,
                     unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
                 );
+        }
+        // We may alloc large object into LOS as nursery objects. Trace them here.
+        if self.gencopy().common.get_los().in_space(object) {
+            return self
+                .gencopy()
+                .common
+                .get_los()
+                .trace_object::<Self>(self, object);
         }
         debug_assert!(!self.gencopy().fromspace().in_space(object));
         debug_assert!(self.gencopy().tospace().in_space(object));
