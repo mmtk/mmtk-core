@@ -69,6 +69,10 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             None,
             Some(Ordering::SeqCst),
         );
+
+        if self.common.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        }
     }
 }
 
@@ -104,13 +108,14 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        _constraints: &'static PlanConstraints,
+        constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
                 movable: false,
                 immortal: true,
+                needs_log_bit: constraints.needs_log_bit,
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {

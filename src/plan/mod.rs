@@ -38,9 +38,10 @@ mod tracelocal;
 pub use tracelocal::TraceLocal;
 
 mod transitive_closure;
-pub use transitive_closure::TransitiveClosure;
+pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod gencopy;
+mod immix;
 mod marksweep;
 mod nogc;
 mod pageprotect;
@@ -50,6 +51,7 @@ mod semispace;
 // it is possible for performance reasons that they want the constraints as constants.
 
 pub use gencopy::GENCOPY_CONSTRAINTS;
+pub use immix::IMMIX_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;

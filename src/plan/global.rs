@@ -126,6 +126,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }
@@ -137,6 +138,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
+    scheduler: Arc<MMTkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -148,6 +150,9 @@ pub fn create_plan<VM: VMBinding>(
         }
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
+        )),
+        PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
+            vm_map, mmapper, options, scheduler,
         )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
@@ -649,7 +654,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    fn is_user_triggered_collection(&self) -> bool {
+    pub fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
     }
 
