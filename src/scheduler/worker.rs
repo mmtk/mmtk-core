@@ -3,7 +3,7 @@ use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
-use crate::vm::{VMBinding, Collection};
+use crate::vm::{Collection, VMBinding};
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -65,7 +65,7 @@ pub struct GCWorker<VM: VMBinding> {
     pub local_work_bucket: WorkBucket<VM>,
     pub sender: Sender<CoordinatorMessage<VM>>,
     pub stat: WorkerLocalStat<VM>,
-    context: Option<&'static MMTK<VM>>,
+    mmtk: Option<&'static MMTK<VM>>,
     is_coordinator: bool,
     local_work_buffer: Vec<(WorkBucketStage, Box<dyn GCWork<VM>>)>,
 }
@@ -90,7 +90,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             sender,
             scheduler,
             stat: Default::default(),
-            context: None,
+            mmtk: None,
             is_coordinator,
             local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
         }
@@ -145,20 +145,20 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
-        work.do_work(self, self.context.unwrap());
+        work.do_work(self, self.mmtk.unwrap());
     }
 
-    pub fn run(&mut self, context: &'static MMTK<VM>) {
-        self.context = Some(context);
+    pub fn run(&mut self, mmtk: &'static MMTK<VM>) {
+        self.mmtk = Some(mmtk);
         self.parked.store(false, Ordering::SeqCst);
         loop {
             while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
                 debug_assert!(self.scheduler.work_buckets[bucket].is_activated());
-                work.do_work_with_stat(self, context);
+                work.do_work_with_stat(self, mmtk);
             }
             let mut work = self.scheduler().poll(self);
             debug_assert!(!self.is_parked());
-            work.do_work_with_stat(self, context);
+            work.do_work_with_stat(self, mmtk);
         }
     }
 }

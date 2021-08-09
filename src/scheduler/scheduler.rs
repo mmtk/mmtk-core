@@ -25,7 +25,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     worker_group: Option<Arc<WorkerGroup<VM>>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    context: Option<&'static MMTK<VM>>,
+    mmtk: Option<&'static MMTK<VM>>,
     coordinator_worker: Option<RwLock<GCWorker<VM>>>,
     /// A message channel to send new coordinator work and other actions to the coordinator thread
     channel: (
@@ -69,7 +69,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
             worker_monitor,
-            context: None,
+            mmtk: None,
             coordinator_worker: None,
             channel: channel(),
             startup: Mutex::new(None),
@@ -86,7 +86,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn initialize(
         self: &'static Arc<Self>,
         num_workers: usize,
-        context: &'static MMTK<VM>,
+        mmtk: &'static MMTK<VM>,
         tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
@@ -99,7 +99,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut self_mut = self.clone();
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
-        self_mut.context = Some(context);
+        self_mut.mmtk = Some(mmtk);
         self_mut.coordinator_worker = Some(RwLock::new(GCWorker::new(
             0,
             Arc::downgrade(&self),
@@ -111,10 +111,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             Arc::downgrade(&self),
             self.channel.0.clone(),
         ));
-        self.worker_group
-            .as_ref()
-            .unwrap()
-            .spawn_workers(tls, context);
+        self.worker_group.as_ref().unwrap().spawn_workers(tls, mmtk);
 
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
@@ -196,8 +193,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Execute coordinator work, in the controller thread
     fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<VM>>) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
-        let context = self.context.unwrap();
-        work.do_work_with_stat(&mut coordinator_worker, context);
+        let mmtk = self.mmtk.unwrap();
+        work.do_work_with_stat(&mut coordinator_worker, mmtk);
     }
 
     /// Drain the message queue and execute coordinator work. Only the coordinator should call this.
@@ -352,108 +349,5 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();
         self.worker_monitor.1.notify_all();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    /* An implementation of parallel quicksort */
-    use crate::scheduler::*;
-    use crate::util::opaque_pointer::*;
-    use lazy_static::lazy_static;
-    use rand::{thread_rng, Rng};
-    use std::sync::Arc;
-
-    /// A work-packet to (quick)sort a slice of array
-    struct Sort(&'static mut [usize]);
-
-    impl Work<()> for Sort {
-        fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
-            if self.0.len() <= 1 {
-                return; /* Do nothing */
-            }
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained]
-                .add(Partition(unsafe { &mut *(self.0 as *mut _) }));
-        }
-    }
-
-    /// A work-packet to do array partition
-    ///
-    /// Recursively generates `Sort` work for partitioned sub-arrays.
-    struct Partition(&'static mut [usize]);
-
-    impl Work<()> for Partition {
-        fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
-            assert!(self.0.len() >= 2);
-
-            // 1. Partition
-
-            let pivot: usize = self.0[0];
-            let le = self
-                .0
-                .iter()
-                .skip(1)
-                .filter(|v| **v <= pivot)
-                .copied()
-                .collect::<Vec<_>>();
-            let gt = self
-                .0
-                .iter()
-                .skip(1)
-                .filter(|v| **v > pivot)
-                .copied()
-                .collect::<Vec<_>>();
-
-            let pivot_index = le.len();
-            for (i, v) in le.iter().enumerate() {
-                self.0[i] = *v;
-            }
-            self.0[pivot_index] = pivot;
-            for (i, v) in gt.iter().enumerate() {
-                self.0[pivot_index + i + 1] = *v;
-            }
-
-            // 2. Create two `Sort` work packets
-
-            let left: &'static mut [usize] =
-                unsafe { &mut *(&mut self.0[..pivot_index] as *mut _) };
-            let right: &'static mut [usize] =
-                unsafe { &mut *(&mut self.0[pivot_index + 1..] as *mut _) };
-
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(left));
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(right));
-        }
-    }
-
-    lazy_static! {
-        static ref SCHEDULER: Arc<Scheduler<()>> = Scheduler::new();
-    }
-
-    const NUM_WORKERS: usize = 16;
-
-    fn random_array(size: usize) -> Box<[usize]> {
-        let mut rng = thread_rng();
-        (0..size).map(|_| rng.gen()).collect()
-    }
-
-    #[test]
-    fn quicksort() {
-        let data: &'static mut [usize] = Box::leak(random_array(1000));
-
-        // println!("Original: {:?}", data);
-
-        SCHEDULER.initialize(NUM_WORKERS, &(), VMThread::UNINITIALIZED);
-        SCHEDULER.enable_stat();
-        SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
-            .add(Sort(unsafe { &mut *(data as *mut _) }));
-        SCHEDULER.wait_for_completion();
-
-        // println!("Sorted: {:?}", data);
-
-        println!("{:?}", SCHEDULER.statistics());
-
-        assert!(data.is_sorted());
-
-        let _data = unsafe { Box::from_raw(data) };
     }
 }

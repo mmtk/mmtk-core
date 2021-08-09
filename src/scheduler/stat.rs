@@ -206,7 +206,7 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
         &mut self,
         work_id: TypeId,
         work_name: &'static str,
-        context: &'static MMTK<VM>,
+        mmtk: &'static MMTK<VM>,
     ) -> WorkStat {
         let stat = WorkStat {
             type_id: work_id,
@@ -215,7 +215,7 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
         if self.is_enabled() {
             self.work_counters
                 .entry(work_id)
-                .or_insert_with(|| MMTK::<VM>::counter_set(context))
+                .or_insert_with(|| MMTK::<VM>::counter_set(mmtk))
                 .iter_mut()
                 .for_each(|c| c.start());
         }
