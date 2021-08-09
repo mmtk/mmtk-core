@@ -299,10 +299,12 @@ pub struct ConcurrentWorkStart;
 impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkStart {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if worker.is_coordinator() {
+            // FIXME: Put this flag in correct place.
             {
                 *crate::IN_CONCURRENT_GC.lock() = true;
             }
             println!("Resume mutators for CM");
+            // Resume mutators for concurrent marking.
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
             mmtk.scheduler
@@ -325,16 +327,19 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
             let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
+            // Do nothing if not in concurrent phase
             if !*in_concurrent_gc {
                 return;
             }
             mem::drop(in_concurrent_gc);
             println!("Stop mutators after CM");
+            // Stop mutators
             <E::VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
+            // Set the flag to false
             let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
             *in_concurrent_gc = false;
             mem::drop(in_concurrent_gc);
-
+            // Scan and mark roots again
             mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
             for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
