@@ -57,7 +57,10 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
-            println!("[STWController: Request recieved.] {}", self.concurrent.load(Ordering::SeqCst));
+            println!(
+                "[STWController: Request recieved.] {}",
+                self.concurrent.load(Ordering::SeqCst)
+            );
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
@@ -67,7 +70,9 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
             let scheduler = self.scheduler.read().unwrap();
             let scheduler = scheduler.as_ref().unwrap();
             scheduler.initialize_worker(tls);
-            scheduler.set_initializer(Some(ScheduleCollection(self.concurrent.load(Ordering::SeqCst))));
+            scheduler.set_initializer(Some(ScheduleCollection(
+                self.concurrent.load(Ordering::SeqCst),
+            )));
             scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");
         }
@@ -82,10 +87,12 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         // if !self.request_flag.load(Ordering::Relaxed) {
         //     self.request_flag.store(true, Ordering::Relaxed);
         //     guard.request_count += 1;
-            // self.request_condvar.notify_all();
-            let scheduler = self.scheduler.read().unwrap();
-            let scheduler = scheduler.as_ref().unwrap();
-            scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+        // self.request_condvar.notify_all();
+        let scheduler = self.scheduler.read().unwrap();
+        let scheduler = scheduler.as_ref().unwrap();
+        scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkEnd::<
+            ImmixProcessEdges<VM, { TraceKind::Fast }>,
+        >::new());
         // }
     }
 

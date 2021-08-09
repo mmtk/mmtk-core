@@ -79,7 +79,9 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
-        if self.modbuf.is_empty() { return }
+        if self.modbuf.is_empty() {
+            return;
+        }
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
@@ -102,7 +104,9 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
                     return;
                 }
                 let deleted = unsafe { slot.load::<ObjectReference>() };
-                if deleted.is_null() { return }
+                if deleted.is_null() {
+                    return;
+                }
                 // println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
                 if !deleted.is_null() {
                     self.enqueue_node(deleted);

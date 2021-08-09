@@ -76,5 +76,4 @@ pub use crate::plan::{
     TransitiveClosure,
 };
 
-
 static IN_CONCURRENT_GC: Mutex<bool> = Mutex::new(false);

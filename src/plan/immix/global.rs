@@ -8,7 +8,6 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::{BarrierSelector, scheduler::*};
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
@@ -21,13 +20,14 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::{
     mmtk::MMTK,
     policy::immix::{block::Block, ImmixSpace},
     util::opaque_pointer::VMWorkerThread,
 };
-use crate::vm::ObjectModel;
+use crate::{scheduler::*, BarrierSelector};
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -59,7 +59,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn concurrent_collection_required(&self) -> bool {
-        self.base().gc_status() == GcStatus::NotInGC && self.get_pages_reserved() * 100 / 45 > self.get_total_pages()
+        self.base().gc_status() == GcStatus::NotInGC
+            && self.get_pages_reserved() * 100 / 45 > self.get_total_pages()
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -108,7 +109,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // Prepare global/collectors/mutators
         if concurrent {
             scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkStart);
-            scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+            scheduler.work_buckets[WorkBucketStage::PostClosure].add(ConcurrentWorkEnd::<
+                ImmixProcessEdges<VM, { TraceKind::Fast }>,
+            >::new());
         }
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
@@ -120,8 +123,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
         }
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(FlushMutators::<VM>::new());
+        scheduler.work_buckets[WorkBucketStage::RefClosure].add(FlushMutators::<VM>::new());
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, ImmixCopyContext<VM>>::new(self));
@@ -183,8 +185,22 @@ impl<VM: VMBinding> Immix<VM> {
         };
         let global_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let immix = Immix {
-            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, scheduler, global_metadata_specs.clone()),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, global_metadata_specs.clone()),
+            immix_space: ImmixSpace::new(
+                "immix",
+                vm_map,
+                mmapper,
+                &mut heap,
+                scheduler,
+                global_metadata_specs.clone(),
+            ),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &IMMIX_CONSTRAINTS,
+                global_metadata_specs.clone(),
+            ),
         };
 
         {

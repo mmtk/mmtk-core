@@ -104,9 +104,7 @@ pub struct FlushMutators<VM: VMBinding> {
 
 impl<VM: VMBinding> FlushMutators<VM> {
     pub fn new() -> Self {
-        Self {
-            _p: PhantomData,
-        }
+        Self { _p: PhantomData }
     }
 }
 
@@ -285,7 +283,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         }
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
-        println!("End of GC: {} / {}", mmtk.plan.get_pages_reserved(), mmtk.plan.get_total_pages());
+        println!(
+            "End of GC: {} / {}",
+            mmtk.plan.get_pages_reserved(),
+            mmtk.plan.get_total_pages()
+        );
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -297,7 +299,9 @@ pub struct ConcurrentWorkStart;
 impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkStart {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         if worker.is_coordinator() {
-            {*crate::IN_CONCURRENT_GC.lock() = true;}
+            {
+                *crate::IN_CONCURRENT_GC.lock() = true;
+            }
             println!("Resume mutators for CM");
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
@@ -322,7 +326,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
         if worker.is_coordinator() {
             let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
             if !*in_concurrent_gc {
-                return
+                return;
             }
             mem::drop(in_concurrent_gc);
             println!("Stop mutators after CM");
@@ -629,18 +633,24 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                 );
             }
         }
-        if !mmtk.plan.base().control_collector_context.concurrent.load(Ordering::SeqCst) {
+        if !mmtk
+            .plan
+            .base()
+            .control_collector_context
+            .concurrent
+            .load(Ordering::SeqCst)
+        {
             println!("Skip REMSET");
-            return
+            return;
         }
         // if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut modbuf = vec![];
-                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
-            }
+        if !self.modbuf.is_empty() {
+            let mut modbuf = vec![];
+            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+            GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
+        }
         // } else {
-            // Do nothing
+        // Do nothing
         // }
     }
 }

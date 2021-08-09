@@ -248,10 +248,20 @@ pub trait Plan: 'static + Sync + Downcast {
             }*/
             self.log_poll(space, "Triggering collection");
             if *crate::IN_CONCURRENT_GC.lock() {
-                println!("End CONC GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
-                self.base().control_collector_context.terminate_concurrent_gc();
+                println!(
+                    "End CONC GC: {} / {}",
+                    self.get_pages_reserved(),
+                    self.get_total_pages()
+                );
+                self.base()
+                    .control_collector_context
+                    .terminate_concurrent_gc();
             } else {
-                println!("Trigger STW GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
+                println!(
+                    "Trigger STW GC: {} / {}",
+                    self.get_pages_reserved(),
+                    self.get_total_pages()
+                );
                 self.base().control_collector_context.request(false);
             }
             return true;
@@ -259,7 +269,11 @@ pub trait Plan: 'static + Sync + Downcast {
 
         // FIXME
         if self.concurrent_collection_required() {
-            println!("Trigger CONC GC: {} / {}", self.get_pages_reserved(), self.get_total_pages());
+            println!(
+                "Trigger CONC GC: {} / {}",
+                self.get_pages_reserved(),
+                self.get_total_pages()
+            );
             // FIXME
             /*if space == self.common().meta_data_space {
                 self.log_poll(space, "Triggering async concurrent collection");
