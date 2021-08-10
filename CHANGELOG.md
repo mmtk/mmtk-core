@@ -1,3 +1,47 @@
+0.6.0 (2021-08-10)
+===
+
+GC Plans
+---
+* Added the Immix plan, an efficient mark-region garbage collector.
+* Added a large code space for BasePlan (included by all the plans).
+
+Allocators
+---
+* Added the Immix allocator.
+
+Policies
+---
+* Added the Immix space, and related data structures.
+* Added `get_forwarded_object()` and `is_reachable()` to the space function table (SFT).
+* Improved the Malloc space (marksweep).
+  * It now supports parallel sweeping.
+  * It now uses side metadata for page and chunk bits.
+  * It now supports bulk check for live objects if mark bits are side metadata.
+* Fixed a bug that the side forwarding bits were not cleared for CopySpace.
+
+API
+---
+* Refactored the metadata specs in the ObjectModel trait. Now each spec
+  has a specific type (e.g. VMGlobalLogBitSpec), and provides a simpler constructor
+  for binding implementers to create them.
+* Added support for VM specific weak reference processing:
+  * added an API function `on_closure_end()` to add a callback so the binding will
+    be notified when a object transitive closure ends.
+  * added `vm_release()` and `process_weak_refs()` to the `Collection` trait.
+
+Misc
+---
+* Added a few new plan constraints.
+  * needs_log_bit: indicates whether a plan will use the global log bit.
+  * may_trace_duplicate_edges: indicates whether a plan may allow benign races and trace duplicate edges in a GC.
+  * max_non_los_default_alloc_bytes: indicates the maximum object size (in bytes) that can be allocated with the
+    default allocator for the plan. For objects that are larger than this, they should be allocated with AllocationSemantics.Los.
+* Added utilities to measure process-wide perf events.
+* Refactored the offset field for SideMetadataSpec with a union type SideMetadataOffset.
+* Fixed a concurrency bug that may cause munprotect fail for the PageProtect plan.
+* Fixed a few issues with the tutorial and documentation.
+
 0.5.0 (2021-06-25)
 ===
 
