@@ -18,11 +18,11 @@ Policies
   * It now supports parallel sweeping.
   * It now uses side metadata for page and chunk bits.
   * It now supports bulk check for live objects if mark bits are side metadata.
-* Fixed a bug that the side forwarding bits are not cleared for CopySpace.
+* Fixed a bug that the side forwarding bits were not cleared for CopySpace.
 
 API
 ---
-* Refactored to the metadata specs in the ObjectModel trait. Now each spec
+* Refactored the metadata specs in the ObjectModel trait. Now each spec
   has a specific type (e.g. VMGlobalLogBitSpec), and provides a simpler constructor
   for binding implementers to create them.
 * Added support for VM specific weak reference processing:
@@ -34,7 +34,7 @@ Misc
 ---
 * Added a few new plan constraints.
   * needs_log_bit: indicates whether a plan will use the global log bit.
-  * may_trace_duplicate_edges: indicates whether a plan may allow benign race and trace duplicate edges in a GC.
+  * may_trace_duplicate_edges: indicates whether a plan may allow benign races and trace duplicate edges in a GC.
   * max_non_los_default_alloc_bytes: indicates the maximum object size (in bytes) that can be allocated with the
     default allocator for the plan. For objects that are larger than this, they should be allocated with AllocationSemantics.Los.
 * Added utilities to measure process-wide perf events.
