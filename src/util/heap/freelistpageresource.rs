@@ -119,6 +119,19 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
         // The meta-data portion of reserved Pages was committed above.
         self.commit_pages(reserved_pages, required_pages, tls);
         if self.protect_memory_on_release && !new_chunk {
+            use crate::util::heap::layout::Mmapper;
+            use crate::MMAPPER;
+            // This check is necessary to prevent us from mprotecting an address that is not yet mapped by mmapper.
+            // See https://github.com/mmtk/mmtk-core/issues/400.
+            // It is possible that one thread gets a new chunk, and returns from this function. However, the Space.acquire()
+            // has not yet call ensure_mapped() for it. So the chunk is not yet mmapped. At this point, if another thread calls
+            // this function, and get a few more pages from the same chunk, it is no longer seen as 'new_chunk', and we
+            // will try to munprotect on it. But the chunk may not yet be mapped.
+            //
+            // If we want to improve and get rid of this loop, we need to move this munprotect to anywhere after the ensure_mapped() call
+            // in Space.acquire(). We can either move it the option of 'protect_on_release' to space, or have a call to page resource
+            // after ensure_mapped(). However, I think this is sufficient given that this option is only used for PageProtect for debugging use.
+            while !MMAPPER.is_mapped_address(rtn) {}
             self.munprotect(rtn, self.free_list.size(page_offset as _) as _)
         };
         Result::Ok(PRAllocResult {
