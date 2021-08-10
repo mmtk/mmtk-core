@@ -138,7 +138,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),

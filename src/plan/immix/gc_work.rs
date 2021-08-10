@@ -3,7 +3,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::immix::ScanObjectsAndMarkLines;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{WorkBucketStage, WorkerLocal};
+use crate::scheduler::{WorkBucketStage, GCWorkerLocal};
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
@@ -74,7 +74,7 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for ImmixCopyContext<VM> {
+impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
