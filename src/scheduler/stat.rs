@@ -215,30 +215,15 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
         if self.is_enabled() {
             self.work_counters
                 .entry(work_id)
-                .or_insert_with(|| MMTK::<VM>::counter_set(mmtk))
+                .or_insert_with(|| Self::counter_set(mmtk))
                 .iter_mut()
                 .for_each(|c| c.start());
         }
         stat
     }
-}
 
-/// Private trait to let different contexts supply different sets of default
-/// counters
-trait HasCounterSet {
-    fn counter_set(context: &'static Self) -> Vec<Box<dyn WorkCounter>>;
-}
-
-impl<C> HasCounterSet for C {
-    default fn counter_set(_context: &'static Self) -> Vec<Box<dyn WorkCounter>> {
-        vec![Box::new(WorkDuration::new())]
-    }
-}
-
-/// Specialization for MMTk to read the options
-#[allow(unused_variables, unused_mut)]
-impl<VM: VMBinding> HasCounterSet for MMTK<VM> {
-    fn counter_set(mmtk: &'static Self) -> Vec<Box<dyn WorkCounter>> {
+    #[allow(unused_variables, unused_mut)]
+    fn counter_set(mmtk: &'static MMTK<VM>) -> Vec<Box<dyn WorkCounter>> {
         let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
         #[cfg(feature = "perf_counter")]
         for e in &mmtk.options.work_perf_events.events {
