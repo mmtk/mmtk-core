@@ -18,7 +18,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
-    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, GCWorkScheduler, WorkBucketStage},
+    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},

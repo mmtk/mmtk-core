@@ -3,7 +3,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::immix::ScanObjectsAndMarkLines;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{WorkBucketStage, GCWorkerLocal};
+use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
