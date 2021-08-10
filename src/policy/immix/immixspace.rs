@@ -135,6 +135,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     global: global_side_metadata_specs,
                     local: Self::side_metadata_specs(),
                 },
+                needs_log_bit: false,
             },
             vm_map,
             mmapper,

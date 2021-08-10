@@ -19,6 +19,8 @@ pub struct PlanConstraints {
     /// Size (in bytes) beyond which copied objects must be copied to the LOS.
     /// This depends on the copy allocator.
     pub max_non_los_copy_bytes: usize,
+    /// Does this plan use the log bit? See vm::ObjectModel::GLOBAL_LOG_BIT_SPEC.
+    pub needs_log_bit: bool,
     /// Some plans may allow benign race for testing mark bit, and this will lead to trace the same edges
     /// multiple times. If a plan allows tracing duplicate edges, we will not run duplicate edge check
     /// in extreme_assertions.
@@ -45,6 +47,7 @@ impl PlanConstraints {
             generate_gc_trace: false,
             may_trace_duplicate_edges: false,
             needs_forward_after_liveness: false,
+            needs_log_bit: false,
             barrier: BarrierSelector::NoBarrier,
         }
     }
