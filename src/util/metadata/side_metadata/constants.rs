@@ -98,11 +98,18 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
 //      - Offset LOCAL_SIDE_METADATA_BASE_OFFSET
 //  2 - MarkSweep Active Page byte:
 //      - Offset after Alloc bit
+//  3 - Immix line mark byte:
+//      - Offset after MS alloc bit
+//  4 - Immix block defrag byte:
+//      - Offset after Immix block defrag byte
+//  5 - Immix block mark byte:
+//      - Offset after Immix block mark byte
+//  6 - Immix chumk-map mark byte:
+//      - Offset after Immix chumk-map mark byte
 //
 // --------------------------------------------------
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
-pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset = SideMetadataOffset::layout_after(
-    &crate::policy::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC,
-);
+pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
+    SideMetadataOffset::layout_after(&crate::policy::immix::LAST_LOCAL_SIDE_METADATA);

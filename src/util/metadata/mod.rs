@@ -222,4 +222,6 @@ mod global;
 pub mod header_metadata;
 pub mod side_metadata;
 
+pub(crate) mod log_bit;
+
 pub use global::*;

@@ -4,12 +4,22 @@ use std::sync::Mutex;
 
 use crate::util::Address;
 
-#[derive(Debug)]
 pub struct TreadMill {
     from_space: Mutex<HashSet<Address>>,
     to_space: Mutex<HashSet<Address>>,
     collect_nursery: Mutex<HashSet<Address>>,
     alloc_nursery: Mutex<HashSet<Address>>,
+}
+
+impl std::fmt::Debug for TreadMill {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TreadMill")
+            .field("from", &self.from_space.lock().unwrap())
+            .field("to", &self.to_space.lock().unwrap())
+            .field("collect_nursery", &self.collect_nursery.lock().unwrap())
+            .field("alloc_nursery", &self.alloc_nursery.lock().unwrap())
+            .finish()
+    }
 }
 
 impl TreadMill {
