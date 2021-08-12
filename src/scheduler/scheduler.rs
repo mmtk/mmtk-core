@@ -103,13 +103,13 @@ impl<C: Context> Scheduler<C> {
         self_mut.context = Some(context);
         self_mut.coordinator_worker = Some(RwLock::new(Worker::new(
             0,
-            Arc::downgrade(&self),
+            Arc::downgrade(self),
             true,
             self.channel.0.clone(),
         )));
         self_mut.worker_group = Some(WorkerGroup::new(
             num_workers,
-            Arc::downgrade(&self),
+            Arc::downgrade(self),
             self.channel.0.clone(),
         ));
         self.worker_group

@@ -76,7 +76,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.immix_space.init(&vm_map);
+        self.immix_space.init(vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
@@ -90,6 +90,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.base().options.full_heap_system_gc,
         );
         // Stop & scan mutators (mutator scanning can happen before STW)
+        #[allow(clippy::if_same_then_else)] // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
+        #[allow(clippy::branches_sharing_code)] // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
         if in_defrag {
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
@@ -100,6 +102,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
+        #[allow(clippy::if_same_then_else)] // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
+        #[allow(clippy::branches_sharing_code)] // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
         if in_defrag {
             scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
                 ImmixProcessEdges<VM, { TraceKind::Defrag }>,

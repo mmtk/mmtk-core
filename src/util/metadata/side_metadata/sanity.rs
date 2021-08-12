@@ -320,7 +320,7 @@ impl SideMetadataSanity {
                 .specs_sanity_map
                 .get(&GLOBAL_META_NAME)
                 .unwrap()
-                .contains(&spec)
+                .contains(spec)
             {
                 panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, self.get_all_specs(true));
             }
@@ -352,7 +352,7 @@ impl SideMetadataSanity {
                 .specs_sanity_map
                 .get(policy_name)
                 .unwrap()
-                .contains(&spec)
+                .contains(spec)
             {
                 panic!(
                     "Policy-specific metadata for -{}- changed from {:#?} to {:#?}",
