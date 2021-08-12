@@ -49,6 +49,7 @@ perf_counter = ["pfm"]
 # .github/scripts/ci-common.sh extracts features from the following part (including from comments).
 # So be careful when editing or adding stuff to the section below.
 
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
 
@@ -56,6 +57,9 @@ perf_counter = ["pfm"]
 vm_space = []
 ro_space = []
 code_space  = []
+
+# metadata
+global_alloc_bit = []
 
 # Run sanity GC
 sanity = []

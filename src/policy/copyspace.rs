@@ -4,6 +4,8 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+#[cfg(feature = "global_alloc_bit")]
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
@@ -38,7 +40,11 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn is_sane(&self) -> bool {
         !self.from_space()
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+        // This is only effective in slow path. We do not call post_alloc in fast path
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(_object);
+    }
     #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !self.from_space() {
@@ -142,10 +148,25 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
+            #[cfg(feature = "global_alloc_bit")]
+            self.reset_alloc_bit();
             self.pr.reset();
         }
         self.common.metadata.reset();
         self.from_space.store(false, Ordering::SeqCst);
+    }
+
+    #[cfg(feature = "global_alloc_bit")]
+    unsafe fn reset_alloc_bit(&self) {
+        let current_chunk = self.pr.get_current_chunk();
+        if self.common.contiguous {
+            crate::util::alloc_bit::bzero_alloc_bit(
+                self.common.start,
+                current_chunk + BYTES_IN_CHUNK - self.common.start,
+            );
+        } else {
+            unimplemented!();
+        }
     }
 
     fn from_space(&self) -> bool {
