@@ -1,4 +1,5 @@
 use super::Immix;
+use crate::plan::barriers::FieldLoggingBarrier;
 use crate::plan::barriers::ObjectRememberingBarrier;
 use crate::plan::immix::gc_work::ImmixProcessEdges;
 use crate::plan::immix::gc_work::TraceKind;
@@ -69,7 +70,7 @@ pub fn create_immix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box ObjectRememberingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(
+        barrier: box FieldLoggingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(
             mmtk,
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
         ),
