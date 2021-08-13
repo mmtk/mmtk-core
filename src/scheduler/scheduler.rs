@@ -1,7 +1,6 @@
 use super::stat::SchedulerStat;
-use super::work::Work;
 use super::work_bucket::*;
-use super::worker::{Worker, WorkerGroup};
+use super::worker::{GCWorker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -12,29 +11,29 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 
-pub enum CoordinatorMessage<C: Context> {
-    Work(Box<dyn CoordinatorWork<C>>),
+pub enum CoordinatorMessage<VM: VMBinding> {
+    Work(Box<dyn CoordinatorWork<VM>>),
     AllWorkerParked,
     BucketDrained,
 }
 
-pub struct Scheduler<C: Context> {
-    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<C>>,
+pub struct GCWorkScheduler<VM: VMBinding> {
+    pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Work for the coordinator thread
-    pub coordinator_work: WorkBucket<C>,
+    pub coordinator_work: WorkBucket<VM>,
     /// workers
-    worker_group: Option<Arc<WorkerGroup<C>>>,
+    worker_group: Option<Arc<WorkerGroup<VM>>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    context: Option<&'static C>,
-    coordinator_worker: Option<RwLock<Worker<C>>>,
+    mmtk: Option<&'static MMTK<VM>>,
+    coordinator_worker: Option<RwLock<GCWorker<VM>>>,
     /// A message channel to send new coordinator work and other actions to the coordinator thread
     channel: (
-        Sender<CoordinatorMessage<C>>,
-        Receiver<CoordinatorMessage<C>>,
+        Sender<CoordinatorMessage<VM>>,
+        Receiver<CoordinatorMessage<VM>>,
     ),
-    startup: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
-    finalizer: Mutex<Option<Box<dyn CoordinatorWork<C>>>>,
+    startup: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
+    finalizer: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
     /// A callback to be fired after the `Closure` bucket is drained.
     /// This callback should return `true` if it adds more work packets to the
     /// `Closure` bucket. `WorkBucket::can_open` then consult this return value
@@ -52,9 +51,9 @@ pub struct Scheduler<C: Context> {
 // 2. Only the coordinator can use Receiver.
 // TODO: We should remove channel from Scheduler, and directly send Sender/Receiver when creating the coordinator and
 // the workers.
-unsafe impl<C: Context> Sync for Scheduler<C> {}
+unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
-impl<C: Context> Scheduler<C> {
+impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new() -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
@@ -73,7 +72,7 @@ impl<C: Context> Scheduler<C> {
             coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
             worker_monitor,
-            context: None,
+            mmtk: None,
             coordinator_worker: None,
             channel: channel(),
             startup: Mutex::new(None),
@@ -90,7 +89,7 @@ impl<C: Context> Scheduler<C> {
     pub fn initialize(
         self: &'static Arc<Self>,
         num_workers: usize,
-        context: &'static C,
+        mmtk: &'static MMTK<VM>,
         tls: VMThread,
     ) {
         use crate::scheduler::work_bucket::WorkBucketStage::*;
@@ -103,8 +102,8 @@ impl<C: Context> Scheduler<C> {
         let mut self_mut = self.clone();
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
-        self_mut.context = Some(context);
-        self_mut.coordinator_worker = Some(RwLock::new(Worker::new(
+        self_mut.mmtk = Some(mmtk);
+        self_mut.coordinator_worker = Some(RwLock::new(GCWorker::new(
             233,
             Arc::downgrade(&self),
             true,
@@ -115,10 +114,7 @@ impl<C: Context> Scheduler<C> {
             Arc::downgrade(&self),
             self.channel.0.clone(),
         ));
-        self.worker_group
-            .as_ref()
-            .unwrap()
-            .spawn_workers(tls, context);
+        self.worker_group.as_ref().unwrap().spawn_workers(tls, mmtk);
 
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
@@ -164,19 +160,19 @@ impl<C: Context> Scheduler<C> {
         coordinator_worker.init(tls);
     }
 
-    pub fn set_initializer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
-        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
+    pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
+        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
     }
 
-    pub fn set_finalizer<W: CoordinatorWork<C>>(&self, w: Option<W>) {
-        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<C>>);
+    pub fn set_finalizer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
+        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
         *self.closure_end.lock().unwrap() = Some(f);
     }
 
-    pub fn worker_group(&self) -> Arc<WorkerGroup<C>> {
+    pub fn worker_group(&self) -> Arc<WorkerGroup<VM>> {
         self.worker_group.as_ref().unwrap().clone()
     }
 
@@ -205,10 +201,10 @@ impl<C: Context> Scheduler<C> {
     }
 
     /// Execute coordinator work, in the controller thread
-    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<C>>) {
+    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<VM>>) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
-        let context = self.context.unwrap();
-        work.do_work_with_stat(&mut coordinator_worker, context);
+        let mmtk = self.mmtk.unwrap();
+        work.do_work_with_stat(&mut coordinator_worker, mmtk);
     }
 
     /// Drain the message queue and execute coordinator work. Only the coordinator should call this.
@@ -294,7 +290,7 @@ impl<C: Context> Scheduler<C> {
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
-    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<C>, worker: &Worker<C>) {
+    pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
         worker
             .sender
             .send(CoordinatorMessage::Work(box work))
@@ -302,7 +298,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     #[inline]
-    fn pop_scheduable_work(&self, worker: &Worker<C>) -> Option<(Box<dyn Work<C>>, bool)> {
+    fn pop_scheduable_work(&self, worker: &GCWorker<VM>) -> Option<(Box<dyn GCWork<VM>>, bool)> {
         if let Some(work) = worker.local_work_bucket.poll() {
             return Some((work, worker.local_work_bucket.is_empty()));
         }
@@ -316,7 +312,7 @@ impl<C: Context> Scheduler<C> {
 
     /// Get a scheduable work. Called by workers
     #[inline]
-    pub fn poll(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
+    pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         let work = if let Some((work, bucket_is_empty)) = self.pop_scheduable_work(worker) {
             if bucket_is_empty {
                 worker
@@ -332,7 +328,7 @@ impl<C: Context> Scheduler<C> {
     }
 
     #[cold]
-    fn poll_slow(&self, worker: &Worker<C>) -> Box<dyn Work<C>> {
+    fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         debug_assert!(!worker.is_parked());
         let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
@@ -378,114 +374,7 @@ impl<C: Context> Scheduler<C> {
         summary.merge(&coordinator_worker.stat);
         summary.harness_stat()
     }
-}
 
-#[cfg(test)]
-mod tests {
-    /* An implementation of parallel quicksort */
-    use crate::scheduler::*;
-    use crate::util::opaque_pointer::*;
-    use lazy_static::lazy_static;
-    use rand::{thread_rng, Rng};
-    use std::sync::Arc;
-
-    /// A work-packet to (quick)sort a slice of array
-    struct Sort(&'static mut [usize]);
-
-    impl Work<()> for Sort {
-        fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
-            if self.0.len() <= 1 {
-                return; /* Do nothing */
-            }
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained]
-                .add(Partition(unsafe { &mut *(self.0 as *mut _) }));
-        }
-    }
-
-    /// A work-packet to do array partition
-    ///
-    /// Recursively generates `Sort` work for partitioned sub-arrays.
-    struct Partition(&'static mut [usize]);
-
-    impl Work<()> for Partition {
-        fn do_work(&mut self, worker: &mut Worker<()>, _context: &'static ()) {
-            assert!(self.0.len() >= 2);
-
-            // 1. Partition
-
-            let pivot: usize = self.0[0];
-            let le = self
-                .0
-                .iter()
-                .skip(1)
-                .filter(|v| **v <= pivot)
-                .copied()
-                .collect::<Vec<_>>();
-            let gt = self
-                .0
-                .iter()
-                .skip(1)
-                .filter(|v| **v > pivot)
-                .copied()
-                .collect::<Vec<_>>();
-
-            let pivot_index = le.len();
-            for (i, v) in le.iter().enumerate() {
-                self.0[i] = *v;
-            }
-            self.0[pivot_index] = pivot;
-            for (i, v) in gt.iter().enumerate() {
-                self.0[pivot_index + i + 1] = *v;
-            }
-
-            // 2. Create two `Sort` work packets
-
-            let left: &'static mut [usize] =
-                unsafe { &mut *(&mut self.0[..pivot_index] as *mut _) };
-            let right: &'static mut [usize] =
-                unsafe { &mut *(&mut self.0[pivot_index + 1..] as *mut _) };
-
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(left));
-            worker.scheduler().work_buckets[WorkBucketStage::Unconstrained].add(Sort(right));
-        }
-    }
-
-    lazy_static! {
-        static ref SCHEDULER: Arc<Scheduler<()>> = Scheduler::new();
-    }
-
-    const NUM_WORKERS: usize = 16;
-
-    fn random_array(size: usize) -> Box<[usize]> {
-        let mut rng = thread_rng();
-        (0..size).map(|_| rng.gen()).collect()
-    }
-
-    #[test]
-    fn quicksort() {
-        let data: &'static mut [usize] = Box::leak(random_array(1000));
-
-        // println!("Original: {:?}", data);
-
-        SCHEDULER.initialize(NUM_WORKERS, &(), VMThread::UNINITIALIZED);
-        SCHEDULER.enable_stat();
-        SCHEDULER.work_buckets[WorkBucketStage::Unconstrained]
-            .add(Sort(unsafe { &mut *(data as *mut _) }));
-        SCHEDULER.wait_for_completion();
-
-        // println!("Sorted: {:?}", data);
-
-        println!("{:?}", SCHEDULER.statistics());
-
-        assert!(data.is_sorted());
-
-        let _data = unsafe { Box::from_raw(data) };
-    }
-}
-
-pub type MMTkScheduler<VM> = Scheduler<MMTK<VM>>;
-
-impl<VM: VMBinding> MMTkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.clear_request();
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());

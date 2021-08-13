@@ -1,5 +1,5 @@
-use super::work::Work;
 use super::*;
+use crate::vm::VMBinding;
 use enum_map::Enum;
 use spin::RwLock;
 use std::cmp;
@@ -18,14 +18,14 @@ impl WorkUID {
     }
 }
 
-struct PrioritizedWork<C: Context> {
+struct PrioritizedWork<VM: VMBinding> {
     priority: usize,
     work_uid: WorkUID,
-    work: Box<dyn Work<C>>,
+    work: Box<dyn GCWork<VM>>,
 }
 
-impl<C: Context> PrioritizedWork<C> {
-    pub fn new(priority: usize, work: Box<dyn Work<C>>) -> Self {
+impl<VM: VMBinding> PrioritizedWork<VM> {
+    pub fn new(priority: usize, work: Box<dyn GCWork<VM>>) -> Self {
         Self {
             priority,
             work,
@@ -34,35 +34,35 @@ impl<C: Context> PrioritizedWork<C> {
     }
 }
 
-impl<C: Context> PartialEq for PrioritizedWork<C> {
+impl<VM: VMBinding> PartialEq for PrioritizedWork<VM> {
     fn eq(&self, other: &Self) -> bool {
         self.priority == other.priority && self.work_uid == other.work_uid
     }
 }
 
-impl<C: Context> Eq for PrioritizedWork<C> {}
+impl<VM: VMBinding> Eq for PrioritizedWork<VM> {}
 
-impl<C: Context> Ord for PrioritizedWork<C> {
+impl<VM: VMBinding> Ord for PrioritizedWork<VM> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.priority.cmp(&other.priority)
     }
 }
 
-impl<C: Context> PartialOrd for PrioritizedWork<C> {
+impl<VM: VMBinding> PartialOrd for PrioritizedWork<VM> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-pub struct WorkBucket<C: Context> {
+pub struct WorkBucket<VM: VMBinding> {
     active: AtomicBool,
     /// A priority queue
-    queue: RwLock<BinaryHeap<PrioritizedWork<C>>>,
+    queue: RwLock<BinaryHeap<PrioritizedWork<VM>>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
     can_open: Option<Box<dyn (Fn() -> bool) + Send>>,
 }
 
-impl<C: Context> WorkBucket<C> {
+impl<VM: VMBinding> WorkBucket<VM> {
     pub const DEFAULT_PRIORITY: usize = 1000;
     pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
         Self {
@@ -103,17 +103,17 @@ impl<C: Context> WorkBucket<C> {
         self.active.store(false, Ordering::SeqCst);
     }
     /// Add a work packet to this bucket, with a given priority
-    pub fn add_with_priority(&self, priority: usize, work: Box<dyn Work<C>>) {
+    pub fn add_with_priority(&self, priority: usize, work: Box<dyn GCWork<VM>>) {
         self.queue
             .write()
             .push(PrioritizedWork::new(priority, work));
         self.notify_one_worker(); // FIXME: Performance
     }
     /// Add a work packet to this bucket, with a default priority (1000)
-    pub fn add<W: Work<C>>(&self, work: W) {
+    pub fn add<W: GCWork<VM>>(&self, work: W) {
         self.add_with_priority(Self::DEFAULT_PRIORITY, box work);
     }
-    pub fn bulk_add_with_priority(&self, priority: usize, work_vec: Vec<Box<dyn Work<C>>>) {
+    pub fn bulk_add_with_priority(&self, priority: usize, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         {
             let mut queue = self.queue.write();
             for w in work_vec {
@@ -122,11 +122,11 @@ impl<C: Context> WorkBucket<C> {
         }
         self.notify_all_workers(); // FIXME: Performance
     }
-    pub fn bulk_add(&self, work_vec: Vec<Box<dyn Work<C>>>) {
+    pub fn bulk_add(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.bulk_add_with_priority(1000, work_vec)
     }
     /// Get a work packet (with the greatest priority) from this bucket
-    pub fn poll(&self) -> Option<Box<dyn Work<C>>> {
+    pub fn poll(&self) -> Option<Box<dyn GCWork<VM>>> {
         if !self.active.load(Ordering::SeqCst) {
             return None;
         }

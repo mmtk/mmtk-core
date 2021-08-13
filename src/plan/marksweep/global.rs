@@ -51,12 +51,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>, _: bool) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>, _: bool) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)

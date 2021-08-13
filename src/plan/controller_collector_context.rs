@@ -19,7 +19,7 @@ struct RequestSync {
 pub struct ControllerCollectorContext<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
-    scheduler: RwLock<Option<Arc<MMTkScheduler<VM>>>>,
+    scheduler: RwLock<Option<Arc<GCWorkScheduler<VM>>>>,
     request_flag: AtomicBool,
     pub concurrent: AtomicBool,
     phantom: PhantomData<VM>,
@@ -47,7 +47,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         }
     }
 
-    pub fn init(&self, scheduler: &Arc<MMTkScheduler<VM>>) {
+    pub fn init(&self, scheduler: &Arc<GCWorkScheduler<VM>>) {
         let mut scheduler_guard = self.scheduler.write().unwrap();
         debug_assert!(scheduler_guard.is_none());
         *scheduler_guard = Some(scheduler.clone());
