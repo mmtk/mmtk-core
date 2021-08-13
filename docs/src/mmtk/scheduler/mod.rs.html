@@ -28,33 +28,13 @@
 <span id="25">25</span>
 <span id="26">26</span>
 <span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
-<span id="32">32</span>
-<span id="33">33</span>
-<span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
-<span id="38">38</span>
 </pre><pre class="rust">
 <span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.</span>
-
-<span class="kw">mod</span> <span class="ident">context</span>;
-<span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">use</span> <span class="ident">context::Context</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">context::WorkerLocal</span>;
-
-<span class="kw">mod</span> <span class="ident">mmtk_context</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk_context::GCWorkerLocal</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">mmtk_context::GCWorkerLocalPtr</span>;
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::module_inception</span>)]</span>
 <span class="kw">mod</span> <span class="ident">scheduler</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">scheduler::CoordinatorMessage</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">scheduler::MMTkScheduler</span>;
-<span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">use</span> <span class="ident">scheduler::Scheduler</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">scheduler::GCWorkScheduler</span>;
 
 <span class="kw">mod</span> <span class="ident">stat</span>;
 <span class="kw">pub</span>(<span class="self">self</span>) <span class="kw">mod</span> <span class="ident">work_counter</span>;
@@ -62,15 +42,13 @@
 <span class="kw">mod</span> <span class="ident">work</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work::CoordinatorWork</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work::GCWork</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">work::Work</span>;
 
 <span class="kw">mod</span> <span class="ident">work_bucket</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work_bucket::WorkBucketStage</span>;
 
 <span class="kw">mod</span> <span class="ident">worker</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker::GCWorker</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker::Worker</span>;
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker::WorkerLocalPtr</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker</span>::{<span class="ident">GCWorkerLocal</span>, <span class="ident">GCWorkerLocalPtr</span>};
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_work</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gc_work::ProcessEdgesWork</span>;

@@ -651,7 +651,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
         vm_map: &amp;'static VMMap,
         mmapper: &amp;'static Mmapper,
         options: Arc&lt;UnsafeOptionsWrapper&gt;,
-        _scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+        _scheduler: &amp;'static GCWorkScheduler&lt;VM&gt;,
     ) -&gt; Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -704,7 +704,7 @@ initializer calls are identical.</p>
         &amp;mut self,
         heap_size: usize,
         vm_map: &amp;'static VMMap,
-        scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,
+        scheduler: &amp;Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.copyspace0.init(&amp;vm_map);
@@ -922,7 +922,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
-use crate::scheduler::WorkerLocal;
+use crate::scheduler::GCWorkerLocal;
 use std::ops::{Deref, DerefMut};
 <span class="boring">}
 </span></code></pre></pre>
@@ -1007,7 +1007,7 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
     }
 }
 
-impl&lt;VM: VMBinding&gt; WorkerLocal for MyGCCopyContext&lt;VM&gt; {
+impl&lt;VM: VMBinding&gt; GCWorkerLocal for MyGCCopyContext&lt;VM&gt; {
     fn init(&amp;mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
@@ -1073,7 +1073,7 @@ will further push work for a transitive closure.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn schedule_collection(&amp;'static self, scheduler: &amp;MMTkScheduler&lt;VM&gt;) {
+</span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]

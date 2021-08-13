@@ -250,7 +250,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">heap_size</span>: <span class="ident">usize</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
         <span class="comment">// Warn users that the plan may fail due to maximum mapping allowed.</span>
         <span class="macro">warn!</span>(
@@ -267,7 +267,7 @@
         <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="ident">vm_map</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>();
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
         <span class="self">self</span>.<span class="ident">common</span>()

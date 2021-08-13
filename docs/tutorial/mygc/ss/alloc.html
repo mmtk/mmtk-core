@@ -268,7 +268,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
         vm_map: &amp;'static VMMap,
         mmapper: &amp;'static Mmapper,
         options: Arc&lt;UnsafeOptionsWrapper&gt;,
-        _scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+        _scheduler: &amp;'static GCWorkScheduler&lt;VM&gt;,
     ) -&gt; Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -321,7 +321,7 @@ initializer calls are identical.</p>
         &amp;mut self,
         heap_size: usize,
         vm_map: &amp;'static VMMap,
-        scheduler: &amp;Arc&lt;MMTkScheduler&lt;VM&gt;&gt;,
+        scheduler: &amp;Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.copyspace0.init(&amp;vm_map);

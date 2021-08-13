@@ -568,7 +568,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ScheduleCollection</span> {}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ScheduleCollection</span> {}
 
 <span class="doccomment">/// The global GC Preparation Work</span>
 <span class="doccomment">/// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and</span>
@@ -577,12 +577,12 @@
 <span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
 <span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
 <span class="doccomment">/// be a race condition.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">plan</span>,
@@ -591,7 +591,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Prepare Global&quot;</span>);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
@@ -631,15 +631,15 @@
 
 <span class="doccomment">/// The collector GC Preparation Work</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">PrepareCollector</span>(<span class="ident">PhantomData</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PrepareCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Prepare Collector&quot;</span>);
         <span class="kw">unsafe</span> { <span class="ident">worker</span>.<span class="ident">local</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>() }.<span class="ident">prepare</span>();
@@ -653,12 +653,12 @@
 <span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
 <span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
 <span class="doccomment">/// be a race condition.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">plan</span>,
@@ -667,7 +667,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
         <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::vm_release</span>();
@@ -710,15 +710,15 @@
 
 <span class="doccomment">/// The collector release Work</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>);
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="ident">ReleaseCollector</span>(<span class="ident">PhantomData</span>)
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">WorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ReleaseCollector</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Collector&quot;</span>);
         <span class="kw">unsafe</span> { <span class="ident">worker</span>.<span class="ident">local</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>() }.<span class="ident">release</span>();
@@ -779,7 +779,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StopMutators</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StopMutators</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {}
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EndOfGC</span>;
@@ -799,7 +799,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EndOfGC</span> {}
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">EndOfGC</span> {}
 
 <span class="doccomment">/// Delegate to the VM binding for reference processing.</span>
 <span class="doccomment">///</span>

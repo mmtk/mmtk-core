@@ -102,7 +102,7 @@
 <span class="doccomment">///! MMTk instance.</span>
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan::Plan</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::SFTMap</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::MMTkScheduler</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::GCWorkScheduler</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::finalizable_processor::FinalizableProcessor</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::heap::layout::heap_layout::VMMap</span>;
@@ -144,7 +144,7 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">finalizable_processor</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">sanity_checker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">SanityChecker</span><span class="op">&gt;</span>,
     <span class="ident">inside_harness</span>: <span class="ident">AtomicBool</span>,
@@ -152,7 +152,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">MMTkScheduler::new</span>();
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">GCWorkScheduler::new</span>();
         <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>()));
         <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">crate</span><span class="ident">::plan::create_plan</span>(
             <span class="ident">options</span>.<span class="ident">plan</span>,

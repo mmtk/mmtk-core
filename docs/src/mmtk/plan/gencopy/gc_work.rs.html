@@ -235,7 +235,7 @@
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::plan</span>::{<span class="ident">barriers::BarrierSelector</span>, <span class="ident">CopyContext</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::policy::space::Space</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::gc_work</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::WorkerLocal</span>;
+<span class="kw">use</span> <span class="kw">crate</span><span class="ident">::scheduler::GCWorkerLocal</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">BumpAllocator</span>};
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="kw">crate</span><span class="ident">::util::opaque_pointer</span>::<span class="kw-2">*</span>;
@@ -302,7 +302,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">WorkerLocal</span> <span class="kw">for</span> <span class="ident">GenCopyCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerLocal</span> <span class="kw">for</span> <span class="ident">GenCopyCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="ident">CopyContext::init</span>(<span class="self">self</span>, <span class="ident">tls</span>);
     }

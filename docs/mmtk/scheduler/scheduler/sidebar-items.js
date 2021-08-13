@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["CoordinatorMessage",""]],"struct":[["Scheduler",""]],"type":[["MMTkScheduler",""]]});
+initSidebarItems({"enum":[["CoordinatorMessage",""]],"struct":[["GCWorkScheduler",""]]});

@@ -1006,7 +1006,7 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">WorkerLocal</span> <span class="kw">for</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerLocal</span> <span class="kw">for</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="ident">CopyContext::init</span>(<span class="self">self</span>, <span class="ident">tls</span>);
     }
@@ -1037,7 +1037,7 @@
     <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
     <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="ident">plan</span> {
         <span class="ident">PlanSelector::NoGC</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Box::new</span>(<span class="kw">crate</span><span class="ident">::plan::nogc::NoGC::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>)),
@@ -1085,7 +1085,7 @@
         <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">GCWorkerLocalPtr</span>;
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">_scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span>);
+    <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">_scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span>);
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span> {
         <span class="macro">panic!</span>(<span class="string">&quot;Common Plan not handled!&quot;</span>)
     }
@@ -1101,7 +1101,7 @@
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">heap_size</span>: <span class="ident">usize</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="self">Self</span><span class="ident">::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     );
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>;
@@ -1405,7 +1405,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">heap_size</span>: <span class="ident">usize</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
         <span class="ident">vm_map</span>.<span class="ident">boot</span>();
         <span class="ident">vm_map</span>.<span class="ident">finalize_static_space_map</span>(
@@ -1697,7 +1697,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">heap_size</span>: <span class="ident">usize</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) {
         <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>, <span class="ident">scheduler</span>);
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
@@ -1739,7 +1739,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">schedule_common</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">MMTkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) {
         <span class="comment">// Schedule finalization</span>
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
