@@ -659,3 +659,58 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         // }
     }
 }
+
+pub struct ProcessEdgeModBuf<E: ProcessEdgesWork> {
+    modbuf: Vec<Address>,
+    phantom: PhantomData<E>,
+    meta: MetadataSpec,
+}
+
+impl<E: ProcessEdgesWork> ProcessEdgeModBuf<E> {
+    pub fn new(modbuf: Vec<Address>, meta: MetadataSpec) -> Self {
+        Self {
+            modbuf,
+            meta,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
+    #[inline(always)]
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        println!("ProcessEdgeModBuf");
+        if !self.modbuf.is_empty() {
+            for edge in &self.modbuf {
+                compare_exchange_metadata::<E::VM>(
+                    &self.meta,
+                    unsafe { edge.to_object_reference() },
+                    0b1,
+                    0b0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                );
+            }
+        }
+        if !mmtk
+            .plan
+            .base()
+            .control_collector_context
+            .concurrent
+            .load(Ordering::SeqCst)
+        {
+            println!("Skip REMSET");
+            return;
+        }
+        // if mmtk.plan.is_current_gc_nursery() {
+        if !self.modbuf.is_empty() {
+            let mut modbuf = vec![];
+            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+            GCWork::do_work(&mut E::new(modbuf, false, mmtk), worker, mmtk)
+        }
+        // } else {
+        // Do nothing
+        // }
+    }
+}

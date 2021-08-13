@@ -121,7 +121,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
 
 pub struct FieldLoggingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
-    modbuf: Vec<ObjectReference>,
+    modbuf: Vec<Address>,
     /// The metadata used for log bit. Though this allows taking an arbitrary metadata spec,
     /// for this field, 0 means logged, and 1 means unlogged (the same as the vm::object_model::VMGlobalLogBitSpec).
     meta: MetadataSpec,
@@ -138,20 +138,20 @@ impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node(&mut self, obj: ObjectReference) {
+    fn enqueue_edge(&mut self, edge: Address) {
         if !*crate::IN_CONCURRENT_GC.lock() {
             return;
         }
         if compare_exchange_metadata::<E::VM>(
             &self.meta,
-            obj,
+            unsafe { edge.to_object_reference() },
             0b0,
             0b1,
             None,
             Ordering::SeqCst,
             Ordering::SeqCst,
         ) {
-            self.modbuf.push(obj);
+            self.modbuf.push(edge);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
             }
@@ -174,7 +174,7 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
         );
         if !modbuf.is_empty() {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessModBuf::<E>::new(modbuf, self.meta));
+                .add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
         }
     }
 
@@ -186,14 +186,14 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
                 if !*crate::IN_CONCURRENT_GC.lock() {
                     return;
                 }
-                let deleted = unsafe { slot.load::<ObjectReference>() };
-                if deleted.is_null() {
-                    return;
-                }
+                // let deleted = unsafe { slot.load::<ObjectReference>() };
+                // if deleted.is_null() {
+                //     return;
+                // }
                 // println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
-                if !deleted.is_null() {
-                    self.enqueue_node(deleted);
-                }
+                // if !deleted.is_null() {
+                    self.enqueue_edge(slot);
+                // }
             }
         }
     }
