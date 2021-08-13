@@ -346,7 +346,7 @@ pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: 
     };
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(&metadata_spec, data_addr, res);
+    sanity::verify_load(metadata_spec, data_addr, res);
 
     res
 }
@@ -663,7 +663,7 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
     };
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(&metadata_spec, data_addr, res);
+    sanity::verify_load(metadata_spec, data_addr, res);
 
     res
 }
