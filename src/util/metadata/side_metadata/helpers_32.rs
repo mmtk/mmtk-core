@@ -12,7 +12,6 @@ use super::constants::{
 };
 #[cfg(test)]
 use super::ensure_munmap_metadata;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
 
