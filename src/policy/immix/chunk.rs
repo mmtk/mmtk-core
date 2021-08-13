@@ -188,9 +188,9 @@ impl ChunkMap {
     /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
-        func: impl Fn(Chunk) -> Box<dyn Work<MMTK<VM>>>,
-    ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
-        let mut work_packets: Vec<Box<dyn Work<MMTK<VM>>>> = vec![];
+        func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
+    ) -> Vec<Box<dyn GCWork<VM>>> {
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
         for chunk in self
             .all_chunks()
             .filter(|c| self.get(*c) == ChunkState::Allocated)
@@ -204,7 +204,7 @@ impl ChunkMap {
     pub fn generate_sweep_tasks<VM: VMBinding>(
         &self,
         space: &'static ImmixSpace<VM>,
-    ) -> Vec<Box<dyn Work<MMTK<VM>>>> {
+    ) -> Vec<Box<dyn GCWork<VM>>> {
         space.defrag.mark_histograms.lock().clear();
         self.generate_tasks(|chunk| box SweepChunk { space, chunk })
     }
