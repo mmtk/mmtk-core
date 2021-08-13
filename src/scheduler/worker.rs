@@ -16,9 +16,6 @@ pub trait GCWorkerLocal {
     fn init(&mut self, _tls: VMWorkerThread) {}
 }
 
-/// A default implementation for scheduling systems that does not require a worker-local context.
-impl GCWorkerLocal for () {}
-
 /// This struct will be accessed during trace_object(), which is performance critical.
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
 /// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
