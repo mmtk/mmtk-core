@@ -5,9 +5,11 @@ use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
+use std::lazy::SyncLazy;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
+use std::sync::Condvar;
 use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection(pub bool);
@@ -323,6 +325,8 @@ impl<E: ProcessEdgesWork> ConcurrentWorkEnd<E> {
     }
 }
 
+static MONITOR: SyncLazy<(std::sync::Mutex<bool>, Condvar)> = SyncLazy::new(Default::default);
+
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
@@ -347,9 +351,20 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
             }
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanVMSpecificRoots::<E>::new());
+            let (lock, cvar) = &*MONITOR;
+            let mut started = lock.lock().unwrap();
+            *started = true;
+            // We notify the condvar that the value has changed.
+            cvar.notify_one();
         } else {
+            let (lock, cvar) = &*MONITOR;
+            let mut started = lock.lock().unwrap();
+            *started = false;
             mmtk.scheduler
                 .add_coordinator_work(ConcurrentWorkEnd::<E>::new(), worker);
+            while !*started {
+                started = cvar.wait(started).unwrap();
+            }
         }
     }
 }
@@ -679,7 +694,7 @@ impl<E: ProcessEdgesWork> ProcessEdgeModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ProcessEdgeModBuf");
+        // println!("ProcessEdgeModBuf");
         if !self.modbuf.is_empty() {
             for edge in &self.modbuf {
                 compare_exchange_metadata::<E::VM>(
