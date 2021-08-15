@@ -18,7 +18,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
-    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, MMTkScheduler, WorkBucketStage},
+    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
@@ -48,7 +48,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Object mark state
     mark_state: u8,
     /// Work packet scheduler
-    scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -121,7 +121,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
         let common = CommonSpace::new(
@@ -190,7 +190,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Get work packet scheduler
-    fn scheduler(&self) -> &MMTkScheduler<VM> {
+    fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }
 
