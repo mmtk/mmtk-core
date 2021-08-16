@@ -165,6 +165,7 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
         if self.modbuf.is_empty() {
             return;
         }
+        // println!("flush");
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
@@ -172,10 +173,7 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
             "{:?}",
             self as *const _
         );
-        if !modbuf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
-        }
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
     }
 
     #[inline(always)]

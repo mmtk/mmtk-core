@@ -269,18 +269,18 @@ pub trait Plan: 'static + Sync + Downcast {
 
         // FIXME
         if self.concurrent_collection_required() {
-            println!(
-                "Trigger CONC GC: {} / {}",
-                self.get_pages_reserved(),
-                self.get_total_pages()
-            );
+            // println!(
+            //     "Trigger CONC GC: {} / {}",
+            //     self.get_pages_reserved(),
+            //     self.get_total_pages()
+            // );
             // FIXME
             /*if space == self.common().meta_data_space {
                 self.log_poll(space, "Triggering async concurrent collection");
                 Self::trigger_internal_collection_request();
                 return false;
             } else {*/
-            println!("concurrent_collection_required -> true");
+            // println!("concurrent_collection_required -> true");
             self.log_poll(space, "Triggering concurrent collection");
             self.base().trigger_internal_collection_request();
             return true;

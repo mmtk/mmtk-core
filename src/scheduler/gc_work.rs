@@ -342,7 +342,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
             // Set the flag to false
             let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
             *in_concurrent_gc = false;
-            mem::drop(in_concurrent_gc);
+            // mem::drop(in_concurrent_gc);
             // Scan and mark roots again
             mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
             for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
@@ -694,9 +694,10 @@ impl<E: ProcessEdgesWork> ProcessEdgeModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        // println!("ProcessEdgeModBuf");
+        println!("ProcessEdgeModBuf");
         if !self.modbuf.is_empty() {
             for edge in &self.modbuf {
+                // println!("-{:?}", edge);
                 compare_exchange_metadata::<E::VM>(
                     &self.meta,
                     unsafe { edge.to_object_reference() },
@@ -708,16 +709,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
                 );
             }
         }
-        if !mmtk
-            .plan
-            .base()
-            .control_collector_context
-            .concurrent
-            .load(Ordering::SeqCst)
-        {
-            println!("Skip REMSET");
-            return;
-        }
+        // if !mmtk
+        //     .plan
+        //     .base()
+        //     .control_collector_context
+        //     .concurrent
+        //     .load(Ordering::SeqCst)
+        // {
+        //     println!("Skip REMSET");
+        //     return;
+        // }
         // if mmtk.plan.is_current_gc_nursery() {
         if !self.modbuf.is_empty() {
             let mut modbuf = vec![];
