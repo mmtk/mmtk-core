@@ -178,7 +178,7 @@ and <code>mygc: BumpAllocator</code>.</p>
 <p>Create an implementation block - 
 <code>impl&lt;VM: VMBinding&gt; CopyContext for MyGCCopyContext&lt;VM&gt;</code>.
 Define the associate type <code>VM</code> for <code>CopyContext</code> as the VMBinding type 
-given to the class as <code>VM</code>: <code>type VM: VM</code>. </p>
+given to the class as <code>VM</code>: <code>type VM = VM</code>. </p>
 <p>Add the following skeleton functions (taken from <code>plan/global.rs</code>):</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
@@ -195,7 +195,7 @@ fn prepare(&amp;mut self) {
 fn release(&amp;mut self) {
     unimplemented!()
 }
-fn alloc_copy(`init
+fn alloc_copy(
     &amp;mut self,
     original: ObjectReference,
     bytes: usize,
