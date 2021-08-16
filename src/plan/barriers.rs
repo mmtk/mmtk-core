@@ -58,12 +58,8 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[inline(always)]
     fn log_object(&self, object: ObjectReference) -> bool {
         loop {
-            let old_value = load_metadata::<E::VM>(
-                &self.meta,
-                object,
-                None,
-                Some(Ordering::SeqCst),
-            );
+            let old_value =
+                load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
             if old_value == 0 {
                 return false;
             }
