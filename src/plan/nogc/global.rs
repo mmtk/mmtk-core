@@ -5,9 +5,9 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
+use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
 use crate::scheduler::GCWorkerLocalPtr;
-use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -55,7 +55,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
 
@@ -83,7 +83,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
         unreachable!("GC triggered in nogc")
     }
 

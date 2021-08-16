@@ -78,7 +78,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.copyspace0.init(&vm_map);
@@ -88,7 +88,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: schedule_collection
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
@@ -169,7 +169,7 @@ impl<VM: VMBinding> MyGC<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
+        _scheduler: &'static GCWorkScheduler<VM>,
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);

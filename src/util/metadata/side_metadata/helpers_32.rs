@@ -12,7 +12,6 @@ use super::constants::{
 };
 #[cfg(test)]
 use super::ensure_munmap_metadata;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
 
@@ -177,10 +176,11 @@ pub fn try_mmap_metadata_chunk(
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 
     let policy_meta_start = address_to_meta_chunk_addr(start);
+    let pages = crate::util::conversions::bytes_to_pages_up(local_per_chunk);
     if !no_reserve {
         // We have reserved the memory
-        MMAPPER.ensure_mapped(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        MMAPPER.ensure_mapped(policy_meta_start, pages)
     } else {
-        MMAPPER.quarantine_address_range(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        MMAPPER.quarantine_address_range(policy_meta_start, pages)
     }
 }

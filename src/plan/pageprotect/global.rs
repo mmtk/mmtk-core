@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         // Warn users that the plan may fail due to maximum mapping allowed.
         warn!(
@@ -77,7 +77,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.space.init(vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
