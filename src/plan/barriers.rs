@@ -4,6 +4,7 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
+use crate::util::metadata::load_metadata;
 use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -27,6 +28,7 @@ pub enum WriteTarget {
 
 pub trait Barrier: 'static + Send {
     fn flush(&mut self);
+    fn assert_is_flushed(&self) {}
     fn write_barrier(&mut self, target: WriteTarget);
 }
 
@@ -138,19 +140,37 @@ impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
     }
 
     #[inline(always)]
+    fn log_edge(&self, edge: Address) -> bool {
+        loop {
+            let old_value = load_metadata::<E::VM>(
+                &self.meta,
+                unsafe { edge.to_object_reference() },
+                None,
+                Some(Ordering::SeqCst),
+            );
+            if old_value == 1 {
+                return false;
+            }
+            if compare_exchange_metadata::<E::VM>(
+                &self.meta,
+                unsafe { edge.to_object_reference() },
+                0,
+                1,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                return true;
+            }
+        }
+    }
+
+    #[inline(always)]
     fn enqueue_edge(&mut self, edge: Address) {
         if !*crate::IN_CONCURRENT_GC.lock() {
             return;
         }
-        if compare_exchange_metadata::<E::VM>(
-            &self.meta,
-            unsafe { edge.to_object_reference() },
-            0b0,
-            0b1,
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
+        if self.log_edge(edge) {
             self.modbuf.push(edge);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -165,7 +185,6 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
         if self.modbuf.is_empty() {
             return;
         }
-        // println!("flush");
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
         debug_assert!(
@@ -176,19 +195,19 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
         self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
     }
 
+    fn assert_is_flushed(&self) {
+        assert!(self.modbuf.is_empty());
+    }
+
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
         // println!("write_barrier {:?}\n", target);
         match target {
-            WriteTarget::Field(obj, slot, val) => {
+            WriteTarget::Field(_obj, slot, _val) => {
                 if !*crate::IN_CONCURRENT_GC.lock() {
                     return;
                 }
                 // let deleted = unsafe { slot.load::<ObjectReference>() };
-                // if deleted.is_null() {
-                //     return;
-                // }
-                // println!("{:?}.{:?}: {:?} = {:?}", obj, slot, deleted, val);
                 // if !deleted.is_null() {
                     self.enqueue_edge(slot);
                 // }

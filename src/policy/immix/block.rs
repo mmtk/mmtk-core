@@ -3,6 +3,7 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::{ImmixSpace, IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET};
 use crate::util::constants::*;
+use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -241,6 +242,15 @@ impl Block {
         mark_histogram: &mut Histogram,
         line_mark_state: Option<u8>,
     ) -> bool {
+        if let MetadataSpec::OnSide(meta) =
+            *<VM::VMObjectModel as ObjectModel<VM>>::GLOBAL_LOG_BIT_SPEC
+        {
+            for i in (0..Block::BYTES).step_by(8) {
+                let addr = self.start() + i;
+                let x = unsafe { side_metadata::load(&meta, addr) };
+                assert_eq!(x, 0, "{:?} {}", addr, x);
+            }
+        }
         if super::BLOCK_ONLY {
             match self.get_state() {
                 BlockState::Unallocated => false,

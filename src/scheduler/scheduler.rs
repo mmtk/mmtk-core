@@ -187,11 +187,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
-            let x = bucket.update();
-            if x {
-                println!("Activate WorkBucketStage::{:?}", id);
-            }
-            buckets_updated |= x;
+            buckets_updated |= bucket.update();
         }
         if buckets_updated {
             // Notify the workers for new work
@@ -233,7 +229,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 self.process_coordinator_work(work);
             }
         }
-        println!("Deactivate All Work Buckets");
         self.deactivate_all();
         // Finalization: Resume mutators, reset gc states
         // Note: Resume-mutators must happen after all work buckets are closed.
@@ -378,7 +373,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.clear_request();
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
-        println!("Activate WorkBucketStage::Prepare");
         self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();
         self.worker_monitor.1.notify_all();

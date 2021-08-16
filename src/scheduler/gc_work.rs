@@ -330,19 +330,19 @@ static MONITOR: SyncLazy<(std::sync::Mutex<bool>, Condvar)> = SyncLazy::new(Defa
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if worker.is_coordinator() {
-            let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
-            // Do nothing if not in concurrent phase
-            if !*in_concurrent_gc {
-                return;
+            {
+                // Do nothing if not in concurrent phase
+                if !*crate::IN_CONCURRENT_GC.lock() {
+                    return
+                }
             }
-            mem::drop(in_concurrent_gc);
             println!("Stop mutators after CM");
             // Stop mutators
             <E::VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
             // Set the flag to false
-            let mut in_concurrent_gc = crate::IN_CONCURRENT_GC.lock();
-            *in_concurrent_gc = false;
-            // mem::drop(in_concurrent_gc);
+            {
+                *crate::IN_CONCURRENT_GC.lock() = false;
+            }
             // Scan and mark roots again
             mmtk.plan.base().scanned_stacks.store(0, Ordering::SeqCst);
             for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
@@ -694,39 +694,21 @@ impl<E: ProcessEdgesWork> ProcessEdgeModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        println!("ProcessEdgeModBuf");
         if !self.modbuf.is_empty() {
             for edge in &self.modbuf {
-                // println!("-{:?}", edge);
-                compare_exchange_metadata::<E::VM>(
+                store_metadata::<E::VM>(
                     &self.meta,
                     unsafe { edge.to_object_reference() },
-                    0b1,
-                    0b0,
+                    0,
                     None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                );
+                    Some(Ordering::SeqCst),
+                )
             }
         }
-        // if !mmtk
-        //     .plan
-        //     .base()
-        //     .control_collector_context
-        //     .concurrent
-        //     .load(Ordering::SeqCst)
-        // {
-        //     println!("Skip REMSET");
-        //     return;
-        // }
-        // if mmtk.plan.is_current_gc_nursery() {
         if !self.modbuf.is_empty() {
             let mut modbuf = vec![];
             ::std::mem::swap(&mut modbuf, &mut self.modbuf);
             GCWork::do_work(&mut E::new(modbuf, false, mmtk), worker, mmtk)
         }
-        // } else {
-        // Do nothing
-        // }
     }
 }
