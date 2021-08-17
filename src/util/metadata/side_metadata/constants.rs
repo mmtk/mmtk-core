@@ -102,9 +102,9 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
 // MMTk reserved PolicySpecific side metadata offsets:
 //
 //  1 - MarkSweep Active Page byte:
-//      - Offset after Alloc bit
+//      - 
 //  2 - Immix line mark byte:
-//      - Offset after MS alloc bit
+//      - Offset after MS Active Page byte
 //  3 - Immix block defrag byte:
 //      - Offset after Immix block defrag byte
 //  4 - Immix block mark byte:

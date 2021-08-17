@@ -170,10 +170,12 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         let immix = Immix {
-            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, scheduler, vec![]),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, vec![]),
+            immix_space: ImmixSpace::new(
+                "immix", vm_map, mmapper, &mut heap, scheduler, global_metadata_specs.clone()),
+            common: CommonPlan::new(
+                vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, global_metadata_specs),
         };
 
         {
