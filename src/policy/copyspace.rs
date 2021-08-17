@@ -41,7 +41,6 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.from_space()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        // This is only effective in slow path. We do not call post_alloc in fast path
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }

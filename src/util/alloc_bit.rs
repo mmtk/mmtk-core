@@ -60,6 +60,10 @@ pub fn unset_alloc_bit(object: ObjectReference) {
     );
 }
 
+/// # Safety
+///
+/// This is unsafe: check the comment on `side_metadata::store`
+///
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
 }
@@ -72,6 +76,10 @@ pub fn is_alloced_object(address: Address) -> bool {
     side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
 }
 
+/// # Safety
+///
+/// This is unsafe: check the comment on `side_metadata::load`
+///
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
     side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, address) == 1
 }

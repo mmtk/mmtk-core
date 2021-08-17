@@ -43,20 +43,6 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
     log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
 };
 
-/// This is the metadata spec for the alloc-bit.
-///
-/// An alloc-bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
-///
-/// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
-/// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
-///
-// pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-//     is_global: false,
-//     offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
-//     log_num_of_bits: 0,
-//     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
-// };
-
 /// Metadata spec for the active page byte
 ///
 /// The active page metadata is used to accurately track the total number of pages that have
