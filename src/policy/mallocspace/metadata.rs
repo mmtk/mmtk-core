@@ -76,9 +76,13 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
 
 pub fn is_meta_space_mapped(address: Address) -> bool {
     let chunk_start = conversions::chunk_align_down(address);
+    // Check if the alloc-bit side metadata has been mapped for the chunk as a litmus test
+    // to see if the chunk has been allocated by malloc; if the metadata has not been mapped,
+    // it is safe to assume that the chunk has not been allocated by malloc (yet)
     is_metadata_mapped(chunk_start) && is_chunk_marked(chunk_start)
 }
 
+// Return if the alloc-bit side metadata has been mapped for address `chunk_start`
 fn is_metadata_mapped(chunk_start: Address) -> bool {
     side_metadata::address_to_meta_address(&ALLOC_SIDE_METADATA_SPEC, chunk_start).is_mapped()
 }
