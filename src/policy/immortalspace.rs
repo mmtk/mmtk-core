@@ -185,6 +185,12 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
             trace.process_node(object);
         }

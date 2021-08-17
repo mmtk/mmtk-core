@@ -39,6 +39,7 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
+    debug_assert!(!is_alloced(object), "{:x}: alloc bit already set", object);
     side_metadata::store_atomic(
         &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
@@ -48,10 +49,16 @@ pub fn set_alloc_bit(object: ObjectReference) {
 }
 
 pub fn unset_addr_alloc_bit(address: Address) {
+    debug_assert!(
+        is_alloced_object(address),
+        "{:x}: alloc bit not set",
+        address
+    );
     side_metadata::store_atomic(&ALLOC_SIDE_METADATA_SPEC, address, 0, Ordering::SeqCst);
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
+    debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
     side_metadata::store_atomic(
         &ALLOC_SIDE_METADATA_SPEC,
         object.to_address(),
@@ -65,6 +72,7 @@ pub fn unset_alloc_bit(object: ObjectReference) {
 /// This is unsafe: check the comment on `side_metadata::store`
 ///
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
+    debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
     side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
 }
 

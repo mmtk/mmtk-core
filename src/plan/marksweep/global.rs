@@ -138,12 +138,12 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
-        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to 
+        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]
         let global_metadata_specs =
             SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
-        // if global_alloc_bit is NOT enabled, 
+        // if global_alloc_bit is NOT enabled,
         // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
         #[cfg(not(feature = "global_alloc_bit"))]
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[

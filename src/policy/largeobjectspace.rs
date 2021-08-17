@@ -174,6 +174,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         let nursery_object = self.is_in_nursery(object);
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects

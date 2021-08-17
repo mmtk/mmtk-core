@@ -184,6 +184,12 @@ impl<VM: VMBinding> CopySpace<VM> {
         if !self.from_space() {
             return object;
         }
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         trace!("attempting to forward");
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
         trace!("checking if object is being forwarded");
