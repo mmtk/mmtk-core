@@ -113,7 +113,7 @@ impl Line {
 }
 
 #[allow(clippy::assertions_on_constants)]
-unsafe impl Step for Line {
+impl Step for Line {
     /// Get the number of lines between the given two lines.
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {

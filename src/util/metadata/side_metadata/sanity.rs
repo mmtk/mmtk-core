@@ -320,7 +320,7 @@ impl SideMetadataSanity {
                 .specs_sanity_map
                 .get(&GLOBAL_META_NAME)
                 .unwrap()
-                .contains(&spec)
+                .contains(spec)
             {
                 panic!("Global metadata must not change between policies! NEW SPEC: {:#?} OLD SPECS: {:#?}", spec, self.get_all_specs(true));
             }
@@ -352,7 +352,7 @@ impl SideMetadataSanity {
                 .specs_sanity_map
                 .get(policy_name)
                 .unwrap()
-                .contains(&spec)
+                .contains(spec)
             {
                 panic!(
                     "Policy-specific metadata for -{}- changed from {:#?} to {:#?}",
@@ -385,7 +385,7 @@ impl SideMetadataSanity {
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-    match sanity_map.get_mut(&metadata_spec) {
+    match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             // zero entries where the key (data_addr) is in the range (start, start+size)
             for (k, v) in spec_sanity_map.iter_mut() {
@@ -415,7 +415,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
-    match sanity_map.get(&metadata_spec) {
+    match sanity_map.get(metadata_spec) {
         Some(spec_sanity_map) => {
             // A content of None is Ok because we may load before store
             let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
@@ -448,7 +448,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-    match sanity_map.get_mut(&metadata_spec) {
+    match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             // Newly mapped memory including the side metadata memory is zeroed
             let content = spec_sanity_map.entry(data_addr).or_insert(0);
@@ -467,7 +467,7 @@ fn do_math(
     math_op: MathOp,
 ) -> Result<usize> {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-    match sanity_map.get_mut(&metadata_spec) {
+    match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             // Newly mapped memory including the side metadata memory is zeroed
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
