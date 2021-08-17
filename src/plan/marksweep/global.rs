@@ -53,12 +53,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
@@ -67,7 +67,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(&self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<MSProcessEdges<VM>>::new());
         // Release global/collectors/mutators

@@ -29,12 +29,12 @@ impl SanityChecker {
     }
 }
 
-pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct ScheduleSanityGC<P: Plan, W: CopyContext + GCWorkerLocal> {
     _plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> ScheduleSanityGC<P, W> {
     pub fn new(plan: &'static P) -> Self {
         ScheduleSanityGC {
             _plan: plan,
@@ -43,7 +43,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
@@ -69,12 +69,12 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P
     }
 }
 
-pub struct SanityPrepare<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct SanityPrepare<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -83,7 +83,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.enter_sanity();
         {
@@ -100,12 +100,12 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W
     }
 }
 
-pub struct SanityRelease<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct SanityRelease<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -114,7 +114,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
