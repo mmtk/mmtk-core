@@ -73,8 +73,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
 
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.copyspace0.init(vm_map);
+        self.copyspace1.init(vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {

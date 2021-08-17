@@ -102,13 +102,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self_mut.mmtk = Some(mmtk);
         self_mut.coordinator_worker = Some(RwLock::new(GCWorker::new(
             0,
-            Arc::downgrade(&self),
+            Arc::downgrade(self),
             true,
             self.channel.0.clone(),
         )));
         self_mut.worker_group = Some(WorkerGroup::new(
             num_workers,
-            Arc::downgrade(&self),
+            Arc::downgrade(self),
             self.channel.0.clone(),
         ));
         self.worker_group.as_ref().unwrap().spawn_workers(tls, mmtk);

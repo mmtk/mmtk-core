@@ -4,17 +4,17 @@ use crate::util::Address;
 
 #[derive(Clone, Copy, Debug)]
 pub enum VMRequest {
-    RequestDiscontiguous,
-    RequestFixed {
+    Discontiguous,
+    Fixed {
         start: Address,
         extent: usize,
         top: bool,
     },
-    RequestExtent {
+    Extent {
         extent: usize,
         top: bool,
     },
-    RequestFraction {
+    Fraction {
         frac: f32,
         top: bool,
     },
@@ -22,11 +22,11 @@ pub enum VMRequest {
 
 impl VMRequest {
     pub fn is_discontiguous(&self) -> bool {
-        matches!(self, VMRequest::RequestDiscontiguous { .. })
+        matches!(self, VMRequest::Discontiguous { .. })
     }
 
     pub fn common64bit(top: bool) -> Self {
-        VMRequest::RequestExtent {
+        VMRequest::Extent {
             extent: MAX_SPACE_EXTENT,
             top,
         }
@@ -36,14 +36,14 @@ impl VMRequest {
         if cfg!(target_pointer_width = "64") {
             return Self::common64bit(false);
         }
-        VMRequest::RequestDiscontiguous
+        VMRequest::Discontiguous
     }
 
     pub fn fixed_size(mb: usize) -> Self {
         if cfg!(target_pointer_width = "64") {
             return Self::common64bit(false);
         }
-        VMRequest::RequestExtent {
+        VMRequest::Extent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: false,
         }
@@ -53,14 +53,14 @@ impl VMRequest {
         if cfg!(target_pointer_width = "64") {
             return Self::common64bit(false);
         }
-        VMRequest::RequestFraction { frac, top: false }
+        VMRequest::Fraction { frac, top: false }
     }
 
     pub fn high_fixed_size(mb: usize) -> Self {
         if cfg!(target_pointer_width = "64") {
             return Self::common64bit(true);
         }
-        VMRequest::RequestExtent {
+        VMRequest::Extent {
             extent: mb << LOG_BYTES_IN_MBYTE,
             top: true,
         }
@@ -70,6 +70,6 @@ impl VMRequest {
         if cfg!(target_pointer_width = "64") {
             return Self::common64bit(top);
         }
-        VMRequest::RequestExtent { extent, top }
+        VMRequest::Extent { extent, top }
     }
 }
