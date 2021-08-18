@@ -39,7 +39,7 @@ pub(super) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 3;
 #[cfg(target_pointer_width = "64")]
 pub(super) const LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO: usize = 1;
 
-const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
+pub const LOG_MAX_GLOBAL_SIDE_METADATA_SIZE: usize =
     LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO;
 // TODO - we should check this limit somewhere
 // pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =
