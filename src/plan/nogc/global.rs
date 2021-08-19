@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.nogc_space.init(vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {

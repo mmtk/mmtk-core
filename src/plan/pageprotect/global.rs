@@ -74,7 +74,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
             }
         );
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.space.init(&vm_map);
+        self.space.init(vm_map);
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
