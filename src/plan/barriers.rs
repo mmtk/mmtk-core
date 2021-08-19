@@ -78,7 +78,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
+    fn enqueue_node(&mut self, obj: ObjectReference) {
         // If the objecct is unlogged, log it and push it to mod buffer
         if self.log_object(obj) {
             self.modbuf.push(obj);
@@ -109,7 +109,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                self.enqueue_node::<E::VM>(obj);
+                self.enqueue_node(obj);
             }
             _ => unreachable!(),
         }
