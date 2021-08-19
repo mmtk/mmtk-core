@@ -80,20 +80,11 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
 
     pub fn terminate_concurrent_gc(&self) {
         println!("terminate_concurrent_gc");
-        // if self.request_flag.load(Ordering::Relaxed) {
-        //     return;
-        // }
-        // let mut guard = self.request_sync.lock().unwrap();
-        // if !self.request_flag.load(Ordering::Relaxed) {
-        //     self.request_flag.store(true, Ordering::Relaxed);
-        //     guard.request_count += 1;
-        // self.request_condvar.notify_all();
         let scheduler = self.scheduler.read().unwrap();
         let scheduler = scheduler.as_ref().unwrap();
         scheduler.work_buckets[WorkBucketStage::PreClosure].add(ConcurrentWorkEnd::<
             ImmixProcessEdges<VM, { TraceKind::Fast }>,
         >::new());
-        // }
     }
 
     pub fn request(&self, concurrent: bool) {
