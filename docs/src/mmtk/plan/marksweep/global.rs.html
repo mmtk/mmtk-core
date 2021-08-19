@@ -168,6 +168,18 @@
 <span id="168">168</span>
 <span id="169">169</span>
 <span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
@@ -185,6 +197,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::GcHookWork</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
@@ -307,8 +321,18 @@
         <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
+        <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to</span>
+        <span class="comment">// SideMetadataContext by default, so we don&#39;t need to add it here.</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>
             <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[<span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>]);
+        <span class="comment">// if global_alloc_bit is NOT enabled,</span>
+        <span class="comment">// we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
+        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[
+            <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>,
+            <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>,
+        ]);
 
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MarkSweep</span> {
             <span class="ident">ms</span>: <span class="ident">MallocSpace::new</span>(<span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>()),

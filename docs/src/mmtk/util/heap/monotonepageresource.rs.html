@@ -316,6 +316,11 @@
 <span id="316">316</span>
 <span id="317">317</span>
 <span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::required_chunks</span>;
@@ -553,6 +558,11 @@
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reset</span>();
         <span class="self">self</span>.<span class="ident">release_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">guard</span>);
         <span class="ident">drop</span>(<span class="ident">guard</span>);
+    }
+
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">get_current_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+        <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="ident">guard</span>.<span class="ident">current_chunk</span>
     }
 
     <span class="comment">/*/**

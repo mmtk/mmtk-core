@@ -206,6 +206,8 @@
 <span id="206">206</span>
 <span id="207">207</span>
 <span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -381,6 +383,8 @@
                     <span class="ident">lines</span>,
                     <span class="self">self</span>.<span class="ident">tls</span>
                 );
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>);
                 <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>);
                 <span class="macro">debug_assert!</span>(
                     <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>) <span class="op">+</span> <span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">limit</span>

@@ -895,8 +895,23 @@
 <span id="895">895</span>
 <span id="896">896</span>
 <span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::{<span class="ident">BYTES_IN_PAGE</span>, <span class="ident">LOG_BITS_IN_BYTE</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::memory</span>;
@@ -1043,8 +1058,17 @@
 }
 
 <span class="kw">impl</span> <span class="ident">SideMetadataContext</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_global_specs</span>(<span class="ident">specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="ident">ret</span>.<span class="ident">extend_from_slice</span>(<span class="ident">specs</span>);
+        <span class="ident">ret</span>
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_global_specs</span>(<span class="ident">specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+        <span class="ident">ret</span>.<span class="ident">extend_from_slice</span>(<span class="kw-2">&amp;</span>[<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>]);
         <span class="ident">ret</span>.<span class="ident">extend_from_slice</span>(<span class="ident">specs</span>);
         <span class="ident">ret</span>
     }
@@ -1687,6 +1711,8 @@
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
     <span class="kw">let</span> <span class="ident">_lock</span> <span class="op">=</span> <span class="ident">sanity::SANITY_LOCK</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
 
+    <span class="comment">// yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
     <span class="macro">debug_assert!</span>(
         <span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>) <span class="op">&amp;&amp;</span> <span class="ident">meta_byte_lshift</span>(<span class="ident">metadata_spec</span>, <span class="ident">start</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
     );

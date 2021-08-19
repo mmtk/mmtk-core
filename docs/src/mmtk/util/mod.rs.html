@@ -74,6 +74,7 @@
 <span id="74">74</span>
 <span id="75">75</span>
 <span id="76">76</span>
+<span id="77">77</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.</span>
 
@@ -100,7 +101,8 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">reference_processor</span>;
 
 <span class="comment">// The following modules are only public in the mmtk crate. They should only be used in MMTk core.</span>
-
+<span class="doccomment">/// Alloc bit</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">alloc_bit</span>;
 <span class="doccomment">/// An analysis framework for collecting data and profiling in GC.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">analysis</span>;

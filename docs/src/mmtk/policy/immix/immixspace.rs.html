@@ -560,6 +560,17 @@
 <span id="560">560</span>
 <span id="561">561</span>
 <span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
@@ -630,7 +641,10 @@
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
-    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {}
+    <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">_object</span>);
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -868,6 +882,12 @@
         <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
         <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+        <span class="macro">debug_assert!</span>(
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
+            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="ident">object</span>
+        );
         <span class="kw">if</span> <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">is_defrag_source</span>() {
             <span class="self">self</span>.<span class="ident">trace_object_with_opportunistic_copy</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
         } <span class="kw">else</span> {
@@ -921,6 +941,8 @@
                 <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">set_state</span>(<span class="ident">BlockState::Marked</span>);
                 <span class="ident">object</span>
             } <span class="kw">else</span> {
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit</span>(<span class="ident">object</span>);
                 <span class="ident">ForwardingWord::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
             };
             <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME</span> {

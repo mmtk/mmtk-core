@@ -189,6 +189,21 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">ImmixCopyContext</span>, <span class="ident">ImmixProcessEdges</span>, <span class="ident">TraceKind</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
@@ -208,6 +223,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
@@ -362,10 +378,24 @@
         <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
-
+        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
         <span class="kw">let</span> <span class="ident">immix</span> <span class="op">=</span> <span class="ident">Immix</span> {
-            <span class="ident">immix_space</span>: <span class="ident">ImmixSpace::new</span>(<span class="string">&quot;immix&quot;</span>, <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>, <span class="ident">scheduler</span>, <span class="macro">vec!</span>[]),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">heap</span>, <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>, <span class="macro">vec!</span>[]),
+            <span class="ident">immix_space</span>: <span class="ident">ImmixSpace::new</span>(
+                <span class="string">&quot;immix&quot;</span>,
+                <span class="ident">vm_map</span>,
+                <span class="ident">mmapper</span>,
+                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">heap</span>,
+                <span class="ident">scheduler</span>,
+                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
+            ),
+            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
+                <span class="ident">vm_map</span>,
+                <span class="ident">mmapper</span>,
+                <span class="ident">options</span>,
+                <span class="ident">heap</span>,
+                <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>,
+                <span class="ident">global_metadata_specs</span>,
+            ),
         };
 
         {

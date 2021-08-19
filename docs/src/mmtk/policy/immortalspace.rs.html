@@ -189,6 +189,14 @@
 <span id="189">189</span>
 <span id="190">190</span>
 <span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
@@ -265,6 +273,8 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
             <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
         }
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">object</span>);
     }
 }
 
@@ -375,6 +385,12 @@
         <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+        <span class="macro">debug_assert!</span>(
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
+            <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
+            <span class="ident">object</span>
+        );
         <span class="kw">if</span> <span class="ident">ImmortalSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::test_and_mark</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) {
             <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
         }
