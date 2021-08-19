@@ -1,10 +1,10 @@
+use crate::util::alloc_bit;
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
@@ -38,23 +38,9 @@ lazy_static! {
 /// overwriting the previous mapping.
 pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: true,
-    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
+    offset: SideMetadataOffset::layout_after(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
     log_num_of_bits: 3,
     log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
-};
-
-/// This is the metadata spec for the alloc-bit.
-///
-/// An alloc-bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
-///
-/// The other metadata used by MallocSpace is mark-bit, which is per-object and can be kept in object header if the VM allows it.
-/// Thus, mark-bit is vm-dependant and is part of each VM's ObjectModel.
-///
-pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
-    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
-    log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
 /// Metadata spec for the active page byte
@@ -69,7 +55,7 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: SideMetadataOffset::layout_after(&ALLOC_SIDE_METADATA_SPEC),
+    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 3,
     log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
 };
@@ -153,11 +139,11 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+    alloc_bit::is_alloced_object(address)
 }
 
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
-    side_metadata::load(&ALLOC_SIDE_METADATA_SPEC, address) == 1
+    alloc_bit::is_alloced_object_unsafe(address)
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
@@ -192,12 +178,7 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
-    side_metadata::store_atomic(
-        &ALLOC_SIDE_METADATA_SPEC,
-        object.to_address(),
-        1,
-        Ordering::SeqCst,
-    );
+    alloc_bit::set_alloc_bit(object);
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
@@ -208,6 +189,11 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ord
         None,
         ordering,
     );
+}
+
+#[allow(unused)]
+pub fn unset_alloc_bit(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit(object);
 }
 
 pub(super) fn set_page_mark(page_addr: Address) {
@@ -224,9 +210,10 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
 }
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    side_metadata::store(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
+    alloc_bit::unset_alloc_bit_unsafe(object);
 }
 
+#[allow(unused)]
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
     store_metadata::<VM>(
         &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
