@@ -61,24 +61,38 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
         }
     }
 
+    /// Attepmt to atomically log an object.
+    /// Returns true if the object is not logged previously.
+    #[inline(always)]
+    fn log_object(&self, object: ObjectReference) -> bool {
+        loop {
+            let old_value =
+                load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
+            if old_value == 0 {
+                return false;
+            }
+            if compare_exchange_metadata::<E::VM>(
+                &self.meta,
+                object,
+                1,
+                0,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                return true;
+            }
+        }
+    }
+
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
-        if !*crate::IN_CONCURRENT_GC.lock() {
-            return;
-        }
-        if compare_exchange_metadata::<E::VM>(
-            &self.meta,
-            obj,
-            0b0,
-            0b1,
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
-            self.modbuf.push(obj);
-            if self.modbuf.len() >= E::CAPACITY {
-                self.flush();
-            }
+        // If the objecct is unlogged, log it and push it to mod buffer
+        if self.log_object(obj) {
+           self.modbuf.push(obj);
+           if self.modbuf.len() >= E::CAPACITY {
+               self.flush();
+           }
         }
     }
 }
@@ -97,7 +111,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
             self as *const _
         );
         if !modbuf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(ProcessModBuf::<E>::new(modbuf, self.meta));
         }
     }
