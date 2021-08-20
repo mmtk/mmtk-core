@@ -160,7 +160,7 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
-<span class="kw">const</span> <span class="ident">LOG_MAX_GLOBAL_SIDE_METADATA_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_MAX_GLOBAL_SIDE_METADATA_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span>
     <span class="ident">LOG_ADDRESS_SPACE</span> <span class="op">-</span> <span class="ident">LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO</span>;
 <span class="comment">// TODO - we should check this limit somewhere</span>
 <span class="comment">// pub(crate) const LOG_MAX_LOCAL_SIDE_METADATA_SIZE: usize =</span>
