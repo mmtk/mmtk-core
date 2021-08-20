@@ -30,7 +30,6 @@ pub enum WriteTarget {
 
 pub trait Barrier: 'static + Send {
     fn flush(&mut self);
-    fn assert_is_flushed(&self) {}
     fn write_barrier(&mut self, target: WriteTarget);
 }
 
@@ -203,15 +202,8 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
         self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
     }
 
-    fn assert_is_flushed(&self) {
-        assert!(self.modbuf.is_empty());
-    }
-
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
-        if !*crate::IN_CONCURRENT_GC.lock() {
-            return;
-        }
         match target {
             WriteTarget::Field { slot, .. } => {
                 self.enqueue_edge(slot);

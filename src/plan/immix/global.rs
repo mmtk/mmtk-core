@@ -59,7 +59,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn concurrent_collection_required(&self) -> bool {
-        self.base().gc_status() == GcStatus::NotInGC
+        super::CONCURRENT_MARKING && self.base().gc_status() == GcStatus::NotInGC
             && self.get_pages_reserved() * 100 / 45 > self.get_total_pages()
     }
 
