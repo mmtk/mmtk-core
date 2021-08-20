@@ -178,9 +178,6 @@ impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
 
     #[inline(always)]
     fn enqueue_edge(&mut self, edge: Address) {
-        if !*crate::IN_CONCURRENT_GC.lock() {
-            return;
-        }
         if self.log_edge(edge) {
             self.modbuf.push(edge);
             if self.modbuf.len() >= E::CAPACITY {
@@ -212,11 +209,11 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
 
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
+        if !*crate::IN_CONCURRENT_GC.lock() {
+            return;
+        }
         match target {
-            WriteTarget::Field { src, slot, val } => {
-                if !*crate::IN_CONCURRENT_GC.lock() {
-                    return;
-                }
+            WriteTarget::Field { slot, .. } => {
                 self.enqueue_edge(slot);
             }
             WriteTarget::ArrayCopy { src, len, .. } => {

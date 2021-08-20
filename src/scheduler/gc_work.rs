@@ -691,11 +691,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
                     unsafe { edge.to_object_reference() },
                     0,
                     None,
-                    Some(Ordering::SeqCst),
+                    Some(Ordering::Relaxed),
                 )
             }
-        }
-        if !self.modbuf.is_empty() {
             let mut modbuf = vec![];
             ::std::mem::swap(&mut modbuf, &mut self.modbuf);
             GCWork::do_work(&mut E::new(modbuf, false, mmtk), worker, mmtk)

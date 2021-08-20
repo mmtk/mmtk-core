@@ -85,6 +85,9 @@ impl SchedulerStat {
                     format!("work.{}.{}.max", self.work_name(n), name),
                     format!("{:.2}", fold.max),
                 );
+                if name == "time" {
+                    println!(" - {:<30} count={:7} time.total={:15.2}", self.work_name(n), self.work_counts[t], fold.total);
+                }
             }
         }
         // Print out overall execution time

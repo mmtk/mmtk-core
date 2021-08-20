@@ -272,15 +272,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         // println!(" - Alloc block {:?}", block);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
-        if let MetadataSpec::OnSide(meta) =
-            *<VM::VMObjectModel as ObjectModel<VM>>::GLOBAL_LOG_BIT_SPEC
-        {
-            side_metadata::bzero_metadata(
-                &meta,
-                block.start(),
-                Block::BYTES,
-            );
-        }
         Some(block)
     }
 
@@ -527,21 +518,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
-            if let MetadataSpec::OnSide(meta) =
-            *<VM::VMObjectModel as ObjectModel<VM>>::GLOBAL_LOG_BIT_SPEC
-        {
-            // side_metadata::bzero_metadata(
-            //     &meta,
-            //     block.start(),
-            //     Block::BYTES,
-            // );
-            for i in (0..Block::BYTES).step_by(8) {
-                let addr = block.start() + i;
-                let x = unsafe { side_metadata::load(&meta, addr) };
-                assert_eq!(x, 0, "{:?} {}", addr, x);
-            }
-            // side_metadata::MetadataByteArrayRef::<>::new(&meta, block.start(), Block::BYTES);
-        }
         }
     }
 }
