@@ -246,6 +246,7 @@ pub trait Plan: 'static + Sync + Downcast {
                 self.common().control_collector_context.request();
                 return false;
             }*/
+            println!("Triggering collection");
             self.log_poll(space, "Triggering collection");
             if *crate::IN_CONCURRENT_GC.lock() {
                 println!(
@@ -257,11 +258,11 @@ pub trait Plan: 'static + Sync + Downcast {
                     .control_collector_context
                     .terminate_concurrent_gc();
             } else {
-                println!(
-                    "Trigger STW GC: {} / {}",
-                    self.get_pages_reserved(),
-                    self.get_total_pages()
-                );
+                // println!(
+                //     "Trigger STW GC: {} / {}",
+                //     self.get_pages_reserved(),
+                //     self.get_total_pages()
+                // );
                 self.base().control_collector_context.request(false);
             }
             return true;

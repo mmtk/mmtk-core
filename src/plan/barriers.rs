@@ -24,8 +24,8 @@ pub enum BarrierSelector {
 #[derive(Debug)]
 pub enum WriteTarget {
     Field { src: ObjectReference, slot: Address, val: ObjectReference },
-    ArrayCopy { src: Address, dst: Address, len: usize },
-    Clone { src: ObjectReference, dst: ObjectReference, size: usize },
+    ArrayCopy { src: ObjectReference, src_offset: usize, dst: ObjectReference, dst_offset: usize, len: usize },
+    Clone { src: ObjectReference, dst: ObjectReference },
 }
 
 pub trait Barrier: 'static + Send {
@@ -118,25 +118,15 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
-        // println!("write_barrier {:?}\n", target);
         match target {
-            WriteTarget::Field { src, slot, val } => {
-                if !*crate::IN_CONCURRENT_GC.lock() {
-                    return;
-                }
-                let deleted = unsafe { slot.load::<ObjectReference>() };
-                if deleted.is_null() {
-                    return;
-                }
-                if !deleted.is_null() {
-                    self.enqueue_node(deleted);
-                }
+            WriteTarget::Field { src, .. } => {
+                self.enqueue_node(src);
             }
-            WriteTarget::ArrayCopy { src, len, .. } => {
-                unimplemented!();
+            WriteTarget::ArrayCopy { dst, .. } => {
+                self.enqueue_node(dst);
             }
-            WriteTarget::Clone {..} => {
-                unimplemented!();
+            WriteTarget::Clone { dst, .. } => {
+                self.enqueue_node(dst);
             }
         }
     }
@@ -231,7 +221,7 @@ impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
             }
             WriteTarget::ArrayCopy { src, len, .. } => {
                 for i in 0..len {
-                    self.enqueue_edge(src + (i << 3));
+                    self.enqueue_edge(src.to_address() + (i << 3));
                 }
             }
             WriteTarget::Clone {..} => {}

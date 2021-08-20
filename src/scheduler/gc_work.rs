@@ -285,11 +285,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         }
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
-        println!(
-            "End of GC: {} / {}",
-            mmtk.plan.get_pages_reserved(),
-            mmtk.plan.get_total_pages()
-        );
+        // println!(
+        //     "End of GC: {} / {}",
+        //     mmtk.plan.get_pages_reserved(),
+        //     mmtk.plan.get_total_pages()
+        // );
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
 }
@@ -645,33 +645,23 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
                 compare_exchange_metadata::<E::VM>(
                     &self.meta,
                     *obj,
-                    0b1,
                     0b0,
+                    0b1,
                     None,
                     Ordering::SeqCst,
                     Ordering::SeqCst,
                 );
             }
         }
-        if !mmtk
-            .plan
-            .base()
-            .control_collector_context
-            .concurrent
-            .load(Ordering::SeqCst)
-        {
-            println!("Skip REMSET");
-            return;
+        if mmtk.plan.is_current_gc_nursery() {
+            if !self.modbuf.is_empty() {
+                let mut modbuf = vec![];
+                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
+            }
+        } else {
+            // Do nothing
         }
-        // if mmtk.plan.is_current_gc_nursery() {
-        if !self.modbuf.is_empty() {
-            let mut modbuf = vec![];
-            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-            GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
-        }
-        // } else {
-        // Do nothing
-        // }
     }
 }
 
