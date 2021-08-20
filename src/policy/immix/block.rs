@@ -225,6 +225,8 @@ impl Block {
     /// Deinitalize a block before releasing.
     #[inline]
     pub fn deinit(&self) {
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::bzero_alloc_bit(self.start(), Self::BYTES);
         self.set_state(BlockState::Unallocated);
     }
 
