@@ -269,13 +269,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
         // eprintln!("halfway through acquire, tls={}", tls_usize);
-        let a = if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
             if !allow_poll {
                 panic!("Collection is not enabled.");
             }
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            eprintln!("gc");
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -324,9 +325,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     unsafe { Address::zero() }
                 }
             }
-        };
-        // eprintln!("done acquiring space");
-        a
+        }
     }
 
     fn address_in_space(&self, start: Address) -> bool {
