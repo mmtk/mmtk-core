@@ -410,6 +410,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             pr.clear_request(pages_reserved);
             drop(lock); // drop the lock before block
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            eprintln!("gc");
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -490,9 +491,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     unsafe { Address::zero() }
                 }
             }
-        };
-        // eprintln!("done acquiring space");
-        a
+        }
     }
 
     fn address_in_space(&self, start: Address) -> bool {
