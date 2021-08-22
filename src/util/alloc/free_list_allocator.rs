@@ -627,7 +627,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn reset(&mut self) {
-        // eprintln!("reset");
         trace!("reset");
         // consumed and available are now unswept
         let mut bin = 0;
