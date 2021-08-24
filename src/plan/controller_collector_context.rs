@@ -57,10 +57,7 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
-            println!(
-                "[STWController: Request recieved.] {}",
-                self.concurrent.load(Ordering::SeqCst)
-            );
+            debug!("[STWController: Request recieved.]");
 
             // For heap growth logic
             // FIXME: This is not used. However, we probably want to set a 'user_triggered' flag
@@ -96,7 +93,6 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
         if !self.request_flag.load(Ordering::Relaxed) {
             self.request_flag.store(true, Ordering::Relaxed);
             self.concurrent.store(concurrent, Ordering::SeqCst);
-            println!("concurrent = {}", self.concurrent.load(Ordering::SeqCst));
             guard.request_count += 1;
             self.request_condvar.notify_all();
         }

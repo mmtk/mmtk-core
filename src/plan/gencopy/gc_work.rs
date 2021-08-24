@@ -55,9 +55,6 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         _semantics: crate::AllocationSemantics,
     ) {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
-        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
-        }
     }
 }
 

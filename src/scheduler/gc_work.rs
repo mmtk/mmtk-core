@@ -305,7 +305,6 @@ impl<VM: VMBinding> GCWork<VM> for ConcurrentWorkStart {
             {
                 *crate::IN_CONCURRENT_GC.lock() = true;
             }
-            println!("Resume mutators for CM");
             // Resume mutators for concurrent marking.
             <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
         } else {
@@ -336,7 +335,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
                     return
                 }
             }
-            println!("Stop mutators after CM");
             // Stop mutators
             <E::VM as VMBinding>::VMCollection::stop_all_mutators2(worker.tls);
             // Set the flag to false
@@ -665,27 +663,30 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     }
 }
 
-pub struct ProcessEdgeModBuf<E: ProcessEdgesWork> {
-    modbuf: Vec<Address>,
+pub struct ProcessModBufSATB<E: ProcessEdgesWork> {
+    edges: Vec<Address>,
+    nodes: Vec<ObjectReference>,
     phantom: PhantomData<E>,
     meta: MetadataSpec,
 }
 
-impl<E: ProcessEdgesWork> ProcessEdgeModBuf<E> {
-    pub fn new(modbuf: Vec<Address>, meta: MetadataSpec) -> Self {
+impl<E: ProcessEdgesWork> ProcessModBufSATB<E> {
+    pub fn new(
+        edges: Vec<Address>,
+        nodes: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
         Self {
-            modbuf,
+            edges, nodes,
             meta,
             phantom: PhantomData,
         }
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBufSATB<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modbuf.is_empty() {
-            for edge in &self.modbuf {
+        if !self.edges.is_empty() {
+            for edge in &self.edges {
                 store_metadata::<E::VM>(
                     &self.meta,
                     unsafe { edge.to_object_reference() },
@@ -695,7 +696,45 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessEdgeModBuf<E> {
                 )
             }
             let mut modbuf = vec![];
-            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+            ::std::mem::swap(&mut modbuf, &mut self.nodes);
+            GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk);
+        }
+    }
+}
+
+
+pub struct ProcessModBufIU<E: ProcessEdgesWork> {
+    edges: Vec<Address>,
+    phantom: PhantomData<E>,
+    meta: MetadataSpec,
+}
+
+impl<E: ProcessEdgesWork> ProcessModBufIU<E> {
+    pub fn new(
+        edges: Vec<Address>, meta: MetadataSpec) -> Self {
+        Self {
+            edges,
+            meta,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBufIU<E> {
+    #[inline(always)]
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !self.edges.is_empty() {
+            for edge in &self.edges {
+                store_metadata::<E::VM>(
+                    &self.meta,
+                    unsafe { edge.to_object_reference() },
+                    0,
+                    None,
+                    Some(Ordering::Relaxed),
+                )
+            }
+            let mut modbuf = vec![];
+            ::std::mem::swap(&mut modbuf, &mut self.edges);
             GCWork::do_work(&mut E::new(modbuf, false, mmtk), worker, mmtk)
         }
     }

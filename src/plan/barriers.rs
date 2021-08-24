@@ -131,20 +131,27 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 }
 
-pub struct FieldLoggingBarrier<E: ProcessEdgesWork> {
+#[derive(PartialEq, Eq)]
+pub enum FLBKind {
+    SATB, IU,
+}
+
+pub struct FieldLoggingBarrier<E: ProcessEdgesWork, const KIND: FLBKind = { FLBKind::SATB }> {
     mmtk: &'static MMTK<E::VM>,
-    modbuf: Vec<Address>,
+    edges: Vec<Address>,
+    nodes: Vec<ObjectReference>,
     /// The metadata used for log bit. Though this allows taking an arbitrary metadata spec,
     /// for this field, 0 means logged, and 1 means unlogged (the same as the vm::object_model::VMGlobalLogBitSpec).
     meta: MetadataSpec,
 }
 
-impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
+impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, meta: MetadataSpec) -> Self {
         Self {
             mmtk,
-            modbuf: vec![],
+            edges: vec![],
+            nodes: vec![],
             meta,
         }
     }
@@ -176,41 +183,57 @@ impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_edge(&mut self, edge: Address) {
+    fn enqueue_node(&mut self, edge: Address) {
+        if !*crate::IN_CONCURRENT_GC.lock() {
+            return;
+        }
         if self.log_edge(edge) {
-            self.modbuf.push(edge);
-            if self.modbuf.len() >= E::CAPACITY {
+            self.edges.push(edge);
+            if KIND == FLBKind::SATB {
+                let node: ObjectReference = unsafe { edge.load() };
+                if !node.is_null() {
+                    self.nodes.push(node);
+                }
+            }
+            if self.edges.len() >= E::CAPACITY {
                 self.flush();
             }
         }
     }
 }
 
-impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
+impl<E: ProcessEdgesWork, const KIND: FLBKind> Barrier for FieldLoggingBarrier<E, KIND> {
     #[cold]
     fn flush(&mut self) {
-        if self.modbuf.is_empty() {
+        if KIND == FLBKind::SATB {
+        if self.edges.is_empty() && self.nodes.is_empty() {
             return;
         }
-        let mut modbuf = vec![];
-        std::mem::swap(&mut modbuf, &mut self.modbuf);
-        debug_assert!(
-            !self.mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
-            "{:?}",
-            self as *const _
-        );
-        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessEdgeModBuf::<E>::new(modbuf, self.meta));
+        let mut edges = vec![];
+        std::mem::swap(&mut edges, &mut self.edges);
+        let mut nodes = vec![];
+        std::mem::swap(&mut nodes, &mut self.nodes);
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessModBufSATB::<E>::new(edges, nodes, self.meta));
+    } else {
+        if self.edges.is_empty() {
+            return;
+        }
+        let mut edges = vec![];
+        std::mem::swap(&mut edges, &mut self.edges);
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessModBufIU::<E>::new(edges, self.meta));
+    }
     }
 
     #[inline(always)]
     fn write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Field { slot, .. } => {
-                self.enqueue_edge(slot);
+                self.enqueue_node(slot);
             }
-            WriteTarget::ArrayCopy { src, len, .. } => {
+            WriteTarget::ArrayCopy { src, src_offset, len, .. } => {
+                let src_base = src.to_address() + src_offset;
                 for i in 0..len {
-                    self.enqueue_edge(src.to_address() + (i << 3));
+                    self.enqueue_node(src_base + (i << 3));
                 }
             }
             WriteTarget::Clone {..} => {}

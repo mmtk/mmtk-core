@@ -15,6 +15,7 @@
 #![feature(step_trait)]
 #![feature(const_generics)]
 #![feature(once_cell)]
+#![feature(const_generics_defaults)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
