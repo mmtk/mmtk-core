@@ -469,7 +469,7 @@
             <span class="kw">if</span> <span class="ident">c</span>.<span class="ident">merge_phases</span>() {
                 <span class="macro">print!</span>(<span class="string">&quot;{}\t&quot;</span>, <span class="ident">c</span>.<span class="ident">name</span>());
             } <span class="kw">else</span> {
-                <span class="macro">print!</span>(<span class="string">&quot;{}.mu\t{}.gc\t&quot;</span>, <span class="ident">c</span>.<span class="ident">name</span>(), <span class="ident">c</span>.<span class="ident">name</span>());
+                <span class="macro">print!</span>(<span class="string">&quot;{}.other\t{}.stw\t&quot;</span>, <span class="ident">c</span>.<span class="ident">name</span>(), <span class="ident">c</span>.<span class="ident">name</span>());
             }
         }
         <span class="kw">for</span> <span class="ident">name</span> <span class="kw">in</span> <span class="ident">scheduler_stat</span>.<span class="ident">keys</span>() {
