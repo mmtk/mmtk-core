@@ -98,6 +98,22 @@
 <span id="98"> 98</span>
 <span id="99"> 99</span>
 <span id="100">100</span>
+<span id="101">101</span>
+<span id="102">102</span>
+<span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
 </pre><pre class="rust">
 <span class="doccomment">//! Read/Write barrier implementations.</span>
 
@@ -105,9 +121,9 @@
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::WorkBucketStage</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::load_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{<span class="ident">compare_exchange_metadata</span>, <span class="ident">MetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
 
 <span class="doccomment">/// BarrierSelector describes which barrier to use.</span>
@@ -153,18 +169,34 @@
         }
     }
 
+    <span class="doccomment">/// Attepmt to atomically log an object.</span>
+    <span class="doccomment">/// Returns true if the object is not logged previously.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">enqueue_node</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">fn</span> <span class="ident">log_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">loop</span> {
+            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span>
+                <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>));
+            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+                <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(
+                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>,
+                <span class="ident">object</span>,
+                <span class="number">1</span>,
+                <span class="number">0</span>,
+                <span class="prelude-val">None</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+                <span class="ident">Ordering::SeqCst</span>,
+            ) {
+                <span class="kw">return</span> <span class="bool-val">true</span>;
+            }
+        }
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">enqueue_node</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
         <span class="comment">// If the objecct is unlogged, log it and push it to mod buffer</span>
-        <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>,
-            <span class="ident">obj</span>,
-            <span class="number">0b1</span>,
-            <span class="number">0b0</span>,
-            <span class="prelude-val">None</span>,
-            <span class="ident">Ordering::SeqCst</span>,
-            <span class="ident">Ordering::SeqCst</span>,
-        ) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">log_object</span>(<span class="ident">obj</span>) {
             <span class="self">self</span>.<span class="ident">modbuf</span>.<span class="ident">push</span>(<span class="ident">obj</span>);
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">modbuf</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">E::CAPACITY</span> {
                 <span class="self">self</span>.<span class="ident">flush</span>();
@@ -193,7 +225,7 @@
     <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>) {
         <span class="kw">match</span> <span class="ident">target</span> {
             <span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>) <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="self">self</span>.<span class="ident">enqueue_node</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
+                <span class="self">self</span>.<span class="ident">enqueue_node</span>(<span class="ident">obj</span>);
             }
             <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
         }
