@@ -227,43 +227,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         Block::NEXT_BLOCK_TABLE
     }
 
-    #[inline]
-    pub fn get_free_metadata_spec(&self) -> SideMetadataSpec {
-        Block::FREE_LIST_TABLE
-    }
-
-    #[inline]
-    pub fn get_size_metadata_spec(&self) -> SideMetadataSpec {
-        Block::SIZE_TABLE
-    }
-
-    #[inline]
-    pub fn get_local_free_metadata_spec(&self) -> SideMetadataSpec {
-        Block::LOCAL_FREE_LIST_TABLE
-    }
-
-    #[inline]
-    pub fn get_thread_free_metadata_spec(&self) -> SideMetadataSpec {
-        Block::THREAD_FREE_LIST_TABLE
-    }
-
-    #[inline]
-    pub fn get_tls_metadata_spec(&self) -> SideMetadataSpec {
-        Block::TLS_TABLE
-    }
-
-    // #[inline]
-    // pub fn get_marked_metadata_spec(&self) -> SideMetadataSpec {
-    //     self.common.metadata.local[6]
-    // }
-
-    // pub fn eager_sweep(&self, tls: VMWorkerThread) {
-    //     let active_blocks = &*self.active_blocks.lock().unwrap();
-    //     for block in active_blocks {
-    //         self.sweep_block(*block, tls)
-    //     }
-    // }
-
     pub fn reset(&mut self) {
         // do nothing
     }
@@ -355,7 +318,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn alloced_block(&self, block: Address) -> bool {
         load_metadata::<VM>(
-            &MetadataSpec::OnSide(self.get_tls_metadata_spec()),
+            &MetadataSpec::OnSide(Block::TLS_TABLE),
             unsafe { block.to_object_reference() },
             None,
             Some(Ordering::SeqCst),
@@ -376,7 +339,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
         let tls = load_metadata::<VM>(
-            &MetadataSpec::OnSide(self.get_tls_metadata_spec()),
+            &MetadataSpec::OnSide(Block::TLS_TABLE),
             unsafe { block.to_object_reference() },
             None,
             Some(Ordering::SeqCst),
