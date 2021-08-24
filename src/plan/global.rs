@@ -246,7 +246,6 @@ pub trait Plan: 'static + Sync + Downcast {
                 self.common().control_collector_context.request();
                 return false;
             }*/
-            println!("Triggering collection");
             self.log_poll(space, "Triggering collection");
             if *crate::IN_CONCURRENT_GC.lock() {
                 println!(

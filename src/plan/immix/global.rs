@@ -185,7 +185,7 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let immix_specs = if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier {
+        let immix_specs = if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier && !super::BARRIER_MEASUREMENT {
             metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
         } else {
             vec![]

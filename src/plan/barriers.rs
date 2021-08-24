@@ -184,7 +184,7 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, edge: Address) {
-        if !*crate::IN_CONCURRENT_GC.lock() {
+        if !crate::plan::immix::BARRIER_MEASUREMENT && !*crate::IN_CONCURRENT_GC.lock() {
             return;
         }
         if self.log_edge(edge) {
@@ -205,6 +205,11 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
 impl<E: ProcessEdgesWork, const KIND: FLBKind> Barrier for FieldLoggingBarrier<E, KIND> {
     #[cold]
     fn flush(&mut self) {
+        if crate::plan::immix::BARRIER_MEASUREMENT {
+            self.edges.clear();
+            self.nodes.clear();
+            return;
+        }
         if KIND == FLBKind::SATB {
         if self.edges.is_empty() && self.nodes.is_empty() {
             return;
