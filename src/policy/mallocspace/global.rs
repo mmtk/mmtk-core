@@ -172,7 +172,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
             metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
                 local: metadata::extract_side_metadata(&[
-                    MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
@@ -334,13 +333,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut last_on_page_boundary = false;
 
         debug_assert!(
-            ALLOC_SIDE_METADATA_SPEC.log_min_obj_size == mark_bit_spec.log_min_obj_size,
+            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size
+                == mark_bit_spec.log_min_obj_size,
             "Alloc-bit and mark-bit metadata have different minimum object sizes!"
         );
 
         // For bulk xor'ing 128-bit vectors on architectures with vector instructions
         // Each bit represents an object of LOG_MIN_OBJ_SIZE size
-        let bulk_load_size: usize = 128 * (1 << ALLOC_SIDE_METADATA_SPEC.log_min_obj_size);
+        let bulk_load_size: usize =
+            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size);
 
         while address < chunk_end {
             // We extensively tested the performance of the following if-statement and were
@@ -363,7 +364,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 last_on_page_boundary = false;
             }
 
-            let alloc_128: u128 = unsafe { load128(&ALLOC_SIDE_METADATA_SPEC, address) };
+            let alloc_128: u128 =
+                unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
             let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
             // Check if there are dead objects in the bulk loaded region
