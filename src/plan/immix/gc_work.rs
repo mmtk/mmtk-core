@@ -27,7 +27,7 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
-        &super::global::IMMIX_CONSTRAINTS
+        super::global::get_immix_constraints()
     }
     fn init(&mut self, tls: VMWorkerThread) {
         self.immix.tls = tls.0;

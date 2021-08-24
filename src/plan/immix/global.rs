@@ -40,14 +40,24 @@ pub struct Immix<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
-pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+pub fn get_immix_constraints() -> &'static PlanConstraints {
+    static mut C: PlanConstraints = IMMIX_CONSTRAINTS_;
+    unsafe {
+        if None == option_env!("FLB_KIND") && super::BARRIER_MEASUREMENT {
+            C.barrier = BarrierSelector::NoBarrier
+        }
+        &C
+    }
+}
+
+pub const IMMIX_CONSTRAINTS_: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
     /// Max immix object size is half of a block.
     max_non_los_default_alloc_bytes: Block::BYTES >> 1,
-    barrier: super::ACTIVE_BARRIER,
+    barrier: BarrierSelector::FieldLoggingBarrier,
     ..PlanConstraints::default()
 };
 
@@ -65,7 +75,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
-        &IMMIX_CONSTRAINTS
+        get_immix_constraints()
     }
 
     fn create_worker_local(
@@ -84,6 +94,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
+        let flb = option_env!("FLB_KIND");
+        println!("FLB_KIND: {:?}", flb);
+        assert!(flb == None || flb == Some("SATB") || flb == Some("IU"));
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.immix_space.init(vm_map);
     }
@@ -186,12 +199,13 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let immix_specs =
-            if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier && !super::BARRIER_MEASUREMENT {
-                metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
-            } else {
-                vec![]
-            };
+        let immix_specs = if get_immix_constraints().barrier != BarrierSelector::NoBarrier
+            || super::BARRIER_MEASUREMENT
+        {
+            metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+        } else {
+            vec![]
+        };
         let global_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let immix = Immix {
             immix_space: ImmixSpace::new(
@@ -207,7 +221,7 @@ impl<VM: VMBinding> Immix<VM> {
                 mmapper,
                 options,
                 heap,
-                &IMMIX_CONSTRAINTS,
+                get_immix_constraints(),
                 global_metadata_specs.clone(),
             ),
         };
