@@ -7,7 +7,6 @@ use crate::scheduler::WorkBucketStage;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
-use crate::vm::VMBinding;
 use crate::MMTK;
 
 /// BarrierSelector describes which barrier to use.
