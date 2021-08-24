@@ -1,8 +1,8 @@
 use super::block::{Block, BlockState};
 use super::defrag::Histogram;
 use super::immixspace::ImmixSpace;
+use crate::util::metadata::side_metadata::{self, load, SideMetadataOffset, SideMetadataSpec};
 use crate::util::metadata::MetadataSpec;
-use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec, load};
 use crate::{
     scheduler::*,
     util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},

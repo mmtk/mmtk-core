@@ -114,13 +114,30 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     fn get_tls(&self) -> VMMutatorThread;
     fn barrier(&mut self) -> &mut dyn Barrier;
 
-    fn object_reference_write(&mut self, src: ObjectReference, slot: Address, val: ObjectReference) {
+    fn object_reference_write(
+        &mut self,
+        src: ObjectReference,
+        slot: Address,
+        val: ObjectReference,
+    ) {
         self.barrier()
             .write_barrier(WriteTarget::Field { src, slot, val });
     }
-    fn object_reference_arraycopy(&mut self, src: ObjectReference, src_offset: usize, dst: ObjectReference, dst_offset: usize, len: usize) {
-        self.barrier()
-            .write_barrier(WriteTarget::ArrayCopy { src, src_offset, dst, dst_offset, len });
+    fn object_reference_arraycopy(
+        &mut self,
+        src: ObjectReference,
+        src_offset: usize,
+        dst: ObjectReference,
+        dst_offset: usize,
+        len: usize,
+    ) {
+        self.barrier().write_barrier(WriteTarget::ArrayCopy {
+            src,
+            src_offset,
+            dst,
+            dst_offset,
+            len,
+        });
     }
     fn object_reference_clone(&mut self, src: ObjectReference, dst: ObjectReference) {
         self.barrier()

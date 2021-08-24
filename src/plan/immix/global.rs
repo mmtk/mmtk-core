@@ -59,7 +59,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn concurrent_collection_required(&self) -> bool {
-        super::CONCURRENT_MARKING && self.base().gc_status() == GcStatus::NotInGC
+        super::CONCURRENT_MARKING
+            && self.base().gc_status() == GcStatus::NotInGC
             && self.get_pages_reserved() * 100 / 45 > self.get_total_pages()
     }
 
@@ -185,11 +186,12 @@ impl<VM: VMBinding> Immix<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let immix_specs = if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier && !super::BARRIER_MEASUREMENT {
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
-        } else {
-            vec![]
-        };
+        let immix_specs =
+            if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier && !super::BARRIER_MEASUREMENT {
+                metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
+            } else {
+                vec![]
+            };
         let global_metadata_specs = SideMetadataContext::new_global_specs(&immix_specs);
         let immix = Immix {
             immix_space: ImmixSpace::new(

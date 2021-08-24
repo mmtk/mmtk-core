@@ -9,8 +9,8 @@ use std::lazy::SyncLazy;
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::sync::Condvar;
 use std::sync::atomic::Ordering;
+use std::sync::Condvar;
 
 pub struct ScheduleCollection(pub bool);
 
@@ -332,7 +332,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ConcurrentWorkEnd<E> {
             {
                 // Do nothing if not in concurrent phase
                 if !*crate::IN_CONCURRENT_GC.lock() {
-                    return
+                    return;
                 }
             }
             // Stop mutators
@@ -671,11 +671,10 @@ pub struct ProcessModBufSATB<E: ProcessEdgesWork> {
 }
 
 impl<E: ProcessEdgesWork> ProcessModBufSATB<E> {
-    pub fn new(
-        edges: Vec<Address>,
-        nodes: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
+    pub fn new(edges: Vec<Address>, nodes: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
         Self {
-            edges, nodes,
+            edges,
+            nodes,
             meta,
             phantom: PhantomData,
         }
@@ -702,7 +701,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBufSATB<E> {
     }
 }
 
-
 pub struct ProcessModBufIU<E: ProcessEdgesWork> {
     edges: Vec<Address>,
     phantom: PhantomData<E>,
@@ -710,8 +708,7 @@ pub struct ProcessModBufIU<E: ProcessEdgesWork> {
 }
 
 impl<E: ProcessEdgesWork> ProcessModBufIU<E> {
-    pub fn new(
-        edges: Vec<Address>, meta: MetadataSpec) -> Self {
+    pub fn new(edges: Vec<Address>, meta: MetadataSpec) -> Self {
         Self {
             edges,
             meta,

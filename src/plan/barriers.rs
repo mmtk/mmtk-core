@@ -23,9 +23,22 @@ pub enum BarrierSelector {
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address\
 #[derive(Debug)]
 pub enum WriteTarget {
-    Field { src: ObjectReference, slot: Address, val: ObjectReference },
-    ArrayCopy { src: ObjectReference, src_offset: usize, dst: ObjectReference, dst_offset: usize, len: usize },
-    Clone { src: ObjectReference, dst: ObjectReference },
+    Field {
+        src: ObjectReference,
+        slot: Address,
+        val: ObjectReference,
+    },
+    ArrayCopy {
+        src: ObjectReference,
+        src_offset: usize,
+        dst: ObjectReference,
+        dst_offset: usize,
+        len: usize,
+    },
+    Clone {
+        src: ObjectReference,
+        dst: ObjectReference,
+    },
 }
 
 pub trait Barrier: 'static + Send {
@@ -88,10 +101,10 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     fn enqueue_node(&mut self, obj: ObjectReference) {
         // If the objecct is unlogged, log it and push it to mod buffer
         if self.log_object(obj) {
-           self.modbuf.push(obj);
-           if self.modbuf.len() >= E::CAPACITY {
-               self.flush();
-           }
+            self.modbuf.push(obj);
+            if self.modbuf.len() >= E::CAPACITY {
+                self.flush();
+            }
         }
     }
 }
@@ -133,10 +146,11 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
 
 #[derive(PartialEq, Eq)]
 pub enum FLBKind {
-    SATB, IU,
+    SATB,
+    IU,
 }
 
-pub struct FieldLoggingBarrier<E: ProcessEdgesWork, const KIND: FLBKind = { FLBKind::SATB }> {
+pub struct FieldLoggingBarrier<E: ProcessEdgesWork, const KIND: FLBKind> {
     mmtk: &'static MMTK<E::VM>,
     edges: Vec<Address>,
     nodes: Vec<ObjectReference>,
@@ -211,22 +225,24 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> Barrier for FieldLoggingBarrier<E
             return;
         }
         if KIND == FLBKind::SATB {
-        if self.edges.is_empty() && self.nodes.is_empty() {
-            return;
+            if self.edges.is_empty() && self.nodes.is_empty() {
+                return;
+            }
+            let mut edges = vec![];
+            std::mem::swap(&mut edges, &mut self.edges);
+            let mut nodes = vec![];
+            std::mem::swap(&mut nodes, &mut self.nodes);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessModBufSATB::<E>::new(edges, nodes, self.meta));
+        } else {
+            if self.edges.is_empty() {
+                return;
+            }
+            let mut edges = vec![];
+            std::mem::swap(&mut edges, &mut self.edges);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(ProcessModBufIU::<E>::new(edges, self.meta));
         }
-        let mut edges = vec![];
-        std::mem::swap(&mut edges, &mut self.edges);
-        let mut nodes = vec![];
-        std::mem::swap(&mut nodes, &mut self.nodes);
-        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessModBufSATB::<E>::new(edges, nodes, self.meta));
-    } else {
-        if self.edges.is_empty() {
-            return;
-        }
-        let mut edges = vec![];
-        std::mem::swap(&mut edges, &mut self.edges);
-        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessModBufIU::<E>::new(edges, self.meta));
-    }
     }
 
     #[inline(always)]
@@ -235,13 +251,18 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> Barrier for FieldLoggingBarrier<E
             WriteTarget::Field { slot, .. } => {
                 self.enqueue_node(slot);
             }
-            WriteTarget::ArrayCopy { src, src_offset, len, .. } => {
+            WriteTarget::ArrayCopy {
+                src,
+                src_offset,
+                len,
+                ..
+            } => {
                 let src_base = src.to_address() + src_offset;
                 for i in 0..len {
                     self.enqueue_node(src_base + (i << 3));
                 }
             }
-            WriteTarget::Clone {..} => {}
+            WriteTarget::Clone { .. } => {}
         }
     }
 }
