@@ -188,9 +188,12 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             let consumed_blocks = &mut self.consumed_blocks[bin as usize];
             debug_assert!(available_blocks.size == consumed_blocks.size);
 
+<<<<<<< HEAD
             FreeListAllocator::<VM>::push_onto_block_list(consumed_blocks, block);
             debug_assert!(consumed_blocks.first == block);
             
+=======
+>>>>>>> remove big in alloc_slow_once, use is_zero
             return self.alloc_slow(size, align, offset);
         }
 
@@ -209,6 +212,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         // try to find an existing block with free cells
+<<<<<<< HEAD
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
             // gc
@@ -221,6 +225,24 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // _mi_page_malloc
         let free_list = FreeListAllocator::<VM>::load_free_list(block);
         debug_assert!(!free_list.is_zero());
+=======
+        // eprintln!("alloc_slow_once, tls={:?}", self.tls.0);
+        let block = self.acquire_block_for_size(size);
+        if block.is_zero() {
+            return block;
+        }
+
+        // _mi_page_malloc
+        let free_list = unsafe {
+            Address::from_usize(load_metadata::<VM>(
+                &MetadataSpec::OnSide(self.space.get_free_metadata_spec()),
+                block.to_object_reference(),
+                None,
+                None,
+            ))
+        };
+        assert!(!free_list.is_zero());
+>>>>>>> remove big in alloc_slow_once, use is_zero
 
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
@@ -360,10 +382,21 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         );
     }
 
+<<<<<<< HEAD
     pub fn load_block_cell_size(block: Address) -> usize {
         load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::SIZE_TABLE),
             unsafe { block.to_object_reference() },
+=======
+    fn pop_from_block_list(block_list: &mut BlockList) -> Address {
+        if block_list.first.is_zero() {
+            return unsafe { Address::zero() };
+        }
+        let next = load_metadata::<VM>(
+            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
+            unsafe { block_list.first.to_object_reference() },
+            None,
+>>>>>>> remove big in alloc_slow_once, use is_zero
             None,
             Some(Ordering::SeqCst),
         )
@@ -397,10 +430,39 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         )
     }
 
+<<<<<<< HEAD
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         let rtn = block_list.first;
         if rtn.is_zero() {
             return rtn;
+=======
+    pub fn block_thread_free_collect(&self, block: Address) {
+        let free_list = FreeListAllocator::<VM>::load_free_list(block);
+
+        let mut success = false;
+        let mut thread_free = unsafe { Address::zero() };
+        while !success {
+            thread_free = self.get_thread_free_list(block);
+            if thread_free.is_zero() {
+                // no frees from other threads to worry about
+                return
+            }
+            success = self.cas_thread_free_list(block, thread_free, unsafe { Address::zero() });
+        }
+        // no more CAS needed
+        // futher frees to the thread free list will be done from a new empty list
+        if free_list.is_zero() {
+            self.set_free_list(block, thread_free);
+        } else {
+            let mut tail = thread_free;
+            unsafe {
+                while !tail.is_zero() {
+                    tail = tail.load::<Address>();
+                }
+                tail.store(free_list);
+            }
+            self.set_free_list(block, thread_free);
+>>>>>>> remove big in alloc_slow_once, use is_zero
         }
         let next = FreeListAllocator::<VM>::load_next_block(rtn);
         block_list.first = next;
@@ -454,10 +516,19 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
         debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
 
+<<<<<<< HEAD
         if !local_free.is_zero() {
             if !free_list.is_zero() {
                 let mut tail = local_free;
                 unsafe {
+=======
+        if free_list.is_zero() {
+            self.set_free_list(block, local_free);
+        } else {
+            unsafe {
+                if !local_free.is_zero() {
+                    let mut tail = local_free;
+>>>>>>> remove big in alloc_slow_once, use is_zero
                     let mut next = tail.load::<Address>();
                     while !next.is_zero() {
                         tail = next;
@@ -473,7 +544,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn block_has_free_cells(block: Address) -> bool {
+<<<<<<< HEAD
         debug_assert!(!block.is_zero());
+=======
+>>>>>>> remove big in alloc_slow_once, use is_zero
         !FreeListAllocator::<VM>::load_free_list(block).is_zero()
 
     }
@@ -485,8 +559,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         loop {
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
+<<<<<<< HEAD
             if block.is_zero() {
                 // reached end of unswept list
+=======
+            // eprintln!("block {} is unswept {:?}", block, self.tls);
+            if block.is_zero() {
+>>>>>>> remove big in alloc_slow_once, use is_zero
                 break
             }
             self.sweep_block(block);
@@ -507,9 +586,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
 
         // fresh block
+<<<<<<< HEAD
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if block.is_zero() {
             // GC, I guess
+=======
+
+        let mut block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        if block.is_zero() {
+>>>>>>> remove big in alloc_slow_once, use is_zero
             return block;
         }
 
