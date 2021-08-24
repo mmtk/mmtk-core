@@ -6,6 +6,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
+use crate::util::metadata::side_metadata::LOG_MAX_GLOBAL_SIDE_METADATA_SIZE;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -20,8 +21,11 @@ lazy_static! {
         local: vec![],
     };
 
-    // lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
+    /// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
+    /// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds
+    static ref MAX_METADATA_ADDRESS: Address =
+        ACTIVE_CHUNK_METADATA_SPEC.get_absolute_offset() + (1_usize << LOG_MAX_GLOBAL_SIDE_METADATA_SIZE);
 }
 
 /// Metadata spec for the active chunk byte
@@ -166,7 +170,16 @@ pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
 }
 
 pub fn is_chunk_mapped(chunk_start: Address) -> bool {
-    side_metadata::address_to_meta_address(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start).is_mapped()
+    // Since `address_to_meta_address` will translate a data address to a metadata address without caring
+    // if it goes across metadata boundaries, we have to check if we have accidentally gone over the bounds
+    // of the active chunk metadata spec before we check if the metadata has been mapped or not
+    let meta_address =
+        side_metadata::address_to_meta_address(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start);
+    if meta_address < *MAX_METADATA_ADDRESS {
+        meta_address.is_mapped()
+    } else {
+        false
+    }
 }
 
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
