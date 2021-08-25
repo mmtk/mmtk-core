@@ -118,6 +118,7 @@
 <span id="118">118</span>
 <span id="119">119</span>
 <span id="120">120</span>
+<span id="121">121</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
@@ -134,11 +135,12 @@
 <span class="comment">// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,</span>
 <span class="comment">// as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system</span>
 <span class="comment">// reserved addresses such as 0x0.</span>
+<span class="comment">// public, VM bingdings may need to use this</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span>) };
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0600_0000_0000usize</span>) };
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
