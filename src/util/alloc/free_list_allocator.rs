@@ -604,9 +604,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
-        // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-        // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-        // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
 
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
@@ -632,7 +629,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     self.consumed_blocks.get_mut(bin).unwrap(),
                     block,
                 );
-                // eprintln!("slow consumed blocks: {:?}", self.consumed_blocks[bin]);
             }
         }
 
@@ -755,11 +751,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     #[cfg(feature = "lazy_sweeping")]
     pub fn reset(&mut self) {
         trace!("reset");
-        // eprintln!("reset");
-        eprintln!("at reset c blocks: {:?}", self.consumed_blocks[10]);
-        assert!(self.consumed_blocks[10].first.as_usize() != 0);
-        
-
         // consumed and available are now unswept
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
