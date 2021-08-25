@@ -253,87 +253,22 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align >= VM::MIN_ALIGNMENT);
         debug_assert!(offset == 0);
 
-<<<<<<< HEAD
         let rtn = self.alloc_from_available(size);
         if rtn.is_zero() {
             debug_assert!(self.available_blocks[FreeListAllocator::<VM>::mi_bin(size) as usize].is_empty());
             return self.alloc_slow(size, align, offset)
         }
         rtn
-=======
-        // _mi_heap_get_free_small_page
-        let bin = FreeListAllocator::<VM>::mi_bin(size);
-        debug_assert!(bin <= MI_BIN_HUGE as u8);
-
-        let available_blocks = &mut self.available_blocks[bin as usize];
-        debug_assert!(available_blocks.size >= size);
-
-        let block = available_blocks.first;
-        if block.is_zero() {
-            // no block for this size, go to slow path
-            return self.alloc_slow(size, align, offset);
-        }
-
-        // _mi_page_malloc
-        let free_list = FreeListAllocator::<VM>::load_free_list(block);
-
-        if free_list.is_zero() {
-            // first block has no empty cells, put it on the consumed list and go to slow path
-<<<<<<< HEAD
-            debug_assert!(!block.is_zero());
-            available_blocks.first = FreeListAllocator::<VM>::load_next_block(block);
-=======
-            available_blocks.first = FreeListAllocator::<VM>::load_next_block(block);
-
-            // eprintln!("alloc consumed blocks: {:?}", self.consumed_blocks[bin as usize]);
-            let consumed_blocks = &mut self.consumed_blocks[bin as usize];
-            FreeListAllocator::<VM>::push_onto_block_list(consumed_blocks, block);
-            // eprintln!("alloc consumed blocks: {:?}", self.consumed_blocks[bin as usize]);
->>>>>>> refactoring, new bug with consumed list disappearing
-
-            let consumed_blocks = &mut self.consumed_blocks[bin as usize];
-            debug_assert!(available_blocks.size == consumed_blocks.size);
-
-<<<<<<< HEAD
-            FreeListAllocator::<VM>::push_onto_block_list(consumed_blocks, block);
-            debug_assert!(consumed_blocks.first == block);
-            
-=======
->>>>>>> remove big in alloc_slow_once, use is_zero
-            return self.alloc_slow(size, align, offset);
-        }
-
-        // update free list
-        debug_assert!(!free_list.is_zero());
-        let next_cell = unsafe { free_list.load::<Address>() };
-        FreeListAllocator::<VM>::store_free_list(block, next_cell);
-<<<<<<< HEAD
-        debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
-=======
->>>>>>> refactoring, new bug with consumed list disappearing
-
-        // set allocation bit
-        set_alloc_bit(unsafe { free_list.to_object_reference() });
-        debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
-
-        free_list
->>>>>>> refactoring, new bug with consumed list disappearing
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         // try to find an existing block with free cells
-<<<<<<< HEAD
         let bin = FreeListAllocator::<VM>::mi_bin(size);
         // debug_assert!(self.available_blocks[bin as usize].is_empty());
         if !self.available_blocks[bin as usize].is_empty() {
             // we've just had GC, which has made some blocks available
             return self.alloc_from_available(size);
         }
-
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> refactoring, new bug with consumed list disappearing
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
             // gc
@@ -345,12 +280,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // _mi_page_malloc
         let free_list = FreeListAllocator::<VM>::load_free_list(block);
         debug_assert!(!free_list.is_zero());
-<<<<<<< HEAD
-=======
-=======
-        // eprintln!("alloc_slow_once, tls={:?}", self.tls.0);
-=======
->>>>>>> refactoring, new bug with consumed list disappearing
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
             return block;
@@ -359,16 +288,11 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // _mi_page_malloc
         let free_list = FreeListAllocator::<VM>::load_free_list(block);
         assert!(!free_list.is_zero());
->>>>>>> remove big in alloc_slow_once, use is_zero
->>>>>>> refactoring, new bug with consumed list disappearing
 
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
         FreeListAllocator::<VM>::store_free_list(block, next_cell);
-<<<<<<< HEAD
         debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
-=======
->>>>>>> refactoring, new bug with consumed list disappearing
 
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
@@ -490,25 +414,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn store_thread_free_list(block: Address, thread_free: Address) {
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-<<<<<<< HEAD
-=======
-            unsafe { block.to_object_reference() },
-            thread_free.as_usize(),
-            None,
-            None,
-        );
-    }
-
-    #[inline]
-    pub fn cas_thread_free_list(
-        &self,
-        block: Address,
-        old_thread_free: Address,
-        new_thread_free: Address,
-    ) -> bool {
-        compare_exchange_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
->>>>>>> refactoring, new bug with consumed list disappearing
             unsafe { block.to_object_reference() },
             thread_free.as_usize(),
             None,
@@ -584,33 +489,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             None,
         );
     }
-
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> refactoring, new bug with consumed list disappearing
->>>>>>> refactoring, new bug with consumed list disappearing
     pub fn load_block_cell_size(block: Address) -> usize {
         load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::SIZE_TABLE),
             unsafe { block.to_object_reference() },
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
+        )
+    }
+
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         if block_list.first.is_zero() {
             return unsafe { Address::zero() };
         }
-        let next = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-            unsafe { block_list.first.to_object_reference() },
-=======
-            None,
-            Some(Ordering::SeqCst),
-        )
+
     }
     
     pub fn store_block_cell_size(block: Address, size: usize) {
@@ -618,12 +508,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             &MetadataSpec::OnSide(Block::SIZE_TABLE),
             unsafe { block.to_object_reference() },
             size,
->>>>>>> refactoring, new bug with consumed list disappearing
             None,
->>>>>>> remove big in alloc_slow_once, use is_zero
->>>>>>> refactoring, new bug with consumed list disappearing
-            None,
-<<<<<<< HEAD
             Some(Ordering::SeqCst),
         )
     }
@@ -654,33 +539,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             Ordering::SeqCst,
             Ordering::SeqCst,
         )
-=======
-        );
     }
 
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         let rtn = block_list.first;
         if rtn.is_zero() {
             return rtn;
-        }
-        let next = FreeListAllocator::<VM>::load_next_block(rtn);
-        block_list.first = next;
-        rtn
-    }
-
-    fn push_onto_block_list(block_list: &mut BlockList, block: Address) {
-        FreeListAllocator::<VM>::store_next_block(block, block_list.first);
-        block_list.first = block;
->>>>>>> refactoring, new bug with consumed list disappearing
-    }
-
-    fn pop_from_block_list(block_list: &mut BlockList) -> Address {
-        let rtn = block_list.first;
-        if rtn.is_zero() {
-            return rtn;
-<<<<<<< HEAD
-=======
-=======
     pub fn block_thread_free_collect(&self, block: Address) {
         let free_list = FreeListAllocator::<VM>::load_free_list(block);
 
@@ -707,10 +571,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
                 tail.store(free_list);
             }
-<<<<<<< HEAD
-            self.set_free_list(block, thread_free);
->>>>>>> remove big in alloc_slow_once, use is_zero
->>>>>>> refactoring, new bug with consumed list disappearing
         }
         let next = FreeListAllocator::<VM>::load_next_block(rtn);
         block_list.first = next;
@@ -720,10 +580,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     fn push_onto_block_list(block_list: &mut BlockList, block: Address) {
         FreeListAllocator::<VM>::store_next_block(block, block_list.first);
         block_list.first = block;
-=======
-        }
-        FreeListAllocator::<VM>::store_free_list(block, thread_free);
->>>>>>> refactoring, new bug with consumed list disappearing
     }
 
     // pub fn block_thread_free_collect(&self, block: Address) {
@@ -766,31 +622,23 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // same thread
         let local_free = FreeListAllocator::<VM>::load_local_free_list(block);
         FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
-<<<<<<< HEAD
         debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
 
         if !local_free.is_zero() {
             if !free_list.is_zero() {
                 let mut tail = local_free;
                 unsafe {
-<<<<<<< HEAD
-=======
-=======
         if free_list.is_zero() {
             self.set_free_list(block, local_free);
         } else {
             unsafe {
                 if !local_free.is_zero() {
                     let mut tail = local_free;
->>>>>>> remove big in alloc_slow_once, use is_zero
-=======
 
         if !free_list.is_zero() {
             if !local_free.is_zero() {
                 let mut tail = local_free;
                 unsafe {
->>>>>>> refactoring, new bug with consumed list disappearing
->>>>>>> refactoring, new bug with consumed list disappearing
                     let mut next = tail.load::<Address>();
                     while !next.is_zero() {
                         tail = next;
@@ -799,15 +647,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     tail.store(free_list);
                 }
             }
-<<<<<<< HEAD
             FreeListAllocator::<VM>::store_free_list(block, local_free);
         }
 
         debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
-=======
-        }
-        FreeListAllocator::<VM>::store_free_list(block, local_free);
->>>>>>> refactoring, new bug with consumed list disappearing
     }
 
     pub fn block_has_free_cells(block: Address) -> bool {
@@ -827,7 +670,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-<<<<<<< HEAD
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
@@ -839,14 +681,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             unreachable!();
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
             if block.is_zero() {
-                // reached end of unswept list
-<<<<<<< HEAD
-=======
-=======
-            // eprintln!("block {} is unswept {:?}", block, self.tls);
+
             if block.is_zero() {
->>>>>>> remove big in alloc_slow_once, use is_zero
-=======
+
         eprintln!("block for size c blocks: {:?}", self.consumed_blocks[10]);
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
@@ -858,17 +695,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
             if block.is_zero() {
                 // reached end of unswept list
->>>>>>> refactoring, new bug with consumed list disappearing
->>>>>>> refactoring, new bug with consumed list disappearing
                 break
             }
             self.sweep_block(block);
             if FreeListAllocator::<VM>::block_has_free_cells(block) {
                 // recyclable block
-<<<<<<< HEAD
-=======
-                eprintln!("found a recylable block");
->>>>>>> refactoring, new bug with consumed list disappearing
                 FreeListAllocator::<VM>::push_onto_block_list(
                     self.available_blocks.get_mut(bin).unwrap(),
                     block,
@@ -876,24 +707,14 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 return block;
             } else {
                 // nothing was freed from this block
-<<<<<<< HEAD
-=======
-                // eprintln!("slow consumed blocks: {:?}", self.consumed_blocks[bin]);
->>>>>>> refactoring, new bug with consumed list disappearing
                 FreeListAllocator::<VM>::push_onto_block_list(
                     self.consumed_blocks.get_mut(bin).unwrap(),
                     block,
                 );
-                // eprintln!("slow consumed blocks: {:?}", self.consumed_blocks[bin]);
             }
         }
 
         // fresh block
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> refactoring, new bug with consumed list disappearing
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if bin == 4 {
             // eprintln!("space gives {}", block);
@@ -901,22 +722,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         if block.is_zero() {
             self.print_blocklists();
             // GC, I guess
-<<<<<<< HEAD
-=======
-=======
 
         let mut block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if block.is_zero() {
->>>>>>> remove big in alloc_slow_once, use is_zero
-=======
         eprintln!("before acquire c blocks: {:?}", self.consumed_blocks[10]);
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if block.is_zero() {
             // GC, I guess
->>>>>>> refactoring, new bug with consumed list disappearing
->>>>>>> refactoring, new bug with consumed list disappearing
-            return block;
-        }
+        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        if block.is_zero() {
+            // GC, I guess
         // eprintln!("b > 0x{:0x}", block);
 
         // construct free list
@@ -999,7 +814,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             unsafe {
                 addr.store(local_free);
             }
-<<<<<<< HEAD
             FreeListAllocator::<VM>::store_local_free_list(block, addr);
         } else {
             // different thread to allocator
@@ -1012,19 +826,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             //     }
             //     success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
             // }
-=======
-            FreeListAllocator::<VM>::store_local_free_list(block, local_free);
-        } else {
-            // different thread to allocator
-            let mut success = false;
-            while !success {
-                let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
-                unsafe {
-                    addr.store(thread_free);
-                }
-                success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
-            }
->>>>>>> refactoring, new bug with consumed list disappearing
         }
 
         // unset allocation bit
@@ -1044,28 +845,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "lazy_sweeping")]
     pub fn reset(&mut self) {
-        // eprintln!("reset");
         trace!("reset");
-        // eprintln!("reset");
-        eprintln!("at reset c blocks: {:?}", self.consumed_blocks[10]);
-        assert!(self.consumed_blocks[10].first.as_usize() != 0);
-        
-
         // consumed and available are now unswept
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
-<<<<<<< HEAD
             let unswept = &mut self.unswept_blocks[bin];
             let available = self.available_blocks[bin];
             debug_assert!(available.size == unswept.size);
-=======
-            // eprintln!("before");
-            // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-            // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-            // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
-            let unswept = &mut self.unswept_blocks[bin];
-            let available = self.available_blocks[bin];
->>>>>>> refactoring, new bug with consumed list disappearing
             if !available.is_empty() {
                 if unswept.is_empty() {
                     unswept.first = available.first
@@ -1091,14 +877,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     );
                 }
             }
-<<<<<<< HEAD
-=======
-            // eprintln!("\nafter");
-            // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-            // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-            // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
-            // unreachable!();
->>>>>>> refactoring, new bug with consumed list disappearing
             bin += 1;
         }
         self.available_blocks = BLOCK_LISTS_EMPTY.to_vec();
