@@ -4,9 +4,9 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
+use crate::util::metadata::load_metadata;
 use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
-use crate::vm::VMBinding;
 use crate::MMTK;
 
 /// BarrierSelector describes which barrier to use.
@@ -52,18 +52,34 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
         }
     }
 
+    /// Attepmt to atomically log an object.
+    /// Returns true if the object is not logged previously.
     #[inline(always)]
-    fn enqueue_node<VM: VMBinding>(&mut self, obj: ObjectReference) {
+    fn log_object(&self, object: ObjectReference) -> bool {
+        loop {
+            let old_value =
+                load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
+            if old_value == 0 {
+                return false;
+            }
+            if compare_exchange_metadata::<E::VM>(
+                &self.meta,
+                object,
+                1,
+                0,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                return true;
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn enqueue_node(&mut self, obj: ObjectReference) {
         // If the objecct is unlogged, log it and push it to mod buffer
-        if compare_exchange_metadata::<VM>(
-            &self.meta,
-            obj,
-            0b1,
-            0b0,
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        ) {
+        if self.log_object(obj) {
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -92,7 +108,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     fn post_write_barrier(&mut self, target: WriteTarget) {
         match target {
             WriteTarget::Object(obj) => {
-                self.enqueue_node::<E::VM>(obj);
+                self.enqueue_node(obj);
             }
             _ => unreachable!(),
         }
