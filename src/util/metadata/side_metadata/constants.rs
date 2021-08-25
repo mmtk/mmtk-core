@@ -13,6 +13,7 @@ use super::metadata_address_range_size;
 // XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,
 // as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
 // reserved addresses such as 0x0.
+// public, VM bingdings may need to use this
 #[cfg(target_pointer_width = "32")]
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(BYTES_IN_CHUNK) };
