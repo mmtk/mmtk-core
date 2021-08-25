@@ -175,11 +175,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             // first block has no empty cells, put it on the consumed list and go to slow path
             available_blocks.first = FreeListAllocator::<VM>::load_next_block(block);
 
-            // eprintln!("alloc consumed blocks: {:?}", self.consumed_blocks[bin as usize]);
             let consumed_blocks = &mut self.consumed_blocks[bin as usize];
             FreeListAllocator::<VM>::push_onto_block_list(consumed_blocks, block);
-            // eprintln!("alloc consumed blocks: {:?}", self.consumed_blocks[bin as usize]);
-
+            
             return self.alloc_slow(size, align, offset);
         }
 
@@ -435,12 +433,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
-        eprintln!("block for size c blocks: {:?}", self.consumed_blocks[10]);
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
-        // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-        // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-        // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
 
         loop {
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
@@ -451,7 +445,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             self.sweep_block(block);
             if FreeListAllocator::<VM>::block_has_free_cells(block) {
                 // recyclable block
-                eprintln!("found a recylable block");
                 FreeListAllocator::<VM>::push_onto_block_list(
                     self.available_blocks.get_mut(bin).unwrap(),
                     block,
@@ -459,17 +452,14 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 return block;
             } else {
                 // nothing was freed from this block
-                // eprintln!("slow consumed blocks: {:?}", self.consumed_blocks[bin]);
                 FreeListAllocator::<VM>::push_onto_block_list(
                     self.consumed_blocks.get_mut(bin).unwrap(),
                     block,
                 );
-                // eprintln!("slow consumed blocks: {:?}", self.consumed_blocks[bin]);
             }
         }
 
         // fresh block
-        eprintln!("before acquire c blocks: {:?}", self.consumed_blocks[10]);
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if block.is_zero() {
             // GC, I guess
@@ -548,7 +538,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             unsafe {
                 addr.store(local_free);
             }
-            FreeListAllocator::<VM>::store_local_free_list(block, local_free);
+            FreeListAllocator::<VM>::store_local_free_list(block, addr);
         } else {
             // different thread to allocator
             let mut success = false;
@@ -578,18 +568,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     pub fn reset(&mut self) {
         trace!("reset");
-        // eprintln!("reset");
-        eprintln!("at reset c blocks: {:?}", self.consumed_blocks[10]);
-        assert!(self.consumed_blocks[10].first.as_usize() != 0);
-        
-
         // consumed and available are now unswept
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
-            // eprintln!("before");
-            // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-            // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-            // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
             let unswept = &mut self.unswept_blocks[bin];
             let available = self.available_blocks[bin];
             if !available.is_empty() {
@@ -613,11 +594,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     );
                 }
             }
-            // eprintln!("\nafter");
-            // eprintln!("available blocks: {:?}", self.available_blocks[bin]);
-            // eprintln!("unswept blocks: {:?}", self.unswept_blocks[bin]);
-            // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
-            // unreachable!();
             bin += 1;
         }
         self.available_blocks = BLOCK_LISTS_EMPTY.to_vec();
