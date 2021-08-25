@@ -14,7 +14,7 @@ use super::metadata_address_range_size;
 // as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
 // reserved addresses such as 0x0.
 #[cfg(target_pointer_width = "32")]
-pub(crate) const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
+pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
     unsafe { Address::from_usize(BYTES_IN_CHUNK) };
 #[cfg(target_pointer_width = "64")]
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
