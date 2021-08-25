@@ -44,12 +44,12 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), &gencopy.nursery),
+            (AllocatorSelector::BumpPointer(0), &gencopy.gen.nursery),
             (
                 AllocatorSelector::BumpPointer(1),
-                gencopy.common.get_immortal(),
+                gencopy.gen.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), gencopy.common.get_los()),
+            (AllocatorSelector::LargeObject(0), gencopy.gen.common.get_los()),
         ],
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,

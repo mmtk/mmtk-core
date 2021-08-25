@@ -101,36 +101,37 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        // Evacuate nursery objects
-        if self.gencopy().nursery.in_space(object) {
-            return self
-                .gencopy()
-                .nursery
-                .trace_object::<Self, GenCopyCopyContext<VM>>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-                );
-        }
-        // We may alloc large object into LOS as nursery objects. Trace them here.
-        if self.gencopy().common.get_los().in_space(object) {
-            return self
-                .gencopy()
-                .common
-                .get_los()
-                .trace_object::<Self>(self, object);
-        }
-        debug_assert!(!self.gencopy().fromspace().in_space(object));
-        debug_assert!(self.gencopy().tospace().in_space(object));
-        object
+        self.gencopy().gen.trace_object_nursery(self, object, unsafe { self.worker().local::<GenCopyCopyContext<VM>>() })
+        // // Evacuate nursery objects
+        // if self.gencopy().gen.nursery.in_space(object) {
+        //     return self
+        //         .gencopy()
+        //         .gen.nursery
+        //         .trace_object::<Self, GenCopyCopyContext<VM>>(
+        //             self,
+        //             object,
+        //             super::global::ALLOC_SS,
+        //             unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
+        //         );
+        // }
+        // // We may alloc large object into LOS as nursery objects. Trace them here.
+        // if self.gencopy().gen.common.get_los().in_space(object) {
+        //     return self
+        //         .gencopy()
+        //         .gen.common
+        //         .get_los()
+        //         .trace_object::<Self>(self, object);
+        // }
+        // debug_assert!(!self.gencopy().fromspace().in_space(object));
+        // debug_assert!(self.gencopy().tospace().in_space(object));
+        // object
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {
         debug_assert!(!self.gencopy().fromspace().address_in_space(slot));
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        debug_assert!(!self.gencopy().nursery.in_space(new_object));
+        debug_assert!(!self.gencopy().gen.nursery.in_space(new_object));
         unsafe { slot.store(new_object) };
     }
 }
@@ -172,17 +173,17 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             return object;
         }
         // Evacuate nursery objects
-        if self.gencopy().nursery.in_space(object) {
-            return self
-                .gencopy()
-                .nursery
-                .trace_object::<Self, GenCopyCopyContext<VM>>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-                );
-        }
+        // if self.gencopy().gen.nursery.in_space(object) {
+        //     return self
+        //         .gencopy()
+        //         .gen.nursery
+        //         .trace_object::<Self, GenCopyCopyContext<VM>>(
+        //             self,
+        //             object,
+        //             super::global::ALLOC_SS,
+        //             unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
+        //         );
+        // }
         // Evacuate mature objects
         if self.gencopy().tospace().in_space(object) {
             return self
@@ -207,8 +208,8 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
                 );
         }
         self.gencopy()
-            .common
-            .trace_object::<Self, GenCopyCopyContext<VM>>(self, object)
+            .gen
+            .trace_object_full_heap::<Self, GenCopyCopyContext<VM>>(self, object, unsafe { self.worker().local::<GenCopyCopyContext<VM>>() })
     }
 }
 
