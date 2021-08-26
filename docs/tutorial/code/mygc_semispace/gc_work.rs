@@ -10,7 +10,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
-use crate::scheduler::WorkerLocal;
+use crate::scheduler::GCWorkerLocal;
 use std::ops::{Deref, DerefMut};
 // ANCHOR_END: imports
 
@@ -77,7 +77,7 @@ impl<VM: VMBinding> MyGCCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for MyGCCopyContext<VM> {
+impl<VM: VMBinding> GCWorkerLocal for MyGCCopyContext<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }

@@ -418,10 +418,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if common.contiguous {
             print!("{}->{}", common.start, common.start + common.extent - 1);
             match common.vmrequest {
-                VMRequest::RequestExtent { extent, .. } => {
+                VMRequest::Extent { extent, .. } => {
                     print!(" E {}", extent);
                 }
-                VMRequest::RequestFraction { frac, .. } => {
+                VMRequest::Fraction { frac, .. } => {
                     print!(" F {}", frac);
                 }
                 _ => {}
@@ -537,12 +537,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         let (extent, top) = match vmrequest {
-            VMRequest::RequestFraction { frac, top: _top } => (get_frac_available(frac), _top),
-            VMRequest::RequestExtent {
+            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
+            VMRequest::Extent {
                 extent: _extent,
                 top: _top,
             } => (_extent, _top),
-            VMRequest::RequestFixed {
+            VMRequest::Fixed {
                 extent: _extent,
                 top: _top,
                 ..
@@ -558,7 +558,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         let start: Address;
-        if let VMRequest::RequestFixed { start: _start, .. } = vmrequest {
+        if let VMRequest::Fixed { start: _start, .. } = vmrequest {
             start = _start;
         } else {
             // FIXME

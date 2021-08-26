@@ -16,6 +16,7 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
@@ -73,13 +74,13 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.immix_space.init(&vm_map);
+        self.immix_space.init(vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         let in_defrag = self.immix_space.decide_whether_to_defrag(
@@ -90,6 +91,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.base().options.full_heap_system_gc,
         );
         // Stop & scan mutators (mutator scanning can happen before STW)
+        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
+        #[allow(clippy::if_same_then_else)]
+        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
+        #[allow(clippy::branches_sharing_code)]
         if in_defrag {
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
@@ -100,6 +105,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
+        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
+        #[allow(clippy::if_same_then_else)]
+        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
+        #[allow(clippy::branches_sharing_code)]
         if in_defrag {
             scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
                 ImmixProcessEdges<VM, { TraceKind::Defrag }>,
@@ -159,13 +168,27 @@ impl<VM: VMBinding> Immix<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         let immix = Immix {
-            immix_space: ImmixSpace::new("immix", vm_map, mmapper, &mut heap, scheduler, vec![]),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &IMMIX_CONSTRAINTS, vec![]),
+            immix_space: ImmixSpace::new(
+                "immix",
+                vm_map,
+                mmapper,
+                &mut heap,
+                scheduler,
+                global_metadata_specs.clone(),
+            ),
+            common: CommonPlan::new(
+                vm_map,
+                mmapper,
+                options,
+                heap,
+                &IMMIX_CONSTRAINTS,
+                global_metadata_specs,
+            ),
         };
 
         {

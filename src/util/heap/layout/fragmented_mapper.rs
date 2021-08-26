@@ -274,7 +274,7 @@ impl FragmentedMapper {
 
     fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
         debug_assert!(self.slab_table[index].is_some());
-        self.slab_table[index].as_ref().map(|x| &x as &Slab)
+        self.slab_table[index].as_ref().map(|x| x as &Slab)
     }
 
     /**

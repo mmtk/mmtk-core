@@ -18,7 +18,7 @@ impl<VM: VMBinding> GCWork<VM> for ScheduleCollection {
     }
 }
 
-impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
+impl<VM: VMBinding> CoordinatorWork<VM> for ScheduleCollection {}
 
 /// The global GC Preparation Work
 /// This work packet invokes prepare() for the plan (which will invoke prepare() for each space), and
@@ -27,12 +27,12 @@ impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for ScheduleCollection {}
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
-pub struct Prepare<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct Prepare<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> Prepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -41,7 +41,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Prepare<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Prepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for Prepare<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
@@ -81,15 +81,15 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
 
 /// The collector GC Preparation Work
 #[derive(Default)]
-pub struct PrepareCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
+pub struct PrepareCollector<W: CopyContext + GCWorkerLocal>(PhantomData<W>);
 
-impl<W: CopyContext + WorkerLocal> PrepareCollector<W> {
+impl<W: CopyContext + GCWorkerLocal> PrepareCollector<W> {
     pub fn new() -> Self {
         PrepareCollector(PhantomData)
     }
 }
 
-impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollector<W> {
+impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for PrepareCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
         unsafe { worker.local::<W>() }.prepare();
@@ -103,12 +103,12 @@ impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for PrepareCollecto
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
-pub struct Release<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct Release<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> Release<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -117,7 +117,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> Release<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for Release<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for Release<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         trace!("Release Global");
         <P::VM as VMBinding>::VMCollection::vm_release();
@@ -160,15 +160,15 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
 
 /// The collector release Work
 #[derive(Default)]
-pub struct ReleaseCollector<W: CopyContext + WorkerLocal>(PhantomData<W>);
+pub struct ReleaseCollector<W: CopyContext + GCWorkerLocal>(PhantomData<W>);
 
-impl<W: CopyContext + WorkerLocal> ReleaseCollector<W> {
+impl<W: CopyContext + GCWorkerLocal> ReleaseCollector<W> {
     pub fn new() -> Self {
         ReleaseCollector(PhantomData)
     }
 }
 
-impl<VM: VMBinding, W: CopyContext + WorkerLocal> GCWork<VM> for ReleaseCollector<W> {
+impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for ReleaseCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
         unsafe { worker.local::<W>() }.release();
@@ -229,7 +229,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> CoordinatorWork<MMTK<E::VM>> for StopMutators<E> {}
+impl<E: ProcessEdgesWork> CoordinatorWork<E::VM> for StopMutators<E> {}
 
 #[derive(Default)]
 pub struct EndOfGC;
@@ -249,7 +249,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     }
 }
 
-impl<VM: VMBinding> CoordinatorWork<MMTK<VM>> for EndOfGC {}
+impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
 /// Delegate to the VM binding for reference processing.
 ///
