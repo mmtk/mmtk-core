@@ -24,6 +24,9 @@ pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
 
+// Base address of alloc bit, public to VM bindings which may need to use this.
+pub const ALLOC_SIDE_METADATA_ADDR: Address = crate::util::alloc_bit::ALLOC_SIDE_METADATA_ADDR;
+
 /// This constant represents the worst-case ratio of source data size to global side metadata.
 /// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.
 /// So, a value of `n` means this ratio must be less than $2^-n$.
