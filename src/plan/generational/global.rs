@@ -23,8 +23,11 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+/// Common implementation for generational plans.
 pub struct Gen<VM: VMBinding> {
+    /// The nursery space. Its type depends on the actual plan.
     pub nursery: CopySpace<VM>,
+    /// The common plan.
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
     pub gc_full_heap: AtomicBool,
