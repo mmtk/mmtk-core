@@ -94,7 +94,6 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
         known_alignment,
         VM::MIN_ALIGNMENT
     );
-    debug_assert!(size == size & !(known_alignment - 1));
     debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
 
     if VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT || alignment <= known_alignment {
