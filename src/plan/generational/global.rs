@@ -106,7 +106,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     pub fn request_full_heap_collection(&self, used_pages: usize, reserved_pages: usize) -> bool {
         // For barrier overhead measurements, we always do full gc in nursery collections.
-        if crate::plan::gencopy::FULL_NURSERY_GC {
+        if crate::plan::generational::copying::FULL_NURSERY_GC {
             return true;
         }
 

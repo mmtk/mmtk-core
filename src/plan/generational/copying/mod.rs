@@ -1,11 +1,11 @@
 //! Plan: generational copying
 
-pub(super) mod gc_work;
-pub(super) mod global;
-pub(super) mod mutator;
+pub(in crate::plan) mod gc_work;
+pub(in crate::plan) mod global;
+pub(in crate::plan) mod mutator;
 
 pub use self::global::GenCopy;
-use super::barriers::BarrierSelector;
+use crate::plan::barriers::BarrierSelector;
 
 /// # Barrier overhead measurement:
 ///  - Set `FULL_NURSERY_GC` to `true`.

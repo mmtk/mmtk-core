@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenNurseryProcessEdges};
+use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -6,6 +6,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;

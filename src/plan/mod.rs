@@ -40,7 +40,6 @@ pub use tracelocal::TraceLocal;
 mod transitive_closure;
 pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
-mod gencopy;
 mod immix;
 mod marksweep;
 mod nogc;
@@ -51,7 +50,7 @@ mod generational;
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.
 
-pub use gencopy::GENCOPY_CONSTRAINTS;
+pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;

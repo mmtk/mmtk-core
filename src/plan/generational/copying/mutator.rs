@@ -1,5 +1,6 @@
-use super::gc_work::*;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use super::GenCopy;
+use super::gc_work::GenCopyCopyContext;
 use crate::plan::barriers::*;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
