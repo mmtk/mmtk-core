@@ -119,6 +119,9 @@
 <span id="119">119</span>
 <span id="120">120</span>
 <span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
+<span id="124">124</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
@@ -145,6 +148,9 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
     <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>);
+
+<span class="comment">// Base address of alloc bit, public to VM bindings which may need to use this.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_ADDR</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_ADDR</span>;
 
 <span class="doccomment">/// This constant represents the worst-case ratio of source data size to global side metadata.</span>
 <span class="doccomment">/// A value of 2 means the space required for global side metadata must be less than 1/4th of the source data.</span>
