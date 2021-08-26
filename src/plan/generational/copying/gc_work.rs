@@ -1,18 +1,14 @@
-use atomic::Ordering;
-
 use super::global::GenCopy;
 use crate::plan::PlanConstraints;
-use crate::plan::{barriers::BarrierSelector, CopyContext};
+use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::object_forwarding;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
-use crate::plan::generational::global::Gen;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenCopyCopyContext<VM: VMBinding> {

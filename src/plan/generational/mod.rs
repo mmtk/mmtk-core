@@ -54,7 +54,7 @@ pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetada
     SideMetadataContext::new_global_specs(&specs)
 }
 
-pub fn generational_post_copy<VM: VMBinding>(obj: ObjectReference, tib: Address, bytes: usize, semantics: AllocationSemantics) {
+pub fn generational_post_copy<VM: VMBinding>(obj: ObjectReference, _tib: Address, _bytes: usize, _semantics: AllocationSemantics) {
     crate::util::object_forwarding::clear_forwarding_bits::<VM>(obj);
     if !NO_SLOW && ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
