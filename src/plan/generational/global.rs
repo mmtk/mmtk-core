@@ -105,25 +105,21 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     pub fn request_full_heap_collection(&self, used_pages: usize, reserved_pages: usize) -> bool {
-        // For barrier overhead measurements, we always do full gc in nursery collections.
-        if crate::plan::generational::copying::FULL_NURSERY_GC {
-            return true;
-        }
-
-        if self.common.base.user_triggered_collection.load(Ordering::SeqCst)
-            && self.common.base.options.full_heap_system_gc
-        {
-            return true;
-        }
-
-        if self.next_gc_full_heap.load(Ordering::SeqCst)
-            || self.common.base.cur_collection_attempts.load(Ordering::SeqCst) > 1
-        {
+        let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
+            // For barrier overhead measurements, we always do full gc in nursery collections.
+            true
+        } else if self.common.base.user_triggered_collection.load(Ordering::SeqCst)
+            && self.common.base.options.full_heap_system_gc {
+            // User triggered collection, and we force full heap for user triggered collection
+            true
+        } else if self.next_gc_full_heap.load(Ordering::SeqCst)
+            || self.common.base.cur_collection_attempts.load(Ordering::SeqCst) > 1 {
             // Forces full heap collection
-            return true;
-        }
+            true
+        } else {
+            used_pages <= reserved_pages
+        };
 
-        let is_full_heap = used_pages <= reserved_pages;
         if is_full_heap {
             self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
         }

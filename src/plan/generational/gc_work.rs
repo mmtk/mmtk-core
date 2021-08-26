@@ -19,12 +19,6 @@ pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext + GCWorkerLocal>
     base: ProcessEdgesBase<GenNurseryProcessEdges<VM, C>>,
 }
 
-// impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
-//     fn gencopy(&self) -> &'static GenCopy<VM> {
-//         self.plan
-//     }
-// }
-
 impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork for GenNurseryProcessEdges<VM, C> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -38,29 +32,6 @@ impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork for GenNurs
             return object;
         }
         self.gen.trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
-        // // Evacuate nursery objects
-        // if self.gencopy().gen.nursery.in_space(object) {
-        //     return self
-        //         .gencopy()
-        //         .gen.nursery
-        //         .trace_object::<Self, GenCopyCopyContext<VM>>(
-        //             self,
-        //             object,
-        //             super::global::ALLOC_SS,
-        //             unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-        //         );
-        // }
-        // // We may alloc large object into LOS as nursery objects. Trace them here.
-        // if self.gencopy().gen.common.get_los().in_space(object) {
-        //     return self
-        //         .gencopy()
-        //         .gen.common
-        //         .get_los()
-        //         .trace_object::<Self>(self, object);
-        // }
-        // debug_assert!(!self.gencopy().fromspace().in_space(object));
-        // debug_assert!(self.gencopy().tospace().in_space(object));
-        // object
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {

@@ -51,14 +51,11 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
     fn post_copy(
         &mut self,
         obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        _semantics: crate::AllocationSemantics,
+        tib: Address,
+        bytes: usize,
+        semantics: crate::AllocationSemantics,
     ) {
-        object_forwarding::clear_forwarding_bits::<VM>(obj);
-        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
-        }
+        crate::plan::generational::generational_post_copy::<VM>(obj, tib, bytes, semantics)
     }
 }
 
@@ -102,18 +99,6 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        // Evacuate nursery objects
-        // if self.gencopy().gen.nursery.in_space(object) {
-        //     return self
-        //         .gencopy()
-        //         .gen.nursery
-        //         .trace_object::<Self, GenCopyCopyContext<VM>>(
-        //             self,
-        //             object,
-        //             super::global::ALLOC_SS,
-        //             unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-        //         );
-        // }
         // Evacuate mature objects
         if self.gencopy().tospace().in_space(object) {
             return self

@@ -39,19 +39,7 @@ pub struct GenCopy<VM: VMBinding> {
     pub copyspace1: CopySpace<VM>,
 }
 
-pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
-    needs_log_bit: true,
-    barrier: super::ACTIVE_BARRIER,
-    max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
-        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
-        crate::util::options::NURSERY_SIZE,
-    ),
-    ..PlanConstraints::default()
-};
+pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
 
 impl<VM: VMBinding> Plan for GenCopy<VM> {
     type VM = VM;
@@ -90,19 +78,20 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.request_full_heap_collection();
-        self.gen.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
+
+        // TODO: We should have a schedule_generational
 
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
-            info!("Nursery GC");
+            debug!("Nursery GC");
             self.common()
                 .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
                 .add(StopMutators::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new());
         } else {
-            info!("Full heap GC");
+            debug!("Full heap GC");
             self.common()
                 .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
@@ -195,12 +184,8 @@ impl<VM: VMBinding> GenCopy<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-            metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
-        } else {
-            vec![]
-        };
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&gencopy_specs);
+        // We have no specific side metadata for copying. So just use the ones from generational.
+        let global_metadata_specs = crate::plan::generational::new_generational_global_metadata_specs::<VM>();
 
         let copyspace0 = CopySpace::new(
             "copyspace0",
