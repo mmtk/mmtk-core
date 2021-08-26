@@ -1,12 +1,14 @@
 use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
+use crate::mmtk::MMTK;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
+use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -23,8 +25,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
-use crate::mmtk::MMTK;
-use crate::plan::generational::global::Gen;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -85,10 +85,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(&GENCOPY_CONSTRAINTS, scheduler);
+                .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(
+                    &GENCOPY_CONSTRAINTS,
+                    scheduler,
+                );
             // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new());
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
+            >::new());
         } else {
             debug!("Full heap GC");
             self.common()
@@ -105,8 +109,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
         } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new());
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
+            >::new());
         }
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
@@ -141,7 +146,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             self.fromspace().release();
         }
 
-        self.gen.set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
+        self.gen
+            .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -149,8 +155,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.gen.get_pages_used()
-            + self.tospace().reserved_pages()
+        self.gen.get_pages_used() + self.tospace().reserved_pages()
     }
 
     /// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.
@@ -184,7 +189,8 @@ impl<VM: VMBinding> GenCopy<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         // We have no specific side metadata for copying. So just use the ones from generational.
-        let global_metadata_specs = crate::plan::generational::new_generational_global_metadata_specs::<VM>();
+        let global_metadata_specs =
+            crate::plan::generational::new_generational_global_metadata_specs::<VM>();
 
         let copyspace0 = CopySpace::new(
             "copyspace0",
@@ -208,7 +214,14 @@ impl<VM: VMBinding> GenCopy<VM> {
         );
 
         let res = GenCopy {
-            gen: Gen::new(heap, global_metadata_specs, &GENCOPY_CONSTRAINTS, vm_map, mmapper, options.clone()),
+            gen: Gen::new(
+                heap,
+                global_metadata_specs,
+                &GENCOPY_CONSTRAINTS,
+                vm_map,
+                mmapper,
+                options,
+            ),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,
@@ -218,7 +231,8 @@ impl<VM: VMBinding> GenCopy<VM> {
         // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            res.gen.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            res.gen
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
             res.copyspace0
                 .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
             res.copyspace1
@@ -229,7 +243,8 @@ impl<VM: VMBinding> GenCopy<VM> {
     }
 
     fn request_full_heap_collection(&self) -> bool {
-        self.gen.request_full_heap_collection(self.get_pages_used(), self.get_pages_reserved())
+        self.gen
+            .request_full_heap_collection(self.get_pages_used(), self.get_pages_reserved())
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

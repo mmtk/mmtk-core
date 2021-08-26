@@ -1,6 +1,6 @@
 use super::global::GenCopy;
-use crate::plan::PlanConstraints;
 use crate::plan::CopyContext;
+use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWorkerLocal;
@@ -120,7 +120,9 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         }
         self.gencopy()
             .gen
-            .trace_object_full_heap::<Self, GenCopyCopyContext<VM>>(self, object, unsafe { self.worker().local::<GenCopyCopyContext<VM>>() })
+            .trace_object_full_heap::<Self, GenCopyCopyContext<VM>>(self, object, unsafe {
+                self.worker().local::<GenCopyCopyContext<VM>>()
+            })
     }
 }
 

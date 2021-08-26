@@ -3,6 +3,7 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
+use crate::plan::generational::global::Gen;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -27,7 +28,6 @@ use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
-use crate::plan::generational::global::Gen;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::marker::PhantomData;
@@ -123,7 +123,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::SemiSpace => {
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::GenCopy => crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk),
+        PlanSelector::GenCopy => {
+            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
+        }
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
@@ -146,9 +148,9 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => {
-            Box::new(crate::plan::generational::copying::GenCopy::new(vm_map, mmapper, options))
-        }
+        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
+            vm_map, mmapper, options,
+        )),
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
         )),

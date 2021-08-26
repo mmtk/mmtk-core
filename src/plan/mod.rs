@@ -40,12 +40,12 @@ pub use tracelocal::TraceLocal;
 mod transitive_closure;
 pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
+mod generational;
 mod immix;
 mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
-mod generational;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.

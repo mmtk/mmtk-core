@@ -1,3 +1,4 @@
+use crate::plan::generational::global::Gen;
 use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -5,7 +6,6 @@ use crate::scheduler::GCWorkerLocal;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
-use crate::plan::generational::global::Gen;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext + GCWorkerLocal> {
@@ -13,7 +13,9 @@ pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext + GCWorkerLocal>
     base: ProcessEdgesBase<GenNurseryProcessEdges<VM, C>>,
 }
 
-impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork for GenNurseryProcessEdges<VM, C> {
+impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork
+    for GenNurseryProcessEdges<VM, C>
+{
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
@@ -25,7 +27,8 @@ impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork for GenNurs
         if object.is_null() {
             return object;
         }
-        self.gen.trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
+        self.gen
+            .trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {

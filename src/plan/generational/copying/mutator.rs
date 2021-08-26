@@ -1,7 +1,7 @@
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use super::GenCopy;
 use super::gc_work::GenCopyCopyContext;
+use super::GenCopy;
 use crate::plan::barriers::*;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -50,7 +50,10 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
                 AllocatorSelector::BumpPointer(1),
                 gencopy.gen.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), gencopy.gen.common.get_los()),
+            (
+                AllocatorSelector::LargeObject(0),
+                gencopy.gen.common.get_los(),
+            ),
         ],
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
@@ -58,10 +61,11 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new(
-            mmtk,
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-        ),
+        barrier:
+            box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new(
+                mmtk,
+                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            ),
         mutator_tls,
         config,
         plan: gencopy,

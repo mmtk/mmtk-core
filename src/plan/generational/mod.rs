@@ -1,16 +1,16 @@
 use crate::plan::barriers::BarrierSelector;
-use crate::plan::PlanConstraints;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::vm::VMBinding;
-use crate::vm::ObjectModel;
-use crate::util::{Address, ObjectReference};
 use crate::plan::AllocationSemantics;
+use crate::plan::PlanConstraints;
+use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::{Address, ObjectReference};
+use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 
 use std::sync::atomic::Ordering;
 
-pub(super) mod global;
 pub(super) mod gc_work;
+pub(super) mod global;
 
 pub mod copying;
 
@@ -54,7 +54,12 @@ pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetada
     SideMetadataContext::new_global_specs(&specs)
 }
 
-pub fn generational_post_copy<VM: VMBinding>(obj: ObjectReference, _tib: Address, _bytes: usize, _semantics: AllocationSemantics) {
+pub fn generational_post_copy<VM: VMBinding>(
+    obj: ObjectReference,
+    _tib: Address,
+    _bytes: usize,
+    _semantics: AllocationSemantics,
+) {
     crate::util::object_forwarding::clear_forwarding_bits::<VM>(obj);
     if !NO_SLOW && ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
