@@ -12,6 +12,7 @@ use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
+use crate::plan::generational::global::Gen;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenCopyCopyContext<VM: VMBinding> {
@@ -78,30 +79,30 @@ impl<VM: VMBinding> GCWorkerLocal for GenCopyCopyContext<VM> {
     }
 }
 
-pub struct GenCopyNurseryProcessEdges<VM: VMBinding> {
-    plan: &'static GenCopy<VM>,
-    base: ProcessEdgesBase<GenCopyNurseryProcessEdges<VM>>,
+pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext + GCWorkerLocal> {
+    gen: &'static Gen<VM>,
+    base: ProcessEdgesBase<GenNurseryProcessEdges<VM, C>>,
 }
 
-impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
-    fn gencopy(&self) -> &'static GenCopy<VM> {
-        self.plan
-    }
-}
+// impl<VM: VMBinding> GenCopyNurseryProcessEdges<VM> {
+//     fn gencopy(&self) -> &'static GenCopy<VM> {
+//         self.plan
+//     }
+// }
 
-impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
+impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork for GenNurseryProcessEdges<VM, C> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
-        let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
-        Self { plan, base }
+        let gen = base.plan().generational();
+        Self { gen, base }
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
         }
-        self.gencopy().gen.trace_object_nursery(self, object, unsafe { self.worker().local::<GenCopyCopyContext<VM>>() })
+        self.gen.trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
         // // Evacuate nursery objects
         // if self.gencopy().gen.nursery.in_space(object) {
         //     return self
@@ -128,22 +129,21 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyNurseryProcessEdges<VM> {
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {
-        debug_assert!(!self.gencopy().fromspace().address_in_space(slot));
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        debug_assert!(!self.gencopy().gen.nursery.in_space(new_object));
+        debug_assert!(!self.gen.nursery.in_space(new_object));
         unsafe { slot.store(new_object) };
     }
 }
 
-impl<VM: VMBinding> Deref for GenCopyNurseryProcessEdges<VM> {
+impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> Deref for GenNurseryProcessEdges<VM, C> {
     type Target = ProcessEdgesBase<Self>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding> DerefMut for GenCopyNurseryProcessEdges<VM> {
+impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> DerefMut for GenNurseryProcessEdges<VM, C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

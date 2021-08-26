@@ -27,6 +27,7 @@ use crate::util::statistics::stats::Stats;
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
+use crate::plan::generational::global::Gen;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::marker::PhantomData;
@@ -189,6 +190,9 @@ pub trait Plan: 'static + Sync + Downcast {
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
+    }
+    fn generational(&self) -> &Gen<Self::VM> {
+        panic!("This is not a generational plan.")
     }
     fn mmapper(&self) -> &'static Mmapper {
         self.base().mmapper

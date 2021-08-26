@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenCopyNurseryProcessEdges};
+use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges, GenNurseryProcessEdges};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -96,10 +96,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             info!("Nursery GC");
             self.common()
-                .schedule_common::<GenCopyNurseryProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
+                .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(&GENCOPY_CONSTRAINTS, scheduler);
             // Stop & scan mutators (mutator scanning can happen before STW)
             scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<GenCopyNurseryProcessEdges<VM>>::new());
+                .add(StopMutators::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new());
         } else {
             info!("Full heap GC");
             self.common()
@@ -117,7 +117,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
         } else {
             scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<GenCopyNurseryProcessEdges<VM>>::new());
+                .add(ProcessWeakRefs::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new());
         }
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
@@ -176,6 +176,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.gen.common
+    }
+
+    fn generational(&self) -> &Gen<VM> {
+        &self.gen
     }
 
     fn is_current_gc_nursery(&self) -> bool {
