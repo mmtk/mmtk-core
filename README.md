@@ -113,6 +113,7 @@ If you would like to upstream non-trivial changes to MMTk, we suggest first gett
 
 Generally we expect a pull request to meeting the following requirements before it can be merged:
 1. The PR includes only one change. You can break down large pull requests into separate smaller ones.
-2. The code is well documented and a PR only introduces unsafe code where it is a must.
-3. The PR passes the mmtk-core unit tests and complies with the coding style. We have scripts in `.github/scripts` that are used by our Github action to run those checks for each PR.
-4. The PR passes all the binding tests. We run benchmarks with bindings to test mmtk-core. A new pull request should not break bindings, as we ensure that our supported bindings always work with the latest mmtk-core. If a pull request makes changes that require the bindings to be updated correspondingly, you can approach the MMTk team on [our Zulip](https://mmtk.zulipchat.com/) and seek help from them to update the bindings.
+2. The code is well documented.
+3. The PR does not introduce unsafe Rust code unless necessary. Whenever introducing unsafe code, the contributor must elaborate why it is necessary.
+4. The PR passes the mmtk-core unit tests and complies with the coding style. We have scripts in `.github/scripts` that are used by our Github action to run those checks for each PR.
+5. The PR passes all the binding tests. We run benchmarks with bindings to test mmtk-core. A new pull request should not break bindings, as we ensure that our supported bindings always work with the latest mmtk-core. If a pull request makes changes that require the bindings to be updated correspondingly, you can approach the MMTk team on [our Zulip](https://mmtk.zulipchat.com/) and seek help from them to update the bindings.
