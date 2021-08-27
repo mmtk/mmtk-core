@@ -130,13 +130,12 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     /// Get the name of the space
-    /// 
+    ///
     /// We have to override the default implementation because
     /// LockFreeImmortalSpace doesn't have a common space
     fn get_name(&self) -> &'static str {
         "LockFreeImmortalSpace"
     }
-
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
