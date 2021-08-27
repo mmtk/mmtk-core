@@ -8,6 +8,7 @@ use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
+/// Process edges for a nursery GC. A generatinoal plan should use this type for a nursery GC.
 pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext + GCWorkerLocal> {
     gen: &'static Gen<VM>,
     base: ProcessEdgesBase<GenNurseryProcessEdges<VM, C>>,

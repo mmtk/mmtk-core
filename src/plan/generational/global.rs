@@ -23,7 +23,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-/// Common implementation for generational plans.
+/// Common implementation for generational plans. Each generational plan
+/// should include this type, and forward calls to it where possible.
 pub struct Gen<VM: VMBinding> {
     /// The nursery space. Its type depends on the actual plan.
     pub nursery: CopySpace<VM>,
@@ -68,11 +69,13 @@ impl<VM: VMBinding> Gen<VM> {
         }
     }
 
+    /// Verify side metadata specs used in the spaces in Gen.
     pub fn verify_side_metadata_sanity(&self, sanity: &mut SideMetadataSanity) {
         self.common.verify_side_metadata_sanity(sanity);
         self.nursery.verify_side_metadata_sanity(sanity);
     }
 
+    /// Initialize Gen. This should be called by the gc_init() API call.
     pub fn gc_init(
         &mut self,
         heap_size: usize,
@@ -83,18 +86,22 @@ impl<VM: VMBinding> Gen<VM> {
         self.nursery.init(vm_map);
     }
 
+    /// Prepare Gen. This should be called by a single thread in GC prepare work.
     pub fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
     }
 
+    /// Release Gen. This should be called by a single thread in GC release work.
     pub fn release(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.common.release(tls, full_heap);
         self.nursery.release();
     }
 
+    /// Check if we need a GC based on the nursery space usage. This method may mark
+    /// the following GC as a full heap GC.
     pub fn collection_required<P: Plan>(
         &self,
         plan: &P,
@@ -116,6 +123,8 @@ impl<VM: VMBinding> Gen<VM> {
             .collection_required(plan, space_full, space)
     }
 
+    /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
+    /// It also sets gc_full_heap based on the result.
     pub fn request_full_heap_collection(&self, used_pages: usize, reserved_pages: usize) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
@@ -146,13 +155,12 @@ impl<VM: VMBinding> Gen<VM> {
             used_pages <= reserved_pages
         };
 
-        if is_full_heap {
-            self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
-        }
+        self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
         is_full_heap
     }
 
+    /// Trace objects for spaces in generational and common plans for a full heap GC.
     pub fn trace_object_full_heap<T: TransitiveClosure, C: CopyContext + GCWorkerLocal>(
         &self,
         trace: &mut T,
@@ -170,6 +178,7 @@ impl<VM: VMBinding> Gen<VM> {
         self.common.trace_object::<T, C>(trace, object)
     }
 
+    /// Trace objects for spaces in generational and common plans for a nursery GC.
     pub fn trace_object_nursery<T: TransitiveClosure, C: CopyContext + GCWorkerLocal>(
         &self,
         trace: &mut T,
@@ -192,23 +201,30 @@ impl<VM: VMBinding> Gen<VM> {
         object
     }
 
+    /// Is the current GC a nursery GC?
     pub fn is_current_gc_nursery(&self) -> bool {
         !self.gc_full_heap.load(Ordering::SeqCst)
     }
 
+    /// Check a plan to see if the next GC should be a full heap GC.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         plan.get_pages_avail() < conversions::bytes_to_pages_up(plan.base().options.min_nursery)
     }
 
+    /// Set next_gc_full_heap to the given value.
     pub fn set_next_gc_full_heap(&self, next_gc_full_heap: bool) {
         self.next_gc_full_heap
             .store(next_gc_full_heap, Ordering::SeqCst);
     }
 
+    /// Get pages reserved for the collection by a generational plan. A generational plan should
+    /// add their own reservatioin with the value returned by this method.
     pub fn get_collection_reserve(&self) -> usize {
         self.nursery.reserved_pages()
     }
 
+    /// Get pages used by a generational plan. A generational plan should add their own used pages
+    /// with the value returned by this method.
     pub fn get_pages_used(&self) -> usize {
         self.nursery.reserved_pages() + self.common.get_pages_used()
     }
