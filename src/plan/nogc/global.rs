@@ -144,8 +144,10 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.nogc_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        if cfg!(not(feature = "nogc_lock_free")) {
+            res.nogc_space
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        }
 
         res
     }
