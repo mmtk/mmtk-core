@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: mmtk/ci-perf-kit
-          ref: "0.6.4"
+          ref: "0.6.5"
           path: ci-perf-kit
           submodules: true
       # setup

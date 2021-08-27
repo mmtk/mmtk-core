@@ -18,7 +18,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
-    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorker, MMTkScheduler, WorkBucketStage},
+    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
@@ -48,7 +48,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Object mark state
     mark_state: u8,
     /// Work packet scheduler
-    scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -67,7 +67,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(_object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -121,7 +124,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
         let common = CommonSpace::new(
@@ -190,7 +193,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     /// Get work packet scheduler
-    fn scheduler(&self) -> &MMTkScheduler<VM> {
+    fn scheduler(&self) -> &GCWorkScheduler<VM> {
         &self.scheduler
     }
 
@@ -305,6 +308,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if Block::containing::<VM>(object).is_defrag_source() {
             self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
         } else {
@@ -358,6 +367,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_alloc_bit(object);
                 ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
             };
             if !super::MARK_LINE_AT_SCAN_TIME {

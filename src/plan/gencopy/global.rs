@@ -95,15 +95,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.nursery.init(&vm_map);
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.nursery.init(vm_map);
+        self.copyspace0.init(vm_map);
+        self.copyspace1.init(vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.request_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
