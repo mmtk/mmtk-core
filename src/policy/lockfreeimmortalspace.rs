@@ -17,6 +17,7 @@ use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::util::metadata::side_metadata::SideMetadataSanity;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -136,6 +137,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn get_name(&self) -> &'static str {
         "LockFreeImmortalSpace"
     }
+
+    /// We have to override the default implementation because
+    /// LockFreeImmortalSpace doesn't use side metadata
+    fn verify_side_metadata_sanity(&self, _: &mut SideMetadataSanity) {}
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
