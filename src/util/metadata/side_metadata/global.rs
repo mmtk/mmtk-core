@@ -187,6 +187,28 @@ impl SideMetadataContext {
 
     pub fn reset(&self) {}
 
+    /// Eagerly map the address range that will be used for global side metadata specs.
+    pub fn eagerly_reserve_address_range_for_global_specs(
+        specs: Vec<SideMetadataSpec>,
+    ) -> Result<()> {
+        let context = SideMetadataContext {
+            global: specs,
+            local: vec![],
+        };
+        #[cfg(target_pointer_width = "64")]
+        return context.try_map_metadata_address_range(
+            Address::ZERO,
+            1 << crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
+        );
+        #[cfg(target_pointer_width = "32")]
+        // FIXME: We should use the whole address range as size but it cannot be expressed as usize. We should change try_map_metadata_address_range() to take
+        // the number of chunks as the parameter.
+        return context.try_map_metadata_address_range(
+            Address::ZERO,
+            crate::util::conversions::raw_align_down(usize::MAX, BYTES_IN_CHUNK),
+        );
+    }
+
     // ** NOTE: **
     //  Regardless of the number of bits in a metadata unit, we always represent its content as a word.
 

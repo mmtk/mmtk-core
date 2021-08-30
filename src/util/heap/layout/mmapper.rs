@@ -81,6 +81,11 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
     ) -> Result<()> {
+        trace!(
+            "Trying to map {} - {}",
+            mmap_start,
+            mmap_start + MMAP_CHUNK_BYTES
+        );
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => dzmmap_noreplace(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Protected => munprotect(mmap_start, MMAP_CHUNK_BYTES),
@@ -100,6 +105,11 @@ impl MapState {
         state: &Atomic<MapState>,
         mmap_start: Address,
     ) -> Result<()> {
+        trace!(
+            "Trying to quarantine {} - {}",
+            mmap_start,
+            mmap_start + MMAP_CHUNK_BYTES
+        );
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Quarantined => Ok(()),

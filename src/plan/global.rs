@@ -433,7 +433,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
-        BasePlan {
+        let ret = BasePlan {
             #[cfg(feature = "code_space")]
             code_space: ImmortalSpace::new(
                 "code_space",
@@ -474,7 +474,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 &mut heap,
                 options.vm_space_size,
                 constraints,
-                global_side_metadata_specs,
+                global_side_metadata_specs.clone(),
             ),
 
             initialized: AtomicBool::new(false),
@@ -499,7 +499,10 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
-        }
+        };
+
+        crate::util::metadata::side_metadata::SideMetadataContext::eagerly_reserve_address_range_for_global_specs(global_side_metadata_specs).expect("Cannot eagerly reserve address range");
+        ret
     }
 
     pub fn gc_init(
