@@ -98,3 +98,8 @@ A full list of all the unit tests we run in our CI can be found [here](.github/s
 
 MMTk is also tested with the VM bindings we are maintaining by running standard test/benchmark suites for the VMs.
 For details, please refer to each VM binding repository.
+
+## Contributing to MMTk
+
+Thank you for your interest in contributing to MMTk. We appreciate all the contributors. Generally you can contribute to MMTk by either
+reporting MMTk bugs you encountered or submitting your patches to MMTk. For details, you can refer to our [contribution guidelines](./CONTRIBUTING.md).
