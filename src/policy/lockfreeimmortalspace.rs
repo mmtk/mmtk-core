@@ -139,7 +139,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     /// We have to override the default implementation because
-    /// LockFreeImmortalSpace doesn't use side metadata
+    /// LockFreeImmortalSpace doesn't put metadata in a common space
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
