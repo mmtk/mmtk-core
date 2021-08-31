@@ -11,6 +11,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
+use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -127,6 +128,21 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             crate::util::memory::zero(start, bytes);
         }
         start
+    }
+
+    /// Get the name of the space
+    ///
+    /// We have to override the default implementation because
+    /// LockFreeImmortalSpace doesn't have a common space
+    fn get_name(&self) -> &'static str {
+        "LockFreeImmortalSpace"
+    }
+
+    /// We have to override the default implementation because
+    /// LockFreeImmortalSpace doesn't put metadata in a common space
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 }
 
