@@ -191,6 +191,8 @@ impl SideMetadataContext {
     /// BasePlan in its constructor. We try map the possible addresses that may be used by global specs. We do
     /// not eagerly map for local specs here, as only one policy may use a chunk and we do not know which policy
     /// a chunk may use - mapping for all the policies may be overly restrictive.
+    // We made assumptions based on the LOG_ADDRESS_SPACE.
+    #[allow(clippy::assertions_on_constants)]
     pub fn eagerly_reserve_address_range_for_global_specs(
         specs: Vec<SideMetadataSpec>,
     ) -> Result<()> {
@@ -206,7 +208,7 @@ impl SideMetadataContext {
                 LOG_ADDRESS_SPACE < 64,
                 "If LOG_ADDRESS_SPACE is 64, we cannot get a size in bytes for it."
             );
-            return context.try_map_metadata_address_range(Address::ZERO, 1 << LOG_ADDRESS_SPACE);
+            context.try_map_metadata_address_range(Address::ZERO, 1 << LOG_ADDRESS_SPACE)
         }
         #[cfg(target_pointer_width = "32")]
         {
@@ -222,7 +224,7 @@ impl SideMetadataContext {
             let half = 1 << (LOG_ADDRESS_SPACE - 1);
             let map_first = context.try_map_metadata_address_range(Address::ZERO, half);
             let map_second = context.try_map_metadata_address_range(Address::ZERO + half, half);
-            return map_first.and(map_second);
+            map_first.and(map_second)
         }
     }
 
