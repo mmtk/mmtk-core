@@ -187,26 +187,43 @@ impl SideMetadataContext {
 
     pub fn reset(&self) {}
 
-    /// Eagerly map the address range that will be used for global side metadata specs.
+    /// Eagerly map the address range that will be used for global side metadata specs. This is called by
+    /// BasePlan in its constructor. We try map the possible addresses that may be used by global specs. We do
+    /// not eagerly map for local specs here, as only one policy may use a chunk and we do not know which policy
+    /// a chunk may use - mapping for all the policies may be overly restrictive.
     pub fn eagerly_reserve_address_range_for_global_specs(
         specs: Vec<SideMetadataSpec>,
     ) -> Result<()> {
+        use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
         let context = SideMetadataContext {
             global: specs,
             local: vec![],
         };
         #[cfg(target_pointer_width = "64")]
-        return context.try_map_metadata_address_range(
-            Address::ZERO,
-            1 << crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
-        );
+        {
+            // LOG_ADDRESS_SPACE should be less than the entire address space. We are not mapping the entire address range.
+            assert!(
+                LOG_ADDRESS_SPACE < 64,
+                "If LOG_ADDRESS_SPACE is 64, we cannot get a size in bytes for it."
+            );
+            return context.try_map_metadata_address_range(Address::ZERO, 1 << LOG_ADDRESS_SPACE);
+        }
         #[cfg(target_pointer_width = "32")]
-        // FIXME: We should use the whole address range as size but it cannot be expressed as usize. We should change try_map_metadata_address_range() to take
-        // the number of chunks as the parameter.
-        return context.try_map_metadata_address_range(
-            Address::ZERO,
-            crate::util::conversions::raw_align_down(usize::MAX, BYTES_IN_CHUNK),
-        );
+        {
+            // We will map the metadata for the whole address range. But unlike the 64bits case, LOG_ADDRESS_SPACE in 32bits is 32, which
+            // covers the whole address space, and we cannot express this as size in bytes in a usize(32bits). So we do it in two steps,
+            // each maps half of the address space.
+            // TODO: If we change the size parameter to the number of chunks/pages rather than the number of bytes, we should be able to do
+            // it in one step.
+            assert_eq!(
+                LOG_ADDRESS_SPACE, 32,
+                "If LOG_ADDRESS_SPACE is not 32, we do not need to map side metadata in two steps."
+            );
+            let half = 1 << (LOG_ADDRESS_SPACE - 1);
+            let map_first = context.try_map_metadata_address_range(Address::ZERO, half);
+            let map_second = context.try_map_metadata_address_range(Address::ZERO + half, half);
+            return map_first.and(map_second);
+        }
     }
 
     // ** NOTE: **
