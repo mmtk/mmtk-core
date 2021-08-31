@@ -150,6 +150,22 @@
 <span id="150">150</span>
 <span id="151">151</span>
 <span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
@@ -164,6 +180,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{
     <span class="ident">AVAILABLE_BYTES</span>, <span class="ident">AVAILABLE_END</span>, <span class="ident">AVAILABLE_START</span>,
 };
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
@@ -280,6 +297,21 @@
             <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">start</span>, <span class="ident">bytes</span>);
         }
         <span class="ident">start</span>
+    }
+
+    <span class="doccomment">/// Get the name of the space</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// We have to override the default implementation because</span>
+    <span class="doccomment">/// LockFreeImmortalSpace doesn&#39;t have a common space</span>
+    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+        <span class="string">&quot;LockFreeImmortalSpace&quot;</span>
+    }
+
+    <span class="doccomment">/// We have to override the default implementation because</span>
+    <span class="doccomment">/// LockFreeImmortalSpace doesn&#39;t put metadata in a common space</span>
+    <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {
+        <span class="ident">side_metadata_sanity_checker</span>
+            .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metadata</span>)
     }
 }
 
