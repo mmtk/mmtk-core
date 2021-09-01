@@ -200,16 +200,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if !address.is_zero() {
             let actual_size = unsafe { malloc_usable_size(raw) };
-            // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the address.
-            if !is_meta_space_mapped(address) {
-                let chunk_start = conversions::chunk_align_down(address);
-                debug!(
-                    "Add malloc chunk {} to {}",
-                    chunk_start,
-                    chunk_start + BYTES_IN_CHUNK
-                );
+            // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
+            if !is_meta_space_mapped(address, actual_size) {
                 // Map the metadata space for the associated chunk
-                self.map_metadata_and_update_bound(chunk_start);
+                self.map_metadata_and_update_bound(address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -266,37 +260,47 @@ impl<VM: VMBinding> MallocSpace<VM> {
         object
     }
 
-    fn map_metadata_and_update_bound(&self, chunk_start: Address) {
-        // Map the metadata space for chunk
-        map_meta_space_for_chunk(&self.metadata, chunk_start);
+    fn map_metadata_and_update_bound(&self, addr: Address, size: usize) {
+        // Map the metadata space for the range [addr, addr + size)
+        map_meta_space(&self.metadata, addr, size);
 
         // Update the bounds of the max and min chunk addresses seen -- this is used later in the sweep
         // Lockless compare-and-swap loops perform better than a locking variant
-        let chunk_usize = chunk_start.as_usize();
-        let mut min = self.chunk_addr_min.load(Ordering::Relaxed);
-        let mut max = self.chunk_addr_max.load(Ordering::Relaxed);
 
-        while chunk_usize < min {
-            match self.chunk_addr_min.compare_exchange_weak(
-                min,
-                chunk_usize,
-                Ordering::AcqRel,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => break,
-                Err(x) => min = x,
+        // Update chunk_addr_min, basing on the start of the allocation: addr.
+        {
+            let min_chunk_start = conversions::chunk_align_down(addr);
+            let min_chunk_usize = min_chunk_start.as_usize();
+            let mut min = self.chunk_addr_min.load(Ordering::Relaxed);
+            while min_chunk_usize < min {
+                match self.chunk_addr_min.compare_exchange_weak(
+                    min,
+                    min_chunk_usize,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(x) => min = x,
+                }
             }
         }
 
-        while chunk_usize > max {
-            match self.chunk_addr_max.compare_exchange_weak(
-                max,
-                chunk_usize,
-                Ordering::AcqRel,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => break,
-                Err(x) => max = x,
+        // Update chunk_addr_max, basing on the end of the allocation: addr + size.
+        // chn
+        {
+            let max_chunk_start = conversions::chunk_align_down(addr + size);
+            let max_chunk_usize = max_chunk_start.as_usize();
+            let mut max = self.chunk_addr_max.load(Ordering::Relaxed);
+            while max_chunk_usize > max {
+                match self.chunk_addr_max.compare_exchange_weak(
+                    max,
+                    max_chunk_usize,
+                    Ordering::AcqRel,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => break,
+                    Err(x) => max = x,
+                }
             }
         }
     }
