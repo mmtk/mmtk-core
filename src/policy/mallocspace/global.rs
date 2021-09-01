@@ -286,7 +286,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         // Update chunk_addr_max, basing on the end of the allocation: addr + size.
-        // chn
         {
             let max_chunk_start = conversions::chunk_align_down(addr + size);
             let max_chunk_usize = max_chunk_start.as_usize();
