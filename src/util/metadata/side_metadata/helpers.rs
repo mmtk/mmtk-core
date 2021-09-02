@@ -1,14 +1,14 @@
 use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::conversions;
 use crate::util::heap::layout::Mmapper;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
-    heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_ADDRESS_SPACE},
+    heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
 };
-use crate::util::conversions;
 use crate::MMAPPER;
 use std::io::Result;
 
@@ -33,6 +33,7 @@ pub(crate) fn address_to_contiguous_meta_address(
 /// Unmaps the specified metadata range, or panics.
 #[cfg(test)]
 pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     use crate::util::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
@@ -58,7 +59,11 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
-    println!("unmap side metadata: {} - {}", mmap_start, mmap_start + mmap_size);
+    println!(
+        "unmap side metadata: {} - {}",
+        mmap_start,
+        mmap_start + mmap_size
+    );
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
@@ -81,7 +86,11 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
-    println!("map for side metadata: {} = {}", mmap_start, mmap_start + mmap_size);
+    println!(
+        "map for side metadata: {} = {}",
+        mmap_start,
+        mmap_start + mmap_size
+    );
     if mmap_size > 0 {
         if !no_reserve {
             MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
