@@ -44,6 +44,14 @@ impl Mmapper for ByteMapMmapper {
         }
     }
 
+    fn mark_as_unmapped(&self, start: Address, bytes: usize) {
+        let start_chunk = Self::address_to_mmap_chunks_down(start);
+        let end_chunk = Self::address_to_mmap_chunks_up(start + bytes) - 1;
+        for i in start_chunk..=end_chunk {
+            self.mapped[i].store(MapState::Unmapped, Ordering::Relaxed);
+        }
+    }
+
     fn ensure_mapped(&self, start: Address, pages: usize) -> Result<()> {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));

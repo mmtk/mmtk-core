@@ -6,7 +6,7 @@ use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;
 use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
-    heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
+    heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_ADDRESS_SPACE},
 };
 use crate::util::conversions;
 use crate::MMAPPER;
@@ -36,7 +36,14 @@ pub(super) fn ensure_munmap_metadata(start: Address, size: usize) {
     use crate::util::memory;
     trace!("ensure_munmap_metadata({}, 0x{:x})", start, size);
 
-    assert!(memory::munmap(start, size).is_ok())
+    // We unmap the chunks related, and tell mmapper those chunks are unmapped.
+
+    // Unmap at chunk granularity.
+    let chunk_start = start.align_down(BYTES_IN_CHUNK);
+    let chunk_size = (start + size).align_up(BYTES_IN_CHUNK) - chunk_start;
+
+    assert!(memory::munmap(chunk_start, chunk_size).is_ok());
+    MMAPPER.mark_as_unmapped(chunk_start, chunk_size);
 }
 
 /// Unmaps a metadata space (`spec`) for the specified data address range (`start` and `size`)
@@ -51,6 +58,7 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
+    println!("unmap side metadata: {} - {}", mmap_start, mmap_start + mmap_size);
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
@@ -73,6 +81,7 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
+    println!("map for side metadata: {} = {}", mmap_start, mmap_start + mmap_size);
     if mmap_size > 0 {
         if !no_reserve {
             MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)

@@ -23,6 +23,12 @@ pub trait Mmapper {
     /// * `bytes`: Number of bytes to ensure mapped
     fn mark_as_mapped(&self, start: Address, bytes: usize);
 
+    /// Mark a number of pages as unmapped, without actually calling
+    /// unmap to the operating system. This is currently only used
+    /// in tests so we can clear some mappings, and tell the mmapper
+    /// that they are actually unmapped.
+    fn mark_as_unmapped(&self, start: Address, bytes: usize);
+
     /// Quarantine/reserve address range. We mmap from the OS with no reserve and with PROT_NONE,
     /// which should be little overhead. This ensures that we can reserve certain address range that
     /// we can use if needed. Quarantined memory needs to be mapped before it can be used.

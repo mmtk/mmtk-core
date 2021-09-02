@@ -80,6 +80,27 @@ impl Mmapper for FragmentedMapper {
         }
     }
 
+    fn mark_as_unmapped(&self, mut start: Address, bytes: usize) {
+        let end = start + bytes;
+        // Iterate over the slabs covered
+        while start < end {
+            let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
+                Self::slab_limit(start)
+            } else {
+                end
+            };
+            let slab = Self::slab_align_down(start);
+            let start_chunk = Self::chunk_index(slab, start);
+            let end_chunk = Self::chunk_index(slab, conversions::mmap_chunk_align_up(high));
+
+            let mapped = self.get_or_allocate_slab_table(start);
+            for entry in mapped.iter().take(end_chunk).skip(start_chunk) {
+                entry.store(MapState::Unmapped, Ordering::Relaxed);
+            }
+            start = high;
+        }
+    }
+
     fn quarantine_address_range(&self, mut start: Address, pages: usize) -> Result<()> {
         let end = start + conversions::pages_to_bytes(pages);
         // Iterate over the slabs covered

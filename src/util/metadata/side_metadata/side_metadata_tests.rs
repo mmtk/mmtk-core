@@ -313,7 +313,9 @@ mod tests {
             with_cleanup(
                 || {
                     // map_start = 0x10000000, mmap_size = 33554432
+                    println!("map1");
                     assert!(try_mmap_contiguous_metadata_space(Address::ZERO, half_address_space, &gspec, false).is_ok());
+                    println!("map2");
                     assert!(try_mmap_contiguous_metadata_space(Address::ZERO + half_address_space, half_address_space, &gspec, false).is_ok());
                     metadata.ensure_unmap_metadata_space(Address::ZERO, half_address_space);
                     metadata.ensure_unmap_metadata_space(Address::ZERO + half_address_space, half_address_space);
