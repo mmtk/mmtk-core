@@ -169,7 +169,7 @@ jobs:
       # report
       - name: Result
         if: always()
-        uses: thollander/actions-comment-pull-request@master
+        uses: thollander/actions-comment-pull-request@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
@@ -299,7 +299,7 @@ jobs:
       # report
       - name: Result
         if: always()
-        uses: thollander/actions-comment-pull-request@master
+        uses: thollander/actions-comment-pull-request@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
