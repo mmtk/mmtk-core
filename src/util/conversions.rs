@@ -65,6 +65,7 @@ pub fn pages_to_bytes(pages: usize) -> usize {
     pages << LOG_BYTES_IN_PAGE
 }
 
+/// Convert size in bytes to the number of pages (aligned up)
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE
 }

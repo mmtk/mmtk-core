@@ -8,6 +8,7 @@ use crate::util::{
     constants::{BITS_IN_WORD, BYTES_IN_PAGE, LOG_BITS_IN_BYTE},
     heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE,
 };
+use crate::util::conversions;
 use crate::MMAPPER;
 use std::io::Result;
 
@@ -49,8 +50,7 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     // nearest page-aligned starting address
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let mmap_size =
-        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    let mmap_size = metadata_mmap_size(spec, size);
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
@@ -72,8 +72,7 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     // nearest page-aligned starting address
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let mmap_size =
-        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    let mmap_size = metadata_mmap_size(spec, size);
     if mmap_size > 0 {
         if !no_reserve {
             MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
@@ -111,6 +110,11 @@ pub(crate) fn address_to_meta_address(
     );
 
     res
+}
+
+/// Calculate the mmap size (aligned up by pages) for a side metadata spec and the data size.
+fn metadata_mmap_size(spec: &SideMetadataSpec, data_size: usize) -> usize {
+    conversions::raw_align_up(data_size >> addr_rshift(spec), BYTES_IN_PAGE)
 }
 
 pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {

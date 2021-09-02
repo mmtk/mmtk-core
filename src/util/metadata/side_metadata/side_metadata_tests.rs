@@ -295,6 +295,36 @@ mod tests {
         })
     }
 
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn test_side_metadata_try_mmap_contiguous_metadata_space_entire_address_space() {
+        serial_test(|| {
+            let gspec = SideMetadataSpec {
+                is_global: true,
+                offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                log_num_of_bits: 0,
+                log_min_obj_size: 3,
+            };
+            let metadata = SideMetadataContext {
+                global: vec![gspec],
+                local: vec![],
+            };
+            let half_address_space = 1 << (crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE - 1);
+            with_cleanup(
+                || {
+                    // map_start = 0x10000000, mmap_size = 33554432
+                    assert!(try_mmap_contiguous_metadata_space(Address::ZERO, half_address_space, &gspec, false).is_ok());
+                    assert!(try_mmap_contiguous_metadata_space(Address::ZERO + half_address_space, half_address_space, &gspec, false).is_ok());
+                    metadata.ensure_unmap_metadata_space(Address::ZERO, half_address_space);
+                    metadata.ensure_unmap_metadata_space(Address::ZERO + half_address_space, half_address_space);
+                },
+                || {
+                    sanity::reset();
+                }
+            )
+        })
+    }
+
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_ge8bits() {
         serial_test(|| {
