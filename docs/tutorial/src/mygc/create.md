@@ -24,8 +24,9 @@ files.
         pub mod mygc;
         ```
         This adds `mygc` as a module.
-    1. `mmtk-core/src/util/options.rs`, add `MyGC` to `PlanSelector`. This allows MMTk to accept `MyGC`
-    as a command line option for `plan`, or an environment variable for `MMTK_PLAN`:
+    1. `mmtk-core/src/util/options.rs`, add `MyGC` to `PlanSelector`. 
+    This allows MMTk to accept `MyGC` as a command line option for `plan`, 
+    or an environment variable for `MMTK_PLAN`:
         ```rust
         #[derive(Copy, Clone, EnumFromStr, Debug)]
         pub enum PlanSelector {
@@ -35,8 +36,9 @@ files.
             MyGC
         }
         ```
-    1. `mmtk-core/src/plan/global.rs`, change `create_mutator()` and `create_plan()` to create the `MyGC` mutator and the `MyGC` plan
-    based on `PlanSelector`:
+    1. `mmtk-core/src/plan/global.rs`, change `create_mutator()` and 
+    `create_plan()` to create the `MyGC` mutator and the `MyGC` plan based 
+    on `PlanSelector`:
         ```rust
         pub fn create_mutator<VM: VMBinding>(
             tls: OpaquePointer,
@@ -80,8 +82,8 @@ files.
     
 Note that all of the above changes almost exactly copy the NoGC entries in 
 each of these files. However, NoGC has some variants, such as a lock-free 
-variant. For simplicity, those are not needed for this tutorial. Remove references to them in
-the MyGC plan now. 
+variant. For simplicity, those are not needed for this tutorial. Remove 
+references to them in the MyGC plan now. 
 
 1. Within `mygc/global.rs`, find any use of `#[cfg(feature = "mygc_lock_free")]` 
 and delete both it *and the line below it*.
@@ -89,10 +91,12 @@ and delete both it *and the line below it*.
 `#[cfg(not(feature = "mygc_lock_free"))]`, this time without changing the 
 line below it.
 
-After you rebuild OpenJDK (and `mmtk-core`), you can run MyGC with your new build (`MMTK_PLAN=MyGC`). Try testing it
-with the each of the three benchmarks. It should work identically to NoGC.
+After you rebuild OpenJDK (and `mmtk-core`), you can run MyGC with your new 
+build (`MMTK_PLAN=MyGC`). Try testing it with the each of the three benchmarks. 
+It should work identically to NoGC.
 
-If you've got to this point, then congratulations! You have created your first working MMTk collector!
+If you've got to this point, then congratulations! You have created your first 
+working MMTk collector!
 
 
 At this point, you should familiarise yourself with the MyGC plan if you 

@@ -20,5 +20,6 @@ dependencies by following the instructions in the
    * Use the `slowdebug` option when building the OpenJDK binding. This is the 
    fastest debug variant to build, and allows for easier debugging and better 
    testing. The rest of the tutorial will assume you are using `slowdebug`.
-   * You can use the env var `MMTK_PLAN=[PlanName]` to choose a plan to use at run-time.
-   The plans that are relevant to this tutorial are `NoGC` and `SemiSpace`.
+   * You can use the env var `MMTK_PLAN=[PlanName]` to choose a plan to use at 
+   run-time. The plans that are relevant to this tutorial are 
+   `NoGC` and `SemiSpace`.
