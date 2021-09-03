@@ -104,7 +104,7 @@ Add a new constructor, `new()`.
 ## Introduce collection to MyGC plan
 
 Now that they've been added, you should import `MyGCCopyContext` and
-`MyGCProcessEdges` into `global.rs`, which we will be working in for the
+`MyGCProcessEdges` into `mygc/global.rs`, which we will be working in for the
 next few steps. 
 
 In `create_worker_local()` in `impl Plan for MyGC`, create an instance of `MyGCCopyContext`.
@@ -139,7 +139,7 @@ We'll add these now.
 
 ### Prepare plan
 
-In `global.rs`, find the method `prepare`. Delete the `unreachable!()` 
+In `mygc/global.rs`, find the method `prepare`. Delete the `unreachable!()` 
 call, and add the following code:
 
 ```rust
@@ -225,7 +225,7 @@ run after each collection.
 
 ### Release in plan
 
-Find the method `release()` in `global.rs`. Replace the 
+Find the method `release()` in `mygc/global.rs`. Replace the 
 `unreachable!()` call with the following code.
 
 ```rust

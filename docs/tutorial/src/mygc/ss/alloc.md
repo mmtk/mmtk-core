@@ -25,7 +25,7 @@ Finished Code (Step 1-4):
 
 ## Change the plan implementation
 
-Next, in `global.rs`, replace the old immortal (nogc) space with two copyspaces.
+Next, in `mygc/global.rs`, replace the old immortal (nogc) space with two copyspaces.
 
 ### Imports
 
