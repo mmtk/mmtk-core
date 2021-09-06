@@ -125,7 +125,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
-    pub fn request_full_heap_collection(&self, used_pages: usize, reserved_pages: usize) -> bool {
+    pub fn request_full_heap_collection(&self, total_pages: usize, reserved_pages: usize) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         #[allow(clippy::if_same_then_else)]
@@ -152,7 +152,7 @@ impl<VM: VMBinding> Gen<VM> {
             // Forces full heap collection
             true
         } else {
-            used_pages <= reserved_pages
+            total_pages <= reserved_pages
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);

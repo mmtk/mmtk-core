@@ -244,7 +244,7 @@ impl<VM: VMBinding> GenCopy<VM> {
 
     fn request_full_heap_collection(&self) -> bool {
         self.gen
-            .request_full_heap_collection(self.get_pages_used(), self.get_pages_reserved())
+            .request_full_heap_collection(self.get_total_pages(), self.get_pages_reserved())
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {
