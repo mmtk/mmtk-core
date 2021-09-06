@@ -236,6 +236,11 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         drop(guard);
     }
 
+    pub unsafe fn get_current_chunk(&self) -> Address {
+        let guard = self.sync.lock().unwrap();
+        guard.current_chunk
+    }
+
     /*/**
     * Release all pages associated with this page resource, optionally
     * zeroing on release and optionally memory protecting on release.

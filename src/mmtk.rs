@@ -1,7 +1,7 @@
 ///! MMTk instance.
 use crate::plan::Plan;
 use crate::policy::space::SFTMap;
-use crate::scheduler::MMTkScheduler;
+use crate::scheduler::GCWorkScheduler;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -43,7 +43,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor: Mutex<FinalizableProcessor>,
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
-    pub(crate) scheduler: Arc<MMTkScheduler<VM>>,
+    pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker>,
     inside_harness: AtomicBool,
@@ -51,9 +51,15 @@ pub struct MMTK<VM: VMBinding> {
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
-        let scheduler = MMTkScheduler::new();
+        let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        let plan = crate::plan::create_plan(options.plan, &VM_MAP, &MMAPPER, options.clone());
+        let plan = crate::plan::create_plan(
+            options.plan,
+            &VM_MAP,
+            &MMAPPER,
+            options.clone(),
+            scheduler.clone(),
+        );
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),

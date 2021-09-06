@@ -1,5 +1,7 @@
 use super::*;
-use crate::util::constants::BYTES_IN_PAGE;
+#[cfg(feature = "global_alloc_bit")]
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::{constants, Address};
@@ -145,8 +147,17 @@ pub struct SideMetadataContext {
 }
 
 impl SideMetadataContext {
+    #[cfg(not(feature = "global_alloc_bit"))]
     pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
+        ret.extend_from_slice(specs);
+        ret
+    }
+
+    #[cfg(feature = "global_alloc_bit")]
+    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
+        let mut ret = vec![];
+        ret.extend_from_slice(&[ALLOC_SIDE_METADATA_SPEC]);
         ret.extend_from_slice(specs);
         ret
     }
@@ -346,7 +357,7 @@ pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: 
     };
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(&metadata_spec, data_addr, res);
+    sanity::verify_load(metadata_spec, data_addr, res);
 
     res
 }
@@ -663,7 +674,7 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
     };
 
     #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(&metadata_spec, data_addr, res);
+    sanity::verify_load(metadata_spec, data_addr, res);
 
     res
 }
@@ -716,6 +727,67 @@ pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metada
     sanity::verify_store(metadata_spec, data_addr, metadata);
 }
 
+/// A byte array in side-metadata
+pub struct MetadataByteArrayRef<const ENTRIES: usize> {
+    #[cfg(feature = "extreme_assertions")]
+    heap_range_start: Address,
+    #[cfg(feature = "extreme_assertions")]
+    spec: SideMetadataSpec,
+    data: &'static [u8; ENTRIES],
+}
+
+impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
+    /// Get a piece of metadata address range as a byte array.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata_spec` - The specification of the target side metadata.
+    /// * `start` - The starting address of the heap range.
+    /// * `bytes` - The size of the heap range.
+    ///
+    pub fn new(metadata_spec: &SideMetadataSpec, start: Address, bytes: usize) -> Self {
+        debug_assert_eq!(
+            metadata_spec.log_num_of_bits, LOG_BITS_IN_BYTE as usize,
+            "Each heap entry should map to a byte in side-metadata"
+        );
+        debug_assert_eq!(
+            bytes >> metadata_spec.log_min_obj_size,
+            ENTRIES,
+            "Heap range size and MetadataByteArray size does not match"
+        );
+        Self {
+            #[cfg(feature = "extreme_assertions")]
+            heap_range_start: start,
+            #[cfg(feature = "extreme_assertions")]
+            spec: *metadata_spec,
+            // # Safety
+            // The metadata memory is assumed to be mapped when accessing.
+            data: unsafe { &*address_to_meta_address(metadata_spec, start).to_ptr() },
+        }
+    }
+
+    /// Get the length of the array.
+    #[allow(clippy::len_without_is_empty)]
+    pub const fn len(&self) -> usize {
+        ENTRIES
+    }
+
+    /// Get a byte from the metadata byte array at the given index.
+    #[inline(always)]
+    #[allow(clippy::let_and_return)]
+    pub fn get(&self, index: usize) -> u8 {
+        #[cfg(feature = "extreme_assertions")]
+        let _lock = sanity::SANITY_LOCK.lock().unwrap();
+        let value = self.data[index];
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let data_addr = self.heap_range_start + (index << self.spec.log_min_obj_size);
+            sanity::verify_load(&self.spec, data_addr, value as _);
+        }
+        value
+    }
+}
+
 /// Bulk-zero a specific metadata for a chunk.
 ///
 /// # Arguments
@@ -728,6 +800,8 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
+    // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
+    #[cfg(not(feature = "global_alloc_bit"))]
     debug_assert!(
         start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
     );

@@ -69,6 +69,12 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             None,
             Some(Ordering::SeqCst),
         );
+
+        if self.common.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        }
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(object);
     }
 }
 
@@ -104,13 +110,14 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        _constraints: &'static PlanConstraints,
+        constraints: &'static PlanConstraints,
     ) -> Self {
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
                 movable: false,
                 immortal: true,
+                needs_log_bit: constraints.needs_log_bit,
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
@@ -178,6 +185,12 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
             trace.process_node(object);
         }

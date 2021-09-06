@@ -107,7 +107,7 @@ impl<VM: VMBinding> NoCopy<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
+impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
@@ -126,6 +126,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }
@@ -137,6 +138,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -149,6 +151,9 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
         )),
+        PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
+            vm_map, mmapper, options, scheduler,
+        )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
         )),
@@ -160,6 +165,17 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
+///
+/// Constructor:
+///
+/// For the constructor of a new plan, there are a few things the constructor _must_ do
+/// (please check existing plans and see what they do in the constructor):
+/// 1. Create a HeapMeta, and use this HeapMeta to initialize all the spaces.
+/// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
+///    the parameter is a vector of global side metadata specs that are specific to the plan.
+/// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
+/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
 pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
@@ -170,7 +186,7 @@ pub trait Plan: 'static + Sync + Downcast {
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
@@ -186,7 +202,7 @@ pub trait Plan: 'static + Sync + Downcast {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<Self::VM>>,
+        scheduler: &Arc<GCWorkScheduler<Self::VM>>,
     );
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
@@ -490,7 +506,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
@@ -638,7 +654,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    fn is_user_triggered_collection(&self) -> bool {
+    pub fn is_user_triggered_collection(&self) -> bool {
         self.user_triggered_collection.load(Ordering::Relaxed)
     }
 
@@ -782,7 +798,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
         self.immortal.init(vm_map);
@@ -824,7 +840,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
         &self,
         constraints: &'static PlanConstraints,
-        scheduler: &MMTkScheduler<VM>,
+        scheduler: &GCWorkScheduler<VM>,
     ) {
         // Schedule finalization
         if !self.base.options.no_finalizer {

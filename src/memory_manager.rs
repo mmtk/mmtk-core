@@ -14,9 +14,8 @@
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
-use crate::scheduler::GCWorker;
-use crate::scheduler::Work;
 use crate::scheduler::WorkBucketStage;
+use crate::scheduler::{GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
@@ -71,6 +70,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     mmtk.plan
         .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
     info!("Initialized MMTk with {:?}", mmtk.options.plan);
+    #[cfg(feature = "extreme_assertions")]
+    warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
@@ -409,7 +410,7 @@ pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `bucket`: Which work bucket to add this packet to.
 /// * `packet`: The work packet to be added.
-pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
+pub fn add_work_packet<VM: VMBinding, W: GCWork<VM>>(
     mmtk: &'static MMTK<VM>,
     bucket: WorkBucketStage,
     packet: W,
@@ -427,7 +428,7 @@ pub fn add_work_packet<VM: VMBinding, W: Work<MMTK<VM>>>(
 pub fn add_work_packets<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     bucket: WorkBucketStage,
-    packets: Vec<Box<dyn Work<MMTK<VM>>>>,
+    packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
 }

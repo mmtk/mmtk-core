@@ -14,6 +14,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(not(feature = "global_alloc_bit"))]
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -40,6 +42,7 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    may_trace_duplicate_edges: true,
     ..PlanConstraints::default()
 };
 
@@ -50,12 +53,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
@@ -64,7 +67,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<Self, NoCopy<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(&self));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<MSProcessEdges<VM>>::new());
         // Release global/collectors/mutators
@@ -135,8 +138,18 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // SideMetadataContext by default, so we don't need to add it here.
+        #[cfg(feature = "global_alloc_bit")]
         let global_metadata_specs =
             SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
+        // if global_alloc_bit is NOT enabled,
+        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "global_alloc_bit"))]
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[
+            ALLOC_SIDE_METADATA_SPEC,
+            ACTIVE_CHUNK_METADATA_SPEC,
+        ]);
 
         let res = MarkSweep {
             ms: MallocSpace::new(global_metadata_specs.clone()),
@@ -150,6 +163,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
             res.common

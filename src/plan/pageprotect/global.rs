@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         // Warn users that the plan may fail due to maximum mapping allowed.
         warn!(
@@ -74,10 +74,10 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
             }
         );
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.space.init(&vm_map);
+        self.space.init(vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
@@ -148,7 +148,7 @@ impl<VM: VMBinding> PageProtect<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
-        PageProtect {
+        let ret = PageProtect {
             space: LargeObjectSpace::new(
                 "los",
                 true,
@@ -168,6 +168,19 @@ impl<VM: VMBinding> PageProtect<VM> {
                 &CONSTRAINTS,
                 global_metadata_specs,
             ),
+        };
+
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
+        {
+            use crate::util::metadata::side_metadata::SideMetadataSanity;
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            ret.common
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            ret.space
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
+
+        ret
     }
 }

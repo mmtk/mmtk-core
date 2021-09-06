@@ -52,7 +52,7 @@ jobs:
   # JikesRVM
   jikesrvm-binding-test:
     runs-on: ubuntu-18.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
       - name: Checkout MMTk Core
@@ -136,7 +136,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.4"
+          ref: "0.6.5"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -169,7 +169,7 @@ jobs:
       # report
       - name: Result
         if: always()
-        uses: thollander/actions-comment-pull-request@master
+        uses: thollander/actions-comment-pull-request@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}
@@ -183,7 +183,7 @@ jobs:
   # OpenJDK
   openjdk-binding-test:
     runs-on: ubuntu-18.04
-    timeout-minutes: 120
+    timeout-minutes: 240
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
       - name: Checkout MMTk Core
@@ -266,7 +266,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.4"
+          ref: "0.6.5"
           path: ci-perf-kit
           submodules: true
       # setup
@@ -299,7 +299,7 @@ jobs:
       # report
       - name: Result
         if: always()
-        uses: thollander/actions-comment-pull-request@master
+        uses: thollander/actions-comment-pull-request@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}

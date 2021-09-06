@@ -69,6 +69,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             Some(Ordering::SeqCst),
         );
 
+        if self.common.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        }
+
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
@@ -84,7 +90,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {}
+    fn init(&mut self, _vm_map: &'static VMMap) {
+        self.common().init(self.as_space());
+    }
 
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
@@ -105,7 +113,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        _constraints: &'static PlanConstraints,
+        constraints: &'static PlanConstraints,
         protect_memory_on_release: bool,
     ) -> Self {
         let common = CommonSpace::new(
@@ -114,6 +122,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 movable: false,
                 immortal: false,
                 zeroed,
+                needs_log_bit: constraints.needs_log_bit,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
@@ -165,6 +174,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         let nursery_object = self.is_in_nursery(object);
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
@@ -185,11 +200,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         }

@@ -1,5 +1,6 @@
 // ANCHOR: imports
 use super::MyGC; // Add
+use crate::Plan;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
@@ -59,19 +60,22 @@ lazy_static! {
 
 pub fn create_mygc_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
-    plan: &'static MyGC<VM>,
+    plan: &'static dyn Plan<VM = VM>,
 ) -> Mutator<VM> {
+    // ANCHOR: plan_downcast
+    let mygc = plan.downcast_ref::<MyGC<VM>>().unwrap();
+    // ANCHOR_END: plan_downcast
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         // Modify
         // ANCHOR: space_mapping
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), plan.tospace()),
+            (AllocatorSelector::BumpPointer(0), mygc.tospace()),
             (
                 AllocatorSelector::BumpPointer(1),
-                plan.common.get_immortal(),
+                mygc.common.get_immortal(),
             ),
-            (AllocatorSelector::LargeObject(0), plan.common.get_los()),
+            (AllocatorSelector::LargeObject(0), mygc.common.get_los()),
         ],
         // ANCHOR_END: space_mapping
         prepare_func: &mygc_mutator_prepare, // Modify

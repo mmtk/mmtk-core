@@ -418,10 +418,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if common.contiguous {
             print!("{}->{}", common.start, common.start + common.extent - 1);
             match common.vmrequest {
-                VMRequest::RequestExtent { extent, .. } => {
+                VMRequest::Extent { extent, .. } => {
                     print!(" E {}", extent);
                 }
-                VMRequest::RequestFraction { frac, .. } => {
+                VMRequest::Fraction { frac, .. } => {
                     print!(" F {}", frac);
                 }
                 _ => {}
@@ -482,6 +482,10 @@ pub struct CommonSpace<VM: VMBinding> {
 
     pub metadata: SideMetadataContext,
 
+    /// This field equals to needs_log_bit in the plan constraints.
+    // TODO: This should be a constant for performance.
+    pub needs_log_bit: bool,
+
     p: PhantomData<VM>,
 }
 
@@ -490,6 +494,7 @@ pub struct SpaceOptions {
     pub movable: bool,
     pub immortal: bool,
     pub zeroed: bool,
+    pub needs_log_bit: bool,
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
@@ -517,6 +522,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             head_discontiguous_region: unsafe { Address::zero() },
             vm_map,
             mmapper,
+            needs_log_bit: opt.needs_log_bit,
             metadata: opt.side_metadata_specs,
             p: PhantomData,
         };
@@ -531,12 +537,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         let (extent, top) = match vmrequest {
-            VMRequest::RequestFraction { frac, top: _top } => (get_frac_available(frac), _top),
-            VMRequest::RequestExtent {
+            VMRequest::Fraction { frac, top: _top } => (get_frac_available(frac), _top),
+            VMRequest::Extent {
                 extent: _extent,
                 top: _top,
             } => (_extent, _top),
-            VMRequest::RequestFixed {
+            VMRequest::Fixed {
                 extent: _extent,
                 top: _top,
                 ..
@@ -552,7 +558,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
 
         let start: Address;
-        if let VMRequest::RequestFixed { start: _start, .. } = vmrequest {
+        if let VMRequest::Fixed { start: _start, .. } = vmrequest {
             start = _start;
         } else {
             // FIXME
