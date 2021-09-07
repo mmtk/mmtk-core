@@ -99,7 +99,7 @@
 <span class="kw">mod</span> <span class="ident">transitive_closure</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">transitive_closure</span>::{<span class="ident">ObjectsClosure</span>, <span class="ident">TransitiveClosure</span>};
 
-<span class="kw">mod</span> <span class="ident">gencopy</span>;
+<span class="kw">mod</span> <span class="ident">generational</span>;
 <span class="kw">mod</span> <span class="ident">immix</span>;
 <span class="kw">mod</span> <span class="ident">marksweep</span>;
 <span class="kw">mod</span> <span class="ident">nogc</span>;
@@ -109,7 +109,7 @@
 <span class="comment">// Expose plan constraints as public. Though a binding can get them from plan.constraints(),</span>
 <span class="comment">// it is possible for performance reasons that they want the constraints as constants.</span>
 
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gencopy::GENCOPY_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">generational::copying::GENCOPY_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immix::IMMIX_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">marksweep::MS_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">nogc::NOGC_CONSTRAINTS</span>;

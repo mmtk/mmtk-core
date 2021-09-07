@@ -1,1 +1,0 @@
-initSidebarItems({"constant":[["ACTIVE_BARRIER","Barrier overhead measurement:"],["FULL_NURSERY_GC","Full heap collection as nursery GC."],["NO_SLOW","Force object barrier never enters the slow-path. If enabled,"]],"mod":[["gc_work",""],["global",""],["mutator",""]]});

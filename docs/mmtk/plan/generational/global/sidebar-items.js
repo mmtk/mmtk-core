@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Gen","Common implementation for generational plans. Each generational plan should include this type, and forward calls to it where possible."]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["GenNurseryProcessEdges","Process edges for a nursery GC. A generatinoal plan should use this type for a nursery GC."]]});
