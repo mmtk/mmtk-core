@@ -54,7 +54,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
             let mut vec = create_space_mapping(GENCOPY_RESERVED_ALLOCATOR, true, &*mmtk.plan);
-            vec.push((AllocatorSelector::BumpPointer(0), &gencopy.nursery));
+            vec.push((AllocatorSelector::BumpPointer(0), &gencopy.gen.nursery));
             vec
         },
         prepare_func: &gencopy_mutator_prepare,
