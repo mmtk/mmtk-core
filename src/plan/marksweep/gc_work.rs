@@ -25,6 +25,22 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     type VM = VM;
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        // Check if the edges are where we expect them to be
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let ms = mmtk.plan.downcast_ref::<MarkSweep<VM>>().unwrap();
+            for edge in &edges {
+                let object = unsafe { edge.load::<ObjectReference>() };
+                assert!(
+                    object.is_null()
+                        || ms.ms_space().in_space(object)
+                        || ms.common().in_space(object),
+                    "Unknown object {:?}",
+                    object,
+                );
+            }
+        }
+
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
         Self { plan, base }

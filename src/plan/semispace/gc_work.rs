@@ -88,6 +88,23 @@ impl<VM: VMBinding> SSProcessEdges<VM> {
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        // Check if the edges are where we expect them to be
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let ss = mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap();
+            for edge in &edges {
+                let object = unsafe { edge.load::<ObjectReference>() };
+                assert!(
+                    object.is_null()
+                        || ss.fromspace().in_space(object)
+                        || ss.tospace().in_space(object)
+                        || ss.common.in_space(object),
+                    "Unknown object {:?}",
+                    object,
+                );
+            }
+        }
+
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
         Self { plan, base }

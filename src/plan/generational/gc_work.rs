@@ -19,6 +19,22 @@ impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork
 {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        // Check if the edges are where we expect them to be
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let gen = mmtk.plan.generational();
+            for edge in &edges {
+                let object = unsafe { edge.load::<ObjectReference>() };
+                assert!(
+                    object.is_null()
+                        || gen.nursery.in_space(object)
+                        || gen.common.get_los().in_space(object),
+                    "Unknown object {:?}",
+                    object,
+                );
+            }
+        }
+
         let base = ProcessEdgesBase::new(edges, mmtk);
         let gen = base.plan().generational();
         Self { gen, base }

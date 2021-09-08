@@ -126,6 +126,22 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        // Check if the edges are where we expect them to be
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let ix = mmtk.plan.downcast_ref::<Immix<VM>>().unwrap();
+            for edge in &edges {
+                let object = unsafe { edge.load::<ObjectReference>() };
+                assert!(
+                    object.is_null()
+                        || ix.immix_space.in_space(object)
+                        || ix.common.in_space(object),
+                    "Unknown object {:?}",
+                    object,
+                );
+            }
+        }
+
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
         Self { plan, base, mmtk }

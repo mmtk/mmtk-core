@@ -558,6 +558,33 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
+    /// Return whether a given `ObjectReference` has been allocated in any of the space in the `BasePlan`.
+    pub fn in_space(&self, _object: ObjectReference) -> bool {
+        #[allow(unused_mut)]
+        let mut ret = false;
+        #[cfg(feature = "code_space")]
+        {
+            ret = ret || self.code_space.in_space(_object);
+        }
+
+        #[cfg(feature = "code_space")]
+        {
+            ret = ret || self.code_lo_space.in_space(_object);
+        }
+
+        #[cfg(feature = "ro_space")]
+        {
+            ret = ret || self.ro_space.in_space(_object);
+        }
+
+        #[cfg(feature = "vm_space")]
+        {
+            ret = ret || self.vm_space.in_space(_object);
+        }
+
+        ret
+    }
+
     pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
         &self,
         _trace: &mut T,
@@ -813,6 +840,11 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
     pub fn get_pages_used(&self) -> usize {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_pages_used()
+    }
+
+    /// Return whether a given `ObjectReference` has been allocated in any of the space in the `CommonPlan` or the `BasePlan`.
+    pub fn in_space(&self, object: ObjectReference) -> bool {
+        self.immortal.in_space(object) || self.los.in_space(object) || self.base.in_space(object)
     }
 
     pub fn trace_object<T: TransitiveClosure, C: CopyContext>(

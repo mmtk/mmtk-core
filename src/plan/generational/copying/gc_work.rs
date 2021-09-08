@@ -86,6 +86,24 @@ impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        // Check if the edges are where we expect them to be
+        #[cfg(feature = "extreme_assertions")]
+        {
+            let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
+            for edge in &edges {
+                let object = unsafe { edge.load::<ObjectReference>() };
+                assert!(
+                    object.is_null()
+                        || gencopy.fromspace().in_space(object)
+                        || gencopy.tospace().in_space(object)
+                        || gencopy.gen.nursery.in_space(object)
+                        || gencopy.gen.common.in_space(object),
+                    "Unknown object {:?}",
+                    object,
+                );
+            }
+        }
+
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self { plan, base }
