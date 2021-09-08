@@ -190,7 +190,11 @@ impl<VM: VMBinding> CopySpace<VM> {
         copy_context: &mut C,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        debug_assert!(self.from_space(), "Trace object called for object ({:?}) in to-space", object);
+        debug_assert!(
+            self.from_space(),
+            "Trace object called for object ({:?}) in to-space",
+            object
+        );
 
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
