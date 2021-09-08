@@ -522,15 +522,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                compare_exchange_metadata::<E::VM>(
-                    &self.meta,
-                    *obj,
-                    0b0,
-                    0b1,
-                    None,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
-                );
+                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
             }
         }
         if mmtk.plan.is_current_gc_nursery() {
