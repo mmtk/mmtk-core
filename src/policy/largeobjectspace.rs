@@ -50,7 +50,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize, alloc: bool) {
         let old_value = load_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
@@ -69,8 +69,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             Some(Ordering::SeqCst),
         );
 
-        if self.common.needs_log_bit {
+        if self.common.needs_log_bit && !self.common.needs_field_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+        }
+        if self.common.needs_log_bit && self.common.needs_field_log_bit {
+            for i in (0..bytes).step_by(8) {
+                let a = object.to_address() + i;
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .mark_as_unlogged::<VM>(unsafe { a.to_object_reference() }, Ordering::SeqCst);
+            }
         }
 
         let cell = VM::VMObjectModel::object_start_ref(object);
@@ -121,6 +128,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 immortal: false,
                 zeroed,
                 needs_log_bit: constraints.needs_log_bit,
+                needs_field_log_bit: constraints.needs_field_log_bit,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,

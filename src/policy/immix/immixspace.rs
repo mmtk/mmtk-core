@@ -67,7 +67,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {}
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -136,6 +136,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     local: Self::side_metadata_specs(),
                 },
                 needs_log_bit: false,
+                needs_field_log_bit: false,
             },
             vm_map,
             mmapper,

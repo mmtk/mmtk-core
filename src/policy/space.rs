@@ -70,7 +70,7 @@ pub trait SFT {
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
     /// Initialize object metadata (in the header, or in the side metadata).
-    fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize, alloc: bool);
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -107,7 +107,7 @@ impl SFT for EmptySpaceSFT {
         false
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _bytes: usize, _alloc: bool) {
         panic!(
             "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
@@ -485,6 +485,7 @@ pub struct CommonSpace<VM: VMBinding> {
     /// This field equals to needs_log_bit in the plan constraints.
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
+    pub needs_field_log_bit: bool,
 
     p: PhantomData<VM>,
 }
@@ -495,6 +496,7 @@ pub struct SpaceOptions {
     pub immortal: bool,
     pub zeroed: bool,
     pub needs_log_bit: bool,
+    pub needs_field_log_bit: bool,
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
@@ -523,6 +525,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             vm_map,
             mmapper,
             needs_log_bit: opt.needs_log_bit,
+            needs_field_log_bit: opt.needs_field_log_bit,
             metadata: opt.side_metadata_specs,
             p: PhantomData,
         };

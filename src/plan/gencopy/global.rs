@@ -49,6 +49,7 @@ pub const GENCOPY_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     needs_log_bit: true,
+    needs_field_log_bit: super::ACTIVE_BARRIER == BarrierSelector::FieldLoggingBarrier,
     barrier: super::ACTIVE_BARRIER,
     max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
@@ -213,7 +214,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let gencopy_specs = if super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+        let gencopy_specs = if super::ACTIVE_BARRIER != BarrierSelector::NoBarrier {
             metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
         } else {
             vec![]

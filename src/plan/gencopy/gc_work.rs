@@ -51,10 +51,20 @@ impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
         &mut self,
         obj: ObjectReference,
         _tib: Address,
-        _bytes: usize,
+        bytes: usize,
         _semantics: crate::AllocationSemantics,
     ) {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
+        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+        }
+        if !super::NO_SLOW && super::ACTIVE_BARRIER == BarrierSelector::FieldLoggingBarrier {
+            for i in (0..bytes).step_by(8) {
+                let a = obj.to_address() + i;
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .mark_as_unlogged::<VM>(unsafe { a.to_object_reference() }, Ordering::SeqCst);
+            }
+        }
     }
 }
 

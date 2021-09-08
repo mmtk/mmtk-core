@@ -4,6 +4,6 @@ pub(super) mod mutator;
 
 pub use self::global::Immix;
 
-pub const CONCURRENT_MARKING: bool = false;
+pub const CONCURRENT_MARKING: bool = true;
 
-pub const BARRIER_MEASUREMENT: bool = true;
+pub const BARRIER_MEASUREMENT: bool = false;
