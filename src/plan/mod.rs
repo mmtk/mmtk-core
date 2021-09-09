@@ -41,7 +41,7 @@ mod transitive_closure;
 pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod gencopy;
-mod immix;
+pub mod immix;
 mod marksweep;
 mod nogc;
 mod pageprotect;

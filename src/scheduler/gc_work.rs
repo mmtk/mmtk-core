@@ -728,9 +728,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBufSATB<E> {
                     Some(Ordering::Relaxed),
                 )
             }
-            let mut modbuf = vec![];
-            ::std::mem::swap(&mut modbuf, &mut self.nodes);
-            GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk);
+            if !crate::plan::immix::BARRIER_MEASUREMENT {
+                let mut modbuf = vec![];
+                ::std::mem::swap(&mut modbuf, &mut self.nodes);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk);
+            }
         }
     }
 }
