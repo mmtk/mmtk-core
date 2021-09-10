@@ -1,6 +1,9 @@
 use super::Immix;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
@@ -10,7 +13,6 @@ use crate::{
     plan::barriers::NoBarrier,
     util::opaque_pointer::{VMMutatorThread, VMWorkerThread},
 };
-use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn immix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
@@ -35,11 +37,17 @@ pub fn immix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMW
     immix_allocator.reset();
 }
 
+const IMMIX_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 0,
+    n_large_object: 0,
+    n_malloc: 0,
+};
+
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::Immix(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(0),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
+        let mut map = create_allocator_mapping(IMMIX_RESERVED_ALLOCATOR, true);
+        map[AllocationType::Default] = AllocatorSelector::Immix(0);
+        map
     };
 }
 
@@ -50,14 +58,11 @@ pub fn create_immix_mutator<VM: VMBinding>(
     let immix = plan.downcast_ref::<Immix<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![
-            (AllocatorSelector::Immix(0), &immix.immix_space),
-            (
-                AllocatorSelector::BumpPointer(0),
-                immix.common.get_immortal(),
-            ),
-            (AllocatorSelector::LargeObject(0), immix.common.get_los()),
-        ],
+        space_mapping: box {
+            let mut vec = create_space_mapping(IMMIX_RESERVED_ALLOCATOR, true, plan);
+            vec.push((AllocatorSelector::Immix(0), &immix.immix_space));
+            vec
+        },
         prepare_func: &immix_mutator_prepare,
         release_func: &immix_mutator_release,
     };
