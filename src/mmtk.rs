@@ -78,9 +78,11 @@ impl<VM: VMBinding> MMTK<VM> {
         self.inside_harness.store(true, Ordering::SeqCst);
         self.plan.base().stats.start_all();
         self.scheduler.enable_stat();
+        crate::INSIDE_HARNESS.store(true, Ordering::SeqCst);
     }
 
     pub fn harness_end(&'static self) {
+        crate::INSIDE_HARNESS.store(false, Ordering::SeqCst);
         self.plan.base().stats.stop_all(self);
         self.inside_harness.store(false, Ordering::SeqCst);
     }

@@ -14,7 +14,7 @@
 //!
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
-mod barriers;
+pub mod barriers;
 pub use barriers::BarrierSelector;
 
 mod controller_collector_context;

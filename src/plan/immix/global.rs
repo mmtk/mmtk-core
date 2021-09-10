@@ -43,8 +43,11 @@ pub struct Immix<VM: VMBinding> {
 pub fn get_immix_constraints() -> &'static PlanConstraints {
     static mut C: PlanConstraints = IMMIX_CONSTRAINTS_;
     unsafe {
-        if None == option_env!("FLB_KIND") && super::BARRIER_MEASUREMENT {
+        if None == option_env!("FLB_KIND") && crate::plan::barriers::BARRIER_MEASUREMENT {
             C.barrier = BarrierSelector::NoBarrier
+        }
+        if option_env!("IX_OBJ_BARRIER").is_some() && crate::plan::barriers::BARRIER_MEASUREMENT {
+            C.barrier = BarrierSelector::ObjectBarrier
         }
         &C
     }
@@ -94,9 +97,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
-        let flb = option_env!("FLB_KIND");
-        println!("FLB_KIND: {:?}", flb);
-        assert!(flb == None || flb == Some("SATB") || flb == Some("IU"));
+        if option_env!("IX_OBJ_BARRIER").is_some() {
+            println!("IX_OBJ_BARRIER");
+            assert!(crate::plan::barriers::BARRIER_MEASUREMENT);
+        } else {
+            let flb = option_env!("FLB_KIND");
+            println!("FLB_KIND: {:?}", flb);
+            assert!(flb == None || flb == Some("SATB") || flb == Some("IU"));
+        }
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.immix_space.init(vm_map);
     }
@@ -200,7 +208,7 @@ impl<VM: VMBinding> Immix<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let immix_specs = if get_immix_constraints().barrier != BarrierSelector::NoBarrier
-            || super::BARRIER_MEASUREMENT
+            || crate::plan::barriers::BARRIER_MEASUREMENT
         {
             metadata::extract_side_metadata(&[*VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC])
         } else {

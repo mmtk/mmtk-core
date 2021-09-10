@@ -13,9 +13,9 @@ use super::barriers::BarrierSelector;
 ///  - Set `ACTIVE_BARRIER` to `BarrierSelector::NoBarrier`.
 /// ## 2. Object barrier
 ///  - Set `ACTIVE_BARRIER` to `BarrierSelector::ObjectBarrier`.
-pub const ACTIVE_BARRIER: BarrierSelector = BarrierSelector::FieldLoggingBarrier;
+pub const ACTIVE_BARRIER: BarrierSelector = BarrierSelector::ObjectBarrier;
 /// Full heap collection as nursery GC.
-pub const FULL_NURSERY_GC: bool = false;
+pub const FULL_NURSERY_GC: bool = true;
 /// Force object barrier never enters the slow-path.
 /// If enabled,
 ///  - `FULL_NURSERY_GC` must be `true`.

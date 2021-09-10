@@ -68,6 +68,8 @@ extern crate num_cpus;
 extern crate downcast_rs;
 
 mod mmtk;
+use std::sync::atomic::AtomicBool;
+
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
 pub(crate) use mmtk::VM_MAP;
@@ -87,3 +89,5 @@ pub use crate::plan::{
 };
 
 static IN_CONCURRENT_GC: Mutex<bool> = Mutex::new(false);
+
+static INSIDE_HARNESS: AtomicBool = AtomicBool::new(false);

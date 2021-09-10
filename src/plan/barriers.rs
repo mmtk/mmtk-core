@@ -1,5 +1,7 @@
 //! Read/Write barrier implementations.
 
+use std::sync::atomic::AtomicUsize;
+
 use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
@@ -11,6 +13,11 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 
 use super::GcStatus;
+
+pub const BARRIER_MEASUREMENT: bool = true;
+pub const TAKERATE_MEASUREMENT: bool = true;
+pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 /// BarrierSelector describes which barrier to use.
 #[derive(Copy, Clone, Debug)]
@@ -92,17 +99,19 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     /// Returns true if the object is not logged previously.
     #[inline(always)]
     fn log_object(&self, object: ObjectReference) -> bool {
+        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 0 } else { 1 };
+        let logged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 1 } else { 0 };
         loop {
             let old_value =
                 load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
-            if old_value == 0 {
+            if old_value == logged_value {
                 return false;
             }
             if compare_exchange_metadata::<E::VM>(
                 &self.meta,
                 object,
-                1,
-                0,
+                unlogged_value,
+                logged_value,
                 None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
@@ -115,7 +124,13 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[inline(always)]
     fn enqueue_node(&mut self, obj: ObjectReference) {
         // If the objecct is unlogged, log it and push it to mod buffer
+        if TAKERATE_MEASUREMENT && crate::INSIDE_HARNESS.load(Ordering::SeqCst) {
+            FAST_COUNT.fetch_add(1, Ordering::SeqCst);
+        }
         if self.log_object(obj) {
+            if TAKERATE_MEASUREMENT && crate::INSIDE_HARNESS.load(Ordering::SeqCst) {
+                SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
+            }
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -213,10 +228,19 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, edge: Address) {
-        if !crate::plan::immix::BARRIER_MEASUREMENT && !*crate::IN_CONCURRENT_GC.lock() {
+        if option_env!("IX_OBJ_BARRIER").is_some() {
+            unreachable!()
+        }
+        if !BARRIER_MEASUREMENT && !*crate::IN_CONCURRENT_GC.lock() {
             return;
         }
+        if TAKERATE_MEASUREMENT && crate::INSIDE_HARNESS.load(Ordering::SeqCst) {
+            FAST_COUNT.fetch_add(1, Ordering::SeqCst);
+        }
         if self.log_edge(edge) {
+            if TAKERATE_MEASUREMENT && crate::INSIDE_HARNESS.load(Ordering::SeqCst) {
+                SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
+            }
             self.edges.push(edge);
             if KIND == FLBKind::SATB {
                 let node: ObjectReference = unsafe { edge.load() };

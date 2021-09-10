@@ -367,7 +367,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
         let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
         summary.merge(&coordinator_worker.stat);
-        summary.harness_stat()
+        let mut stat = summary.harness_stat();
+        if crate::plan::barriers::TAKERATE_MEASUREMENT {
+            let fast = crate::plan::barriers::FAST_COUNT.load(Ordering::SeqCst);
+            let slow = crate::plan::barriers::SLOW_COUNT.load(Ordering::SeqCst);
+            stat.insert("barrier.fast".to_owned(), format!("{:?}", fast));
+            stat.insert("barrier.slow".to_owned(), format!("{:?}", slow));
+            stat.insert("barrier.takerate".to_owned(), format!("{}", slow as f64 / fast as f64));
+        }
+        stat
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {

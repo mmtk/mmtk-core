@@ -638,9 +638,10 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 0 } else { 1 };
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
+                store_metadata::<E::VM>(&self.meta, *obj, unlogged_value, None, Some(Ordering::SeqCst));
             }
         }
         if mmtk.plan.is_current_gc_nursery() {
@@ -728,7 +729,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBufSATB<E> {
                     Some(Ordering::Relaxed),
                 )
             }
-            if !crate::plan::immix::BARRIER_MEASUREMENT {
+            if !crate::plan::barriers::BARRIER_MEASUREMENT {
                 let mut modbuf = vec![];
                 ::std::mem::swap(&mut modbuf, &mut self.nodes);
                 GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk);
