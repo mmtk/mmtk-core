@@ -9,13 +9,12 @@ use crate::scheduler::WorkBucketStage;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
 use crate::util::*;
-use crate::vm::VMBinding;
 use crate::MMTK;
 
 use super::GcStatus;
 
-pub const BARRIER_MEASUREMENT: bool = true;
-pub const TAKERATE_MEASUREMENT: bool = true;
+pub const BARRIER_MEASUREMENT: bool = false;
+pub const TAKERATE_MEASUREMENT: bool = false;
 pub static FAST_COUNT: AtomicUsize = AtomicUsize::new(0);
 pub static SLOW_COUNT: AtomicUsize = AtomicUsize::new(0);
 

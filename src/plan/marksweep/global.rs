@@ -14,6 +14,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(not(feature = "global_alloc_bit"))]
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -136,8 +138,18 @@ impl<VM: VMBinding> MarkSweep<VM> {
         options: Arc<UnsafeOptionsWrapper>,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // SideMetadataContext by default, so we don't need to add it here.
+        #[cfg(feature = "global_alloc_bit")]
         let global_metadata_specs =
             SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
+        // if global_alloc_bit is NOT enabled,
+        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "global_alloc_bit"))]
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[
+            ALLOC_SIDE_METADATA_SPEC,
+            ACTIVE_CHUNK_METADATA_SPEC,
+        ]);
 
         let res = MarkSweep {
             ms: MallocSpace::new(global_metadata_specs.clone()),

@@ -230,7 +230,7 @@ impl<VM: VMBinding> Immix<VM> {
                 options,
                 heap,
                 get_immix_constraints(),
-                global_metadata_specs.clone(),
+                global_metadata_specs,
             ),
         };
 

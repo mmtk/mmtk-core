@@ -211,7 +211,7 @@ impl Stats {
             if c.merge_phases() {
                 print!("{}\t", c.name());
             } else {
-                print!("{}.mu\t{}.gc\t", c.name(), c.name());
+                print!("{}.other\t{}.stw\t", c.name(), c.name());
             }
         }
         for name in scheduler_stat.keys() {

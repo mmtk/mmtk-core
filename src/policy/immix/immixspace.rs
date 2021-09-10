@@ -67,7 +67,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
-    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {}
+    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(_object);
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
@@ -308,6 +311,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
     ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if Block::containing::<VM>(object).is_defrag_source() {
             self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
         } else {
@@ -362,6 +371,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::unset_alloc_bit(object);
                 ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
             };
             if !super::MARK_LINE_AT_SCAN_TIME {
