@@ -104,8 +104,8 @@ jobs:
                 number: ${{ env.PERF_PR }}
                 id: jikesrvm-perf-compare-comment
                 # message: ${{ steps.cat.outputs.text }}
-                message: 'Run finished.'
-                recreate: true
+                message: 'JikesRVM benchmarks finished.'
+                append: true
           # Cleanup logs (this is necessary for self-hosted runners)
           - name: Clean up logs and reports
             if: always()
@@ -181,24 +181,24 @@ jobs:
                 id: openjdk-perf-compare-comment
                 message: 'Running benchmarks for OpenJDK...'
                 recreate: true
-            - name: Compare Performance
-              id: run
-              run: |
-                ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
-            # set report.md to output
-            - uses: pCYSl5EDgo/cat@master
-              id: cat
-              with:
-                path: openjdk-compare-report.md
-            # upload run results
-            - uses: actions/upload-artifact@v2
-              with:
-                name: openjdk-log
-                path: ci-perf-kit/running/results/log
-            - uses: actions/upload-artifact@v2
-              with:
-                name: openjdk-compare-report.md
-                path: openjdk-compare-report.md
+            # - name: Compare Performance
+            #   id: run
+            #   run: |
+            #     ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
+            # # set report.md to output
+            # - uses: pCYSl5EDgo/cat@master
+            #   id: cat
+            #   with:
+            #     path: openjdk-compare-report.md
+            # # upload run results
+            # - uses: actions/upload-artifact@v2
+            #   with:
+            #     name: openjdk-log
+            #     path: ci-perf-kit/running/results/log
+            # - uses: actions/upload-artifact@v2
+            #   with:
+            #     name: openjdk-compare-report.md
+            #     path: openjdk-compare-report.md
             # report
             - uses: hasura/comment-progress@v2.1.0
               if: always()
@@ -208,8 +208,8 @@ jobs:
                 number: ${{ env.PERF_PR }}
                 id: openjdk-perf-compare-comment
                 # message: ${{ steps.cat.outputs.text }}
-                message: 'Run finished'
-                recreate: true
+                message: 'OpenJDK benchmarks finished.'
+                append: true
             # Cleanup logs (this is necessary for self-hosted runners)
             - name: Clean up logs and reports
               if: always()
