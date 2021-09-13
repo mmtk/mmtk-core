@@ -32,7 +32,9 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-
+lazy_static! {
+    pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
+}
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(1 * 4),
@@ -422,23 +424,23 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         );
     }
 
-    #[inline]
-    pub fn cas_thread_free_list(
-        &self,
-        block: Address,
-        old_thread_free: Address,
-        new_thread_free: Address,
-    ) -> bool {
-        compare_exchange_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            old_thread_free.as_usize(),
-            new_thread_free.as_usize(),
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        )
-    }
+    // #[inline]
+    // pub fn cas_thread_free_list(
+    //     &self,
+    //     block: Address,
+    //     old_thread_free: Address,
+    //     new_thread_free: Address,
+    // ) -> bool {
+    //     compare_exchange_metadata::<VM>(
+    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+    //         unsafe { block.to_object_reference() },
+    //         old_thread_free.as_usize(),
+    //         new_thread_free.as_usize(),
+    //         None,
+    //         Ordering::SeqCst,
+    //         Ordering::SeqCst,
+    //     )
+    // }
 
     #[inline]
     pub fn store_thread_free_list(block: Address, thread_free: Address) {
@@ -709,6 +711,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
+
+        if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
+            println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+            *TRACING_OBJECT.lock().unwrap() = 0;
+        }
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
