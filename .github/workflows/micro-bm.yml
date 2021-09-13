@@ -1,10 +1,16 @@
 name: Post Code Review Checks (Micro Benchmarks)
 
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened, labeled]
+#     branches:
+#       - master
+
+# disable micro bm
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+  push:
+    branches-ignore:
+      - '**'
 
 jobs:
   openjdk-microbm:
