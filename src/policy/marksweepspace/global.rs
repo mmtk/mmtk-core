@@ -175,6 +175,10 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
+        use crate::util::alloc::free_list_allocator::TRACING_OBJECT;
+        if *TRACING_OBJECT.lock().unwrap() == address.as_usize() {
+            println!("marking tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+        }
         if !is_marked::<VM>(object, None) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             let block = Block::from(FreeListAllocator::<VM>::get_block(address));
