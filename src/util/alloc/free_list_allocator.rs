@@ -10,6 +10,7 @@ use crate::policy::marksweepspace::metadata::unset_alloc_bit_unsafe;
 use crate::policy::marksweepspace::metadata::unset_mark_bit;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
+use crate::util::ObjectReference;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::metadata::compare_exchange_metadata;
 use crate::util::metadata::load_metadata;
@@ -31,9 +32,9 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-// lazy_static! {
-//     pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
-// }
+lazy_static! {
+    pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
+}
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(1 * 4),
@@ -164,7 +165,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
         debug_assert!(offset == 0);
-
         // _mi_heap_get_free_small_page
         let bin = FreeListAllocator::<VM>::mi_bin(size);
         debug_assert!(bin <= MI_BIN_HUGE as u8);
@@ -183,10 +183,14 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
         if free_list.is_zero() {
             // first block has no empty cells, put it on the consumed list and go to slow path
+            debug_assert!(!block.is_zero());
             available_blocks.first = FreeListAllocator::<VM>::load_next_block(block);
 
             let consumed_blocks = &mut self.consumed_blocks[bin as usize];
+            debug_assert!(available_blocks.size == consumed_blocks.size);
+
             FreeListAllocator::<VM>::push_onto_block_list(consumed_blocks, block);
+            debug_assert!(consumed_blocks.first == block);
             
             return self.alloc_slow(size, align, offset);
         }
@@ -195,6 +199,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(!free_list.is_zero());
         let next_cell = unsafe { free_list.load::<Address>() };
         FreeListAllocator::<VM>::store_free_list(block, next_cell);
+        debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
 
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
@@ -207,26 +212,32 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // try to find an existing block with free cells
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
+            // gc
             return block;
         }
 
+
+        debug_assert!(!block.is_zero());
+
         // _mi_page_malloc
         let free_list = FreeListAllocator::<VM>::load_free_list(block);
-        assert!(!free_list.is_zero());
+        debug_assert!(!free_list.is_zero());
 
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
         FreeListAllocator::<VM>::store_free_list(block, next_cell);
+        debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
 
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
 
         
-        // if *TRACING_OBJECT.lock().unwrap() == 0 {
-        //     *TRACING_OBJECT.lock().unwrap() = free_list.as_usize();
-        //     println!("selected tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        // }
+        // let mut tracing_object = TRACING_OBJECT.lock().unwrap();
+        if *TRACING_OBJECT.lock().unwrap() == 0 {
+            *TRACING_OBJECT.lock().unwrap() = free_list.as_usize();
+            println!("selected tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+        }
         free_list
     }
 }
@@ -316,21 +327,23 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         );
     }
 
-    #[inline]
-    pub fn cas_thread_free_list(
-        &self,
-        block: Address,
-        old_thread_free: Address,
-        new_thread_free: Address,
-    ) -> bool {
-        compare_exchange_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            thread_free.as_usize(),
-            None,
-            None,
-        );
-    }
+    // #[inline]
+    // pub fn cas_thread_free_list(
+    //     &self,
+    //     block: Address,
+    //     old_thread_free: Address,
+    //     new_thread_free: Address,
+    // ) -> bool {
+    //     compare_exchange_metadata::<VM>(
+    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+    //         unsafe { block.to_object_reference() },
+    //         old_thread_free.as_usize(),
+    //         new_thread_free.as_usize(),
+    //         None,
+    //         Ordering::SeqCst,
+    //         Ordering::SeqCst,
+    //     )
+    // }
 
     // #[inline]
     // pub fn cas_thread_free_list(
@@ -406,35 +419,36 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block_list.first = block;
     }
 
-    pub fn block_thread_free_collect(&self, block: Address) {
-        let free_list = FreeListAllocator::<VM>::load_free_list(block);
+    // pub fn block_thread_free_collect(&self, block: Address) {
+    //     let free_list = FreeListAllocator::<VM>::load_free_list(block);
 
-        let mut success = false;
-        let mut thread_free = unsafe { Address::zero() };
-        while !success {
-            thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
-            if thread_free.is_zero() {
-                // no frees from other threads to worry about
-                return
-            }
-            success = self.cas_thread_free_list(block, thread_free, unsafe { Address::zero() });
-        }
+    //     let mut success = false;
+    //     let mut thread_free = unsafe { Address::zero() };
+    //     while !success {
+    //         thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
+    //         if thread_free.is_zero() {
+    //             // no frees from other threads to worry about
+    //             return
+    //         }
+    //         success = self.cas_thread_free_list(block, thread_free, unsafe { Address::zero() });
+    //     }
+    //     assert!(false);
 
-        // no more CAS needed
-        // futher frees to the thread free list will be done from a new empty list
-        if !free_list.is_zero() {
-            let mut tail = thread_free;
-            unsafe {
-                let mut next = tail.load::<Address>();
-                while !next.is_zero() {
-                    tail = next;
-                    next = tail.load::<Address>();
-                }
-                tail.store(free_list);
-            }
-        }
-        FreeListAllocator::<VM>::store_free_list(block, thread_free);
-    }
+    //     // no more CAS needed
+    //     // futher frees to the thread free list will be done from a new empty list
+    //     if !free_list.is_zero() {
+    //         let mut tail = thread_free;
+    //         unsafe {
+    //             let mut next = tail.load::<Address>();
+    //             while !next.is_zero() {
+    //                 tail = next;
+    //                 next = tail.load::<Address>();
+    //             }
+    //             tail.store(free_list);
+    //         }
+    //     }
+    //     FreeListAllocator::<VM>::store_free_list(block, thread_free);
+    // }
 
     // pub fn block_thread_free_collect(&self, block: Address) {
     //     let free_list = FreeListAllocator::<VM>::load_free_list(block);
@@ -476,9 +490,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // same thread
         let local_free = FreeListAllocator::<VM>::load_local_free_list(block);
         FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
+        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block) == unsafe { Address::zero() });
 
-        if !free_list.is_zero() {
-            if !local_free.is_zero() {
+        if !local_free.is_zero() {
+            if !free_list.is_zero() {
                 let mut tail = local_free;
                 unsafe {
                     let mut next = tail.load::<Address>();
@@ -489,11 +504,14 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     tail.store(free_list);
                 }
             }
+            FreeListAllocator::<VM>::store_free_list(block, local_free);
         }
-        FreeListAllocator::<VM>::store_free_list(block, local_free);
+
+        debug_assert!(local_free.is_zero());
     }
 
     pub fn block_has_free_cells(block: Address) -> bool {
+        debug_assert!(!block.is_zero());
         !FreeListAllocator::<VM>::load_free_list(block).is_zero()
 
     }
@@ -595,10 +613,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     pub fn free(&self, addr: Address) {
 
-        // if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
-        //     println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        //     *TRACING_OBJECT.lock().unwrap() = 0;
-        // }
+        if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
+            println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+            *TRACING_OBJECT.lock().unwrap() = 0;
+        }
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
@@ -612,14 +630,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             FreeListAllocator::<VM>::store_local_free_list(block, addr);
         } else {
             // different thread to allocator
-            let mut success = false;
-            while !success {
-                let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
-                unsafe {
-                    addr.store(thread_free);
-                }
-                success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
-            }
+            unreachable!();
+            // let mut success = false;
+            // while !success {
+            //     let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
+            //     unsafe {
+            //         addr.store(thread_free);
+            //     }
+            //     success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
+            // }
         }
 
         // unset allocation bit
