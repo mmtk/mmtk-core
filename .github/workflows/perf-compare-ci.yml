@@ -11,7 +11,6 @@ on:
 jobs:
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
-        if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
           - run: echo "PERF_PR=443" >> $GITHUB_ENV
           - name: Check Revisions
@@ -116,7 +115,6 @@ jobs:
 
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
-        if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
             - run: echo "PERF_PR=443" >> $GITHUB_ENV
             - name: Check Revisions
