@@ -1,10 +1,11 @@
 name: Binding Perf Tests
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
+        required: true
 
 jobs:
     jikesrvm-perf-compare:
@@ -12,9 +13,10 @@ jobs:
         if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
           - name: Check Revisions
-            uses: qinsoon/comment-env-vars@1.0.3
+            uses: qinsoon/comment-env-vars@1.1.0
             with:
               token: ${{ secrets.GITHUB_TOKEN }}
+              pull_request: ${{ github.event.inputs.pull_request }}
               default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
           # Trunk
           # - binding
@@ -66,6 +68,14 @@ jobs:
               mkdir -p ci-perf-kit/running/benchmarks/dacapo
               cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
           # run compare
+          - uses: hasura/comment-progress@v2.1.0
+            with:
+                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+                repository: 'mmtk/mmtk-core'
+                number: ${{ github.event.inputs.pull_request }}
+                id: jikesrvm-perf-compare-comment
+                message: 'Running benchmarks for JikesRVM...'
+                recreate: true
           - name: Compare Performance
             id: run
             run: |
@@ -85,12 +95,15 @@ jobs:
               name: jikesrvm-compare-report.md
               path: jikesrvm-compare-report.md
           # report
-          - name: Result
+          - uses: hasura/comment-progress@v2.1.0
             if: always()
-            uses: thollander/actions-comment-pull-request@main
             with:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              message: ${{ steps.cat.outputs.text }}
+                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+                repository: 'mmtk/mmtk-core'
+                number: ${{ github.event.inputs.pull_request }}
+                id: jikesrvm-perf-compare-comment
+                message: ${{ steps.cat.outputs.text }}
+                recreate: true
           # Cleanup logs (this is necessary for self-hosted runners)
           - name: Clean up logs and reports
             if: always()
@@ -103,9 +116,10 @@ jobs:
         if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
             - name: Check Revisions
-              uses: qinsoon/comment-env-vars@1.0.3
+              uses: qinsoon/comment-env-vars@1.1.0
               with:
                 token: ${{ secrets.GITHUB_TOKEN }}
+                pull_request: ${{ github.event.inputs.pull_request }}
                 default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
             # Trunk
             # - binding
@@ -157,6 +171,14 @@ jobs:
                 mkdir -p ci-perf-kit/running/benchmarks/dacapo
                 cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
             # run compare
+            - uses: hasura/comment-progress@v2.1.0
+              with:
+                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+                repository: 'mmtk/mmtk-core'
+                number: ${{ github.event.inputs.pull_request }}
+                id: openjdk-perf-compare-comment
+                message: 'Running benchmarks for OpenJDK...'
+                recreate: true
             - name: Compare Performance
               id: run
               run: |
@@ -176,12 +198,15 @@ jobs:
                 name: openjdk-compare-report.md
                 path: openjdk-compare-report.md
             # report
-            - name: Result
+            - uses: hasura/comment-progress@v2.1.0
               if: always()
-              uses: thollander/actions-comment-pull-request@main
               with:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                github-token: ${{ secrets.CI_ACCESS_TOKEN }}
+                repository: 'mmtk/mmtk-core'
+                number: ${{ github.event.inputs.pull_request }}
+                id: openjdk-perf-compare-comment
                 message: ${{ steps.cat.outputs.text }}
+                recreate: true
             # Cleanup logs (this is necessary for self-hosted runners)
             - name: Clean up logs and reports
               if: always()
