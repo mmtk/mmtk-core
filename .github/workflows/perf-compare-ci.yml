@@ -1,22 +1,24 @@
 name: Binding Perf Tests
 
 on:
-  workflow_dispatch:
-    inputs:
-      pull_request:
-        description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
-        required: true
+  # workflow_dispatch:
+  #   inputs:
+  #     pull_request:
+  #       description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
+  #       required: true
+  pull_request:
 
 jobs:
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
+          - run: echo "PERF_PR=443" >> $GITHUB_ENV
           - name: Check Revisions
             uses: qinsoon/comment-env-vars@1.1.0
             with:
               token: ${{ secrets.GITHUB_TOKEN }}
-              pull_request: ${{ github.event.inputs.pull_request }}
+              pull_request: ${{ env.PERF_PR }}
               default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
           # Trunk
           # - binding
@@ -72,37 +74,38 @@ jobs:
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
+                number: ${{ env.PERF_PR }}
                 id: jikesrvm-perf-compare-comment
                 message: 'Running benchmarks for JikesRVM...'
                 recreate: true
-          - name: Compare Performance
-            id: run
-            run: |
-              JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
-          # set report.md to output
-          - uses: pCYSl5EDgo/cat@master
-            id: cat
-            with:
-              path: jikesrvm-compare-report.md
-          # upload run results
-          - uses: actions/upload-artifact@v2
-            with:
-              name: jikesrvm-log
-              path: ci-perf-kit/running/results/log
-          - uses: actions/upload-artifact@v2
-            with:
-              name: jikesrvm-compare-report.md
-              path: jikesrvm-compare-report.md
+          # - name: Compare Performance
+          #   id: run
+          #   run: |
+          #     JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
+          # # set report.md to output
+          # - uses: pCYSl5EDgo/cat@master
+          #   id: cat
+          #   with:
+          #     path: jikesrvm-compare-report.md
+          # # upload run results
+          # - uses: actions/upload-artifact@v2
+          #   with:
+          #     name: jikesrvm-log
+          #     path: ci-perf-kit/running/results/log
+          # - uses: actions/upload-artifact@v2
+          #   with:
+          #     name: jikesrvm-compare-report.md
+          #     path: jikesrvm-compare-report.md
           # report
           - uses: hasura/comment-progress@v2.1.0
             if: always()
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
+                number: ${{ env.PERF_PR }}
                 id: jikesrvm-perf-compare-comment
-                message: ${{ steps.cat.outputs.text }}
+                # message: ${{ steps.cat.outputs.text }}
+                message: 'Run finished.'
                 recreate: true
           # Cleanup logs (this is necessary for self-hosted runners)
           - name: Clean up logs and reports
@@ -115,11 +118,12 @@ jobs:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
         steps:
+            - run: echo "PERF_PR=443" >> $GITHUB_ENV
             - name: Check Revisions
               uses: qinsoon/comment-env-vars@1.1.0
               with:
                 token: ${{ secrets.GITHUB_TOKEN }}
-                pull_request: ${{ github.event.inputs.pull_request }}
+                pull_request: ${{ env.PERF_PR }}
                 default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
             # Trunk
             # - binding
@@ -175,7 +179,7 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
+                number: ${{ env.PERF_PR }}
                 id: openjdk-perf-compare-comment
                 message: 'Running benchmarks for OpenJDK...'
                 recreate: true
@@ -203,9 +207,10 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ github.event.inputs.pull_request }}
+                number: ${{ env.PERF_PR }}
                 id: openjdk-perf-compare-comment
-                message: ${{ steps.cat.outputs.text }}
+                # message: ${{ steps.cat.outputs.text }}
+                message: 'Run finished'
                 recreate: true
             # Cleanup logs (this is necessary for self-hosted runners)
             - name: Clean up logs and reports
