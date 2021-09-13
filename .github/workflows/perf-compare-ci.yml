@@ -1,0 +1,190 @@
+name: Binding Perf Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - master
+
+jobs:
+    jikesrvm-perf-compare:
+        runs-on: [self-hosted, Linux, freq-scaling-off]
+        if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
+        steps:
+          - name: Check Revisions
+            uses: qinsoon/comment-env-vars@1.0.3
+            with:
+              token: ${{ secrets.GITHUB_TOKEN }}
+              default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
+          # Trunk
+          # - binding
+          - name: Checkout JikesRVM Binding Trunk
+            uses: actions/checkout@v2
+            with:
+              repository: mmtk/mmtk-jikesrvm
+              token: ${{ secrets.GITHUB_TOKEN }}
+              path: mmtk-jikesrvm-trunk
+              submodules: true
+              ref: ${{ env.JIKESRVM_BINDING_TRUNK_REF }}
+          # - core
+          - name: Checkout MMTk Core
+            uses: actions/checkout@v2
+            with:
+              ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+              path: mmtk-core-trunk
+          # Branch
+          # - binding
+          - name: Checkout JikesRVM Binding Branch
+            uses: actions/checkout@v2
+            with:
+              repository: mmtk/mmtk-jikesrvm
+              token: ${{ secrets.GITHUB_TOKEN }}
+              path: mmtk-jikesrvm-branch
+              submodules: true
+              ref: ${{ env.JIKESRVM_BINDING_BRANCH_REF }}
+          # - core
+          - name: Checkout MMTk Core
+            uses: actions/checkout@v2
+            with:
+              ref: ${{ env.MMTK_CORE_BRANCH_REF }}
+              path: mmtk-core-branch
+          # Checkout perf-kit
+          - name: Checkout Perf Kit
+            uses: actions/checkout@v2
+            with:
+              repository: mmtk/ci-perf-kit
+              token: ${{ secrets.GITHUB_TOKEN }}
+              ref: "0.6.5"
+              path: ci-perf-kit
+              submodules: true
+          # setup
+          # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
+          - name: Setup Rust Toolchain
+            run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
+          - name: Setup
+            run: |
+              mkdir -p ci-perf-kit/running/benchmarks/dacapo
+              cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
+          # run compare
+          - name: Compare Performance
+            id: run
+            run: |
+              JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-compare.sh mmtk-jikesrvm-trunk/ mmtk-core-trunk/ mmtk-jikesrvm-branch/ mmtk-core-branch/ jikesrvm-compare-report.md
+          # set report.md to output
+          - uses: pCYSl5EDgo/cat@master
+            id: cat
+            with:
+              path: jikesrvm-compare-report.md
+          # upload run results
+          - uses: actions/upload-artifact@v2
+            with:
+              name: jikesrvm-log
+              path: ci-perf-kit/running/results/log
+          - uses: actions/upload-artifact@v2
+            with:
+              name: jikesrvm-compare-report.md
+              path: jikesrvm-compare-report.md
+          # report
+          - name: Result
+            if: always()
+            uses: thollander/actions-comment-pull-request@main
+            with:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              message: ${{ steps.cat.outputs.text }}
+          # Cleanup logs (this is necessary for self-hosted runners)
+          - name: Clean up logs and reports
+            if: always()
+            run: |
+              rm -rf ci-perf-kit/running/results/log/*
+              rm jikesrvm-compare-report.md
+
+    openjdk-perf-compare:
+        runs-on: [self-hosted, Linux, freq-scaling-off]
+        if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
+        steps:
+            - name: Check Revisions
+              uses: qinsoon/comment-env-vars@1.0.3
+              with:
+                token: ${{ secrets.GITHUB_TOKEN }}
+                default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
+            # Trunk
+            # - binding
+            - name: Checkout OpenJDK Binding Trunk
+              uses: actions/checkout@v2
+              with:
+                repository: mmtk/mmtk-openjdk
+                token: ${{ secrets.GITHUB_TOKEN }}
+                path: mmtk-openjdk-trunk
+                submodules: true
+                ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
+            # -core
+            - name: Checkout MMTk Core
+              uses: actions/checkout@v2
+              with:
+                ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+                path: mmtk-core-trunk
+            # Branch
+            # - binding
+            - name: Checkout OpenJDK Binding Branch
+              uses: actions/checkout@v2
+              with:
+                repository: mmtk/mmtk-openjdk
+                token: ${{ secrets.GITHUB_TOKEN }}
+                path: mmtk-openjdk-branch
+                submodules: true
+                ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
+            # - core
+            - name: Checkout MMTk Core
+              uses: actions/checkout@v2
+              with:
+                ref: ${{ env.MMTK_CORE_BRANCH_REF }}
+                path: mmtk-core-branch
+            # checkout perf-kit
+            - name: Checkout Perf Kit
+              uses: actions/checkout@v2
+              with:
+                repository: mmtk/ci-perf-kit
+                token: ${{ secrets.GITHUB_TOKEN }}
+                ref: "0.6.5"
+                path: ci-perf-kit
+                submodules: true
+            # setup
+            # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
+            - name: Setup Rust Toolchain
+              run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
+            - name: Setup
+              run: |
+                mkdir -p ci-perf-kit/running/benchmarks/dacapo
+                cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
+            # run compare
+            - name: Compare Performance
+              id: run
+              run: |
+                ./ci-perf-kit/scripts/openjdk-compare.sh mmtk-openjdk-trunk/ mmtk-core-trunk/ mmtk-openjdk-branch/ mmtk-core-branch/ openjdk-compare-report.md
+            # set report.md to output
+            - uses: pCYSl5EDgo/cat@master
+              id: cat
+              with:
+                path: openjdk-compare-report.md
+            # upload run results
+            - uses: actions/upload-artifact@v2
+              with:
+                name: openjdk-log
+                path: ci-perf-kit/running/results/log
+            - uses: actions/upload-artifact@v2
+              with:
+                name: openjdk-compare-report.md
+                path: openjdk-compare-report.md
+            # report
+            - name: Result
+              if: always()
+              uses: thollander/actions-comment-pull-request@main
+              with:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                message: ${{ steps.cat.outputs.text }}
+            # Cleanup logs (this is necessary for self-hosted runners)
+            - name: Clean up logs and reports
+              if: always()
+              run: |
+                rm -rf ci-perf-kit/running/results/log/*
+                rm openjdk-compare-report.md
