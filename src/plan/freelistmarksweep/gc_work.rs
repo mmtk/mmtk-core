@@ -33,7 +33,7 @@ impl<VM: VMBinding> ProcessEdgesWork for FLMSProcessEdges<VM> {
         if self.plan.ms_space.in_space(object) {
             self.plan.ms_space.trace_object::<Self>(self, object)
         } else {
-            self.plan.im_space.trace_object::<Self>(self, object)
+            self.plan.common.get_los().trace_object::<Self>(self, object)
         }
     }
 }
