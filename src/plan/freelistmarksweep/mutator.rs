@@ -56,10 +56,11 @@ pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
             ),
             (
                 AllocatorSelector::BumpPointer(0),
-                &plan
+                plan
                     .downcast_ref::<FreeListMarkSweep<VM>>()
                     .unwrap()
-                    .im_space,
+                    .common()
+                    .get_los(),
             ),
         ],
         prepare_func: &flms_mutator_prepare,

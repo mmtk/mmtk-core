@@ -1,12 +1,12 @@
 use crate::mmtk::MMTK;
 use crate::plan::freelistmarksweep::mutator::ALLOCATOR_MAPPING;
-use crate::plan::global::{BasePlan, NoCopy};
+use crate::plan::global::{BasePlan, CommonPlan, NoCopy};
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::{AllocationSemantics, GcStatus};
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
-use crate::policy::space::Space;
+use crate::policy::space::{CommonSpace, Space, SpaceOptions};
 use crate::scheduler::gc_work::{EndOfGC, Prepare, Release, StopMutators};
 use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::MMTkScheduler;
@@ -32,9 +32,8 @@ use std::sync::Arc;
 use super::gc_work::FLMSProcessEdges;
 
 pub struct FreeListMarkSweep<VM: VMBinding> {
-    pub base: BasePlan<VM>,
+    pub common: CommonPlan<VM>,
     pub ms_space: MarkSweepSpace<VM>,
-    pub im_space: ImmortalSpace<VM>,
 }
 
 pub const FLMS_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -62,23 +61,22 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<MMTkScheduler<VM>>,
     ) {
-        self.base.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
         self.ms_space.init(&vm_map);
-        self.im_space.init(&vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base.collection_required(self, space_full, space)
+        self.common.base.collection_required(self, space_full, space)
     }
 
     fn base(&self) -> &BasePlan<VM> {
-        &self.base
+        &self.common.base
     }
 
-    fn prepare(&mut self, _tls: VMWorkerThread) {
-        self.im_space.prepare();
+    fn prepare(&mut self, tls: VMWorkerThread) {
+        self.common.prepare(tls, true);
         self.ms_space.reset();
     }
 
@@ -111,7 +109,7 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
     }
 
     fn get_pages_used(&self) -> usize {
-        self.im_space.reserved_pages() + self.ms_space.reserved_pages()
+        self.common.get_pages_used() + self.ms_space.reserved_pages()
     }
 }
 
@@ -138,37 +136,38 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         );
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
-        let im_space = ImmortalSpace::new(
-            "IMspace",
-            true,
-            VMRequest::discontiguous(),
-            global_specs.clone(),
+        // let im_space = ImmortalSpace::new(
+        //     "IMspace",
+        //     true,
+        //     VMRequest::discontiguous(),
+        //     global_specs.clone(),
+        //     vm_map,
+        //     mmapper,
+        //     &mut heap,
+        //     &FLMS_CONSTRAINTS,
+        // );
+
+        let common =             CommonPlan::new(
             vm_map,
             mmapper,
-            &mut heap,
+            options,
+            heap,
             &FLMS_CONSTRAINTS,
+            global_specs,
         );
 
         let res = FreeListMarkSweep {
-            im_space,
+            common,
             ms_space,
-            base: BasePlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &FLMS_CONSTRAINTS,
-                global_specs,
-            ),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.base
+        res.common
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.ms_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        res.im_space
-            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        // res.im_space
+        //     .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
 
