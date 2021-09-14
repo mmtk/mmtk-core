@@ -1,5 +1,4 @@
 use super::Immix;
-use crate::plan::barriers::FLBKind;
 use crate::plan::barriers::FieldLoggingBarrier;
 use crate::plan::barriers::ObjectRememberingBarrier;
 use crate::plan::immix::gc_work::ImmixProcessEdges;
@@ -72,24 +71,17 @@ pub fn create_immix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier:
-            if option_env!("IX_OBJ_BARRIER").is_some() {
-                box ObjectRememberingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(mmtk, *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC)
-            } else {
-                match option_env!("FLB_KIND") {
-                    Some("IU") => box FieldLoggingBarrier::<
-                        ImmixProcessEdges<VM, { TraceKind::Fast }>,
-                        { FLBKind::IU },
-                    >::new(mmtk, *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC),
-                    Some("SATB") | None => {
-                        box FieldLoggingBarrier::<
-                            ImmixProcessEdges<VM, { TraceKind::Fast }>,
-                            { FLBKind::SATB },
-                        >::new(mmtk, *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC)
-                    }
-                    _ => unreachable!(),
-                }
-            },
+        barrier: if option_env!("IX_OBJ_BARRIER").is_some() {
+            box ObjectRememberingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(
+                mmtk,
+                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            )
+        } else {
+            box FieldLoggingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(
+                mmtk,
+                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            )
+        },
         mutator_tls,
         config,
         plan: &*mmtk.plan,

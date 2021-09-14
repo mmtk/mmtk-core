@@ -373,7 +373,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let slow = crate::plan::barriers::SLOW_COUNT.load(Ordering::SeqCst);
             stat.insert("barrier.fast".to_owned(), format!("{:?}", fast));
             stat.insert("barrier.slow".to_owned(), format!("{:?}", slow));
-            stat.insert("barrier.takerate".to_owned(), format!("{}", slow as f64 / fast as f64));
+            stat.insert(
+                "barrier.takerate".to_owned(),
+                format!("{}", slow as f64 / fast as f64),
+            );
         }
         stat
     }

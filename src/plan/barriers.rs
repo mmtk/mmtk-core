@@ -98,8 +98,16 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     /// Returns true if the object is not logged previously.
     #[inline(always)]
     fn log_object(&self, object: ObjectReference) -> bool {
-        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 0 } else { 1 };
-        let logged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 1 } else { 0 };
+        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
+            0
+        } else {
+            1
+        };
+        let logged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
+            1
+        } else {
+            0
+        };
         loop {
             let old_value =
                 load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
@@ -173,13 +181,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 }
 
-#[derive(PartialEq, Eq)]
-pub enum FLBKind {
-    SATB,
-    IU,
-}
-
-pub struct FieldLoggingBarrier<E: ProcessEdgesWork, const KIND: FLBKind> {
+pub struct FieldLoggingBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
     edges: Vec<Address>,
     nodes: Vec<ObjectReference>,
@@ -188,7 +190,7 @@ pub struct FieldLoggingBarrier<E: ProcessEdgesWork, const KIND: FLBKind> {
     meta: MetadataSpec,
 }
 
-impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
+impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, meta: MetadataSpec) -> Self {
         Self {
@@ -241,11 +243,9 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
                 SLOW_COUNT.fetch_add(1, Ordering::SeqCst);
             }
             self.edges.push(edge);
-            if KIND == FLBKind::SATB {
-                let node: ObjectReference = unsafe { edge.load() };
-                if !node.is_null() {
-                    self.nodes.push(node);
-                }
+            let node: ObjectReference = unsafe { edge.load() };
+            if !node.is_null() {
+                self.nodes.push(node);
             }
             if self.edges.len() >= E::CAPACITY {
                 self.flush();
@@ -254,28 +254,18 @@ impl<E: ProcessEdgesWork, const KIND: FLBKind> FieldLoggingBarrier<E, KIND> {
     }
 }
 
-impl<E: ProcessEdgesWork, const KIND: FLBKind> Barrier for FieldLoggingBarrier<E, KIND> {
+impl<E: ProcessEdgesWork> Barrier for FieldLoggingBarrier<E> {
     #[cold]
     fn flush(&mut self) {
-        if KIND == FLBKind::SATB {
-            if self.edges.is_empty() && self.nodes.is_empty() {
-                return;
-            }
-            let mut edges = vec![];
-            std::mem::swap(&mut edges, &mut self.edges);
-            let mut nodes = vec![];
-            std::mem::swap(&mut nodes, &mut self.nodes);
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessModBufSATB::<E>::new(edges, nodes, self.meta));
-        } else {
-            if self.edges.is_empty() {
-                return;
-            }
-            let mut edges = vec![];
-            std::mem::swap(&mut edges, &mut self.edges);
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessModBufIU::<E>::new(edges, self.meta));
+        if self.edges.is_empty() && self.nodes.is_empty() {
+            return;
         }
+        let mut edges = vec![];
+        std::mem::swap(&mut edges, &mut self.edges);
+        let mut nodes = vec![];
+        std::mem::swap(&mut nodes, &mut self.nodes);
+        self.mmtk.scheduler.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessModBufSATB::<E>::new(edges, nodes, self.meta));
     }
 
     #[inline(always)]

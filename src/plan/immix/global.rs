@@ -28,6 +28,7 @@ use crate::{
     util::opaque_pointer::VMWorkerThread,
 };
 use crate::{scheduler::*, BarrierSelector};
+use std::env;
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -40,29 +41,37 @@ pub struct Immix<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
-pub fn get_immix_constraints() -> &'static PlanConstraints {
-    static mut C: PlanConstraints = IMMIX_CONSTRAINTS_;
-    unsafe {
-        if None == option_env!("FLB_KIND") && crate::plan::barriers::BARRIER_MEASUREMENT {
-            C.barrier = BarrierSelector::NoBarrier
+pub fn get_active_barrier() -> BarrierSelector {
+    if crate::plan::barriers::BARRIER_MEASUREMENT {
+        match env::var("IX_BARRIER") {
+            Ok(s) if s == "ObjectBarrier" => BarrierSelector::ObjectBarrier,
+            Ok(s) if s == "NoBarrier" => BarrierSelector::NoBarrier,
+            Ok(s) if s == "FieldBarrier" => BarrierSelector::FieldLoggingBarrier,
+            _ => unreachable!("Please explicitly specify barrier"),
         }
-        if option_env!("IX_OBJ_BARRIER").is_some() && crate::plan::barriers::BARRIER_MEASUREMENT {
-            C.barrier = BarrierSelector::ObjectBarrier
-        }
-        &C
+    } else if super::CONCURRENT_MARKING {
+        BarrierSelector::FieldLoggingBarrier
+    } else {
+        BarrierSelector::NoBarrier
     }
 }
 
-pub const IMMIX_CONSTRAINTS_: PlanConstraints = PlanConstraints {
-    moves_objects: true,
-    gc_header_bits: 2,
-    gc_header_words: 0,
-    num_specialized_scans: 1,
-    /// Max immix object size is half of a block.
-    max_non_los_default_alloc_bytes: Block::BYTES >> 1,
-    barrier: BarrierSelector::FieldLoggingBarrier,
-    ..PlanConstraints::default()
-};
+pub fn get_immix_constraints() -> &'static PlanConstraints {
+    static mut C: PlanConstraints = PlanConstraints {
+        moves_objects: true,
+        gc_header_bits: 2,
+        gc_header_words: 0,
+        num_specialized_scans: 1,
+        /// Max immix object size is half of a block.
+        max_non_los_default_alloc_bytes: Block::BYTES >> 1,
+        barrier: BarrierSelector::NoBarrier,
+        ..PlanConstraints::default()
+    };
+    unsafe {
+        C.barrier = get_active_barrier();
+        &C
+    }
+}
 
 impl<VM: VMBinding> Plan for Immix<VM> {
     type VM = VM;
@@ -97,14 +106,16 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
-        if option_env!("IX_OBJ_BARRIER").is_some() {
-            println!("IX_OBJ_BARRIER");
-            assert!(crate::plan::barriers::BARRIER_MEASUREMENT);
-        } else {
-            let flb = option_env!("FLB_KIND");
-            println!("FLB_KIND: {:?}", flb);
-            assert!(flb == None || flb == Some("SATB") || flb == Some("IU"));
-        }
+        println!(
+            "BARRIER_MEASUREMENT: {}",
+            crate::plan::barriers::BARRIER_MEASUREMENT
+        );
+        println!(
+            "TAKERATE_MEASUREMENT: {}",
+            crate::plan::barriers::TAKERATE_MEASUREMENT
+        );
+        println!("CONCURRENT_MARKING: {}", super::CONCURRENT_MARKING);
+        println!("BARRIER: {:?}", get_active_barrier());
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.immix_space.init(vm_map);
     }

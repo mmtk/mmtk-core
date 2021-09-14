@@ -638,10 +638,20 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() { 0 } else { 1 };
+        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
+            0
+        } else {
+            1
+        };
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                store_metadata::<E::VM>(&self.meta, *obj, unlogged_value, None, Some(Ordering::SeqCst));
+                store_metadata::<E::VM>(
+                    &self.meta,
+                    *obj,
+                    unlogged_value,
+                    None,
+                    Some(Ordering::SeqCst),
+                );
             }
         }
         if mmtk.plan.is_current_gc_nursery() {
