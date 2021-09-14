@@ -137,13 +137,13 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare();
+        self.immix_space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release();
+        self.immix_space.release(true);
     }
 
     fn get_collection_reserve(&self) -> usize {
