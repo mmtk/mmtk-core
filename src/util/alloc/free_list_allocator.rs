@@ -163,6 +163,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
         debug_assert!(offset == 0);
+
         // _mi_heap_get_free_small_page
         let bin = FreeListAllocator::<VM>::mi_bin(size);
         debug_assert!(bin <= MI_BIN_HUGE as u8);
