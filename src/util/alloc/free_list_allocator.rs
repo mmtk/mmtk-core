@@ -32,9 +32,9 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-lazy_static! {
-    pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
-}
+// lazy_static! {
+//     pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
+// }
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(1 * 4),
@@ -165,6 +165,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
         debug_assert!(offset == 0);
+
         // _mi_heap_get_free_small_page
         let bin = FreeListAllocator::<VM>::mi_bin(size);
         debug_assert!(bin <= MI_BIN_HUGE as u8);
@@ -233,11 +234,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
 
         
-        // let mut tracing_object = TRACING_OBJECT.lock().unwrap();
-        if *TRACING_OBJECT.lock().unwrap() == 0 {
-            *TRACING_OBJECT.lock().unwrap() = free_list.as_usize();
-            println!("selected tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        }
+        // if *TRACING_OBJECT.lock().unwrap() == 0 {
+        //     *TRACING_OBJECT.lock().unwrap() = free_list.as_usize();
+        //     println!("selected tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+        // }
         free_list
     }
 }
@@ -490,7 +490,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // same thread
         let local_free = FreeListAllocator::<VM>::load_local_free_list(block);
         FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
-        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block) == unsafe { Address::zero() });
+        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
 
         if !local_free.is_zero() {
             if !free_list.is_zero() {
@@ -507,7 +507,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             FreeListAllocator::<VM>::store_free_list(block, local_free);
         }
 
-        debug_assert!(local_free.is_zero());
+        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
     }
 
     pub fn block_has_free_cells(block: Address) -> bool {
@@ -519,6 +519,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
+        debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
         loop {
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
@@ -613,10 +614,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     pub fn free(&self, addr: Address) {
 
-        if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
-            println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-            *TRACING_OBJECT.lock().unwrap() = 0;
-        }
+        // if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
+        //     println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+        //     *TRACING_OBJECT.lock().unwrap() = 0;
+        // }
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
@@ -663,6 +664,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         while bin < MI_BIN_HUGE + 1 {
             let unswept = &mut self.unswept_blocks[bin];
             let available = self.available_blocks[bin];
+            debug_assert!(available.size == unswept.size);
             if !available.is_empty() {
                 if unswept.is_empty() {
                     unswept.first = available.first
