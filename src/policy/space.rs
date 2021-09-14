@@ -272,7 +272,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
             if !allow_poll {
-                panic!("Collection is not enabled.");
+                panic!("{} Collection is not enabled.", self.get_name());
             }
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
