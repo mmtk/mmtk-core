@@ -64,7 +64,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         allocator: AllocationType,
     ) -> Address {
         let allocator = if size > crate::util::alloc::free_list_allocator::BYTES_IN_BLOCK {
-            AllocationType::Immortal
+            AllocationType::Los
         } else {
             allocator
         };

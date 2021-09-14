@@ -32,9 +32,9 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-lazy_static! {
-    pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
-}
+// lazy_static! {
+//     pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
+// }
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(1 * 4),
@@ -606,6 +606,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
+        debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
@@ -712,10 +713,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     pub fn free(&self, addr: Address) {
 
-        if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
-            println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-            *TRACING_OBJECT.lock().unwrap() = 0;
-        }
+        // if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
+        //     println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
+        //     *TRACING_OBJECT.lock().unwrap() = 0;
+        // }
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
