@@ -81,7 +81,7 @@ impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(super) enum TraceKind {
+pub(in crate::plan) enum TraceKind {
     Fast,
     Defrag,
 }
