@@ -41,18 +41,27 @@ pub struct Immix<VM: VMBinding> {
     pub common: CommonPlan<VM>,
 }
 
+#[inline]
 pub fn get_active_barrier() -> BarrierSelector {
-    if crate::plan::barriers::BARRIER_MEASUREMENT {
-        match env::var("IX_BARRIER") {
-            Ok(s) if s == "ObjectBarrier" => BarrierSelector::ObjectBarrier,
-            Ok(s) if s == "NoBarrier" => BarrierSelector::NoBarrier,
-            Ok(s) if s == "FieldBarrier" => BarrierSelector::FieldLoggingBarrier,
-            _ => unreachable!("Please explicitly specify barrier"),
+    static mut B: Option<BarrierSelector> = None;
+    unsafe {
+        if B.is_none() {
+            B = Some({
+                if crate::plan::barriers::BARRIER_MEASUREMENT {
+                    match env::var("IX_BARRIER") {
+                        Ok(s) if s == "ObjectBarrier" => BarrierSelector::ObjectBarrier,
+                        Ok(s) if s == "NoBarrier" => BarrierSelector::NoBarrier,
+                        Ok(s) if s == "FieldBarrier" => BarrierSelector::FieldLoggingBarrier,
+                        _ => unreachable!("Please explicitly specify barrier"),
+                    }
+                } else if super::CONCURRENT_MARKING {
+                    BarrierSelector::FieldLoggingBarrier
+                } else {
+                    BarrierSelector::NoBarrier
+                }
+            });
         }
-    } else if super::CONCURRENT_MARKING {
-        BarrierSelector::FieldLoggingBarrier
-    } else {
-        BarrierSelector::NoBarrier
+        B.unwrap()
     }
 }
 

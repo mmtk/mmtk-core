@@ -638,11 +638,12 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
-            0
-        } else {
-            1
-        };
+        let unlogged_value =
+            if crate::plan::immix::get_active_barrier() == BarrierSelector::ObjectBarrier {
+                0
+            } else {
+                1
+            };
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
                 store_metadata::<E::VM>(

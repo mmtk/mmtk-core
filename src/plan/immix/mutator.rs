@@ -3,6 +3,7 @@ use crate::plan::barriers::FieldLoggingBarrier;
 use crate::plan::barriers::ObjectRememberingBarrier;
 use crate::plan::immix::gc_work::ImmixProcessEdges;
 use crate::plan::immix::gc_work::TraceKind;
+use crate::plan::immix::global::get_active_barrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
@@ -71,7 +72,7 @@ pub fn create_immix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: if option_env!("IX_OBJ_BARRIER").is_some() {
+        barrier: if get_active_barrier() == BarrierSelector::ObjectBarrier {
             box ObjectRememberingBarrier::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new(
                 mmtk,
                 *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,

@@ -98,16 +98,13 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     /// Returns true if the object is not logged previously.
     #[inline(always)]
     fn log_object(&self, object: ObjectReference) -> bool {
-        let unlogged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
-            0
-        } else {
-            1
-        };
-        let logged_value = if option_env!("IX_OBJ_BARRIER").is_some() {
-            1
-        } else {
-            0
-        };
+        let unlogged_value =
+            if crate::plan::immix::get_active_barrier() == BarrierSelector::ObjectBarrier {
+                0
+            } else {
+                1
+            };
+        let logged_value = unlogged_value ^ 1;
         loop {
             let old_value =
                 load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
@@ -229,7 +226,7 @@ impl<E: ProcessEdgesWork> FieldLoggingBarrier<E> {
 
     #[inline(always)]
     fn enqueue_node(&mut self, edge: Address) {
-        if option_env!("IX_OBJ_BARRIER").is_some() {
+        if crate::plan::immix::get_active_barrier() == BarrierSelector::ObjectBarrier {
             unreachable!()
         }
         if !BARRIER_MEASUREMENT && !*crate::IN_CONCURRENT_GC.lock() {
