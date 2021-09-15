@@ -92,6 +92,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let global_specs = SideMetadataContext::new_global_specs(&[]);
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         #[cfg(feature = "nogc_lock_free")]
         let nogc_space = NoGCImmortalSpace::new(
@@ -110,7 +111,6 @@ impl<VM: VMBinding> NoGC<VM> {
             &mut heap,
             &NOGC_CONSTRAINTS,
         );
-
 
         let res = NoGC {
             nogc_space,
