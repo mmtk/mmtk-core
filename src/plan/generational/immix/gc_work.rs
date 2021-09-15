@@ -10,6 +10,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
 use crate::util::alloc::ImmixAllocator;
+use crate::AllocationSemantics;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenImmixCopyContext<VM: VMBinding> {
@@ -87,20 +88,73 @@ impl<VM: VMBinding> GCWorkerLocal for GenImmixCopyContext<VM> {
     }
 }
 
-// use crate::plan::immix::gc_work::TraceKind;
-// pub struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
-//     plan: &'static GenImmix<VM>,
-//     base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
-// }
+use crate::plan::immix::gc_work::TraceKind;
+pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
+    plan: &'static GenImmix<VM>,
+    base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
+    mmtk: &'static MMTK<VM>,
+}
 
-// impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for GenImmixMatureProcessEdges<VM, KIND> {
-//     type VM = VM;
+impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for GenImmixMatureProcessEdges<VM, KIND> {
+    type VM = VM;
 
-//     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-//         let base = ProcessEdgesBase::new(edges, mmtk);
-//         let plan = base.plan().downcast_ref::<GenImmix<VM>>().unwrap();
-//         Self { plan, base }
-//     }
+    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, mmtk);
+        let plan = base.plan().downcast_ref::<GenImmix<VM>>().unwrap();
+        Self { plan, base, mmtk }
+    }
 
+    #[cold]
+    fn flush(&mut self) {
+        use crate::policy::immix::ScanObjectsAndMarkLines;
+        use crate::scheduler::WorkBucketStage;
+        let mut new_nodes = vec![];
+        std::mem::swap(&mut new_nodes, &mut self.nodes);
+        let scan_objects_work =
+            ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.plan.immix);
+        if Self::SCAN_OBJECTS_IMMEDIATELY {
+            self.worker().do_work(scan_objects_work);
+        } else {
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+        }
+    }
 
-// }
+    #[inline]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+
+        if self.plan.immix.in_space(object) {
+            if KIND == TraceKind::Fast {
+                return self.plan.immix.fast_trace_object(self, object);
+            } else {
+                return self.plan.immix.trace_object(
+                    self,
+                    object,
+                    AllocationSemantics::Default,
+                    unsafe { self.worker().local::<GenImmixCopyContext<VM>>() },
+                );
+            }
+        }
+
+        self.plan.gen.trace_object_full_heap::<Self, GenImmixCopyContext<VM>>(self, object, unsafe {
+            self.worker().local::<GenImmixCopyContext<VM>>()
+        })
+    }
+}
+
+impl<VM: VMBinding, const KIND: TraceKind> Deref for GenImmixMatureProcessEdges<VM, KIND> {
+    type Target = ProcessEdgesBase<Self>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<VM: VMBinding, const KIND: TraceKind> DerefMut for GenImmixMatureProcessEdges<VM, KIND> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}

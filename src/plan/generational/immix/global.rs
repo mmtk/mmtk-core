@@ -14,6 +14,15 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::plan::AllocationSemantics;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
+use super::gc_work::{GenImmixCopyContext, GenImmixMatureProcessEdges};
+use crate::scheduler::gc_work::*;
+use crate::scheduler::*;
+use crate::plan::immix::gc_work::TraceKind;
+use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::options::UnsafeOptionsWrapper;
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -40,10 +49,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        // let mut c = GenCopyCopyContext::new(mmtk);
-        // c.init(tls);
-        // GCWorkerLocalPtr::new(c)
-        unimplemented!()
+        let mut c = GenImmixCopyContext::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
@@ -68,61 +76,74 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
-        if is_full_heap {
+        let defrag = if is_full_heap {
             self.immix.decide_whether_to_defrag(
                 self.is_emergency_collection(),
                 true,
                 self.base().cur_collection_attempts.load(Ordering::SeqCst),
                 self.base().is_user_triggered_collection(),
                 self.base().options.full_heap_system_gc,
-            );
+            )
+        } else {
+            false
+        };
+
+        if !is_full_heap {
+            debug!("Nursery GC");
+            self.common()
+                .schedule_common::<GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>(
+                    &GENIMMIX_CONSTRAINTS,
+                    scheduler,
+                );
+            // Stop & scan mutators (mutator scanning can happen before STW)
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+                GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
+            >::new());
+        } else {
+            debug!("Full heap GC");
+            if defrag {
+                self.common()
+                    .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(&GENIMMIX_CONSTRAINTS, scheduler);
+                // Stop & scan mutators (mutator scanning can happen before STW)
+                scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                    .add(StopMutators::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>::new());
+            } else {
+                self.common()
+                    .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(&GENIMMIX_CONSTRAINTS, scheduler);
+                // Stop & scan mutators (mutator scanning can happen before STW)
+                scheduler.work_buckets[WorkBucketStage::Unconstrained]
+                    .add(StopMutators::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>::new());
+            }
         }
 
-        unimplemented!()
-
-        // if !is_full_heap {
-        //     debug!("Nursery GC");
-        //     self.common()
-        //         .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(
-        //             &GENCOPY_CONSTRAINTS,
-        //             scheduler,
-        //         );
-        //     // Stop & scan mutators (mutator scanning can happen before STW)
-        //     scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-        //         GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-        //     >::new());
-        // } else {
-        //     debug!("Full heap GC");
-        //     self.common()
-        //         .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
-        //     // Stop & scan mutators (mutator scanning can happen before STW)
-        //     scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        //         .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
-        // }
-
-        // // Prepare global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Prepare]
-        //     .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
-        // if is_full_heap {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //         .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
-        // } else {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-        //         GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-        //     >::new());
-        // }
-        // // Release global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Release]
-        //     .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
-        // // Resume mutators
-        // #[cfg(feature = "sanity")]
-        // scheduler.work_buckets[WorkBucketStage::Final]
-        //     .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
-        // scheduler.set_finalizer(Some(EndOfGC));
+        // Prepare global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(Prepare::<Self, GenImmixCopyContext<VM>>::new(self));
+        if is_full_heap {
+            if defrag {
+                scheduler.work_buckets[WorkBucketStage::RefClosure]
+                    .add(ProcessWeakRefs::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>::new());
+            } else {
+                scheduler.work_buckets[WorkBucketStage::RefClosure]
+                    .add(ProcessWeakRefs::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>::new());
+            }
+        } else {
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
+            >::new());
+        }
+        // Release global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Release]
+            .add(Release::<Self, GenImmixCopyContext<VM>>::new(self));
+        // Resume mutators
+        #[cfg(feature = "sanity")]
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
+        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
-        unimplemented!()
+        &*super::mutator::ALLOCATOR_MAPPING
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
@@ -176,6 +197,50 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> GenImmix<VM> {
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<UnsafeOptionsWrapper>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
+    ) -> Self {
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        // We have no specific side metadata for copying. So just use the ones from generational.
+        let global_metadata_specs =
+            crate::plan::generational::new_generational_global_metadata_specs::<VM>();
+        let immix_space = ImmixSpace::new(
+            "immix_mature",
+            vm_map,
+            mmapper,
+            &mut heap,
+            scheduler,
+            global_metadata_specs.clone(),
+        );
+
+        let genimmix = GenImmix {
+            gen: Gen::new(
+                heap,
+                global_metadata_specs,
+                &GENIMMIX_CONSTRAINTS,
+                vm_map,
+                mmapper,
+                options,
+            ),
+            immix: immix_space,
+            last_gc_was_defrag: AtomicBool::new(false),
+        };
+
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
+        {
+            use crate::util::metadata::side_metadata::SideMetadataSanity;
+            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+            genimmix.gen.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            genimmix.immix.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        }
+
+        genimmix
+    }
+
     fn request_full_heap_collection(&self) -> bool {
         self.gen
             .request_full_heap_collection(self.get_total_pages(), self.get_pages_reserved())
