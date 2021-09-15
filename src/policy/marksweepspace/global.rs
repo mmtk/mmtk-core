@@ -27,13 +27,10 @@ use crate::{
     TransitiveClosure,
 };
 
-use crate::{
-    policy::marksweepspace::{
+use crate::{TransitiveClosure, policy::{marksweepspace::{
         block::{Block, BlockState},
         metadata::{is_marked, set_mark_bit, unset_mark_bit, ALLOC_SIDE_METADATA_SPEC},
-    },
-    scheduler::{MMTkScheduler, WorkBucketStage},
-    util::{
+    }, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{
         alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK},
         constants::LOG_BYTES_IN_PAGE,
         heap::{
@@ -49,13 +46,10 @@ use crate::{
             store_metadata, MetadataSpec,
         },
         Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread,
-    },
-    vm::VMBinding,
-    TransitiveClosure,
-};
+    }, vm::VMBinding};
 
 use super::{
-    super::space::{CommonSpace, Space, SpaceOptions, SFT},
+    super::space::{CommonSpace, Space, SFT},
     chunks::ChunkMap,
     metadata::{is_alloced, unset_alloc_bit_unsafe},
 };
@@ -77,7 +71,7 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
-    scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -138,7 +132,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
         let alloc_mark_bits = &mut metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
@@ -165,6 +159,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 name,
                 movable: false,
                 immortal: false,
+                needs_log_bit: false,
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
@@ -296,7 +291,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Address) {
-        eprintln!("b < 0x{:0x} - 0x{:0x}", block, block + BYTES_IN_BLOCK);
+        eprintln!("b < 0x{:0x}", block);
         self.block_clear_metadata(block);
         let block = Block::from(block);
         block.deinit();
