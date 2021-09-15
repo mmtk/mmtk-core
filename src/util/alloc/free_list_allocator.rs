@@ -508,6 +508,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         // fresh block
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        eprintln!("b > 0x{:0x} - 0x{:0x}", block, block + BYTES_IN_BLOCK);
         if block.is_zero() {
             // GC, I guess
             return block;
