@@ -75,7 +75,9 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
-            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
+            AllocatorSelector::FreeList(index) => {
+                &mut **self.free_list[index as usize].assume_init_mut()
+            },
         }
     }
 
