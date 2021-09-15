@@ -80,7 +80,7 @@ impl Chunk {
     }
 }
 
-impl Step for Chunk {
+unsafe impl Step for Chunk {
     /// Get the number of chunks between the given two chunks.
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {

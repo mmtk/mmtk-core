@@ -8,8 +8,7 @@ use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::{CommonSpace, Space, SpaceOptions};
 use crate::scheduler::gc_work::{EndOfGC, Prepare, Release, StopMutators};
-use crate::scheduler::GCWorkerLocalPtr;
-use crate::scheduler::MMTkScheduler;
+use crate::scheduler::{GCWorkScheduler, GCWorkerLocalPtr};
 use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -59,7 +58,7 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
 
@@ -89,7 +88,7 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         // Stop & scan mutators (mutator scanning can happen before STW)
@@ -122,7 +121,7 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         #[cfg(not(feature = "freelistmarksweep_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
