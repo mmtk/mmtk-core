@@ -121,7 +121,7 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        scheduler: Arc<MMTkScheduler<VM>>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         #[cfg(not(feature = "freelistmarksweep_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
