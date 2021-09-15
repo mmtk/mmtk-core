@@ -1,11 +1,17 @@
 name: OpenJDK Performance Baseline
 
+# on:
+#   # Manual dispatch
+#   workflow_dispatch:
+#   # Or on every sunday 1200am UTC
+#   schedule:
+#     - cron: '0 0 * * SUN'
+
 on:
-  # Manual dispatch
-  workflow_dispatch:
-  # Or on every sunday 1200am UTC
-  schedule:
-    - cron: '0 0 * * SUN'
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - master
 
 jobs:
   openjdk-baseline:
@@ -23,6 +29,7 @@ jobs:
       - name: Checkout Perf Kit
         uses: actions/checkout@v2
         with:
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
           repository: mmtk/ci-perf-kit
           ref: "0.6.5"
           path: ci-perf-kit
@@ -38,7 +45,7 @@ jobs:
         timeout-minutes: 2880
         run: |
           export RESULT_REPO=mmtk/ci-perf-result
-          export RESULT_REPO_BRANCH=self-hosted
+          export RESULT_REPO_BRANCH=test-chopin
           export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-          export FROM_DATE=2020-07-10
+          export FROM_DATE=2021-09-15
           ./ci-perf-kit/scripts/openjdk-stock.sh ./mmtk-openjdk/repos/openjdk
