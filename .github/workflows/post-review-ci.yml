@@ -97,6 +97,7 @@ jobs:
   #         ./.github/scripts/ci-style.sh
   jikesrvm-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
@@ -227,6 +228,7 @@ jobs:
   #         ./.github/scripts/ci-style.sh
   openjdk-perf-compare:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    timeout-minutes: 1440
     if: contains(github.event.pull_request.labels.*.name, 'PR-benchmarking')
     steps:
       - name: Check Revisions
