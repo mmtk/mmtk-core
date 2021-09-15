@@ -198,13 +198,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
         
         let mut address = Address::ZERO;
         let mut is_offset_malloc = false;
-        // if align < 16 && offset == 0 {
-        //     let raw = unsafe { calloc(1, size) };
-        //     address = Address::from_mut_ptr(raw);
-        // } else if align >= 16 && offset == 0 {
-        //     address = align_alloc(size, align);
-        // } else {
-        {
+        if align < 16 && offset == 0 {
+            let raw = unsafe { calloc(1, size) };
+            address = Address::from_mut_ptr(raw);
+        } else if align >= 16 && offset == 0 {
+            address = align_alloc(size, align);
+        } else {
             address = align_offset_alloc(size, align, offset);
             is_offset_malloc = true;
         }
@@ -225,7 +224,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
             if is_offset_malloc {
-                store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address, 1, Ordering::SeqCst);
+                store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address + offset, 1, Ordering::SeqCst);
             }
 
             #[cfg(debug_assertions)]

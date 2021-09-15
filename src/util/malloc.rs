@@ -1,5 +1,5 @@
 #[cfg(feature = "malloc_jemalloc")]
-pub use jemalloc_sys::{calloc, free, malloc_usable_size};
+pub use jemalloc_sys::{calloc, free, malloc_usable_size, posix_memalign};
 
 #[cfg(feature = "malloc_mimalloc")]
 pub use mimalloc_sys::{
@@ -26,7 +26,7 @@ pub fn alloc(size: usize) -> Address {
 }
 
 #[cfg(not(any(
-    feature = "malloc_jemalloc",
+    // feature = "malloc_jemalloc",
     feature = "malloc_mimalloc",
     feature = "malloc_hoard",
 )))]
@@ -43,7 +43,7 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
 }
 
 #[cfg(not(any(
-    feature = "malloc_jemalloc",
+    // feature = "malloc_jemalloc",
     feature = "malloc_mimalloc",
     feature = "malloc_hoard",
 )))]
