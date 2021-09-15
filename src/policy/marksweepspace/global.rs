@@ -296,6 +296,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Address) {
+        eprintln!("b < 0x{:0x} - 0x{:0x}", block, block + BYTES_IN_BLOCK);
         self.block_clear_metadata(block);
         let block = Block::from(block);
         block.deinit();
