@@ -60,7 +60,7 @@ pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
                     .downcast_ref::<FreeListMarkSweep<VM>>()
                     .unwrap()
                     .common()
-                    .get_los(),
+                    .get_immortal(),
             ),
         ],
         prepare_func: &flms_mutator_prepare,

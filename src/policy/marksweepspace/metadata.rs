@@ -14,6 +14,8 @@ use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
+use super::MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET;
+
 lazy_static! {
     pub(super) static ref CHUNK_METADATA: SideMetadataContext = SideMetadataContext {
         global: vec![ACTIVE_CHUNK_METADATA_SPEC],
@@ -52,7 +54,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 ///
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
     is_global: false,
-    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
+    offset: MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
     log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
