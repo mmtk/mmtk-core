@@ -76,7 +76,5 @@ pub const GLOBAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
 
 /// The base address for the local side metadata space available to VM bindings, to be used for the per-object metadata.
 /// VM bindings must use this to avoid overlap with core internal local side metadata.
-pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset = SideMetadataOffset::layout_after(
-    // &crate::policy::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC,
-    &crate::policy::marksweepspace::chunks::ChunkMap::ALLOC_TABLE,
-);
+pub const LOCAL_SIDE_METADATA_VM_BASE_OFFSET: SideMetadataOffset =
+    SideMetadataOffset::layout_after(&crate::policy::marksweepspace::LAST_LOCAL_SIDE_METADATA);
