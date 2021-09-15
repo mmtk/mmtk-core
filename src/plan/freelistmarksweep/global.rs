@@ -111,6 +111,10 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
     fn get_pages_used(&self) -> usize {
         self.common.get_pages_used() + self.ms_space.reserved_pages()
     }
+
+    fn common(&self) -> &CommonPlan<VM> {
+        &self.common
+    }
 }
 
 impl<VM: VMBinding> FreeListMarkSweep<VM> {
