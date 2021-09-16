@@ -258,6 +258,14 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
     );
 }
 
+pub(super) fn set_offset_malloc_bit(address: Address) {
+    side_metadata::store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address, 1, Ordering::SeqCst);
+}
+
+pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
+    side_metadata::store(&OFFSET_MALLOC_METADATA_SPEC, address, 0);
+}
+
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     alloc_bit::unset_alloc_bit_unsafe(object);
 }

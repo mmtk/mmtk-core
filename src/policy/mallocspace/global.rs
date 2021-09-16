@@ -7,7 +7,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::*;
 use crate::util::metadata::side_metadata::{
-    bzero_metadata, load, store_atomic, SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+    bzero_metadata, load, SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
@@ -224,7 +224,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
             if is_offset_malloc {
-                store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address + offset, 1, Ordering::SeqCst);
+                set_offset_malloc_bit(address + offset);
             }
 
             #[cfg(debug_assertions)]
@@ -437,6 +437,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             self.free(obj_start, bytes);
                             trace!("free object {}", object);
                             unsafe { unset_alloc_bit_unsafe(object) };
+                            unsafe { unset_offset_malloc_bit_unsafe(address) };
+
                         } else {
                             // Live object
                             // This chunk and page are still active.
@@ -619,6 +621,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     self.free(obj_start, bytes);
                     trace!("free object {}", object);
                     unsafe { unset_alloc_bit_unsafe(object) };
+                    unsafe { unset_offset_malloc_bit_unsafe(address) };
                 } else {
                     // Live object. Unset mark bit
                     unset_mark_bit::<VM>(object, None);
