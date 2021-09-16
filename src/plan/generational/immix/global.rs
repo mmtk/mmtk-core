@@ -35,7 +35,13 @@ pub struct GenImmix<VM: VMBinding> {
     pub last_gc_was_defrag: AtomicBool,
 }
 
-pub const GENIMMIX_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
+pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
+        crate::plan::IMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+        crate::plan::generational::GEN_CONSTRAINTS.max_non_los_default_alloc_bytes,
+    ),
+    ..crate::plan::generational::GEN_CONSTRAINTS
+};
 
 impl<VM: VMBinding> Plan for GenImmix<VM> {
     type VM = VM;

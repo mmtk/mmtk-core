@@ -33,7 +33,9 @@ impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
 
     fn prepare(&mut self) {
         self.copy.reset();
-        self.defrag_copy.reset();
+        if !self.plan.gen.is_current_gc_nursery() {
+            self.defrag_copy.reset();
+        }
     }
 
     fn release(&mut self) {
@@ -49,12 +51,17 @@ impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
         offset: isize,
         _semantics: crate::AllocationSemantics,
     ) -> Address {
+        trace!("alloc_copy()");
         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
-        if self.plan.immix.in_defrag() {
+        let ret = if self.plan.immix.in_defrag() {
+            trace!("defrag_copy.alloc()");
             self.defrag_copy.alloc(bytes, align, offset)
         } else {
+            trace!("copy.alloc()");
             self.copy.alloc(bytes, align, offset)
-        }
+        };
+        trace!("alloc_copy() - done");
+        ret
     }
 
     #[inline(always)]

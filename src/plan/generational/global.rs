@@ -187,17 +187,24 @@ impl<VM: VMBinding> Gen<VM> {
     ) -> ObjectReference {
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T, C>(
+            trace!("Gen.trace_object_nursery() for nursery");
+            let ret = self.nursery.trace_object::<T, C>(
                 trace,
                 object,
                 crate::plan::global::AllocationSemantics::Default,
                 copy_context,
             );
+            trace!("Gen.trace_object_nursery() for nursery - done");
+            return ret;
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.
         if self.common.get_los().in_space(object) {
-            return self.common.get_los().trace_object::<T>(trace, object);
+            trace!("Gen.trace_object_nursery() for common");
+            let ret = self.common.get_los().trace_object::<T>(trace, object);
+            trace!("Gen.trace_object_nursery() for common - done");
+            return ret;
         }
+        trace!("Gen.trace_object_nursery() no trace - done");
         object
     }
 

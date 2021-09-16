@@ -54,7 +54,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 
     #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        trace!("alloc");
+        trace!("alloc size={}", size);
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
 

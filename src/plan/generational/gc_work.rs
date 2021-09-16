@@ -25,6 +25,7 @@ impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork
     }
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        trace!("GenNurseryProcessEdges.trace_object()");
         if object.is_null() {
             return object;
         }
