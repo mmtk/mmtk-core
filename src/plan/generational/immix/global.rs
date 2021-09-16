@@ -100,14 +100,15 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
             >::new());
         } else {
-            debug!("Full heap GC");
             if defrag {
+                debug!("Full heap GC Defrag");
                 self.common()
                     .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(&GENIMMIX_CONSTRAINTS, scheduler);
                 // Stop & scan mutators (mutator scanning can happen before STW)
                 scheduler.work_buckets[WorkBucketStage::Unconstrained]
                     .add(StopMutators::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>::new());
             } else {
+                debug!("Full heap GC Fast");
                 self.common()
                     .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(&GENIMMIX_CONSTRAINTS, scheduler);
                 // Stop & scan mutators (mutator scanning can happen before STW)

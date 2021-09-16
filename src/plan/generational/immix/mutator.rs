@@ -1,7 +1,7 @@
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::util::alloc::ImmixAllocator;
+use crate::util::alloc::BumpAllocator;
 use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::MMTK;
@@ -15,27 +15,19 @@ use enum_map::enum_map;
 use enum_map::EnumMap;
 
 pub fn genimmix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
-    // reset mature allocator
-    let immix_allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
-    }
-    .downcast_mut::<ImmixAllocator<VM>>()
-    .unwrap();
-    immix_allocator.reset();
+
 }
 
 pub fn genimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
-    // reset mature allocator
-    let immix_allocator = unsafe {
+    // reset nursery allocator
+    let bump_allocator = unsafe {
         mutator
             .allocators
             .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
-    .downcast_mut::<ImmixAllocator<VM>>()
+    .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
-    immix_allocator.reset();
+    bump_allocator.reset();
 }
 
 lazy_static! {
