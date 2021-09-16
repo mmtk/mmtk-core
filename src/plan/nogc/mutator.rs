@@ -13,16 +13,17 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 
 const NOGC_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
-    n_bump_pointer: 1,
+    n_bump_pointer: 3,
     n_large_object: 0,
     n_malloc: 0,
 };
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map =
-            create_allocator_mapping(NOGC_RESERVED_ALLOCATOR, cfg!(feature = "nogc_common_plan"));
+        let mut map = create_allocator_mapping(NOGC_RESERVED_ALLOCATOR, false);
         map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
+        map[AllocationType::Immortal] = AllocatorSelector::BumpPointer(1);
+        map[AllocationType::Los] = AllocatorSelector::BumpPointer(2);
         map
     };
 }
@@ -38,14 +39,18 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = create_space_mapping(
-                NOGC_RESERVED_ALLOCATOR,
-                cfg!(feature = "nogc_common_plan"),
-                plan,
-            );
+            let mut vec = create_space_mapping(NOGC_RESERVED_ALLOCATOR, false, plan);
             vec.push((
                 AllocatorSelector::BumpPointer(0),
                 &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
+            ));
+            vec.push((
+                AllocatorSelector::BumpPointer(1),
+                &plan.downcast_ref::<NoGC<VM>>().unwrap().immortal,
+            ));
+            vec.push((
+                AllocatorSelector::BumpPointer(2),
+                &plan.downcast_ref::<NoGC<VM>>().unwrap().los,
             ));
             vec
         },

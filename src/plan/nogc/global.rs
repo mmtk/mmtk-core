@@ -1,11 +1,10 @@
 use crate::mmtk::MMTK;
-#[cfg(feature = "nogc_common_plan")]
-use crate::plan::global::CommonPlan;
 use crate::plan::global::{BasePlan, NoCopy};
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
@@ -30,11 +29,10 @@ use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
 use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalSpace;
 
 pub struct NoGC<VM: VMBinding> {
-    #[cfg(feature = "nogc_common_plan")]
-    pub common: CommonPlan<VM>,
-    #[cfg(not(feature = "nogc_common_plan"))]
     pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
+    pub immortal: ImmortalSpace<VM>,
+    pub los: ImmortalSpace<VM>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -62,9 +60,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
-        #[cfg(feature = "nogc_common_plan")]
-        self.common.gc_init(heap_size, vm_map, scheduler);
-        #[cfg(not(feature = "nogc_common_plan"))]
         self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
@@ -75,19 +70,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base().collection_required(self, space_full, space)
     }
 
-    #[cfg(feature = "nogc_common_plan")]
-    fn base(&self) -> &BasePlan<VM> {
-        &self.common.base
-    }
-
-    #[cfg(not(feature = "nogc_common_plan"))]
     fn base(&self) -> &BasePlan<VM> {
         &self.base
-    }
-
-    #[cfg(feature = "nogc_common_plan")]
-    fn common(&self) -> &CommonPlan<VM> {
-        &self.common
     }
 
     fn prepare(&mut self, _tls: VMWorkerThread) {
@@ -108,6 +92,9 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn get_pages_used(&self) -> usize {
         self.nogc_space.reserved_pages()
+            + self.immortal.reserved_pages()
+            + self.los.reserved_pages()
+            + self.base.get_pages_used()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
@@ -148,16 +135,26 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let res = NoGC {
             nogc_space,
-            #[cfg(feature = "nogc_common_plan")]
-            common: CommonPlan::new(
+            immortal: ImmortalSpace::new(
+                "immortal",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
                 vm_map,
                 mmapper,
-                options,
-                heap,
+                &mut heap,
                 &NOGC_CONSTRAINTS,
-                global_specs,
             ),
-            #[cfg(not(feature = "nogc_common_plan"))]
+            los: ImmortalSpace::new(
+                "los",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                &NOGC_CONSTRAINTS,
+            ),
             base: BasePlan::new(
                 vm_map,
                 mmapper,
