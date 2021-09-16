@@ -37,7 +37,7 @@ pub struct GenImmix<VM: VMBinding> {
 
 pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
-        crate::plan::IMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+        crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
         crate::plan::generational::GEN_CONSTRAINTS.max_non_los_default_alloc_bytes,
     ),
     ..crate::plan::generational::GEN_CONSTRAINTS

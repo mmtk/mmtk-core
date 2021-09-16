@@ -55,6 +55,8 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
     #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc size={}", size);
+        debug_assert!(size <= crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
+            "Trying to allocate a {} bytes object, which larger than MAX_IMMIX_OBJECT_SIZE {}", size, crate::policy::immix::MAX_IMMIX_OBJECT_SIZE);
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
 

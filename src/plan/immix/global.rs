@@ -45,7 +45,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     /// Max immix object size is half of a block.
-    max_non_los_default_alloc_bytes: Block::BYTES >> 1,
+    max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     ..PlanConstraints::default()
 };
 
