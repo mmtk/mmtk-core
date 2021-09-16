@@ -111,7 +111,7 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         #[cfg(feature = "nogc_lock_free")]
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
