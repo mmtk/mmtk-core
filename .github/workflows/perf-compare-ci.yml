@@ -105,6 +105,7 @@ jobs:
                 message: ${{ steps.cat.outputs.text }}
                 append: true
           # Cleanup logs (this is necessary for self-hosted runners)
+          # [`always()`](https://docs.github.com/en/actions/reference/context-and-expression-syntax-for-github-actions#always) ensures we clean up the logs even if some steps fail
           - name: Clean up logs and reports
             if: always()
             run: |
