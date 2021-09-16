@@ -1,11 +1,11 @@
 name: JikesRVM Performance Baseline
 
-# on:
-#   # Manual dispatch
-#   workflow_dispatch:
-#   # Or on every sunday 1200am UTC
-#   schedule:
-#     - cron: '0 0 * * SUN'
+on:
+  # Manual dispatch
+  workflow_dispatch:
+  # Or on every sunday 1200am UTC
+  schedule:
+    - cron: '0 0 * * SUN'
 
 on:
   pull_request:

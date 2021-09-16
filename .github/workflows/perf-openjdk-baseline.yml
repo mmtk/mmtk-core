@@ -1,17 +1,11 @@
 name: OpenJDK Performance Baseline
 
-# on:
-#   # Manual dispatch
-#   workflow_dispatch:
-#   # Or on every sunday 1200am UTC
-#   schedule:
-#     - cron: '0 0 * * SUN'
-
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+  # Manual dispatch
+  workflow_dispatch:
+  # Or on every sunday 1200am UTC
+  schedule:
+    - cron: '0 0 * * SUN'
 
 jobs:
   openjdk-baseline:
