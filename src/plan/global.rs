@@ -589,7 +589,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object({:?})", _object);
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
         #[cfg(feature = "code_space")]
@@ -600,7 +600,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.prepare();
     }
 
-    pub fn release(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.release();
         #[cfg(feature = "code_space")]
@@ -831,16 +831,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<T, C>(trace, object)
     }
 
-    pub fn prepare(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
-        self.los.prepare(primary);
-        self.base.prepare(tls, primary)
+        self.los.prepare(full_heap);
+        self.base.prepare(tls, full_heap)
     }
 
-    pub fn release(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
-        self.los.release(primary);
-        self.base.release(tls, primary)
+        self.los.release(full_heap);
+        self.base.release(tls, full_heap)
     }
 
     pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
