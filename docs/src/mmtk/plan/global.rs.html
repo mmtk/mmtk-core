@@ -1491,7 +1491,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="macro">panic!</span>(<span class="string">&quot;No special case for space in trace_object({:?})&quot;</span>, <span class="ident">_object</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_primary</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_full_heap</span>: <span class="ident">bool</span>) {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">prepare</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
@@ -1502,7 +1502,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">prepare</span>();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_primary</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_full_heap</span>: <span class="ident">bool</span>) {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">release</span>();
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
@@ -1733,16 +1733,16 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">primary</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">prepare</span>();
-        <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">prepare</span>(<span class="ident">primary</span>);
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="ident">primary</span>)
+        <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">prepare</span>(<span class="ident">full_heap</span>);
+        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">primary</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">release</span>();
-        <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">release</span>(<span class="ident">primary</span>);
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="ident">primary</span>)
+        <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">release</span>(<span class="ident">full_heap</span>);
+        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">schedule_common</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
