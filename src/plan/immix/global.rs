@@ -22,11 +22,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use crate::{
-    mmtk::MMTK,
-    policy::immix::{block::Block, ImmixSpace},
-    util::opaque_pointer::VMWorkerThread,
-};
+use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::Arc;
 
 use atomic::Ordering;

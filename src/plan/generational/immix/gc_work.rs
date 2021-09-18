@@ -4,13 +4,13 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWorkerLocal;
-use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::alloc::Allocator;
+use crate::util::alloc::ImmixAllocator;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::MMTK;
-use crate::util::alloc::ImmixAllocator;
 use crate::AllocationSemantics;
+use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
 pub struct GenImmixCopyContext<VM: VMBinding> {
@@ -83,8 +83,18 @@ impl<VM: VMBinding> GenImmixCopyContext<VM> {
         Self {
             plan,
             // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
-            copy: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(&plan.immix), &*mmtk.plan, false),
-            defrag_copy: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(&plan.immix), &*mmtk.plan, true),
+            copy: ImmixAllocator::new(
+                VMThread::UNINITIALIZED,
+                Some(&plan.immix),
+                &*mmtk.plan,
+                false,
+            ),
+            defrag_copy: ImmixAllocator::new(
+                VMThread::UNINITIALIZED,
+                Some(&plan.immix),
+                &*mmtk.plan,
+                true,
+            ),
         }
     }
 }
@@ -102,7 +112,9 @@ pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKin
     mmtk: &'static MMTK<VM>,
 }
 
-impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for GenImmixMatureProcessEdges<VM, KIND> {
+impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
+    for GenImmixMatureProcessEdges<VM, KIND>
+{
     type VM = VM;
 
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -145,9 +157,11 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for GenImmixMaturePr
             }
         }
 
-        self.plan.gen.trace_object_full_heap::<Self, GenImmixCopyContext<VM>>(self, object, unsafe {
-            self.worker().local::<GenImmixCopyContext<VM>>()
-        })
+        self.plan
+            .gen
+            .trace_object_full_heap::<Self, GenImmixCopyContext<VM>>(self, object, unsafe {
+                self.worker().local::<GenImmixCopyContext<VM>>()
+            })
     }
 }
 

@@ -1,33 +1,33 @@
-use crate::vm::*;
+use super::gc_work::{GenImmixCopyContext, GenImmixMatureProcessEdges};
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::global::Gen;
-use crate::policy::immix::ImmixSpace;
-use crate::plan::PlanConstraints;
-use crate::plan::Plan;
-use crate::util::VMWorkerThread;
-use crate::MMTK;
-use crate::scheduler::GCWorkerLocalPtr;
-use crate::policy::space::Space;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::scheduler::GCWorkScheduler;
-use crate::plan::global::GcStatus;
-use crate::util::alloc::allocators::AllocatorSelector;
-use crate::plan::AllocationSemantics;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use super::gc_work::{GenImmixCopyContext, GenImmixMatureProcessEdges};
-use crate::scheduler::gc_work::*;
-use crate::scheduler::*;
+use crate::plan::global::GcStatus;
 use crate::plan::immix::gc_work::TraceKind;
-use crate::util::heap::HeapMeta;
+use crate::plan::AllocationSemantics;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixSpace;
+use crate::policy::space::Space;
+use crate::scheduler::gc_work::*;
+use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::GCWorkerLocalPtr;
+use crate::scheduler::*;
+use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::VMWorkerThread;
+use crate::vm::*;
+use crate::MMTK;
 
-use std::sync::Arc;
+use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use enum_map::EnumMap;
+use std::sync::Arc;
 
 pub struct GenImmix<VM: VMBinding> {
     pub gen: Gen<VM>,
@@ -77,6 +77,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.immix.init(vm_map);
     }
 
+    // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
+    // are different types. However, it seems clippy does not recognize the constant type parameter and thinks we have identical blocks
+    // in different if branches.
+    #[allow(clippy::if_same_then_else)]
+    #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.request_full_heap_collection();
 
@@ -105,22 +110,28 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
                 GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
             >::new());
+        } else if defrag {
+            debug!("Full heap GC Defrag");
+            self.common()
+                .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(
+                    &GENIMMIX_CONSTRAINTS,
+                    scheduler,
+                );
+            // Stop & scan mutators (mutator scanning can happen before STW)
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+                GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>,
+            >::new());
         } else {
-            if defrag {
-                debug!("Full heap GC Defrag");
-                self.common()
-                    .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(&GENIMMIX_CONSTRAINTS, scheduler);
-                // Stop & scan mutators (mutator scanning can happen before STW)
-                scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                    .add(StopMutators::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>::new());
-            } else {
-                debug!("Full heap GC Fast");
-                self.common()
-                    .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(&GENIMMIX_CONSTRAINTS, scheduler);
-                // Stop & scan mutators (mutator scanning can happen before STW)
-                scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                    .add(StopMutators::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>::new());
-            }
+            debug!("Full heap GC Fast");
+            self.common()
+                .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(
+                    &GENIMMIX_CONSTRAINTS,
+                    scheduler,
+                );
+            // Stop & scan mutators (mutator scanning can happen before STW)
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+                GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>,
+            >::new());
         }
 
         // Prepare global/collectors/mutators
@@ -128,11 +139,13 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .add(Prepare::<Self, GenImmixCopyContext<VM>>::new(self));
         if is_full_heap {
             if defrag {
-                scheduler.work_buckets[WorkBucketStage::RefClosure]
-                    .add(ProcessWeakRefs::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>::new());
+                scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                    GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>,
+                >::new());
             } else {
-                scheduler.work_buckets[WorkBucketStage::RefClosure]
-                    .add(ProcessWeakRefs::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>::new());
+                scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+                    GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>,
+                >::new());
             }
         } else {
             scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
@@ -144,8 +157,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .add(Release::<Self, GenImmixCopyContext<VM>>::new(self));
         // Resume mutators
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
+        {
+            use crate::util::sanity::sanity_checker::*;
+            scheduler.work_buckets[WorkBucketStage::Final]
+                .add(ScheduleSanityGC::<Self, GenImmixCopyContext<VM>>::new(self));
+        }
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
@@ -241,8 +257,12 @@ impl<VM: VMBinding> GenImmix<VM> {
         {
             use crate::util::metadata::side_metadata::SideMetadataSanity;
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            genimmix.gen.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            genimmix.immix.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            genimmix
+                .gen
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+            genimmix
+                .immix
+                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         }
 
         genimmix

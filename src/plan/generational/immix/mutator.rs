@@ -1,24 +1,22 @@
-use crate::plan::mutator_context::Mutator;
-use crate::plan::mutator_context::MutatorConfig;
-use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::util::alloc::BumpAllocator;
-use crate::plan::AllocationSemantics;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::MMTK;
-use crate::plan::generational::immix::GenImmix;
+use super::gc_work::GenImmixCopyContext;
 use crate::plan::barriers::ObjectRememberingBarrier;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use super::gc_work::GenImmixCopyContext;
+use crate::plan::generational::immix::GenImmix;
+use crate::plan::mutator_context::Mutator;
+use crate::plan::mutator_context::MutatorConfig;
+use crate::plan::AllocationSemantics;
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::BumpAllocator;
+use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::{ObjectModel, VMBinding};
+use crate::MMTK;
 
 use enum_map::enum_map;
 use enum_map::EnumMap;
 
-pub fn genimmix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+pub fn genimmix_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
-}
-
-pub fn genimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
+pub fn genimmix_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // reset nursery allocator
     let bump_allocator = unsafe {
         mutator
@@ -62,10 +60,11 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>::new(
-            mmtk,
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-        ),
+        barrier:
+            box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>::new(
+                mmtk,
+                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            ),
         mutator_tls,
         config,
         plan: genimmix,
