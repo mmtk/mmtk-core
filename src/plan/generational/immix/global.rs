@@ -29,13 +29,26 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+/// Generational immix. This implements the functionality of a two-generation copying
+/// collector where the higher generation is an immix space.
+/// See the PLDI'08 paper by Blackburn and McKinley for a description
+/// of the algorithm: http://doi.acm.org/10.1145/1375581.137558.
 pub struct GenImmix<VM: VMBinding> {
+    /// Generational plan, which includes a nursery space and operations related with nursery.
     pub gen: Gen<VM>,
+    /// An immix space as the mature space.
     pub immix: ImmixSpace<VM>,
+    /// Whether the last GC was a defrag GC for the immix space.
     pub last_gc_was_defrag: AtomicBool,
 }
 
 pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
+    // The maximum object size that can be allocated without LOS is restricted by the max immix object size.
+    // This might be too restrictive, as our default allocator is bump pointer (nursery allocator) which
+    // can allocate objects larger than max immix object size. However, for copying, we haven't implemented
+    // copying to LOS so we always copy from nursery to the mature immix space. In this case, we should not
+    // allocate objects larger than the max immix object size to nursery as well.
+    // TODO: We may want to fix this, as this possibly has negative performance impact.
     max_non_los_default_alloc_bytes: crate::util::rust_util::min_of_usize(
         crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
         crate::plan::generational::GEN_CONSTRAINTS.max_non_los_default_alloc_bytes,

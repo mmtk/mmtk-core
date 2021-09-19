@@ -13,6 +13,9 @@ use crate::AllocationSemantics;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
+/// Copy context for generational immix. We include two copy allocators for the same immix space.
+/// We should use the defrag copy allocator for full heap GC with defrag, or the normal copy allocator
+/// for other GCs.
 pub struct GenImmixCopyContext<VM: VMBinding> {
     plan: &'static GenImmix<VM>,
     copy: ImmixAllocator<VM>,
@@ -51,17 +54,12 @@ impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
         offset: isize,
         _semantics: crate::AllocationSemantics,
     ) -> Address {
-        trace!("alloc_copy()");
         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
-        let ret = if self.plan.immix.in_defrag() {
-            trace!("defrag_copy.alloc()");
+        if self.plan.immix.in_defrag() {
             self.defrag_copy.alloc(bytes, align, offset)
         } else {
-            trace!("copy.alloc()");
             self.copy.alloc(bytes, align, offset)
-        };
-        trace!("alloc_copy() - done");
-        ret
+        }
     }
 
     #[inline(always)]
@@ -106,6 +104,11 @@ impl<VM: VMBinding> GCWorkerLocal for GenImmixCopyContext<VM> {
 }
 
 use crate::plan::immix::gc_work::TraceKind;
+
+/// ProcessEdges for a full heap GC for generational immix. The const type parameter
+/// defines whether there is copying in the GC. With TraceKind::Fast, there is no
+/// copying. We invoke the fast_trace_object() on immix space and we do not need to
+/// write the new object reference back to the slot.
 pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     plan: &'static GenImmix<VM>,
     base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
