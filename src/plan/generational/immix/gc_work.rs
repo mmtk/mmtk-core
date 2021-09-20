@@ -132,6 +132,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
     fn flush(&mut self) {
         use crate::policy::immix::ScanObjectsAndMarkLines;
         use crate::scheduler::WorkBucketStage;
+        debug_assert!(!self.nodes.is_empty(), "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty.");
         let mut new_nodes = vec![];
         std::mem::swap(&mut new_nodes, &mut self.nodes);
         let scan_objects_work =

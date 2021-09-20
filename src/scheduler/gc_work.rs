@@ -429,6 +429,7 @@ pub trait ProcessEdgesWork:
 
     #[cold]
     fn flush(&mut self) {
+        debug_assert!(!self.nodes.is_empty(), "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty.");
         let mut new_nodes = vec![];
         mem::swap(&mut new_nodes, &mut self.nodes);
         let scan_objects_work = ScanObjects::<Self>::new(new_nodes, false);
