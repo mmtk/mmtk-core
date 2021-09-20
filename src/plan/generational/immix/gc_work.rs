@@ -114,7 +114,6 @@ use crate::plan::immix::gc_work::TraceKind;
 pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     plan: &'static GenImmix<VM>,
     base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
-    mmtk: &'static MMTK<VM>,
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
@@ -125,23 +124,17 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<GenImmix<VM>>().unwrap();
-        Self { plan, base, mmtk }
+        Self { plan, base }
     }
 
     #[cold]
     fn flush(&mut self) {
-        use crate::policy::immix::ScanObjectsAndMarkLines;
-        use crate::scheduler::WorkBucketStage;
-        debug_assert!(!self.nodes.is_empty(), "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty.");
-        let mut new_nodes = vec![];
-        std::mem::swap(&mut new_nodes, &mut self.nodes);
-        let scan_objects_work =
-            ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.plan.immix);
-        if Self::SCAN_OBJECTS_IMMEDIATELY {
-            self.worker().do_work(scan_objects_work);
-        } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
-        }
+        let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
+            self.pop_nodes(),
+            false,
+            &self.plan.immix,
+        );
+        self.new_scan_work(scan_objects_work);
     }
 
     #[inline]
