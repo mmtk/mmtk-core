@@ -54,6 +54,11 @@ impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
         offset: isize,
         _semantics: crate::AllocationSemantics,
     ) -> Address {
+        debug_assert!(
+            bytes <= super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+            bytes, super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+        );
         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
         if self.plan.immix.in_defrag() {
             self.defrag_copy.alloc(bytes, align, offset)
