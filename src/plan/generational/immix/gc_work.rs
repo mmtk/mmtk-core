@@ -106,9 +106,11 @@ impl<VM: VMBinding> GCWorkerLocal for GenImmixCopyContext<VM> {
 use crate::plan::immix::gc_work::TraceKind;
 
 /// ProcessEdges for a full heap GC for generational immix. The const type parameter
-/// defines whether there is copying in the GC. With TraceKind::Fast, there is no
-/// copying. We invoke the fast_trace_object() on immix space and we do not need to
-/// write the new object reference back to the slot.
+/// defines whether there is copying in the GC.
+/// Note that even with TraceKind::Fast, there is no defragmentation, we are still
+/// copying from nursery to immix space. So we always need to write new object
+/// references in process_edge() (i.e. we do not need to overwrite the default implementation
+/// of process_edge() as the immix plan does).
 pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     plan: &'static GenImmix<VM>,
     base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
