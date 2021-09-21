@@ -208,6 +208,11 @@
 <span id="208">208</span>
 <span id="209">209</span>
 <span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -265,7 +270,12 @@
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;alloc&quot;</span>);
+        <span class="macro">debug_assert!</span>(
+            <span class="ident">size</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident"><span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE</span>,
+            <span class="string">&quot;Trying to allocate a {} bytes object, which is larger than MAX_IMMIX_OBJECT_SIZE {}&quot;</span>,
+            <span class="ident">size</span>,
+            <span class="ident"><span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE</span>
+        );
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
         <span class="kw">let</span> <span class="ident">new_cursor</span> <span class="op">=</span> <span class="ident">result</span> <span class="op">+</span> <span class="ident">size</span>;
 

@@ -188,18 +188,12 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::Immix</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ScanObjectsAndMarkLines</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCWorkerLocal</span>, <span class="ident">WorkBucketStage</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkerLocal</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc</span>::{<span class="ident">Allocator</span>, <span class="ident">ImmixAllocator</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -209,10 +203,7 @@
     <span class="ident">plan::CopyContext</span>,
     <span class="ident">util::opaque_pointer</span>::{<span class="ident">VMThread</span>, <span class="ident">VMWorkerThread</span>},
 };
-<span class="kw">use</span> <span class="ident">std</span>::{
-    <span class="ident">mem</span>,
-    <span class="ident">ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>},
-};
+<span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 
 <span class="doccomment">/// Immix copy allocator</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
@@ -277,7 +268,7 @@
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">enum</span> <span class="ident">TraceKind</span> {
+<span class="kw">pub</span>(<span class="kw">in</span> <span class="ident"><span class="kw">crate</span>::plan</span>) <span class="kw">enum</span> <span class="ident">TraceKind</span> {
     <span class="ident">Fast</span>,
     <span class="ident">Defrag</span>,
 }
@@ -287,7 +278,6 @@
     <span class="comment">// downcast for each traced object.</span>
     <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Immix</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>,
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span> <span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">KIND</span><span class="op">&gt;</span> {
@@ -324,20 +314,20 @@
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">_roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase::new</span>(<span class="ident">edges</span>, <span class="ident">mmtk</span>);
         <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">plan</span>().<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">Immix</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
-        <span class="self">Self</span> { <span class="ident">plan</span>, <span class="ident">base</span>, <span class="ident">mmtk</span> }
+        <span class="self">Self</span> { <span class="ident">plan</span>, <span class="ident">base</span> }
     }
 
     <span class="attribute">#[<span class="ident">cold</span>]</span>
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_nodes</span> <span class="op">=</span> <span class="macro">vec!</span>[];
-        <span class="ident">mem::swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">new_nodes</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">nodes</span>);
-        <span class="kw">let</span> <span class="ident">scan_objects_work</span> <span class="op">=</span>
-            <span class="ident">ScanObjectsAndMarkLines</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">new_nodes</span>, <span class="bool-val">false</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix</span>().<span class="ident">immix_space</span>);
-        <span class="kw">if</span> <span class="ident"><span class="self">Self</span>::SCAN_OBJECTS_IMMEDIATELY</span> {
-            <span class="self">self</span>.<span class="ident">worker</span>().<span class="ident">do_work</span>(<span class="ident">scan_objects_work</span>);
-        } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Closure</span>].<span class="ident">add</span>(<span class="ident">scan_objects_work</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">is_empty</span>() {
+            <span class="kw">return</span>;
         }
+        <span class="kw">let</span> <span class="ident">scan_objects_work</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ScanObjectsAndMarkLines</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(
+            <span class="self">self</span>.<span class="ident">pop_nodes</span>(),
+            <span class="bool-val">false</span>,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix</span>().<span class="ident">immix_space</span>,
+        );
+        <span class="self">self</span>.<span class="ident">new_scan_work</span>(<span class="ident">scan_objects_work</span>);
     }
 
     <span class="doccomment">/// Trace  and evacuate objects.</span>

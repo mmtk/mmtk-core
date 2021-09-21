@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["GENIMMIX_CONSTRAINTS",""]],"struct":[["GenImmix","Generational immix. This implements the functionality of a two-generation copying collector where the higher generation is an immix space. See the PLDI’08 paper by Blackburn and McKinley for a description of the algorithm: http://doi.acm.org/10.1145/1375581.137558."]]});

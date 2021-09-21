@@ -571,6 +571,15 @@
 <span id="571">571</span>
 <span id="572">572</span>
 <span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
@@ -771,14 +780,17 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="comment">// Update mark_state</span>
-        <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">is_on_side</span>() {
-            <span class="self">self</span>.<span class="ident">mark_state</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MARKED_STATE</span>;
-        } <span class="kw">else</span> {
-            <span class="comment">// For header metadata, we use cyclic mark bits.</span>
-            <span class="macro">unimplemented!</span>(<span class="string">&quot;cyclic mark bits is not supported at the moment&quot;</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) {
+        <span class="kw">if</span> <span class="ident">major_gc</span> {
+            <span class="comment">// Update mark_state</span>
+            <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">is_on_side</span>() {
+                <span class="self">self</span>.<span class="ident">mark_state</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MARKED_STATE</span>;
+            } <span class="kw">else</span> {
+                <span class="comment">// For header metadata, we use cyclic mark bits.</span>
+                <span class="macro">unimplemented!</span>(<span class="string">&quot;cyclic mark bits is not supported at the moment&quot;</span>);
+            }
         }
+
         <span class="comment">// Prepare defrag info</span>
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::DEFRAG</span> {
             <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">prepare</span>(<span class="self">self</span>);
@@ -809,13 +821,18 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
-        <span class="comment">// Update line_unavail_state for hole searching afte this GC.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
-            <span class="self">self</span>.<span class="ident">line_unavail_state</span>.<span class="ident">store</span>(
-                <span class="self">self</span>.<span class="ident">line_mark_state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>),
-                <span class="ident">Ordering::Release</span>,
-            );
+    <span class="doccomment">/// Release for the immix space. This is called when a GC finished.</span>
+    <span class="doccomment">/// Return whether this GC was a defrag GC, as a plan may want to know this.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="ident">did_defrag</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">in_defrag</span>();
+        <span class="kw">if</span> <span class="ident">major_gc</span> {
+            <span class="comment">// Update line_unavail_state for hole searching afte this GC.</span>
+            <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
+                <span class="self">self</span>.<span class="ident">line_unavail_state</span>.<span class="ident">store</span>(
+                    <span class="self">self</span>.<span class="ident">line_mark_state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>),
+                    <span class="ident">Ordering::Release</span>,
+                );
+            }
         }
         <span class="comment">// Clear reusable blocks list</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
@@ -827,8 +844,9 @@
         <span class="kw">let</span> <span class="ident">work_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">chunk_map</span>.<span class="ident">generate_sweep_tasks</span>(<span class="ident">space</span>);
         <span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">bulk_add</span>(<span class="ident">work_packets</span>);
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::DEFRAG</span> {
-            <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">release</span>(<span class="self">self</span>)
+            <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">release</span>(<span class="self">self</span>);
         }
+        <span class="ident">did_defrag</span>
     }
 
     <span class="doccomment">/// Release a block.</span>

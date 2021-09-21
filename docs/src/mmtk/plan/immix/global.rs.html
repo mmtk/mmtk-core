@@ -200,10 +200,6 @@
 <span id="200">200</span>
 <span id="201">201</span>
 <span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
 </pre><pre class="rust">
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">ImmixCopyContext</span>, <span class="ident">ImmixProcessEdges</span>, <span class="ident">TraceKind</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
@@ -229,11 +225,7 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">mmtk::MMTK</span>,
-    <span class="ident">policy::immix</span>::{<span class="ident">block::Block</span>, <span class="ident">ImmixSpace</span>},
-    <span class="ident">util::opaque_pointer::VMWorkerThread</span>,
-};
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">mmtk::MMTK</span>, <span class="ident">policy::immix::ImmixSpace</span>, <span class="ident">util::opaque_pointer::VMWorkerThread</span>};
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -252,7 +244,7 @@
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
     <span class="doccomment">/// Max immix object size is half of a block.</span>
-    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident">Block::BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>,
+    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::MAX_IMMIX_OBJECT_SIZE</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
 
@@ -344,13 +336,13 @@
 
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">prepare</span>();
+        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">prepare</span>(<span class="bool-val">true</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
         <span class="comment">// release the collected region</span>
-        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">release</span>();
+        <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">release</span>(<span class="bool-val">true</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
