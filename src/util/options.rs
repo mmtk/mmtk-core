@@ -21,6 +21,7 @@ custom_derive! {
         NoGC,
         SemiSpace,
         GenCopy,
+        GenImmix,
         MarkSweep,
         PageProtect,
         Immix,

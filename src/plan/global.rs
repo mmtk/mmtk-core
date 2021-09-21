@@ -126,6 +126,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::GenCopy => {
             crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
         }
+        PlanSelector::GenImmix => {
+            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
+        }
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
@@ -150,6 +153,9 @@ pub fn create_plan<VM: VMBinding>(
         )),
         PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
             vm_map, mmapper, options,
+        )),
+        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
+            vm_map, mmapper, options, scheduler,
         )),
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
