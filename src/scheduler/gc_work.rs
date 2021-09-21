@@ -454,8 +454,13 @@ pub trait ProcessEdgesWork:
         }
     }
 
+    /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
+    /// this method will simply return with no work packet created.
     #[cold]
     fn flush(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
         let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
         self.new_scan_work(scan_objects_work);
     }

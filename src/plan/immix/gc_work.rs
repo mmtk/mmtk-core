@@ -128,6 +128,9 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
 
     #[cold]
     fn flush(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
         let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
             self.pop_nodes(),
             false,
