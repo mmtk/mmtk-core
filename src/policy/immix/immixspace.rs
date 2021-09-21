@@ -238,6 +238,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Release for the immix space. This is called when a GC finished.
+    /// Return whether this GC was a defrag GC, as a plan may want to know this.
     pub fn release(&mut self, major_gc: bool) -> bool {
         let did_defrag = self.defrag.in_defrag();
         if major_gc {

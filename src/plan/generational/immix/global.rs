@@ -39,6 +39,8 @@ pub struct GenImmix<VM: VMBinding> {
     /// An immix space as the mature space.
     pub immix: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
+    // This is not used. It should be used for last_collection_was_exhaustive.
+    // TODO: We need to fix this.
     pub last_gc_was_defrag: AtomicBool,
 }
 
