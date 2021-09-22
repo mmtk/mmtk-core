@@ -8,6 +8,7 @@ GC Plans
 
 Misc
 ---
+* Upgraded the Rust toolchain we use to nightly-2021-09-17 (rustc 1.57.0-nightly).
 * Added a new feature `global_alloc_bit`: mmtk-core will set a bit for each allocated object. This will later be
   used to implement heap iteration and to support tracing internal pointers.
 * Refactored the scheduler simplify the implementation by removing the abstract `Scheduler`, `Context` and `WorkerLocal`.
