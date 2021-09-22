@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Metadata (OnSide or InHeader) implementation. This is a generic module to work with metadata including side metadata and in-object metadata."><meta name="keywords" content="rust, rustlang, rust-lang, metadata"><title>mmtk::util::metadata - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a><h2 class="location">Module metadata</h2><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div><div id="sidebar-vars" data-name="metadata" data-ty="mod" data-relpath="./"></div><script defer src="./sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Module <a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">util</a>::<wbr><a class="mod" href="#">metadata</a><button id="copy-path" onclick="copy_path(this)" title="copy path"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item import" title="Copy item import to clipboard"></button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../../../src/mmtk/util/metadata/mod.rs.html#1-227" title="goto source code">[src]</a></span></h1><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Metadata (OnSide or InHeader) implementation.
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Metadata (OnSide or InHeader) implementation. This is a generic module to work with metadata including side metadata and in-object metadata."><meta name="keywords" content="rust, rustlang, rust-lang, metadata"><title>mmtk::util::metadata - Rust</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../mmtk/index.html'><div class='logo-container rust-logo'><img src='../../../rust-logo.png' alt='logo'></div></a><h2 class="location">Module metadata</h2><div class="sidebar-elems"><div class="block items"><ul><li><a href="#modules">Modules</a></li><li><a href="#enums">Enums</a></li><li><a href="#functions">Functions</a></li></ul></div><div id="sidebar-vars" data-name="metadata" data-ty="mod" data-relpath="./"></div><script defer src="./sidebar-items.js"></script></div></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav><section id="main" class="content"><h1 class="fqn"><span class="in-band">Module <a href="../../index.html">mmtk</a>::<wbr><a href="../index.html">util</a>::<wbr><a class="mod" href="#">metadata</a><button id="copy-path" onclick="copy_path(this)" title="Copy item path to clipboard"><img src="../../../clipboard.svg" width="19" height="18" alt="Copy item path"></button></span><span class="out-of-band"><span id="render-detail"><a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">[<span class="inner">&#x2212;</span>]</a></span><a class="srclink" href="../../../src/mmtk/util/metadata/mod.rs.html#1-227" title="goto source code">[src]</a></span></h1><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Metadata (OnSide or InHeader) implementation.
 This is a generic module to work with metadata including side metadata and in-object metadata.</p>
 <p>This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).</p>
 <p>The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. alloc-bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.</p>
@@ -23,8 +23,7 @@ This is a generic module to work with metadata including side metadata and in-ob
 The base address for both the global and the local side metadata are constants (e.g. <code>GLOBAL_SIDE_METADATA_BASE_ADDRESS</code> and <code>LOCAL_SIDE_METADATA_BASE_ADDRESS</code>).</p>
 <p>In this case, a schematic of the local and global side metadata looks like:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
- <span class="ident">_______________________________</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code> <span class="ident">_______________________________</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>        <span class="ident">Global</span><span class="op">-</span><span class="number">1</span>             <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">2</span> <span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">+</span>
@@ -53,15 +52,14 @@ The base address for both the global and the local side metadata are constants (
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">local</span><span class="op">-</span><span class="ident">end</span> <span class="op">=</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span>
-                                         <span class="ident">MAX_HEAP_SIZE</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></pre></div>
+                                         <span class="ident">MAX_HEAP_SIZE</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></code></pre></div>
 <p>‌
 ‌ ### 32-bits targets</p>
 <p>In 32-bits targets, the global side metadata is organized the same way as 64-bits, but the policy-specific side metadata is organized per chunk of data (each chunk is managed exclusively by one policy).
 This means, when a new chunk is mapped, the policy-specific side metadata for the whole chunk is also mapped.</p>
 <p>In this case, a schematic of the local and global side metadata looks like:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
- <span class="ident">_______________________________</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>(<span class="ident">e</span>.<span class="ident">g</span>. <span class="number">0x0</span>)
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code> <span class="ident">_______________________________</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>(<span class="ident">e</span>.<span class="ident">g</span>. <span class="number">0x0</span>)
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>        <span class="ident">Global</span><span class="op">-</span><span class="number">1</span>             <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">2</span> <span class="op">=</span> <span class="ident">global</span><span class="op">-</span><span class="number">1</span> <span class="op">+</span>
@@ -83,11 +81,10 @@ This means, when a new chunk is mapped, the policy-specific side metadata for th
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">local</span><span class="op">-</span><span class="ident">end</span> <span class="op">=</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span> <span class="op">+</span>
-                                         <span class="ident">MAX_HEAP_SIZE</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></pre></div>
+                                         <span class="ident">MAX_HEAP_SIZE</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></code></pre></div>
 <p>‌ And inside the PolicySpecific space, each per chunk policy-specific side metadata looks like:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
- <span class="ident">_______________________________</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="ident">offset</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="number">0x0</span>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code> <span class="ident">_______________________________</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="ident">offset</span><span class="op">-</span><span class="number">1</span> <span class="op">=</span> <span class="number">0x0</span>
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>        <span class="ident">Local</span><span class="op">-</span><span class="number">1</span>              <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="ident">offset</span><span class="op">-</span><span class="number">2</span> <span class="op">=</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">Local</span><span class="op">-</span><span class="number">1</span>)
@@ -98,7 +95,7 @@ This means, when a new chunk is mapped, the policy-specific side metadata for th
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span>        <span class="ident">Not</span> <span class="ident">Mapped</span>           <span class="op">|</span>
  <span class="op">|</span>                             <span class="op">|</span>
- <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="number">4MB</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></pre></div>
+ <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="number">4MB</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></code></pre></div>
 <h1 id="how-to-use" class="section-header"><a href="#how-to-use">How to Use</a></h1><h2 id="declare-metadata-specs" class="section-header"><a href="#declare-metadata-specs">Declare metadata specs</a></h2>
 <p>For each global metadata bit-set, a constant instance of the <code>MetadataSpec</code> struct should be created.</p>
 <p>If the metadata is per-object and may possibly reside in objects, the constant instance should be created in the VM’s ObjectModel.
@@ -108,51 +105,47 @@ The VM binding decides whether to put these metadata bit-sets in-objects or on-s
 <p>Example:</p>
 <p>For the first global side metadata bit-set:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">const</span> <span class="ident">GLOBAL_META_1</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const</span> <span class="ident">GLOBAL_META_1</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
    <span class="ident">is_side_metadata</span>: <span class="bool-val">true</span>,
    <span class="ident">is_global</span>: <span class="bool-val">true</span>,
    <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>,
    <span class="ident">log_num_of_bits</span>: <span class="ident">b1</span>,
    <span class="ident">log_min_obj_size</span>: <span class="ident">s1</span>,
-};</pre></div>
+};</code></pre></div>
 <p>Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.
 The <code>offset</code> is actually the base address for a global side metadata bit-set.
 For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_ADDRESS</code>.</p>
 <p>Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">const</span> <span class="ident">GLOBAL_META_2</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const</span> <span class="ident">GLOBAL_META_2</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
    <span class="ident">is_side_metadata</span>: <span class="bool-val">true</span>,
     <span class="ident">is_global</span>: <span class="bool-val">true</span>,
    <span class="ident">offset</span>: <span class="ident">GLOBAL_META_1</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="ident">GLOBAL_META_1</span>)
    <span class="ident">log_num_of_bits</span>: <span class="ident">b2</span>,
    <span class="ident">log_min_obj_size</span>: <span class="ident">s2</span>,
-};</pre></div>
+};</code></pre></div>
 <p>where <code>metadata_address_range_size</code> is a const function which calculates the total metadata space size of a contiguous side metadata bit-set based-on <code>s</code> and <code>b</code>.</p>
 <p>The policy-specific side metadata for 64-bits targets, and the global side metadata for 32-bits targets are used on the same way, except that their base addresses are different.</p>
 <p>Policy-specific side metadata for 32-bits target is slightly different, because it is chunk-based.</p>
 <p>For the first local side metadata bit-set:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">const</span> <span class="ident">LOCAL_META_1</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const</span> <span class="ident">LOCAL_META_1</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
    <span class="ident">is_side_metadata</span>: <span class="bool-val">true</span>,
    <span class="ident">is_global</span>: <span class="bool-val">false</span>,
    <span class="ident">offset</span>: <span class="number">0</span>,
    <span class="ident">log_num_of_bits</span>: <span class="ident">b1</span>,
    <span class="ident">log_min_obj_size</span>: <span class="ident">s1</span>,
-};</pre></div>
+};</code></pre></div>
 <p>Here, the <code>offset</code> is actually the inter-chunk offset of the side metadata from the start of the current side metadata chunk.</p>
 <p>Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:</p>
 
-<div class="example-wrap"><pre class="rust rust-example-rendered">
-<span class="kw">const</span> <span class="ident">LOCAL_META_2</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">const</span> <span class="ident">LOCAL_META_2</span>: <span class="ident">MetadataSpec</span> <span class="op">=</span> <span class="ident">MetadataSpec</span> {
    <span class="ident">is_side_metadata</span>: <span class="bool-val">true</span>,
    <span class="ident">is_global</span>: <span class="bool-val">false</span>,
    <span class="ident">offset</span>: <span class="ident">LOCAL_META_1</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">LOCAL_META_1</span>)
    <span class="ident">log_num_of_bits</span>: <span class="ident">b2</span>,
    <span class="ident">log_min_obj_size</span>: <span class="ident">s2</span>,
-};</pre></div>
+};</code></pre></div>
 <p>So far, we declared each metadata specs.
 We can now use the in-object metadata through the access functions in the VM bindings ObjectModel.
 For side metadata, the next step is to allocate metadata space.</p>
