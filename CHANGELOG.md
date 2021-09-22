@@ -1,3 +1,28 @@
+0.7.0 (2021-09-22)
+===
+
+GC Plans
+---
+* Refactored to extract common generational code from the existing generational copying plan.
+* Added the generational immix plan, a two-generation algorithm that uses immix as its mature generation.
+
+Misc
+---
+* Upgraded the Rust toolchain we use to nightly-2021-09-17 (rustc 1.57.0-nightly).
+* Added a new feature `global_alloc_bit`: mmtk-core will set a bit for each allocated object. This will later be
+  used to implement heap iteration and to support tracing internal pointers.
+* Refactored the scheduler simplify the implementation by removing the abstract `Scheduler`, `Context` and `WorkerLocal`.
+* Renamed the incorrect parameter name `primary` to `full_heap` in a few `prepare()`/`release()` methods.
+* Renamed the phases in statistics reports from `mu`(mutator)/`gc` to `other`/`stw`(stop-the-world) so they won't cause
+  confusion in concurrenct GC plans.
+* Fixed a few misuses of side metadata methods that caused concurrency issues in accessing the unlogged bit.
+* Fixed a bug in `MallocSpace` that caused side metadata was not mapped correctly if an object crossed chunk boundary.
+* Fixed a bug in `MallocSpace` that it may incorrectly consider a chunk's side metadata is mapped.
+* Fixed a bug in side metadata implementation that may cause side metadata not mapped if the side metadata size is less than a page.
+* Fixed regression in `LockFreeImmortalSpace`.
+* Fixed a few typos in the tutorial.
+
+
 0.6.0 (2021-08-10)
 ===
 
