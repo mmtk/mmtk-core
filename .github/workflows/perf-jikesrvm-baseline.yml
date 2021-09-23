@@ -7,12 +7,6 @@ on:
   schedule:
     - cron: '0 0 * * SUN'
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
-
 jobs:
   jikesrvm-baseline:
     runs-on: [self-hosted, Linux, freq-scaling-off]
