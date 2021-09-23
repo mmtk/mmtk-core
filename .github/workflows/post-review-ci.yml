@@ -1,16 +1,16 @@
 name: Post Code Review Checks
 
-# on:
-#   pull_request:
-#     types: [opened, synchronize, reopened, labeled]
-#     branches:
-#       - master
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - master
 
 # disable this workflow
-on:
-  push:
-    branches-ignore:
-      - '**'
+# on:
+#   push:
+#     branches-ignore:
+#       - '**'
 
 jobs:
   # v8-binding-test:
