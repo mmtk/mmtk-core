@@ -26,7 +26,7 @@ Finished code (step 1-3):
 
 ## Change the plan implementation
 
-Next, in `global.rs`, replace the old immortal (nogc) space with two copyspaces.
+Next, in `mygc/global.rs`, replace the old immortal (nogc) space with two copyspaces.
 
 ### Imports
 
@@ -94,6 +94,26 @@ initializer calls are identical.
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:gc_init}}
 ```
+
+### Access MyGC spaces
+
+Add a new section of methods for MyGC:
+
+```rust
+impl<VM: VMBinding> MyGC<VM> {
+}
+```
+
+To this, add two helper methods, `tospace(&self)` 
+and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, 
+and return a reference to the tospace and fromspace respectively. 
+`tospace()` (see below) returns a reference to the tospace, 
+and `fromspace()` returns a reference to the fromspace.
+
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
+```
+
 #### Other methods in the Plan trait
 
 The trait `Plan` requires a `common()` method that should return a 
@@ -131,25 +151,6 @@ Add and override the following helper function:
 
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:plan_get_collection_reserve}}
-```
-
-### Access MyGC spaces
-
-Add a new section of methods for MyGC:
-
-```rust
-impl<VM: VMBinding> MyGC<VM> {
-}
-```
-
-To this, add two helper methods, `tospace(&self)` 
-and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, 
-and return a reference to the tospace and fromspace respectively. 
-`tospace()` (see below) returns a reference to the tospace, 
-and `fromspace()` returns a reference to the fromspace.
-
-```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
 ```
 
 ## Change the mutator definition

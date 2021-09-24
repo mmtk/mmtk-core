@@ -66,16 +66,19 @@ fn post_copy(
 }
 ```
 
-In `init()`, set the `tls` variable in the held instance of `mygc` to
-the one passed to the function. In `constraints()`, return a reference of `MYGC_CONSTRAINTS`.
+In `init()`, set the `tls` variable in the held instance of `mygc` to the one 
+passed to the function. In `constraints()`, return a reference of 
+`MYGC_CONSTRAINTS`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_constraints_init}}
 ```
 
-We just leave the rest of the functions empty for now and will implement them later.
+We just leave the rest of the functions empty for now and will implement them 
+later.
 
-Add a constructor to `MyGCCopyContext` and implement the `WorkerLocal` trait for `MyGCCopyContext`.
+Add a constructor to `MyGCCopyContext` and implement the `WorkerLocal` trait 
+for `MyGCCopyContext`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:constructor_and_workerlocal}}
@@ -104,10 +107,11 @@ Add a new constructor, `new()`.
 ## Introduce collection to MyGC plan
 
 Now that they've been added, you should import `MyGCCopyContext` and
-`MyGCProcessEdges` into `global.rs`, which we will be working in for the
+`MyGCProcessEdges` into `mygc/global.rs`, which we will be working in for the
 next few steps. 
 
-In `create_worker_local()` in `impl Plan for MyGC`, create an instance of `MyGCCopyContext`.
+In `create_worker_local()` in `impl Plan for MyGC`, create an instance of 
+`MyGCCopyContext`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:create_worker_local}}
@@ -121,8 +125,8 @@ Add a new method to `Plan for MyGC`, `schedule_collection()`. This function
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The `StopMutators` work
-will invoke code from the bindings to scan threads and other roots, and those scanning work
-will further push work for a transitive closure.
+will invoke code from the bindings to scan threads and other roots, and those 
+scanning work will further push work for a transitive closure.
 
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:schedule_collection}}
@@ -139,7 +143,7 @@ We'll add these now.
 
 ### Prepare plan
 
-In `global.rs`, find the method `prepare`. Delete the `unreachable!()` 
+In `mygc/global.rs`, find the method `prepare`. Delete the `unreachable!()` 
 call, and add the following code:
 
 ```rust
@@ -183,9 +187,10 @@ This method should return an ObjectReference, and use the
 inline attribute.
 Check if the object passed into the function is null 
 (`object.is_null()`). If it is, return the object.
-Check if which space the object is in, and forward the call to the policy-specific
-object tracing code. If it is in neither space, forward the call to the common space and let the common space to handle
-object tracing in its spaces (e.g. immortal or large object space):
+Check if which space the object is in, and forward the call to the 
+policy-specific object tracing code. If it is in neither space, forward the 
+call to the common space and let the common space to handle object tracing in 
+its spaces (e.g. immortal or large object space):
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:trace_object}}
@@ -225,15 +230,15 @@ run after each collection.
 
 ### Release in plan
 
-Find the method `release()` in `global.rs`. Replace the 
+Find the method `release()` in `mygc/global.rs`. Replace the 
 `unreachable!()` call with the following code.
 
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:release}}
 ```
 
-This function is called at the end of a collection. It calls the release routines for the common
-plan spaces and the fromspace.
+This function is called at the end of a collection. It calls the release 
+routines for the common plan spaces and the fromspace.
 
 ### Release in mutator
 
