@@ -42,6 +42,7 @@ pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod generational;
 mod immix;
+mod markcompact;
 mod marksweep;
 mod nogc;
 mod pageprotect;
