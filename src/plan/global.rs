@@ -3,6 +3,7 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
+use crate::plan::generational::global::Gen;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -122,7 +123,12 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::SemiSpace => {
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+        PlanSelector::GenCopy => {
+            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
+        }
+        PlanSelector::GenImmix => {
+            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
+        }
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
@@ -145,9 +151,12 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => {
-            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
-        }
+        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
+            vm_map, mmapper, options,
+        )),
+        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
+            vm_map, mmapper, options, scheduler,
+        )),
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
         )),
@@ -189,6 +198,9 @@ pub trait Plan: 'static + Sync + Downcast {
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
+    }
+    fn generational(&self) -> &Gen<Self::VM> {
+        panic!("This is not a generational plan.")
     }
     fn mmapper(&self) -> &'static Mmapper {
         self.base().mmapper
@@ -583,7 +595,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object({:?})", _object);
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
         #[cfg(feature = "code_space")]
@@ -594,7 +606,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.prepare();
     }
 
-    pub fn release(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.release();
         #[cfg(feature = "code_space")]
@@ -825,16 +837,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<T, C>(trace, object)
     }
 
-    pub fn prepare(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
-        self.los.prepare(primary);
-        self.base.prepare(tls, primary)
+        self.los.prepare(full_heap);
+        self.base.prepare(tls, full_heap)
     }
 
-    pub fn release(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
-        self.los.release(primary);
-        self.base.release(tls, primary)
+        self.los.release(full_heap);
+        self.base.release(tls, full_heap)
     }
 
     pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(

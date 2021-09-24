@@ -13,7 +13,8 @@
 #![feature(trait_alias)]
 #![feature(const_panic)]
 #![feature(step_trait)]
-#![feature(const_generics)]
+#![feature(adt_const_params)]
+#![feature(generic_const_exprs)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
