@@ -15,6 +15,7 @@ use crate::util::ObjectReference;
 ///
 #[cfg(target_pointer_width = "32")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    name: "AllocBit",
     is_global: true,
     offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
@@ -23,6 +24,7 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
 
 #[cfg(target_pointer_width = "64")]
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    name: "AllocBit",
     is_global: true,
     offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 0,
