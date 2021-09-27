@@ -86,10 +86,12 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
-    println!(
-        "map for side metadata: {} = {}",
+    trace!(
+        "{} for side metadata {}: {} to {}",
+        if no_reserve { "quarantine" } else { "mmap" },
+        spec.name,
         mmap_start,
-        mmap_start + mmap_size
+        mmap_start + mmap_size,
     );
     if mmap_size > 0 {
         if !no_reserve {
@@ -132,7 +134,14 @@ pub(crate) fn address_to_meta_address(
 
 /// Calculate the mmap size (aligned up by pages) for a side metadata spec and the data size.
 fn metadata_mmap_size(spec: &SideMetadataSpec, data_size: usize) -> usize {
-    conversions::raw_align_up(data_size >> addr_rshift(spec), BYTES_IN_PAGE)
+    assert!(data_size != 0, "attempt to map metadata for 0 bytes data");
+    let metadata_size = data_size >> addr_rshift(spec);
+    if metadata_size == 0 {
+        // The original data_size is not 0, but after right shift, we got 0.
+        // In this case, we at least map 1 page.
+        return BYTES_IN_PAGE;
+    }
+    conversions::raw_align_up(metadata_size, BYTES_IN_PAGE)
 }
 
 pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {

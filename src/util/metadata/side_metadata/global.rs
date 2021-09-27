@@ -360,8 +360,8 @@ pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Ad
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
     debug!(
-        "ensure_metadata_is_mapped({}).meta_start({})",
-        data_addr, meta_start
+        "ensure_metadata_is_mapped({}, data = {}, metadata = {})",
+        metadata_spec.name, data_addr, meta_start
     );
 
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
