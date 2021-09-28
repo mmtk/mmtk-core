@@ -911,6 +911,7 @@ mod tests {
     fn calculate_reserved_pages_one_spec() {
         // 1 bit per 8 bytes - 1:64
         let spec = SideMetadataSpec {
+            name: "test_spec",
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
@@ -931,6 +932,7 @@ mod tests {
     fn calculate_reserved_pages_multi_specs() {
         // 1 bit per 8 bytes - 1:64
         let gspec = SideMetadataSpec {
+            name: "gspec",
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
@@ -938,6 +940,7 @@ mod tests {
         };
         // 2 bits per page - 2 / (4k * 8) = 1:16k
         let lspec = SideMetadataSpec {
+            name: "lspec",
             is_global: false,
             offset: ZERO_OFFSET,
             log_num_of_bits: 1,
