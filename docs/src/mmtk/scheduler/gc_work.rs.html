@@ -556,6 +556,13 @@
 <span id="556">556</span>
 <span id="557">557</span>
 <span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -749,41 +756,43 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StopMutators</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="ident">worker</span>.<span class="ident">is_coordinator</span>() {
-            <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators start&quot;</span>);
-            <span class="macro">debug_assert_eq!</span>(<span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">scanned_stacks</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>), <span class="number">0</span>);
-            <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::stop_all_mutators</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
-            <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators end&quot;</span>);
-            <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">notify_mutators_paused</span>(<span class="ident">mmtk</span>);
-            <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT</span> {
-                <span class="comment">// Prepare mutators if necessary</span>
-                <span class="comment">// FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused</span>
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stacks_prepared</span>() {
-                    <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
-                        <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::prepare_mutator</span>(
-                            <span class="ident">worker</span>.<span class="ident">tls</span>,
-                            <span class="ident">mutator</span>.<span class="ident">get_tls</span>(),
-                            <span class="ident">mutator</span>,
-                        );
-                    }
-                }
-                <span class="comment">// Scan mutators</span>
-                <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING</span> {
-                    <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-                        .<span class="ident">add</span>(<span class="ident">ScanStackRoots</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>());
-                } <span class="kw">else</span> {
-                    <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
-                        <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-                            .<span class="ident">add</span>(<span class="ident">ScanStackRoot</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">mutator</span>));
-                    }
-                }
-            }
-            <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-                .<span class="ident">add</span>(<span class="ident">ScanVMSpecificRoots</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>());
-        } <span class="kw">else</span> {
+        <span class="comment">// If the VM requires that only the coordinator thread can stop the world,</span>
+        <span class="comment">// we delegate the work to the coordinator.</span>
+        <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::COORDINATOR_ONLY_STW</span> <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">worker</span>.<span class="ident">is_coordinator</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>
                 .<span class="ident">add_coordinator_work</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>(), <span class="ident">worker</span>);
+            <span class="kw">return</span>;
         }
+
+        <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators start&quot;</span>);
+        <span class="macro">debug_assert_eq!</span>(<span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">scanned_stacks</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>), <span class="number">0</span>);
+        <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::stop_all_mutators</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;stop_all_mutators end&quot;</span>);
+        <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">notify_mutators_paused</span>(<span class="ident">mmtk</span>);
+        <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT</span> {
+            <span class="comment">// Prepare mutators if necessary</span>
+            <span class="comment">// FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused</span>
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">stacks_prepared</span>() {
+                <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
+                    <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::prepare_mutator</span>(
+                        <span class="ident">worker</span>.<span class="ident">tls</span>,
+                        <span class="ident">mutator</span>.<span class="ident">get_tls</span>(),
+                        <span class="ident">mutator</span>,
+                    );
+                }
+            }
+            <span class="comment">// Scan mutators</span>
+            <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING</span> {
+                <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
+                    .<span class="ident">add</span>(<span class="ident">ScanStackRoots</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            } <span class="kw">else</span> {
+                <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
+                    <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
+                        .<span class="ident">add</span>(<span class="ident">ScanStackRoot</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">mutator</span>));
+                }
+            }
+        }
+        <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>].<span class="ident">add</span>(<span class="ident">ScanVMSpecificRoots</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>());
     }
 }
 
@@ -800,6 +809,11 @@
         <span class="kw">if</span> <span class="ident"><span class="kw">crate</span>::util::edge_logger::should_check_duplicate_edges</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>) {
             <span class="comment">// reset the logging info at the end of each GC</span>
             <span class="ident"><span class="kw">crate</span>::util::edge_logger::reset</span>();
+        }
+
+        <span class="kw">if</span> <span class="op">&lt;</span><span class="ident">VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::COORDINATOR_ONLY_STW</span> {
+            <span class="macro">assert!</span>(<span class="ident">worker</span>.<span class="ident">is_coordinator</span>(),
+                    <span class="string">&quot;VM only allows coordinator to resume mutators, but the current worker is not the coordinator.&quot;</span>);
         }
 
         <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::NotInGC</span>);

@@ -75,6 +75,15 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::MutatorContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
@@ -83,6 +92,15 @@
 
 <span class="doccomment">/// VM-specific methods for garbage collection.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.</span>
+    <span class="doccomment">/// If false, any GC thread can call these methods.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This constant exists because some VMs require the thread that resumes a thread to be the same thread that</span>
+    <span class="doccomment">/// stopped it.  The MMTk Core will use the appropriate thread to stop or start the world according to the value of</span>
+    <span class="doccomment">/// this constant.  If a VM does not have such a requirement, the VM binding shall set this to false to reduce an</span>
+    <span class="doccomment">/// unnecessary context switch.</span>
+    <span class="kw">const</span> <span class="ident">COORDINATOR_ONLY_STW</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+
     <span class="doccomment">/// Stop all the mutator threads. MMTk calls this method when it requires all the mutator to yield for a GC.</span>
     <span class="doccomment">/// This method is called by a single thread in MMTk (the GC controller).</span>
     <span class="doccomment">/// This method should not return until all the threads are yielded.</span>
