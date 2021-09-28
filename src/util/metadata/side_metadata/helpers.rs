@@ -59,7 +59,7 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
     let mmap_size = metadata_mmap_size(spec, size);
-    println!(
+    trace!(
         "unmap side metadata: {} - {}",
         mmap_start,
         mmap_start + mmap_size

@@ -21,10 +21,10 @@ use super::metadata_address_range_size;
 // This is made public, as VM bingdings may need to use this.
 #[cfg(target_pointer_width = "32")]
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
-    unsafe { Address::from_usize(0x1000_0000usize) };
+    crate::util::heap::layout::vm_layout_constants::HEAP_END;
 #[cfg(target_pointer_width = "64")]
 pub const GLOBAL_SIDE_METADATA_BASE_ADDRESS: Address =
-    unsafe { Address::from_usize(0x0000_0600_0000_0000usize) };
+    crate::util::heap::layout::vm_layout_constants::HEAP_START.add((1 << crate::util::heap::layout::heap_parameters::LOG_MAX_SPACES) * crate::util::heap::layout::vm_layout_constants::MAX_SPACE_EXTENT);
 
 pub(crate) const GLOBAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS);
