@@ -403,6 +403,17 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     pub fn plan(&self) -> &'static dyn Plan<VM = E::VM> {
         &*self.mmtk.plan
     }
+    /// Pop all nodes from nodes, and clear nodes to an empty vector.
+    #[inline]
+    pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
+        debug_assert!(
+            !self.nodes.is_empty(),
+            "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
+        );
+        let mut new_nodes = vec![];
+        mem::swap(&mut new_nodes, &mut self.nodes);
+        new_nodes
+    }
 }
 
 /// Scan & update a list of object slots
@@ -427,22 +438,31 @@ pub trait ProcessEdgesWork:
         // So maximum 1 `ScanObjects` work can be created from `nodes` buffer
     }
 
-    #[cold]
-    fn flush(&mut self) {
-        let mut new_nodes = vec![];
-        mem::swap(&mut new_nodes, &mut self.nodes);
-        let scan_objects_work = ScanObjects::<Self>::new(new_nodes, false);
-
+    /// Create a new scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
+    /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
+    #[inline]
+    fn new_scan_work(&mut self, work_packet: impl GCWork<Self::VM>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
             // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
-            self.worker().do_work(scan_objects_work);
+            self.worker().do_work(work_packet);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
         }
+    }
+
+    /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
+    /// this method will simply return with no work packet created.
+    #[cold]
+    fn flush(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
+        let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
+        self.new_scan_work(scan_objects_work);
     }
 
     #[inline]

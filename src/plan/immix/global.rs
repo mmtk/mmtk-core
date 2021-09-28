@@ -22,11 +22,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use crate::{
-    mmtk::MMTK,
-    policy::immix::{block::Block, ImmixSpace},
-    util::opaque_pointer::VMWorkerThread,
-};
+use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -45,7 +41,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     /// Max immix object size is half of a block.
-    max_non_los_default_alloc_bytes: Block::BYTES >> 1,
+    max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     ..PlanConstraints::default()
 };
 
@@ -137,13 +133,13 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare();
+        self.immix_space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release();
+        self.immix_space.release(true);
     }
 
     fn get_collection_reserve(&self) -> usize {
