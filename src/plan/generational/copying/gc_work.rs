@@ -97,17 +97,8 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         }
         // Evacuate mature objects
         if self.gencopy().tospace().in_space(object) {
-            return self
-                .gencopy()
-                .tospace()
-                .trace_object::<Self, GenCopyCopyContext<VM>>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-                );
-        }
-        if self.gencopy().fromspace().in_space(object) {
+            return object;
+        } else if self.gencopy().fromspace().in_space(object) {
             return self
                 .gencopy()
                 .fromspace()
@@ -118,6 +109,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
                     unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
                 );
         }
+
         self.gencopy()
             .gen
             .trace_object_full_heap::<Self, GenCopyCopyContext<VM>>(self, object, unsafe {
