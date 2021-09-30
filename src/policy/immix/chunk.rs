@@ -135,6 +135,7 @@ pub struct ChunkMap {
 impl ChunkMap {
     /// Chunk alloc table
     pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
+        name: "ImmixChunkMap",
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
         log_num_of_bits: 3,
