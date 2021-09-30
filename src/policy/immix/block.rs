@@ -91,7 +91,7 @@ impl Block {
             SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
         log_num_of_bits: 3,
-        log_min_obj_size: Self::LOG_BYTES,
+        log_bytes_in_region: Self::LOG_BYTES,
     };
 
     /// Block mark table (side)
@@ -99,7 +99,7 @@ impl Block {
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Self::DEFRAG_STATE_TABLE),
         log_num_of_bits: 3,
-        log_min_obj_size: Self::LOG_BYTES,
+        log_bytes_in_region: Self::LOG_BYTES,
     };
 
     /// Align the address to a block boundary.

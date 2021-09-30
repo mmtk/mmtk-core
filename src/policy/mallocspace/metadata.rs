@@ -44,7 +44,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
     is_global: true,
     offset: SideMetadataOffset::layout_after(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
     log_num_of_bits: 3,
-    log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
+    log_bytes_in_region: LOG_BYTES_IN_CHUNK as usize,
 };
 
 /// Metadata spec for the active page byte
@@ -61,7 +61,7 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
     is_global: false,
     offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 3,
-    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
+    log_bytes_in_region: constants::LOG_BYTES_IN_PAGE as usize,
 };
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,

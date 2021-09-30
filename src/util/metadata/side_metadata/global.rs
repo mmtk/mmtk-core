@@ -22,7 +22,7 @@ pub struct SideMetadataSpec {
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
     /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
-    pub log_min_obj_size: usize,
+    pub log_bytes_in_region: usize,
 }
 
 impl SideMetadataSpec {
@@ -57,7 +57,7 @@ impl fmt::Debug for SideMetadataSpec {
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
-            **log_min_obj_size: 0x{:x} \
+            **log_bytes_in_region: 0x{:x} \
             }}",
             self.is_global,
             unsafe {
@@ -68,7 +68,7 @@ impl fmt::Debug for SideMetadataSpec {
                 }
             },
             self.log_num_of_bits,
-            self.log_min_obj_size
+            self.log_bytes_in_region
         ))
     }
 }
@@ -114,7 +114,7 @@ impl SideMetadataOffset {
             SideMetadataOffset {
                 rel_offset: unsafe { spec.offset.rel_offset }
                     + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                        spec.log_min_obj_size,
+                        spec.log_bytes_in_region,
                         spec.log_num_of_bits,
                     ),
             }
@@ -260,7 +260,7 @@ impl SideMetadataContext {
             }
             #[cfg(target_pointer_width = "32")]
             {
-                lsize += metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+                lsize += metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
             }
         }
 
@@ -751,7 +751,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
             "Each heap entry should map to a byte in side-metadata"
         );
         debug_assert_eq!(
-            bytes >> metadata_spec.log_min_obj_size,
+            bytes >> metadata_spec.log_bytes_in_region,
             ENTRIES,
             "Heap range size and MetadataByteArray size does not match"
         );
@@ -781,7 +781,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
         let value = self.data[index];
         #[cfg(feature = "extreme_assertions")]
         {
-            let data_addr = self.heap_range_start + (index << self.spec.log_min_obj_size);
+            let data_addr = self.heap_range_start + (index << self.spec.log_bytes_in_region);
             sanity::verify_load(&self.spec, data_addr, value as _);
         }
         value
@@ -847,7 +847,7 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
                 memory::zero(
                     address_to_meta_address(metadata_spec, next_data_chunk),
                     metadata_bytes_per_chunk(
-                        metadata_spec.log_min_obj_size,
+                        metadata_spec.log_bytes_in_region,
                         metadata_spec.log_num_of_bits,
                     ),
                 );
@@ -872,7 +872,7 @@ mod tests {
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
-            log_min_obj_size: 3,
+            log_bytes_in_region: 3,
         };
         let side_metadata = SideMetadataContext {
             global: vec![spec],
@@ -892,14 +892,14 @@ mod tests {
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
-            log_min_obj_size: 3,
+            log_bytes_in_region: 3,
         };
         // 2 bits per page - 2 / (4k * 8) = 1:16k
         let lspec = SideMetadataSpec {
             is_global: false,
             offset: ZERO_OFFSET,
             log_num_of_bits: 1,
-            log_min_obj_size: 12,
+            log_bytes_in_region: 12,
         };
         let side_metadata = SideMetadataContext {
             global: vec![gspec],

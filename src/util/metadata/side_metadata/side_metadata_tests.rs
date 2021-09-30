@@ -16,14 +16,14 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         #[cfg(target_pointer_width = "64")]
         let mut lspec = SideMetadataSpec {
             is_global: false,
             offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         #[cfg(target_pointer_width = "32")]
@@ -31,7 +31,7 @@ mod tests {
             is_global: false,
             offset: SideMetadataOffset::rel(0),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert_eq!(
@@ -61,8 +61,8 @@ mod tests {
             LOCAL_SIDE_METADATA_BASE_ADDRESS + 16usize
         );
 
-        gspec.log_min_obj_size = 2;
-        lspec.log_min_obj_size = 1;
+        gspec.log_bytes_in_region = 2;
+        lspec.log_bytes_in_region = 1;
 
         assert_eq!(
             address_to_meta_address(&gspec, unsafe { Address::from_usize(0) }),
@@ -128,7 +128,7 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert_eq!(meta_byte_mask(&spec), 1);
@@ -147,7 +147,7 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert_eq!(
@@ -194,21 +194,21 @@ mod tests {
                         is_global: true,
                         offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
-                        log_min_obj_size: 1,
+                        log_bytes_in_region: 1,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let mut lspec = SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
-                        log_min_obj_size: 1,
+                        log_bytes_in_region: 1,
                     };
                     #[cfg(target_pointer_width = "32")]
                     let mut lspec = SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset::rel(0),
                         log_num_of_bits: 1,
-                        log_min_obj_size: 1,
+                        log_bytes_in_region: 1,
                     };
 
                     let metadata = SideMetadataContext {
@@ -242,9 +242,9 @@ mod tests {
                         constants::BYTES_IN_PAGE,
                     );
 
-                    gspec.log_min_obj_size = 4;
+                    gspec.log_bytes_in_region = 4;
                     gspec.log_num_of_bits = 4;
-                    lspec.log_min_obj_size = 4;
+                    lspec.log_bytes_in_region = 4;
                     lspec.log_num_of_bits = 4;
 
                     metadata_sanity.reset();
@@ -308,14 +308,14 @@ mod tests {
                         is_global: true,
                         offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 4,
-                        log_min_obj_size: 6,
+                        log_bytes_in_region: 6,
                     };
 
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: true,
                         offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
-                        log_min_obj_size: 7,
+                        log_bytes_in_region: 7,
                     };
 
                     let metadata = SideMetadataContext {
@@ -380,7 +380,7 @@ mod tests {
                         is_global: true,
                         offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 1,
-                        log_min_obj_size: constants::LOG_BYTES_IN_WORD as usize,
+                        log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
                     };
 
                     let metadata = SideMetadataContext {
@@ -434,14 +434,14 @@ mod tests {
                         is_global: false,
                         offset: SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS),
                         log_num_of_bits: 4,
-                        log_min_obj_size: 9,
+                        log_bytes_in_region: 9,
                     };
                     #[cfg(target_pointer_width = "64")]
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
-                        log_min_obj_size: 7,
+                        log_bytes_in_region: 7,
                     };
 
                     #[cfg(target_pointer_width = "32")]
@@ -449,14 +449,14 @@ mod tests {
                         is_global: false,
                         offset: SideMetadataOffset::rel(0),
                         log_num_of_bits: 4,
-                        log_min_obj_size: 9,
+                        log_bytes_in_region: 9,
                     };
                     #[cfg(target_pointer_width = "32")]
                     let metadata_2_spec = SideMetadataSpec {
                         is_global: false,
                         offset: SideMetadataOffset::layout_after(&metadata_1_spec),
                         log_num_of_bits: 3,
-                        log_min_obj_size: 7,
+                        log_bytes_in_region: 7,
                     };
 
                     let metadata = SideMetadataContext {
