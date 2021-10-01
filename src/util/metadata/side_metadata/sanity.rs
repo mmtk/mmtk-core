@@ -106,7 +106,8 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in l_specs {
-        total_size += super::metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
+        total_size +=
+            super::metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
     }
 
     if total_size > 1usize << (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {

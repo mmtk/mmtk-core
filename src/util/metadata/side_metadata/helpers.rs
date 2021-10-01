@@ -114,8 +114,8 @@ pub(crate) fn address_to_meta_address(
 }
 
 pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
-    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_bytes_in_region - (metadata_spec.log_num_of_bits))
-        as i32
+    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_bytes_in_region
+        - (metadata_spec.log_num_of_bits)) as i32
 }
 
 #[allow(dead_code)]
