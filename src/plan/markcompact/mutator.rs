@@ -4,7 +4,6 @@ use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -51,10 +50,16 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
     }
 }
 
-pub fn markcompact_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn markcompact_mutator_prepare<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
 }
 
-pub fn markcompact_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+pub fn markcompact_mutator_release<VM: VMBinding>(
+    _mutator: &mut Mutator<VM>,
+    _tls: VMWorkerThread,
+) {
     // rebind the allocation bump pointer to the appropriate semispace
     // let bump_allocator = unsafe {
     //     mutator

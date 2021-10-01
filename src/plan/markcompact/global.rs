@@ -25,7 +25,6 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::util::sanity::sanity_checker::ScheduleSanityGC;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -121,8 +120,9 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(Release::<Self, NoCopy<VM>>::new(self));
 
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
+        scheduler.work_buckets[WorkBucketStage::Final].add(
+            crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self, NoCopy<VM>>::new(self),
+        );
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

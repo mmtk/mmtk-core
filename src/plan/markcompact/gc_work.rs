@@ -1,15 +1,10 @@
 use super::global::MarkCompact;
 use crate::plan::global::NoCopy;
-use crate::plan::CopyContext;
-use crate::plan::PlanConstraints;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
-use crate::scheduler::GCWorkerLocal;
-use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;

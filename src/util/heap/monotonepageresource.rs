@@ -275,6 +275,33 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
      }
      }*/
 
+    pub fn reset_cursor(&self, _start: Address) {
+        if self.common.contiguous {
+            let mut guard = self.sync.lock().unwrap();
+            let cursor = _start.align_up(crate::util::constants::BYTES_IN_PAGE);
+            let chunk = chunk_align_down(_start);
+            guard.current_chunk = chunk;
+            let start = match guard.conditional {
+                MonotonePageResourceConditional::Contiguous { start: _start, .. } => _start,
+                _ => unreachable!(),
+            };
+            let pages = bytes_to_pages(_start - start);
+            self.common.accounting.reserve_and_commit(pages);
+            println!("########## reset cursor ##########");
+            println!(
+                "cursor: {} origianl chunk: {} original start: {}",
+                guard.cursor, guard.current_chunk, start,
+            );
+            println!(
+                "cursor: {} current_chunk: {}, pages: {}",
+                cursor, chunk, pages
+            );
+            println!("##################################");
+        } else {
+            unimplemented!();
+        }
+    }
+
     #[inline]
     unsafe fn release_pages(&self, guard: &mut MutexGuard<MonotonePageResourceSync>) {
         // TODO: concurrent zeroing
