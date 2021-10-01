@@ -95,7 +95,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        // Evacuate mature objects
+        // Evacuate mature objects; don't trace objects if they are in to-space
         if self.gencopy().tospace().in_space(object) {
             return object;
         } else if self.gencopy().fromspace().in_space(object) {
