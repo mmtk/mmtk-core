@@ -52,6 +52,7 @@ impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for ScheduleSanityGC
 
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
+        <<P as Plan>::VM as VMBinding>::VMScanning::prepare_for_sanity_roots_scanning();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));

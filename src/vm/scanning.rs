@@ -66,4 +66,7 @@ pub trait Scanning<VM: VMBinding> {
 
     /// Return whether the VM supports return barriers. This is unused at the moment.
     fn supports_return_barrier() -> bool;
+
+    /// Notify the binding that we're about to do the second round of roots scanning.
+    fn prepare_for_sanity_roots_scanning() {}
 }
