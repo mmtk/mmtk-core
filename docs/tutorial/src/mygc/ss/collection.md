@@ -110,6 +110,10 @@ Now that they've been added, you should import `MyGCCopyContext` and
 `MyGCProcessEdges` into `mygc/global.rs`, which we will be working in for the
 next few steps. 
 
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:imports_gc_work}}
+```
+
 In `create_worker_local()` in `impl Plan for MyGC`, create an instance of 
 `MyGCCopyContext`.
 
