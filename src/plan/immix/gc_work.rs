@@ -1,9 +1,8 @@
 use super::global::Immix;
 use crate::plan::PlanConstraints;
-use crate::policy::immix::ScanObjectsAndMarkLines;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
+use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::{Allocator, ImmixAllocator};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
@@ -13,10 +12,7 @@ use crate::{
     plan::CopyContext,
     util::opaque_pointer::{VMThread, VMWorkerThread},
 };
-use std::{
-    mem,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 /// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {
@@ -81,7 +77,7 @@ impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(super) enum TraceKind {
+pub(in crate::plan) enum TraceKind {
     Fast,
     Defrag,
 }
@@ -91,7 +87,6 @@ pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     // downcast for each traced object.
     plan: &'static Immix<VM>,
     base: ProcessEdgesBase<Self>,
-    mmtk: &'static MMTK<VM>,
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
@@ -128,20 +123,20 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
-        Self { plan, base, mmtk }
+        Self { plan, base }
     }
 
     #[cold]
     fn flush(&mut self) {
-        let mut new_nodes = vec![];
-        mem::swap(&mut new_nodes, &mut self.nodes);
-        let scan_objects_work =
-            ScanObjectsAndMarkLines::<Self>::new(new_nodes, false, &self.immix().immix_space);
-        if Self::SCAN_OBJECTS_IMMEDIATELY {
-            self.worker().do_work(scan_objects_work);
-        } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+        if self.nodes.is_empty() {
+            return;
         }
+        let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
+            self.pop_nodes(),
+            false,
+            &self.immix().immix_space,
+        );
+        self.new_scan_work(scan_objects_work);
     }
 
     /// Trace  and evacuate objects.

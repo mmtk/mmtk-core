@@ -15,6 +15,9 @@ use self::chunk::ChunkMap;
 
 use super::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC;
 
+/// The max object size for immix: half of a block
+pub const MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES >> 1;
+
 /// Mark/sweep memory for block-level only
 pub const BLOCK_ONLY: bool = false;
 
