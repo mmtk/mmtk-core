@@ -11,23 +11,10 @@ use downcast_rs::Downcast;
 use crate::{TransitiveClosure, policy::{marksweepspace::{
         block::{Block, BlockState},
         metadata::{is_marked, set_mark_bit, unset_mark_bit, ALLOC_SIDE_METADATA_SPEC},
-    }, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{
-        alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK},
-        constants::LOG_BYTES_IN_PAGE,
-        heap::{
+    }, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, constants::LOG_BYTES_IN_PAGE, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        },
-        metadata::{
-            self, compare_exchange_metadata, load_metadata,
-            side_metadata::{
-                SideMetadataContext, SideMetadataOffset, SideMetadataSpec,
-                LOCAL_SIDE_METADATA_BASE_ADDRESS,
-            },
-            store_metadata, MetadataSpec,
-        },
-        Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread,
-    }, vm::VMBinding};
+        }, metadata::{self, MetadataSpec, compare_exchange_metadata, load_metadata, side_metadata::{LOCAL_SIDE_METADATA_BASE_ADDRESS, SideMetadataContext, SideMetadataOffset, SideMetadataSanity, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
 use super::{
     super::space::{CommonSpace, Space, SFT},
@@ -70,7 +57,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        todo!()
+        true
     }
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
@@ -183,10 +170,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        // use crate::util::alloc::free_list_allocator::TRACING_OBJECT;
-        // if *TRACING_OBJECT.lock().unwrap() == address.as_usize() {
-        //     println!("marking tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        // }
+
         if !is_marked::<VM>(object, None) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             let block = Block::from(FreeListAllocator::<VM>::get_block(address));

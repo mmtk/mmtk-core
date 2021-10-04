@@ -20,6 +20,10 @@ lazy_static! {
     };
 }
 pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
+
+}
+
+pub fn flms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     let free_list_allocator = unsafe {
         mutator
             .allocators
@@ -34,10 +38,6 @@ pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWo
             .unwrap()
             .ms_space(),
     )
-}
-
-pub fn flms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // Do nothing
 }
 
 pub fn create_freelistmarksweep_mutator<VM: VMBinding>(
