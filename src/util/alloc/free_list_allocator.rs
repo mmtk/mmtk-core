@@ -32,9 +32,7 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-// lazy_static! {
-//     pub static ref TRACING_OBJECT: Mutex<usize> = Mutex::default();
-// }
+
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(1 * 4),
@@ -269,6 +267,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             // we've just had GC, which has made some blocks available
             return self.alloc_from_available(size);
         }
+<<<<<<< HEAD
+=======
+
+>>>>>>> eager sweeping
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
             // gc
@@ -672,6 +674,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
         // attempt from unswept blocks
         let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
+
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
@@ -692,6 +695,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // eprintln!("consumed blocks: {:?}", self.consumed_blocks[bin]);
 
         loop {
+            unreachable!();
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
             if block.is_zero() {
                 // reached end of unswept list
@@ -716,23 +720,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         // fresh block
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        if bin == 4 {
-            // eprintln!("space gives {}", block);
+        if block.is_zero() {
+            // GC, I guess
+            return block;
         }
-        if block.is_zero() {
-            self.print_blocklists();
-            // GC, I guess
-
-        let mut block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        if block.is_zero() {
-        eprintln!("before acquire c blocks: {:?}", self.consumed_blocks[10]);
-        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        if block.is_zero() {
-            // GC, I guess
-        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
-        if block.is_zero() {
-            // GC, I guess
-        // eprintln!("b > 0x{:0x}", block);
 
         // construct free list
         let block_end = block + BYTES_IN_BLOCK;
@@ -799,11 +790,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
-
-        // if *TRACING_OBJECT.lock().unwrap() == addr.as_usize() {
-        //     println!("freeing tracing object 0x{:0x}", *TRACING_OBJECT.lock().unwrap());
-        //     *TRACING_OBJECT.lock().unwrap() = 0;
-        // }
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
