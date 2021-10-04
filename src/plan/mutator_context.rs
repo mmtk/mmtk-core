@@ -94,11 +94,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     // Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.
     fn post_alloc(&mut self, refer: ObjectReference, _bytes: usize, allocator: AllocationType) {
-        let space =         unsafe {
-            self.allocators
-                .get_allocator_mut(self.config.allocator_mapping[allocator])
-        }
-        .get_space();
         unsafe {
             self.allocators
                 .get_allocator_mut(self.config.allocator_mapping[allocator])
