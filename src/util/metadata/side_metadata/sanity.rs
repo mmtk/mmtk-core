@@ -379,12 +379,13 @@ impl SideMetadataSanity {
 /// 1. Check if data_addr is within the address space that we are supposed to use (LOG_ADDRESS_SPACE). If this fails, we log a warning.
 /// 2. Check if metadata address is out of bounds. If this fails, we will panic.
 fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
-    let data_addr_in_address_space = if cfg!(target_pointer_width = "32") {
-        assert_eq!(LOG_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
-        true
-    } else {
-        data_addr <= unsafe { Address::from_usize(1usize << LOG_ADDRESS_SPACE) }
-    };
+    #[cfg(target_pointer_width = "32")]
+    assert_eq!(LOG_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
+    #[cfg(target_pointer_width = "32")]
+    let data_addr_in_address_space = true;
+    #[cfg(target_pointer_width = "64")]
+    let data_addr_in_address_space =
+        data_addr <= unsafe { Address::from_usize(1usize << LOG_ADDRESS_SPACE) };
 
     if !data_addr_in_address_space {
         warn!(
