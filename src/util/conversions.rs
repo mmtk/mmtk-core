@@ -89,6 +89,22 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
     pages
 }
 
+/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no friction.
+pub fn bytes_to_formatted_string(bytes: usize) -> String {
+    const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
+    let mut i = 0;
+    let mut num = bytes;
+    while i < UNITS.len() - 1 {
+        let new_num = num >> 10;
+        if new_num == 0 {
+            return format!("{}{}", num, UNITS[i]);
+        }
+        num = new_num;
+        i += 1;
+    }
+    return format!("{}PB", num);
+}
+
 #[cfg(test)]
 mod tests {
     use crate::util::conversions::*;
@@ -113,5 +129,19 @@ mod tests {
         assert_eq!(chunk_align_up(addr), unsafe {
             Address::from_usize(0x2380_0000)
         });
+    }
+
+    #[test]
+    fn test_bytes_to_formatted_string() {
+        assert_eq!(bytes_to_formatted_string(0), "0B");
+        assert_eq!(bytes_to_formatted_string(1023), "1023B");
+        assert_eq!(bytes_to_formatted_string(1024), "1KB");
+        assert_eq!(bytes_to_formatted_string(1025), "1KB");
+        assert_eq!(bytes_to_formatted_string(1 << 20), "1MB");
+        assert_eq!(bytes_to_formatted_string(1 << 30), "1GB");
+        assert_eq!(bytes_to_formatted_string(1 << 40), "1TB");
+        assert_eq!(bytes_to_formatted_string(1 << 50), "1PB");
+        assert_eq!(bytes_to_formatted_string(1 << 60), "1024PB");
+        assert_eq!(bytes_to_formatted_string(1 << 63), "8192PB");
     }
 }

@@ -49,6 +49,33 @@ impl SideMetadataSpec {
         debug_assert!(self.is_rel_offset());
         unsafe { self.offset.rel_offset }
     }
+
+    #[cfg(target_pointer_width = "64")]
+    pub const fn upper_bound(&self) -> SideMetadataOffset {
+        debug_assert!(self.is_absolute_offset());
+        SideMetadataOffset {
+            addr: unsafe { self.offset.addr }
+                .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+        }
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound(&self) -> SideMetadataOffset {
+        if self.is_absolute_offset() {
+            SideMetadataOffset {
+                addr: unsafe { self.offset.addr }
+                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+            }
+        } else {
+            SideMetadataOffset {
+                rel_offset: unsafe { self.offset.rel_offset }
+                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                        self.log_bytes_in_region,
+                        self.log_num_of_bits,
+                    ),
+            }
+        }
+    }
 }
 
 impl fmt::Debug for SideMetadataSpec {
@@ -79,8 +106,8 @@ impl fmt::Debug for SideMetadataSpec {
 // The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
 #[derive(Clone, Copy)]
 pub union SideMetadataOffset {
-    addr: Address,
-    rel_offset: usize,
+    pub addr: Address,
+    pub rel_offset: usize,
 }
 
 impl SideMetadataOffset {
@@ -95,31 +122,8 @@ impl SideMetadataOffset {
     }
 
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "64")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        debug_assert!(spec.is_absolute_offset());
-        SideMetadataOffset {
-            addr: unsafe { spec.offset.addr }
-                .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-        }
-    }
-    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "32")]
-    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        if spec.is_absolute_offset() {
-            SideMetadataOffset {
-                addr: unsafe { spec.offset.addr }
-                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-            }
-        } else {
-            SideMetadataOffset {
-                rel_offset: unsafe { spec.offset.rel_offset }
-                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                        spec.log_bytes_in_region,
-                        spec.log_num_of_bits,
-                    ),
-            }
-        }
+        spec.upper_bound()
     }
 }
 
