@@ -6,7 +6,7 @@ use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
 /** log_2 of the addressable virtual space */
 #[cfg(target_pointer_width = "64")]
-pub const LOG_ADDRESS_SPACE: usize = LOG_SPACE_SIZE_64 + LOG_MAX_SPACES;
+pub const LOG_ADDRESS_SPACE: usize = 47;
 #[cfg(target_pointer_width = "32")]
 pub const LOG_ADDRESS_SPACE: usize = 32;
 /**
