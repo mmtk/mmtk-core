@@ -139,9 +139,12 @@ mod tests {
         assert_eq!(bytes_to_formatted_string(1025), "1KB");
         assert_eq!(bytes_to_formatted_string(1 << 20), "1MB");
         assert_eq!(bytes_to_formatted_string(1 << 30), "1GB");
-        assert_eq!(bytes_to_formatted_string(1 << 40), "1TB");
-        assert_eq!(bytes_to_formatted_string(1 << 50), "1PB");
-        assert_eq!(bytes_to_formatted_string(1 << 60), "1024PB");
-        assert_eq!(bytes_to_formatted_string(1 << 63), "8192PB");
+        #[cfg(target_pointer_width = "64")]
+        {
+            assert_eq!(bytes_to_formatted_string(1 << 40), "1TB");
+            assert_eq!(bytes_to_formatted_string(1 << 50), "1PB");
+            assert_eq!(bytes_to_formatted_string(1 << 60), "1024PB");
+            assert_eq!(bytes_to_formatted_string(1 << 63), "8192PB");
+        }
     }
 }
