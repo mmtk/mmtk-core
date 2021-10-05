@@ -387,16 +387,21 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
     };
 
     if !data_addr_in_address_space {
-        warn!("We try get metadata {} for {}, which is not within the address space we should use", data_addr, spec.name);
+        warn!(
+            "We try get metadata {} for {}, which is not within the address space we should use",
+            data_addr, spec.name
+        );
     }
 
-    let metadata_addr = crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
+    let metadata_addr =
+        crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
     let metadata_addr_bound = if spec.is_absolute_offset() {
         unsafe { spec.upper_bound().addr }
     } else {
         #[cfg(target_pointer_width = "32")]
         {
-        crate::util::metadata::side_metadata::helpers_32::address_to_meta_chunk_addr(data_addr) + unsafe { spec.upper_bound().rel_offset }
+            crate::util::metadata::side_metadata::helpers_32::address_to_meta_chunk_addr(data_addr)
+                + unsafe { spec.upper_bound().rel_offset }
         }
         #[cfg(target_pointer_width = "64")]
         unreachable!()
