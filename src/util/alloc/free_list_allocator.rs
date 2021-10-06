@@ -139,6 +139,8 @@ impl BlockList {
     }
 }
 
+unsafe impl<VM: VMBinding> Send for FreeListAllocator<VM> {}
+
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
@@ -200,6 +202,14 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
+
+        let bin = FreeListAllocator::<VM>::mi_bin(size);
+        if bin == 4 {
+            // eprintln!("end of slow, bl = {}", self.available_blocks[4].first);
+        }
+        else {
+            // eprintln!("end of slow not 4, bl = {}",self.available_blocks[4].first)
+        }
 
         free_list
     }
@@ -382,24 +392,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             None,
         );
     }
-    
-    #[inline]
-    pub fn cas_thread_free_list(
-        &self,
-        block: Address,
-        old_thread_free: Address,
-        new_thread_free: Address,
-    ) -> bool {
-        compare_exchange_metadata::<VM>(
-            &MetadataSpec::OnSide(self.space.get_thread_free_metadata_spec()),
-            unsafe { block.to_object_reference() },
-            old_thread_free.as_usize(),
-            new_thread_free.as_usize(),
-            None,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        )
-    }
 
     fn pop_from_block_list(block_list: &mut BlockList) -> Address {
         let rtn = block_list.first;
@@ -500,7 +492,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         #[cfg(feature = "lazy_sweeping")]
         loop {
-            unreachable!();
             let block = FreeListAllocator::<VM>::pop_from_block_list(self.unswept_blocks.get_mut(bin).unwrap());
             if block.is_zero() {
                 // reached end of unswept list
