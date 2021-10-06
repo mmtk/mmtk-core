@@ -1,7 +1,7 @@
 use super::chunk::Chunk;
 use super::defrag::Histogram;
 use super::line::Line;
-use super::{ImmixSpace, IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET};
+use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
@@ -82,25 +82,10 @@ impl Block {
     pub const LINES: usize = 1 << Self::LOG_LINES;
 
     /// Block defrag state table (side)
-    pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: if super::BLOCK_ONLY {
-            // If BLOCK_ONLY is set, we do not use any line marktables.
-            IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET
-        } else {
-            SideMetadataOffset::layout_after(&Line::MARK_TABLE)
-        },
-        log_num_of_bits: 3,
-        log_bytes_in_region: Self::LOG_BYTES,
-    };
+    pub const DEFRAG_STATE_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEFRAG;
 
     /// Block mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Self::DEFRAG_STATE_TABLE),
-        log_num_of_bits: 3,
-        log_bytes_in_region: Self::LOG_BYTES,
-    };
+    pub const MARK_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
 
     /// Align the address to a block boundary.
     pub const fn align(address: Address) -> Address {
