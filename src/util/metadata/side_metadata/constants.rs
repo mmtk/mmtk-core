@@ -14,7 +14,7 @@ use super::metadata_address_range_size;
 // as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system
 // reserved addresses such as 0x0.
 // XXXX: I updated the base address for 32 bit to 0x1000_0000. For what I tested on, the library
-// and the malloc heap often starts at 0x800_0000. If we start the metadata from the second 4Mb chunk,
+// and the malloc heap often starts at 0x800_0000. If we start the metadata from the second 4Mb chunk (i.e. the chunk `[0x40_0000, 0x80_0000)`),
 // we won't be guaranteed enough space before 0x800_0000. For example, the alloc bit is 1 bit per 4 bytes
 // (1 word in 32bits), and it will take the address range of [0x40_000, 0x840_0000) which clashes with
 // the library/heap. So I move this to 0x1000_0000.

@@ -71,7 +71,7 @@
 //!
 //! In this case, a schematic of the local and global side metadata looks like:
 //!
-//!     _______________________________ <= global-1 = GLOBAL_SIDE_METADATA_BASE_ADDRESS(e.g. 0x0)
+//!     _______________________________ <= global-1 = GLOBAL_SIDE_METADATA_BASE_ADDRESS(e.g. 0x1000_0000)
 //!     |                             |
 //!     |        Global-1             |
 //!     |_____________________________| <= global-2 = global-1 +
