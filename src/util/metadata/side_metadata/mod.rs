@@ -6,6 +6,7 @@ mod helpers_32;
 mod global;
 mod sanity;
 mod side_metadata_tests;
+mod spec_defs;
 
 pub use constants::*;
 pub use global::*;
