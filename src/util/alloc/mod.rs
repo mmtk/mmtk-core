@@ -15,11 +15,8 @@ pub use allocators::AllocatorSelector;
 
 /// Bump pointer allocator
 mod bumpallocator;
-pub mod dump_linear_scan;
-pub mod linear_scan;
-pub mod mimalloc;
+pub use bumpallocator::BumpAllocator;
 
-/// Large object allocator
 mod large_object_allocator;
 pub use large_object_allocator::LargeObjectAllocator;
 
