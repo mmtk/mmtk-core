@@ -280,7 +280,6 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
             let mut guard = self.sync.lock().unwrap();
             let cursor = _start.align_up(crate::util::constants::BYTES_IN_PAGE);
             let chunk = chunk_align_down(_start);
-            guard.current_chunk = chunk;
             let start = match guard.conditional {
                 MonotonePageResourceConditional::Contiguous { start: _start, .. } => _start,
                 _ => unreachable!(),
@@ -296,6 +295,8 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 "cursor: {} current_chunk: {}, pages: {}",
                 cursor, chunk, pages
             );
+            guard.current_chunk = chunk;
+            guard.cursor = cursor;
             println!("##################################");
         } else {
             unimplemented!();
