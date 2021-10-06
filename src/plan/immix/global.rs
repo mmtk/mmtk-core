@@ -65,7 +65,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext::new(mmtk);
+        let mut c = ImmixCopyContext::<VM>::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
