@@ -8,7 +8,8 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
-pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT;
+pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT;
 
 pub const ALLOC_SIDE_METADATA_ADDR: Address = ALLOC_SIDE_METADATA_SPEC.get_absolute_offset();
 

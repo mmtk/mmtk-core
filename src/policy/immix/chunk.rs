@@ -134,7 +134,8 @@ pub struct ChunkMap {
 
 impl ChunkMap {
     /// Chunk alloc table
-    pub const ALLOC_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_CHUNK_MARK;
+    pub const ALLOC_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_CHUNK_MARK;
 
     pub fn new() -> Self {
         Self {

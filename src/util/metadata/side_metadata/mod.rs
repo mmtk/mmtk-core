@@ -3,10 +3,10 @@ mod helpers;
 #[cfg(target_pointer_width = "32")]
 mod helpers_32;
 
-pub(crate) mod spec_defs;
 mod global;
 mod sanity;
 mod side_metadata_tests;
+pub(crate) mod spec_defs;
 
 pub use constants::*;
 pub use global::*;

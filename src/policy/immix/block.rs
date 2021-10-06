@@ -82,10 +82,12 @@ impl Block {
     pub const LINES: usize = 1 << Self::LOG_LINES;
 
     /// Block defrag state table (side)
-    pub const DEFRAG_STATE_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEFRAG;
+    pub const DEFRAG_STATE_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_DEFRAG;
 
     /// Block mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
+    pub const MARK_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
 
     /// Align the address to a block boundary.
     pub const fn align(address: Address) -> Address {

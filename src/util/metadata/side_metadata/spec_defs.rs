@@ -1,10 +1,28 @@
-use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::constants::{GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET};
-use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::metadata::side_metadata::constants::{
+    GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,
+};
+use crate::util::metadata::side_metadata::SideMetadataOffset;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 
+// This macro helps define side metadata specs, and layout their offsets one after another.
+// The macro is implemented with the incremental TT muncher pattern (see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html).
+// This should only be used twice within mmtk-core: one for global specs, and one for local specs.
+// This should not be used to layout VM specs (we have provided side_first()/side_after() for the VM side metadata specs).
 macro_rules! define_side_metadata_specs {
+    // Internal patterns
+
+    // Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET
+    (@first_spec $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr)) => {
+        pub const $name: SideMetadataSpec = SideMetadataSpec {
+            is_global: $is_global,
+            offset: if $is_global { GLOBAL_SIDE_METADATA_BASE_OFFSET } else { LOCAL_SIDE_METADATA_BASE_OFFSET },
+            log_num_of_bits: $log_num_of_bits,
+            log_bytes_in_region: $log_bytes_in_region,
+        };
+    };
+    // Define any spec that follows a previous spec. The new spec will be created and laid out after the previous spec.
     (@prev_spec $last_spec: ident as $last_spec_ident: ident, $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr), $($tail:tt)*) => {
         pub const $name: SideMetadataSpec = SideMetadataSpec {
             is_global: $is_global,
@@ -14,19 +32,18 @@ macro_rules! define_side_metadata_specs {
         };
         define_side_metadata_specs!(@prev_spec $name as $last_spec_ident, $($tail)*);
     };
+    // Define the last spec with the given identifier.
     (@prev_spec $last_spec: ident as $last_spec_ident: ident,) => {
         pub const $last_spec_ident: SideMetadataSpec = $last_spec;
     };
-    (@first_spec $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr)) => {
-        pub const $name: SideMetadataSpec = SideMetadataSpec {
-            is_global: $is_global,
-            offset: if $is_global { GLOBAL_SIDE_METADATA_BASE_OFFSET } else { LOCAL_SIDE_METADATA_BASE_OFFSET },
-            log_num_of_bits: $log_num_of_bits,
-            log_bytes_in_region: $log_bytes_in_region,
-        };
-    };
+
+    // The actual macro
+
+    // This is the pattern that should be used outside this macro.
     (last_spec_as $last_spec_ident: ident, $name0: ident = (global: $is_global0: expr, log_num_of_bits: $log_num_of_bits0: expr, log_bytes_in_region: $log_bytes_in_region0: expr), $($tail:tt)*) => {
+        // Defines the first spec
         define_side_metadata_specs!(@first_spec $name0 = (global: $is_global0, log_num_of_bits: $log_num_of_bits0, log_bytes_in_region: $log_bytes_in_region0));
+        // The rest specs
         define_side_metadata_specs!(@prev_spec $name0 as $last_spec_ident, $($tail)*);
     };
 }
@@ -49,8 +66,9 @@ define_side_metadata_specs!(
     IX_LINE_MARK    = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::line::Line::LOG_BYTES),
     // Record defrag state for immix blocks
     IX_BLOCK_DEFRAG = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
-    // Mark blocks by immix;
+    // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
+    // Mark chunks by immix
     IX_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::chunk::Chunk::LOG_BYTES),
 );
 
@@ -161,6 +179,5 @@ mod tests {
         assert_eq!(TEST_LSPEC2.log_bytes_in_region, 6);
 
         assert_eq!(TEST_LSPEC2, LAST_LOCAL_SPEC);
-
     }
 }

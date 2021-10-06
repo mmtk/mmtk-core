@@ -1,4 +1,5 @@
 use crate::util::alloc_bit;
+use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
@@ -8,7 +9,6 @@ use crate::util::metadata::side_metadata::LOG_MAX_GLOBAL_SIDE_METADATA_SIZE;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::conversions;
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -38,7 +38,8 @@ lazy_static! {
 /// This is a global side metadata spec even though it is used only by MallocSpace as
 /// we require its space to be contiguous and mapped only once. Otherwise we risk
 /// overwriting the previous mapping.
-pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK;
+pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK;
 
 /// Metadata spec for the active page byte
 ///
@@ -50,7 +51,8 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = crate::util::met
 /// the same time
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
-pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
+pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
 /// we will go through all the chunks for [address, address + size), and check if they are mapped.

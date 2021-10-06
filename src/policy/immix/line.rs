@@ -22,7 +22,8 @@ impl Line {
     pub const MAX_MARK_STATE: u8 = 127;
 
     /// Line mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = crate::util::metadata::side_metadata::spec_defs::IX_LINE_MARK;
+    pub const MARK_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_LINE_MARK;
 
     /// Align the give address to the line boundary.
     #[inline(always)]
