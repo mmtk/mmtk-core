@@ -18,7 +18,8 @@ import re
 search = re.search("enum PlanSelector \{([^\}]*)\}", options)
 if search:
     raw_plans = search.group(1)
-    PLANS = [x.strip() for x in raw_plans.split(",")]
+    # Python split() results in an empty string as the last element. Use filter() to remove it.
+    PLANS = list(filter(None, [x.strip() for x in raw_plans.split(",")]))
 else:
     print("cannot find PlanSelector in options.rs")
     sys.exit(1)
@@ -31,7 +32,7 @@ if len(sys.argv) > 1:
 
 
 def exec_and_redirect(args, env=None):
-    print("[exec_and_redirect] {}".format(args))
+    print("[exec_and_redirect] {} (env = {})".format(args, env))
     p = subprocess.Popen(args,
                          env=env)
     p.wait()
