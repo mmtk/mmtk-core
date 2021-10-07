@@ -24,6 +24,7 @@ impl Line {
 
     /// Line mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        name: "ImmixLineMark",
         is_global: false,
         offset: IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
