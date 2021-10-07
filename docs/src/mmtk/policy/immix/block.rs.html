@@ -382,6 +382,8 @@
 <span id="382">382</span>
 <span id="383">383</span>
 <span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::chunk::Chunk</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
@@ -467,6 +469,7 @@
 
     <span class="doccomment">/// Block defrag state table (side)</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFRAG_STATE_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+        <span class="ident">name</span>: <span class="string">&quot;ImmixBlockDefragState&quot;</span>,
         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
         <span class="ident">offset</span>: <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
             <span class="comment">// If BLOCK_ONLY is set, we do not use any line marktables.</span>
@@ -480,6 +483,7 @@
 
     <span class="doccomment">/// Block mark table (side)</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+        <span class="ident">name</span>: <span class="string">&quot;ImmixBlockMark&quot;</span>,
         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>),
         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,

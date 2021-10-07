@@ -508,6 +508,21 @@
 <span id="508">508</span>
 <span id="509">509</span>
 <span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
 </pre><pre class="rust"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -523,6 +538,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_address_to_meta_address</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;gspec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -530,6 +546,7 @@
         };
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -538,6 +555,7 @@
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -635,6 +653,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_mask</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;test_spec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -654,6 +673,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_side_metadata_meta_byte_lshift</span>() {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;test_spec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -701,6 +721,7 @@
                     <span class="comment">// We need to do this because of the static NO_METADATA</span>
                     <span class="comment">// sanity::reset();</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;gspec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
@@ -708,6 +729,7 @@
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
@@ -715,6 +737,7 @@
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
@@ -815,6 +838,7 @@
                     <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_START</span>;
 
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
@@ -822,6 +846,7 @@
                     };
 
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
@@ -887,6 +912,7 @@
                         <span class="op">+</span> (<span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>);
 
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">true</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
@@ -941,6 +967,7 @@
 
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
@@ -948,6 +975,7 @@
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
@@ -956,6 +984,7 @@
 
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_1_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_1_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">4</span>,
@@ -963,6 +992,7 @@
                     };
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
                     <span class="kw">let</span> <span class="ident">metadata_2_spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+                        <span class="ident">name</span>: <span class="string">&quot;metadata_2_spec&quot;</span>,
                         <span class="ident">is_global</span>: <span class="bool-val">false</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,

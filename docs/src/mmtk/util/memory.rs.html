@@ -306,6 +306,21 @@
 <span id="306">306</span>
 <span id="307">307</span>
 <span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">Collection</span>, <span class="ident">VMBinding</span>};
@@ -458,6 +473,21 @@
     } <span class="kw">else</span> {
         <span class="prelude-val">Err</span>(<span class="ident">std::io::Error::last_os_error</span>())
     }
+}
+
+<span class="doccomment">/// Get the memory maps for the process. The returned string is a multi-line string.</span>
+<span class="doccomment">/// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.</span>
+<span class="doccomment">/// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_process_memory_maps</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+    <span class="comment">// print map</span>
+    <span class="kw">use</span> <span class="ident">std::fs::File</span>;
+    <span class="kw">use</span> <span class="ident">std::io::Read</span>;
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">String::new</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File::open</span>(<span class="string">&quot;/proc/self/maps&quot;</span>).<span class="ident">unwrap</span>();
+    <span class="ident">f</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>).<span class="ident">unwrap</span>();
+    <span class="ident">data</span>
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>

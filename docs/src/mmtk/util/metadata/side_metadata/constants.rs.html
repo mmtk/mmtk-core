@@ -122,6 +122,10 @@
 <span id="122">122</span>
 <span id="123">123</span>
 <span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
@@ -137,10 +141,14 @@
 <span class="comment">// XXX: We updated the base address to start from the second 4Mb chunk for 32-bit architectures,</span>
 <span class="comment">// as otherwise for side metadatas with a large `min_obj_size`, we were overlapping with system</span>
 <span class="comment">// reserved addresses such as 0x0.</span>
-<span class="comment">// public, VM bingdings may need to use this</span>
+<span class="comment">// XXXX: I updated the base address for 32 bit to 0x1000_0000. For what I tested on, the library</span>
+<span class="comment">// and the malloc heap often starts at 0x800_0000. If we start the metadata from the second 4Mb chunk (i.e. the chunk `[0x40_0000, 0x80_0000)`),</span>
+<span class="comment">// we won&#39;t be guaranteed enough space before 0x800_0000. For example, the alloc bit is 1 bit per 4 bytes</span>
+<span class="comment">// (1 word in 32bits), and it will take the address range of [0x40_000, 0x840_0000) which clashes with</span>
+<span class="comment">// the library/heap. So I move this to 0x1000_0000.</span>
+<span class="comment">// This is made public, as VM bingdings may need to use this.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
-    <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">BYTES_IN_CHUNK</span>) };
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x1000_0000</span>) };
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
     <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0600_0000_0000usize</span>) };

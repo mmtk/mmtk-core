@@ -908,6 +908,10 @@
 <span id="908">908</span>
 <span id="909">909</span>
 <span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
@@ -927,6 +931,7 @@
 <span class="doccomment">/// For performance reasons, objects of this struct should be constants.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SideMetadataSpec</span> {
+    <span class="kw">pub</span> <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
     <span class="kw">pub</span> <span class="ident">is_global</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">offset</span>: <span class="ident">SideMetadataOffset</span>,
     <span class="doccomment">/// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.</span>
@@ -1779,6 +1784,7 @@
     <span class="kw">fn</span> <span class="ident">calculate_reserved_pages_one_spec</span>() {
         <span class="comment">// 1 bit per 8 bytes - 1:64</span>
         <span class="kw">let</span> <span class="ident">spec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;test_spec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -1799,6 +1805,7 @@
     <span class="kw">fn</span> <span class="ident">calculate_reserved_pages_multi_specs</span>() {
         <span class="comment">// 1 bit per 8 bytes - 1:64</span>
         <span class="kw">let</span> <span class="ident">gspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;gspec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
@@ -1806,6 +1813,7 @@
         };
         <span class="comment">// 2 bits per page - 2 / (4k * 8) = 1:16k</span>
         <span class="kw">let</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
+            <span class="ident">name</span>: <span class="string">&quot;lspec&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
