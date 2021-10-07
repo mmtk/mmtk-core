@@ -1,6 +1,4 @@
-use super::gc_work::CalcFwdAddr;
-use super::gc_work::ForwardingProcessEdges;
-use super::gc_work::MarkingProcessEdges;
+use super::gc_work::{CalcFwdAddr, Compact, ForwardingProcessEdges, MarkingProcessEdges};
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
@@ -29,7 +27,7 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
-pub const ALLOC_MARKCOMPACT: AllocationSemantics = AllocationSemantics::Default; // Add
+// pub const ALLOC_MARKCOMPACT: AllocationSemantics = AllocationSemantics::Default; // Add
 
 pub struct MarkCompact<VM: VMBinding> {
     pub mc_space: MarkCompactSpace<VM>,
@@ -40,6 +38,7 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 1,
+    gc_extra_header_words: 1,
     num_specialized_scans: 2,
     ..PlanConstraints::default()
 };
@@ -107,15 +106,15 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
 
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
+        scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalcFwdAddr::<VM>::new(&self.mc_space));
+        // do another trace to update references
         scheduler.work_buckets[WorkBucketStage::RefForwarding]
             .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::RefForwarding]
             .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
 
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(super::gc_work::Info::<VM>::new(&self.mc_space));
+        scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));
 

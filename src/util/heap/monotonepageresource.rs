@@ -286,18 +286,18 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
             };
             let pages = bytes_to_pages(_start - start);
             self.common.accounting.reserve_and_commit(pages);
-            println!("########## reset cursor ##########");
-            println!(
-                "cursor: {} origianl chunk: {} original start: {}",
-                guard.cursor, guard.current_chunk, start,
-            );
-            println!(
-                "cursor: {} current_chunk: {}, pages: {}",
-                cursor, chunk, pages
-            );
+            // println!("########## reset cursor ##########");
+            // println!(
+            //     "cursor: {} origianl chunk: {} original start: {}",
+            //     guard.cursor, guard.current_chunk, start,
+            // );
+            // println!(
+            //     "cursor: {} current_chunk: {}, pages: {}",
+            //     cursor, chunk, pages
+            // );
             guard.current_chunk = chunk;
             guard.cursor = cursor;
-            println!("##################################");
+            // println!("##################################");
         } else {
             unimplemented!();
         }

@@ -61,7 +61,7 @@ pub fn markcompact_mutator_release<VM: VMBinding>(
     _mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
 ) {
-    // reset the allocation bump pointer
+    // reset the thread-local allocation bump pointer
     let bump_allocator = unsafe {
         _mutator
             .allocators

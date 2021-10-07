@@ -1,26 +1,27 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
-use crate::util::alloc::allocator;
-use crate::util::constants::MIN_OBJECT_SIZE;
+use crate::plan::MARKCOMPACT_CONSTRAINTS;
+use crate::util::constants::{BYTES_IN_WORD, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, object_forwarding, Address, ObjectReference};
-use crate::{vm::*, AllocationSemantics, CopyContext, TransitiveClosure};
+use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
-use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+// use std::collections::{HashMap, HashSet};
+// use std::sync::Mutex;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    // pr: FreeListPageResource<VM>,
     pr: MonotonePageResource<VM>,
-    forwarding_pointers: Mutex<HashMap<Address, Address>>,
-    refs: Mutex<HashSet<ObjectReference>>,
+    // forwarding_pointers: Mutex<HashMap<Address, Address>>,
+    // refs: Mutex<HashSet<ObjectReference>>,
 }
 
 const GC_MARK_BIT_MASK: usize = 1;
+
+const GC_EXTRA_HEADER_SIZE: usize = MARKCOMPACT_CONSTRAINTS.gc_extra_header_words * BYTES_IN_WORD;
 
 impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     fn name(&self) -> &str {
@@ -37,8 +38,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        // MarkCompactSpace::<VM>::test_mark_bit(object)
-        self.refs.lock().unwrap().contains(&object) && alloc_bit::is_alloced(object)
+        alloc_bit::is_alloced(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -78,7 +78,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
-        // self.pr.release_pages(_start);
+        panic!("markcompactspace only releases pages enmasse")
     }
 }
 
@@ -93,11 +93,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
-        let local_specs = extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-            *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        ]);
+        let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -117,31 +113,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
         MarkCompactSpace {
             pr: if vmrequest.is_discontiguous() {
-                // FreeListPageResource::new_discontiguous(0, vm_map)
                 MonotonePageResource::new_discontiguous(0, vm_map)
             } else {
-                // FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
                 MonotonePageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            forwarding_pointers: Mutex::new(HashMap::new()),
-            refs: Mutex::new(HashSet::new()),
+            // forwarding_pointers: Mutex::new(HashMap::new()),
+            // refs: Mutex::new(HashSet::new()),
         }
     }
 
     pub fn prepare(&self) {}
 
     pub fn release(&self) {}
-
-    // pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
-    //     &self,
-    //     trace: &mut T,
-    //     object: ObjectReference,
-    //     semantics: AllocationSemantics,
-    //     copy_context: &mut C,
-    // ) -> ObjectReference {
-    //     panic!("not implemented since mark compact needs a two phase trace.")
-    // }
 
     pub fn trace_mark_object<T: TransitiveClosure>(
         &self,
@@ -170,15 +154,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
             trace.process_node(object);
         }
-        let new_object = *self
-            .forwarding_pointers
-            .lock()
-            .unwrap()
-            .get(&object.to_address())
-            .unwrap();
-
-        // object
-        unsafe { new_object.to_object_reference() }
+        // let new_object = *self
+        //     .forwarding_pointers
+        //     .lock()
+        //     .unwrap()
+        //     .get(&object.to_address())
+        //     .unwrap();
+        let forwarding_pointer =
+            unsafe { (object.to_address() - GC_EXTRA_HEADER_SIZE).load::<Address>() };
+        // debug_assert!(
+        //     new_object == forwarding_pointer,
+        //     "extra header mechanism not working properly"
+        // );
+        unsafe { (forwarding_pointer + GC_EXTRA_HEADER_SIZE).to_object_reference() }
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -236,15 +224,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         true
     }
 
-    pub fn test_mark_bit(object: ObjectReference) -> bool {
-        load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-            object,
-            None,
-            Some(Ordering::SeqCst),
-        ) == 1
-    }
-
     pub fn to_be_compacted(object: ObjectReference) -> bool {
         let old_value = load_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
@@ -256,28 +235,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         mark_bit != 0
     }
 
-    pub fn info(&self) {
-        self.compact();
-    }
-
     pub fn calcluate_forwarding_pointer(&self) {
-        println!("##############calculate forwarding pointer start##############");
         let mut from = self.common.start;
         let mut to = self.common.start;
         let end = self.pr.cursor();
-        println!("end is {}, common.end is {:#x?}", end, self.common.extent);
         while from < end {
             if alloc_bit::is_alloced_object(from) {
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj);
+                let size = VM::VMObjectModel::get_current_size(obj) + GC_EXTRA_HEADER_SIZE;
 
                 if Self::to_be_compacted(obj) {
-                    to = allocator::align_allocation_no_fill::<VM>(to, 8, 0);
-                    self.forwarding_pointers.lock().unwrap().insert(from, to);
-                    self.refs
-                        .lock()
-                        .unwrap()
-                        .insert(unsafe { to.to_object_reference() });
+                    // to = allocator::align_allocation_no_fill::<VM>(to, 8, 0);
+                    let extra_header_addr = from - GC_EXTRA_HEADER_SIZE;
+                    unsafe { extra_header_addr.store(to) }
                     to += size;
                 }
                 from += size;
@@ -285,32 +255,29 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 from += MIN_OBJECT_SIZE
             }
         }
-        println!("###############calculate forwarding pointer end###############");
     }
 
     pub fn compact(&self) {
         let mut from = self.common.start;
         let end = self.pr.cursor();
         let mut to = Address::ZERO;
-        // println!("##########clear all alloc bit##########");
-        // crate::util::alloc_bit::bzero_alloc_bit(
-        //     self.common.start,
-        //     unsafe { self.pr.get_current_chunk() }
-        //         + crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK
-        //         - self.common.start,
-        // );
-        // println!("#######################################");
         while from < end {
             if alloc_bit::is_alloced_object(from) {
                 // clear the alloc bit
                 alloc_bit::unset_addr_alloc_bit(from);
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj);
+                let size = VM::VMObjectModel::get_current_size(obj) + GC_EXTRA_HEADER_SIZE;
 
-                if let Some(target_address) = self.forwarding_pointers.lock().unwrap().get(&from) {
-                    to = *target_address;
-                    let target = unsafe { target_address.to_object_reference() };
-                    // println!("target: {}, size: {}", target, size);
+                let extra_header_addr = from - crate::util::constants::BYTES_IN_WORD;
+                let forwarding_pointer = unsafe { extra_header_addr.load::<Address>() };
+                if forwarding_pointer != Address::ZERO {
+                    to = forwarding_pointer;
+                    let forwarding_pointer = unsafe { extra_header_addr.load::<Address>() };
+                    let object_addr = forwarding_pointer + GC_EXTRA_HEADER_SIZE;
+                    // clear forwarding pointer
+                    unsafe { extra_header_addr.store(0) }
+
+                    let target = unsafe { object_addr.to_object_reference() };
                     // copy obj to target
                     let dst = target.to_address();
                     // Copy
@@ -322,7 +289,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     alloc_bit::set_alloc_bit(target);
                     to += size
                 }
-
                 // VM::VMObjectModel::dump_object(obj);
                 from += size;
             } else {
@@ -330,10 +296,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             }
         }
         // reset the bump pointer and clear forwarding_pointers map
-        // self.pr.cursor = to
-        // release_pages(to)
-        // current_chunk = chunk_align_down(to)
         self.pr.reset_cursor(to);
-        self.forwarding_pointers.lock().unwrap().clear();
     }
 }

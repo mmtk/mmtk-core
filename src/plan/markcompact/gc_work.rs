@@ -17,7 +17,6 @@ pub struct CalcFwdAddr<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for CalcFwdAddr<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        // calcluate the forwarding pointer
         self.mc_space.calcluate_forwarding_pointer();
     }
 }
@@ -28,19 +27,18 @@ impl<VM: VMBinding> CalcFwdAddr<VM> {
     }
 }
 
-pub struct Info<VM: VMBinding> {
+pub struct Compact<VM: VMBinding> {
     mc_space: &'static MarkCompactSpace<VM>,
 }
 
-impl<VM: VMBinding> GCWork<VM> for Info<VM> {
+impl<VM: VMBinding> GCWork<VM> for Compact<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        // calcluate the forwarding pointer
-        self.mc_space.info();
+        self.mc_space.compact();
     }
 }
 
-impl<VM: VMBinding> Info<VM> {
+impl<VM: VMBinding> Compact<VM> {
     pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
         Self { mc_space }
     }

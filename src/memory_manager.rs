@@ -129,7 +129,14 @@ pub fn alloc<VM: VMBinding>(
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
-    mutator.alloc(size, align, offset, semantics)
+    let gc_extra_header_words = mutator.plan.constraints().gc_extra_header_words;
+    let extra_header = std::cmp::max(
+        gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
+        align,
+    );
+    // mutator.alloc(size, align, offset, semantics)
+    let rtn = mutator.alloc(size + extra_header, align, offset, semantics);
+    rtn + extra_header
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are
