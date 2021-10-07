@@ -55,18 +55,14 @@ jobs:
             uses: actions/checkout@v2
             with:
               repository: mmtk/ci-perf-kit
-              token: ${{ secrets.GITHUB_TOKEN }}
-              ref: "0.6.5"
+              token: ${{ secrets.CI_ACCESS_TOKEN }}
+              ref: "0.7-test"
               path: ci-perf-kit
               submodules: true
           # setup
           # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
           - name: Setup Rust Toolchain
             run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-          - name: Setup
-            run: |
-              mkdir -p ci-perf-kit/running/benchmarks/dacapo
-              cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
           # run compare
           - uses: hasura/comment-progress@v2.1.0
             with:
@@ -89,7 +85,7 @@ jobs:
           - uses: actions/upload-artifact@v2
             with:
               name: jikesrvm-log
-              path: ci-perf-kit/running/results/log
+              path: ci-perf-kit/logs-ng
           - uses: actions/upload-artifact@v2
             with:
               name: jikesrvm-compare-report.md
@@ -109,7 +105,7 @@ jobs:
           - name: Clean up logs and reports
             if: always()
             run: |
-              rm -rf ci-perf-kit/running/results/log/*
+              rm -rf ci-perf-kit/logs-ng
               rm jikesrvm-compare-report.md
 
     openjdk-perf-compare:
@@ -159,18 +155,14 @@ jobs:
               uses: actions/checkout@v2
               with:
                 repository: mmtk/ci-perf-kit
-                token: ${{ secrets.GITHUB_TOKEN }}
-                ref: "0.6.5"
+                token: ${{ secrets.CI_ACCESS_TOKEN }}
+                ref: "0.7-test"
                 path: ci-perf-kit
                 submodules: true
             # setup
             # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
             - name: Setup Rust Toolchain
               run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
-            - name: Setup
-              run: |
-                mkdir -p ci-perf-kit/running/benchmarks/dacapo
-                cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo/
             # run compare
             - uses: hasura/comment-progress@v2.1.0
               with:
@@ -193,7 +185,7 @@ jobs:
             - uses: actions/upload-artifact@v2
               with:
                 name: openjdk-log
-                path: ci-perf-kit/running/results/log
+                path: ci-perf-kit/logs-ng
             - uses: actions/upload-artifact@v2
               with:
                 name: openjdk-compare-report.md
@@ -212,5 +204,5 @@ jobs:
             - name: Clean up logs and reports
               if: always()
               run: |
-                rm -rf ci-perf-kit/running/results/log/*
+                rm -rf ci-perf-kit/logs-ng
                 rm openjdk-compare-report.md
