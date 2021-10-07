@@ -46,7 +46,6 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(object);
     }
 
@@ -135,7 +134,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         trace!("trace_mark_object");
         if MarkCompactSpace::<VM>::test_and_mark(object) {
             trace!("mark is done for the current object");
-            #[cfg(feature = "global_alloc_bit")]
             debug_assert!(
                 crate::util::alloc_bit::is_alloced(object),
                 "{:x}: alloc bit not set",
