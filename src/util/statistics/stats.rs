@@ -219,10 +219,8 @@ impl Stats {
                     let task_clock = self.task_clock.lock().unwrap();
                     print!(
                         "\t{:.2}\t{:.2}",
-                        c.get_total(Some(true)) as f64
-                            / task_clock.get_total(Some(true)) as f64,
-                        c.get_total(Some(false)) as f64
-                            / task_clock.get_total(Some(false)) as f64
+                        c.get_total(Some(true)) as f64 / task_clock.get_total(Some(true)) as f64,
+                        c.get_total(Some(false)) as f64 / task_clock.get_total(Some(false)) as f64
                     )
                 }
             }
