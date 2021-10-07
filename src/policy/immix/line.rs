@@ -28,7 +28,7 @@ impl Line {
         is_global: false,
         offset: IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
-        log_min_obj_size: Self::LOG_BYTES,
+        log_bytes_in_region: Self::LOG_BYTES,
     };
 
     /// Align the give address to the line boundary.
