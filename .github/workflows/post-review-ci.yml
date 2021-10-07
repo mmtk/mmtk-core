@@ -1,4 +1,4 @@
-name: Post Code Review Checks
+name: Binding Tests
 
 on:
   pull_request:
