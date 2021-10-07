@@ -100,14 +100,14 @@ impl Counter for EventCounter {
         }
     }
 
-    fn print_total(&self, mutator: Option<bool>) {
+    fn get_total(&self, mutator: Option<bool>) -> u64 {
         match mutator {
             None => {
                 let mut total = 0;
                 for p in 0..=self.stats.get_phase() {
                     total += self.count[p];
                 }
-                self.print_value(total);
+                total
             }
             Some(m) => {
                 let mut total = 0;
@@ -116,9 +116,13 @@ impl Counter for EventCounter {
                     total += self.count[p];
                     p += 2;
                 }
-                self.print_value(total);
+                total
             }
-        };
+        }
+    }
+
+    fn print_total(&self, mutator: Option<bool>) {
+        self.print_value(self.get_total(mutator));
     }
 
     fn print_min(&self, mutator: bool) {

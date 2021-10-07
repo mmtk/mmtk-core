@@ -17,6 +17,7 @@ pub trait Counter {
     fn stop(&mut self);
     fn phase_change(&mut self, old_phase: usize);
     fn print_count(&self, phase: usize);
+    fn get_total(&self, mutator: Option<bool>) -> u64;
     fn print_total(&self, mutator: Option<bool>);
     fn print_min(&self, mutator: bool);
     fn print_max(&self, mutator: bool);
@@ -30,6 +31,8 @@ pub trait Counter {
 /// clock), or stateful (e.g. holds reference to a perf event fd)
 pub trait Diffable {
     type Val;
+    fn start(&mut self);
+    fn stop(&mut self);
     fn current_value(&mut self) -> Self::Val;
     fn diff(current: &Self::Val, earlier: &Self::Val) -> u64;
     fn print_diff(val: u64);
@@ -39,6 +42,12 @@ pub struct MonotoneNanoTime;
 
 impl Diffable for MonotoneNanoTime {
     type Val = Instant;
+
+    /// nop for the wall-clock time
+    fn start(&mut self) {}
+
+    /// nop for the wall-clock time
+    fn stop(&mut self) {}
 
     fn current_value(&mut self) -> Instant {
         Instant::now()

@@ -45,6 +45,8 @@ pub struct Stats {
     // Initialization of libpfm4 is required before we can use `PerfEvent` types
     #[cfg(feature = "perf_counter")]
     perfmon: Perfmon,
+    #[cfg(feature = "perf_counter")]
+    task_clock: Arc<Mutex<LongCounter<PerfEventDiffable>>>,
 
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
@@ -74,6 +76,18 @@ impl Stats {
         )));
         counters.push(t.clone());
         #[cfg(feature = "perf_counter")]
+        let task_clock = {
+            let t = Arc::new(Mutex::new(LongCounter::new(
+                "PERF_COUNT_SW_TASK_CLOCK".to_owned(),
+                shared.clone(),
+                true,
+                false,
+                PerfEventDiffable::new("PERF_COUNT_SW_TASK_CLOCK"),
+            )));
+            counters.push(t.clone());
+            t
+        };
+        #[cfg(feature = "perf_counter")]
         for e in &options.phase_perf_events.events {
             counters.push(Arc::new(Mutex::new(LongCounter::new(
                 e.0.clone(),
@@ -88,6 +102,8 @@ impl Stats {
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,
+            #[cfg(feature = "perf_counter")]
+            task_clock,
 
             shared,
             counters: Mutex::new(counters),
@@ -186,10 +202,31 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 c.print_total(None);
+                if cfg!(feature = "perf_counter") {
+                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                        print!(
+                            "\t{:.2}",
+                            c.get_total(None) as f64
+                                / self.task_clock.lock().unwrap().get_total(None) as f64
+                        )
+                    }
+                }
             } else {
                 c.print_total(Some(true));
                 print!("\t");
                 c.print_total(Some(false));
+                if cfg!(feature = "perf_counter") {
+                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                        let task_clock = self.task_clock.lock().unwrap();
+                        print!(
+                            "\t{:.2}\t{:.2}",
+                            c.get_total(Some(true)) as f64
+                                / task_clock.get_total(Some(true)) as f64,
+                            c.get_total(Some(false)) as f64
+                                / task_clock.get_total(Some(false)) as f64
+                        )
+                    }
+                }
             }
             print!("\t");
         }
@@ -210,8 +247,18 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 print!("{}\t", c.name());
+                if cfg!(feature = "perf_counter") {
+                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                        print!("\tfreq")
+                    }
+                }
             } else {
                 print!("{}.other\t{}.stw\t", c.name(), c.name());
+                if cfg!(feature = "perf_counter") {
+                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                        print!("\tfreq.other\tfreq.stw")
+                    }
+                }
             }
         }
         for name in scheduler_stat.keys() {
