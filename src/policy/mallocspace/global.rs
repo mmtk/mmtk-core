@@ -336,15 +336,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut last_on_page_boundary = false;
 
         debug_assert!(
-            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size
-                == mark_bit_spec.log_min_obj_size,
+            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                == mark_bit_spec.log_bytes_in_region,
             "Alloc-bit and mark-bit metadata have different minimum object sizes!"
         );
 
         // For bulk xor'ing 128-bit vectors on architectures with vector instructions
         // Each bit represents an object of LOG_MIN_OBJ_SIZE size
         let bulk_load_size: usize =
-            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size);
+            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
 
         while address < chunk_end {
             // We extensively tested the performance of the following if-statement and were

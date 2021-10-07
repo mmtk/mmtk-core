@@ -106,7 +106,8 @@ fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     let mut total_size = 0usize;
     for spec in l_specs {
-        total_size += super::metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+        total_size +=
+            super::metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
     }
 
     if total_size > 1usize << (LOG_BYTES_IN_CHUNK - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO) {
@@ -160,9 +161,9 @@ fn verify_no_overlap_contiguous(
 #[cfg(target_pointer_width = "32")]
 fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpec) -> Result<()> {
     let end_1 = spec_1.get_rel_offset()
-        + super::metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits);
+        + super::metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits);
     let end_2 = spec_2.get_rel_offset()
-        + super::metadata_bytes_per_chunk(spec_2.log_min_obj_size, spec_2.log_num_of_bits);
+        + super::metadata_bytes_per_chunk(spec_2.log_bytes_in_region, spec_2.log_num_of_bits);
 
     if !(spec_1.get_rel_offset() >= end_2 || spec_2.get_rel_offset() >= end_1) {
         return Err(Error::new(
@@ -559,14 +560,14 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
             offset: SideMetadataOffset::layout_after(&spec_1),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1]).is_ok());
@@ -580,7 +581,7 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::layout_after(&spec_1),
             log_num_of_bits: 3,
-            log_min_obj_size: 1,
+            log_bytes_in_region: 1,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_err());
@@ -591,9 +592,9 @@ mod tests {
             offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 1,
             #[cfg(target_pointer_width = "64")]
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
             #[cfg(target_pointer_width = "32")]
-            log_min_obj_size: 2,
+            log_bytes_in_region: 2,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
@@ -601,9 +602,9 @@ mod tests {
             offset: SideMetadataOffset::layout_after(&spec_1),
             log_num_of_bits: 3,
             #[cfg(target_pointer_width = "64")]
-            log_min_obj_size: 2,
+            log_bytes_in_region: 2,
             #[cfg(target_pointer_width = "32")]
-            log_min_obj_size: 4,
+            log_bytes_in_region: 4,
         };
 
         assert!(verify_global_specs_total_size(&[spec_1, spec_2]).is_ok());
@@ -617,14 +618,14 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: true,
             offset: SideMetadataOffset::layout_after(&spec_1),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_1).is_err());
@@ -635,7 +636,7 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(unsafe { Address::from_usize(1) }),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
@@ -645,7 +646,7 @@ mod tests {
             is_global: true,
             offset: SideMetadataOffset::addr(Address::ZERO),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
@@ -655,7 +656,7 @@ mod tests {
                 spec_1.get_absolute_offset() + metadata_address_range_size(&spec_1) - 1,
             ),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_contiguous(&spec_1, &spec_2).is_err());
@@ -669,14 +670,14 @@ mod tests {
             is_global: false,
             offset: SideMetadataOffset::rel(0),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
             is_global: false,
             offset: SideMetadataOffset::layout_after(&spec_1),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_1).is_err());
@@ -687,7 +688,7 @@ mod tests {
             is_global: false,
             offset: SideMetadataOffset::rel(1),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
@@ -697,7 +698,7 @@ mod tests {
             is_global: false,
             offset: SideMetadataOffset::rel(0),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
         let spec_2 = SideMetadataSpec {
             name: "spec_2",
@@ -705,11 +706,11 @@ mod tests {
             // We make up an invalid offset
             offset: SideMetadataOffset::rel(
                 spec_1.get_rel_offset()
-                    + metadata_bytes_per_chunk(spec_1.log_min_obj_size, spec_1.log_num_of_bits)
+                    + metadata_bytes_per_chunk(spec_1.log_bytes_in_region, spec_1.log_num_of_bits)
                     - 1,
             ),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_no_overlap_chunked(&spec_1, &spec_2).is_err());
@@ -723,7 +724,7 @@ mod tests {
             is_global: false,
             offset: SideMetadataOffset::rel(0),
             log_num_of_bits: 0,
-            log_min_obj_size: 0,
+            log_bytes_in_region: 0,
         };
 
         assert!(verify_local_specs_size(&[spec_1]).is_ok());
