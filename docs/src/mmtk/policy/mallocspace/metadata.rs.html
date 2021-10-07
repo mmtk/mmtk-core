@@ -335,7 +335,7 @@
     <span class="ident">is_global</span>: <span class="bool-val">true</span>,
     <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>),
     <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-    <span class="ident">log_min_obj_size</span>: <span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span>,
+    <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span>,
 };
 
 <span class="doccomment">/// Metadata spec for the active page byte</span>
@@ -353,7 +353,7 @@
     <span class="ident">is_global</span>: <span class="bool-val">false</span>,
     <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>,
     <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-    <span class="ident">log_min_obj_size</span>: <span class="ident">constants::LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>,
+    <span class="ident">log_bytes_in_region</span>: <span class="ident">constants::LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>,
 };
 
 <span class="doccomment">/// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,</span>

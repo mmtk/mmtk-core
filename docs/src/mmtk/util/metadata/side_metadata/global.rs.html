@@ -937,7 +937,7 @@
     <span class="doccomment">/// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.</span>
     <span class="kw">pub</span> <span class="ident">log_num_of_bits</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).</span>
-    <span class="kw">pub</span> <span class="ident">log_min_obj_size</span>: <span class="ident">usize</span>,
+    <span class="kw">pub</span> <span class="ident">log_bytes_in_region</span>: <span class="ident">usize</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">SideMetadataSpec</span> {
@@ -972,7 +972,7 @@
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
-            **log_min_obj_size: 0x{:x} \
+            **log_bytes_in_region: 0x{:x} \
             }}&quot;</span>,
             <span class="self">self</span>.<span class="ident">is_global</span>,
             <span class="kw">unsafe</span> {
@@ -983,7 +983,7 @@
                 }
             },
             <span class="self">self</span>.<span class="ident">log_num_of_bits</span>,
-            <span class="self">self</span>.<span class="ident">log_min_obj_size</span>
+            <span class="self">self</span>.<span class="ident">log_bytes_in_region</span>
         ))
     }
 }
@@ -1029,7 +1029,7 @@
             <span class="ident">SideMetadataOffset</span> {
                 <span class="ident">rel_offset</span>: <span class="kw">unsafe</span> { <span class="ident">spec</span>.<span class="ident">offset</span>.<span class="ident">rel_offset</span> }
                     <span class="op">+</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::metadata_bytes_per_chunk</span>(
-                        <span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>,
+                        <span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>,
                         <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>,
                     ),
             }
@@ -1175,7 +1175,7 @@
             }
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
             {
-                <span class="ident">lsize</span> <span class="op">+</span><span class="op">=</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
+                <span class="ident">lsize</span> <span class="op">+</span><span class="op">=</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
             }
         }
 
@@ -1666,7 +1666,7 @@
             <span class="string">&quot;Each heap entry should map to a byte in side-metadata&quot;</span>
         );
         <span class="macro">debug_assert_eq!</span>(
-            <span class="ident">bytes</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span>,
+            <span class="ident">bytes</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">metadata_spec</span>.<span class="ident">log_bytes_in_region</span>,
             <span class="ident">ENTRIES</span>,
             <span class="string">&quot;Heap range size and MetadataByteArray size does not match&quot;</span>
         );
@@ -1696,7 +1696,7 @@
         <span class="kw">let</span> <span class="ident">value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">data</span>[<span class="ident">index</span>];
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
         {
-            <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heap_range_start</span> <span class="op">+</span> (<span class="ident">index</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>);
+            <span class="kw">let</span> <span class="ident">data_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">heap_range_start</span> <span class="op">+</span> (<span class="ident">index</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>);
             <span class="ident">sanity::verify_load</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">spec</span>, <span class="ident">data_addr</span>, <span class="ident">value</span> <span class="kw">as</span> <span class="kw">_</span>);
         }
         <span class="ident">value</span>
@@ -1762,7 +1762,7 @@
                 <span class="ident">memory::zero</span>(
                     <span class="ident">address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">next_data_chunk</span>),
                     <span class="ident">metadata_bytes_per_chunk</span>(
-                        <span class="ident">metadata_spec</span>.<span class="ident">log_min_obj_size</span>,
+                        <span class="ident">metadata_spec</span>.<span class="ident">log_bytes_in_region</span>,
                         <span class="ident">metadata_spec</span>.<span class="ident">log_num_of_bits</span>,
                     ),
                 );
@@ -1788,7 +1788,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">3</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>,
         };
         <span class="kw">let</span> <span class="ident">side_metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
             <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">spec</span>],
@@ -1809,7 +1809,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">3</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>,
         };
         <span class="comment">// 2 bits per page - 2 / (4k * 8) = 1:16k</span>
         <span class="kw">let</span> <span class="ident">lspec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
@@ -1817,7 +1817,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">ZERO_OFFSET</span>,
             <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">12</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">12</span>,
         };
         <span class="kw">let</span> <span class="ident">side_metadata</span> <span class="op">=</span> <span class="ident">SideMetadataContext</span> {
             <span class="ident">global</span>: <span class="macro">vec!</span>[<span class="ident">gspec</span>],

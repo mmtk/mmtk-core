@@ -110,7 +110,7 @@ The VM binding decides whether to put these metadata bit-sets in-objects or on-s
    <span class="ident">is_global</span>: <span class="bool-val">true</span>,
    <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>,
    <span class="ident">log_num_of_bits</span>: <span class="ident">b1</span>,
-   <span class="ident">log_min_obj_size</span>: <span class="ident">s1</span>,
+   <span class="ident">log_bytes_in_region</span>: <span class="ident">s1</span>,
 };</code></pre></div>
 <p>Here, the number of bits per data is $2^b1$, and the minimum object size is $2^s1$.
 The <code>offset</code> is actually the base address for a global side metadata bit-set.
@@ -122,7 +122,7 @@ For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_AD
     <span class="ident">is_global</span>: <span class="bool-val">true</span>,
    <span class="ident">offset</span>: <span class="ident">GLOBAL_META_1</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="ident">GLOBAL_META_1</span>)
    <span class="ident">log_num_of_bits</span>: <span class="ident">b2</span>,
-   <span class="ident">log_min_obj_size</span>: <span class="ident">s2</span>,
+   <span class="ident">log_bytes_in_region</span>: <span class="ident">s2</span>,
 };</code></pre></div>
 <p>where <code>metadata_address_range_size</code> is a const function which calculates the total metadata space size of a contiguous side metadata bit-set based-on <code>s</code> and <code>b</code>.</p>
 <p>The policy-specific side metadata for 64-bits targets, and the global side metadata for 32-bits targets are used on the same way, except that their base addresses are different.</p>
@@ -134,7 +134,7 @@ For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_AD
    <span class="ident">is_global</span>: <span class="bool-val">false</span>,
    <span class="ident">offset</span>: <span class="number">0</span>,
    <span class="ident">log_num_of_bits</span>: <span class="ident">b1</span>,
-   <span class="ident">log_min_obj_size</span>: <span class="ident">s1</span>,
+   <span class="ident">log_bytes_in_region</span>: <span class="ident">s1</span>,
 };</code></pre></div>
 <p>Here, the <code>offset</code> is actually the inter-chunk offset of the side metadata from the start of the current side metadata chunk.</p>
 <p>Now, to add a second side metadata bit-set, offset needs to be calculated based-on the first global bit-set:</p>
@@ -144,7 +144,7 @@ For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_AD
    <span class="ident">is_global</span>: <span class="bool-val">false</span>,
    <span class="ident">offset</span>: <span class="ident">LOCAL_META_1</span>.<span class="ident">offset</span> <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">LOCAL_META_1</span>)
    <span class="ident">log_num_of_bits</span>: <span class="ident">b2</span>,
-   <span class="ident">log_min_obj_size</span>: <span class="ident">s2</span>,
+   <span class="ident">log_bytes_in_region</span>: <span class="ident">s2</span>,
 };</code></pre></div>
 <p>So far, we declared each metadata specs.
 We can now use the in-object metadata through the access functions in the VM bindings ObjectModel.

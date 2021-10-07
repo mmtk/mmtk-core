@@ -731,6 +731,7 @@
 <span id="731">731</span>
 <span id="732">732</span>
 <span id="733">733</span>
+<span id="734">734</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span>};
@@ -839,7 +840,8 @@
 <span class="kw">fn</span> <span class="ident">verify_local_specs_size</span>(<span class="ident">l_specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">SideMetadataSpec</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_size</span> <span class="op">=</span> <span class="number">0usize</span>;
     <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">l_specs</span> {
-        <span class="ident">total_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
+        <span class="ident">total_size</span> <span class="op">+</span><span class="op">=</span>
+            <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec</span>.<span class="ident">log_num_of_bits</span>);
     }
 
     <span class="kw">if</span> <span class="ident">total_size</span> <span class="op">&gt;</span> <span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="ident">LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO</span>) {
@@ -893,9 +895,9 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">fn</span> <span class="ident">verify_no_overlap_chunked</span>(<span class="ident">spec_1</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">spec_2</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">end_1</span> <span class="op">=</span> <span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>()
-        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>);
+        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>);
     <span class="kw">let</span> <span class="ident">end_2</span> <span class="op">=</span> <span class="ident">spec_2</span>.<span class="ident">get_rel_offset</span>()
-        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_2</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec_2</span>.<span class="ident">log_num_of_bits</span>);
+        <span class="op">+</span> <span class="ident"><span class="kw">super</span>::metadata_bytes_per_chunk</span>(<span class="ident">spec_2</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_2</span>.<span class="ident">log_num_of_bits</span>);
 
     <span class="kw">if</span> <span class="op">!</span>(<span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_2</span> <span class="op">|</span><span class="op">|</span> <span class="ident">spec_2</span>.<span class="ident">get_rel_offset</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">end_1</span>) {
         <span class="kw">return</span> <span class="prelude-val">Err</span>(<span class="ident">Error::new</span>(
@@ -1292,14 +1294,14 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>]).<span class="ident">is_ok</span>());
@@ -1313,7 +1315,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">1</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">1</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_err</span>());
@@ -1324,9 +1326,9 @@
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">1</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-            <span class="ident">log_min_obj_size</span>: <span class="number">2</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">2</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
@@ -1334,9 +1336,9 @@
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-            <span class="ident">log_min_obj_size</span>: <span class="number">2</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">2</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-            <span class="ident">log_min_obj_size</span>: <span class="number">4</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">4</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_global_specs_total_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>, <span class="ident">spec_2</span>]).<span class="ident">is_ok</span>());
@@ -1350,14 +1352,14 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_1</span>).<span class="ident">is_err</span>());
@@ -1368,7 +1370,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">1</span>) }),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
@@ -1378,7 +1380,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">true</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">Address::ZERO</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
@@ -1388,7 +1390,7 @@
                 <span class="ident">spec_1</span>.<span class="ident">get_absolute_offset</span>() <span class="op">+</span> <span class="ident">metadata_address_range_size</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>) <span class="op">-</span> <span class="number">1</span>,
             ),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_contiguous</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
@@ -1402,14 +1404,14 @@
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_1</span>).<span class="ident">is_err</span>());
@@ -1420,7 +1422,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">1</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
@@ -1430,7 +1432,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
         <span class="kw">let</span> <span class="ident">spec_2</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="string">&quot;spec_2&quot;</span>,
@@ -1438,11 +1440,11 @@
             <span class="comment">// We make up an invalid offset</span>
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(
                 <span class="ident">spec_1</span>.<span class="ident">get_rel_offset</span>()
-                    <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_min_obj_size</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>)
+                    <span class="op">+</span> <span class="ident">metadata_bytes_per_chunk</span>(<span class="ident">spec_1</span>.<span class="ident">log_bytes_in_region</span>, <span class="ident">spec_1</span>.<span class="ident">log_num_of_bits</span>)
                     <span class="op">-</span> <span class="number">1</span>,
             ),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_no_overlap_chunked</span>(<span class="kw-2">&amp;</span><span class="ident">spec_1</span>, <span class="kw-2">&amp;</span><span class="ident">spec_2</span>).<span class="ident">is_err</span>());
@@ -1456,7 +1458,7 @@
             <span class="ident">is_global</span>: <span class="bool-val">false</span>,
             <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::rel</span>(<span class="number">0</span>),
             <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-            <span class="ident">log_min_obj_size</span>: <span class="number">0</span>,
+            <span class="ident">log_bytes_in_region</span>: <span class="number">0</span>,
         };
 
         <span class="macro">assert!</span>(<span class="ident">verify_local_specs_size</span>(<span class="kw-2">&amp;</span>[<span class="ident">spec_1</span>]).<span class="ident">is_ok</span>());

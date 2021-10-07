@@ -624,7 +624,7 @@
                             <span class="ident">is_global</span>: <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>,
                             <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_VM_BASE_OFFSET</span>,
                             <span class="ident">log_num_of_bits</span>: <span class="ident"><span class="self">Self</span>::LOG_NUM_BITS</span>,
-                            <span class="ident">log_min_obj_size</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                            <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
                         }))
                     } <span class="kw">else</span> {
                         <span class="self">Self</span>(<span class="ident">MetadataSpec::OnSide</span>(<span class="ident">SideMetadataSpec</span> {
@@ -632,7 +632,7 @@
                             <span class="ident">is_global</span>: <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>,
                             <span class="ident">offset</span>: <span class="ident">LOCAL_SIDE_METADATA_VM_BASE_OFFSET</span>,
                             <span class="ident">log_num_of_bits</span>: <span class="ident"><span class="self">Self</span>::LOG_NUM_BITS</span>,
-                            <span class="ident">log_min_obj_size</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                            <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
                         }))
                     }
                 }
@@ -645,7 +645,7 @@
                         <span class="ident">is_global</span>: <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>,
                         <span class="ident">offset</span>: <span class="ident">SideMetadataOffset::layout_after</span>(<span class="ident">side_spec</span>),
                         <span class="ident">log_num_of_bits</span>: <span class="ident"><span class="self">Self</span>::LOG_NUM_BITS</span>,
-                        <span class="ident">log_min_obj_size</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
+                        <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span> <span class="kw">as</span> <span class="ident">usize</span>,
                     }))
                 }
                 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>

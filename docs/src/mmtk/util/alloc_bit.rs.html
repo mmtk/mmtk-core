@@ -120,7 +120,7 @@
     <span class="ident">is_global</span>: <span class="bool-val">true</span>,
     <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>,
     <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-    <span class="ident">log_min_obj_size</span>: <span class="ident">constants::LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>,
+    <span class="ident">log_bytes_in_region</span>: <span class="ident">constants::LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>,
 };
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
@@ -129,7 +129,7 @@
     <span class="ident">is_global</span>: <span class="bool-val">true</span>,
     <span class="ident">offset</span>: <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>,
     <span class="ident">log_num_of_bits</span>: <span class="number">0</span>,
-    <span class="ident">log_min_obj_size</span>: <span class="ident">constants::LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>,
+    <span class="ident">log_bytes_in_region</span>: <span class="ident">constants::LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>,
 };
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ALLOC_SIDE_METADATA_ADDR</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">get_absolute_offset</span>();
