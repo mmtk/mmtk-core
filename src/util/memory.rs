@@ -153,6 +153,9 @@ fn wrap_libc_call<T: PartialEq>(f: &dyn Fn() -> T, expect: T) -> Result<()> {
 }
 
 /// Get the memory maps for the process. The returned string is a multi-line string.
+/// This is only meant to be used for debugging. For example, log process memory maps after detecting a clash.
+/// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.
+#[cfg(debug_assertions)]
 #[cfg(target_os = "linux")]
 pub fn get_process_memory_maps() -> String {
     // print map
