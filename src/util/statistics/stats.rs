@@ -202,30 +202,28 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 c.print_total(None);
-                if cfg!(feature = "perf_counter") {
-                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                        print!(
-                            "\t{:.2}",
-                            c.get_total(None) as f64
-                                / self.task_clock.lock().unwrap().get_total(None) as f64
-                        )
-                    }
+                #[cfg(feature = "perf_counter")]
+                if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                    print!(
+                        "\t{:.2}",
+                        c.get_total(None) as f64
+                            / self.task_clock.lock().unwrap().get_total(None) as f64
+                    )
                 }
             } else {
                 c.print_total(Some(true));
                 print!("\t");
                 c.print_total(Some(false));
-                if cfg!(feature = "perf_counter") {
-                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                        let task_clock = self.task_clock.lock().unwrap();
-                        print!(
-                            "\t{:.2}\t{:.2}",
-                            c.get_total(Some(true)) as f64
-                                / task_clock.get_total(Some(true)) as f64,
-                            c.get_total(Some(false)) as f64
-                                / task_clock.get_total(Some(false)) as f64
-                        )
-                    }
+                #[cfg(feature = "perf_counter")]
+                if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                    let task_clock = self.task_clock.lock().unwrap();
+                    print!(
+                        "\t{:.2}\t{:.2}",
+                        c.get_total(Some(true)) as f64
+                            / task_clock.get_total(Some(true)) as f64,
+                        c.get_total(Some(false)) as f64
+                            / task_clock.get_total(Some(false)) as f64
+                    )
                 }
             }
             print!("\t");
