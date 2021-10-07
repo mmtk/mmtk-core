@@ -243,17 +243,13 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 print!("{}\t", c.name());
-                if cfg!(feature = "perf_counter") {
-                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                        print!("\tfreq")
-                    }
+                if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                    print!("\tfreq")
                 }
             } else {
                 print!("{}.other\t{}.stw\t", c.name(), c.name());
-                if cfg!(feature = "perf_counter") {
-                    if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                        print!("\tfreq.other\tfreq.stw")
-                    }
+                if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
+                    print!("\tfreq.other\tfreq.stw")
                 }
             }
         }
