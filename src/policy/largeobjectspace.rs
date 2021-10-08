@@ -190,7 +190,8 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                        .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 trace.process_node(object);
             }
