@@ -270,11 +270,14 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 let forwarding_pointer = unsafe { extra_header_addr.load::<Address>() };
                 if forwarding_pointer != Address::ZERO {
                     to = forwarding_pointer;
-                    let forwarding_pointer = unsafe { extra_header_addr.load::<Address>() };
                     let object_addr = forwarding_pointer + GC_EXTRA_HEADER_SIZE;
                     // clear forwarding pointer
-                    unsafe { extra_header_addr.store(0) }
-
+                    for i in 0..GC_EXTRA_HEADER_SIZE {
+                        unsafe {
+                            (to + i).store::<u8>(0);
+                            (extra_header_addr + i).store::<u8>(0);
+                        };
+                    }
                     let target = unsafe { object_addr.to_object_reference() };
                     // copy obj to target
                     let dst = target.to_address();

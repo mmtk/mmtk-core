@@ -285,6 +285,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
                 _ => unreachable!(),
             };
             let pages = bytes_to_pages(_start - start);
+            self.common.accounting.reset();
             self.common.accounting.reserve_and_commit(pages);
             // println!("########## reset cursor ##########");
             // println!(

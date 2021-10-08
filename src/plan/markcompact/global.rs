@@ -71,10 +71,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         self.mc_space.init(&vm_map);
     }
 
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
-    }
-
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
@@ -126,12 +122,16 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.set_finalizer(Some(EndOfGC));
     }
 
+    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+        self.base().collection_required(self, space_full, space)
+    }
+
     fn get_pages_used(&self) -> usize {
         self.mc_space.reserved_pages() + self.common.get_pages_used()
     }
 
     fn get_collection_reserve(&self) -> usize {
-        self.mc_space.reserved_pages()
+        0
     }
 }
 
