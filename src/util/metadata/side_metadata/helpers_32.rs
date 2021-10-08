@@ -21,13 +21,13 @@ pub(super) fn address_to_chunked_meta_address(
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
-    let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region as usize;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
     let internal_addr = data_addr & CHUNK_MASK;
-    let effective_addr = internal_addr >> log_min_obj_size;
+    let effective_addr = internal_addr >> log_bytes_in_region;
     let second_offset = if rshift >= 0 {
         effective_addr >> rshift
     } else {
@@ -74,7 +74,7 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
-            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+            let to_unmap = metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
             ensure_munmap_metadata(address_to_meta_address(spec, next_data_chunk), to_unmap);
             total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
@@ -91,10 +91,10 @@ pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
 }
 
 #[inline(always)]
-pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
+pub const fn metadata_bytes_per_chunk(log_bytes_in_region: usize, log_num_of_bits: usize) -> usize {
     1usize
         << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) + log_num_of_bits
-            - log_min_obj_size)
+            - log_bytes_in_region)
 }
 
 /// Unmaps the metadata for a single chunk starting at `start`

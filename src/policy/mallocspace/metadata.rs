@@ -41,10 +41,11 @@ lazy_static! {
 /// we require its space to be contiguous and mapped only once. Otherwise we risk
 /// overwriting the previous mapping.
 pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    name: "MallocActiveChunk",
     is_global: true,
     offset: SideMetadataOffset::layout_after(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
     log_num_of_bits: 3,
-    log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
+    log_bytes_in_region: LOG_BYTES_IN_CHUNK as usize,
 };
 
 /// Metadata spec for the active page byte
@@ -58,10 +59,11 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    name: "MallocActivePage",
     is_global: false,
     offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
     log_num_of_bits: 3,
-    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
+    log_bytes_in_region: constants::LOG_BYTES_IN_PAGE as usize,
 };
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
