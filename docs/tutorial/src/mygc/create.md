@@ -24,7 +24,7 @@ files.
         pub mod mygc;
         ```
         This adds `mygc` as a module.
-    1. `mmtk-core/src/util/options.rs`, add `MyGC` to `PlanSelector`. 
+    1. `mmtk-core/src/util/options.rs`, add `MyGC` to the enum `PlanSelector`. 
     This allows MMTk to accept `MyGC` as a command line option for `plan`, 
     or an environment variable for `MMTK_PLAN`:
         ```rust
@@ -33,15 +33,23 @@ files.
             NoGC,
             SemiSpace,
             GenCopy,
-            MyGC
+            GenImmix,
+            MarkSweep,
+            PageProtect,
+            Immix,
+            // Add this!
+            MyGC,
         }
         ```
-    1. `mmtk-core/src/plan/global.rs`, change `create_mutator()` and 
-    `create_plan()` to create the `MyGC` mutator and the `MyGC` plan based 
-    on `PlanSelector`:
+    1. `mmtk-core/src/plan/global.rs`, add new expressions to 
+    `create_mutator()` and `create_plan()` for `MyGC`, following the pattern of 
+    the existing plans. These define the location of the mutator and plan's 
+    constructors. 
         ```rust
+        // NOTE: Sections of this code snippet not relevant to this step of the 
+        // tutorial (marked by "// ...") have been omitted.
         pub fn create_mutator<VM: VMBinding>(
-            tls: OpaquePointer,
+            tls: VMMutatorThread,
             mmtk: &'static MMTK<VM>,
         ) -> Box<Mutator<VM>> {
             Box::new(match mmtk.options.plan {
@@ -49,10 +57,11 @@ files.
                 PlanSelector::SemiSpace => {
                     crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
                 }
-                PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+
+                // ...
+
                 // Create MyGC mutator based on selector
-                PlanSelector::MyGC => crate::plan::mygc::mutator::create_mygc_mutator(tls, &*mmtk.plan),
-            })
+                PlanSelector::MyGC => crate::plan::mygc::mutator::create_mygc_mutator(tls, &*mmtk.plan),    })
         }
 
         pub fn create_plan<VM: VMBinding>(
@@ -60,24 +69,22 @@ files.
             vm_map: &'static VMMap,
             mmapper: &'static Mmapper,
             options: Arc<UnsafeOptionsWrapper>,
-            scheduler: &'static MMTkScheduler<VM>,
+            scheduler: Arc<GCWorkScheduler<VM>>,
         ) -> Box<dyn Plan<VM = VM>> {
             match plan {
-                PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
-                    vm_map, mmapper, options, scheduler,
-                )),
+                PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
                 PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-                    vm_map, mmapper, options, scheduler,
+                    vm_map, mmapper, options,
                 )),
-                PlanSelector::GenCopy => Box::new(crate::plan::gencopy::GenCopy::new(
-                    vm_map, mmapper, options, scheduler,
-                )),
+
+                // ...
+
                 // Create MyGC plan based on selector
                 PlanSelector::MyGC => Box::new(crate::plan::mygc::MyGC::new(
                     vm_map, mmapper, options, scheduler,
                 ))
             }
-        }
+        }       
         ```
     
 Note that all of the above changes almost exactly copy the NoGC entries in 
