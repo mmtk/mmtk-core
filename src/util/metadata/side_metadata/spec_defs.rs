@@ -16,6 +16,7 @@ macro_rules! define_side_metadata_specs {
     // Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET
     (@first_spec $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr)) => {
         pub const $name: SideMetadataSpec = SideMetadataSpec {
+            name: stringify!($name),
             is_global: $is_global,
             offset: if $is_global { GLOBAL_SIDE_METADATA_BASE_OFFSET } else { LOCAL_SIDE_METADATA_BASE_OFFSET },
             log_num_of_bits: $log_num_of_bits,
@@ -25,6 +26,7 @@ macro_rules! define_side_metadata_specs {
     // Define any spec that follows a previous spec. The new spec will be created and laid out after the previous spec.
     (@prev_spec $last_spec: ident as $last_spec_ident: ident, $name: ident = (global: $is_global: expr, log_num_of_bits: $log_num_of_bits: expr, log_bytes_in_region: $log_bytes_in_region: expr), $($tail:tt)*) => {
         pub const $name: SideMetadataSpec = SideMetadataSpec {
+            name: stringify!($name),
             is_global: $is_global,
             offset: SideMetadataOffset::layout_after(&$last_spec),
             log_num_of_bits: $log_num_of_bits,
