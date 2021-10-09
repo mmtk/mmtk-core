@@ -141,11 +141,6 @@ impl<'a> SFTMap<'a> {
     }
 
     pub fn get(&self, address: Address) -> &'a dyn SFT {
-        debug_assert!(
-            address.chunk_index() < self.sft.len(),
-            "Invalid address {:?}",
-            address
-        );
         let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
