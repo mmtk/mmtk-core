@@ -93,8 +93,8 @@ impl<VM: VMBinding> SSProcessEdges<VM> {
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
 
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
         Self { plan, base }
     }
