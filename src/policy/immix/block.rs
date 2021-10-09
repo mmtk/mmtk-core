@@ -83,6 +83,7 @@ impl Block {
 
     /// Block defrag state table (side)
     pub const DEFRAG_STATE_TABLE: SideMetadataSpec = SideMetadataSpec {
+        name: "ImmixBlockDefragState",
         is_global: false,
         offset: if super::BLOCK_ONLY {
             // If BLOCK_ONLY is set, we do not use any line marktables.
@@ -91,15 +92,16 @@ impl Block {
             SideMetadataOffset::layout_after(&Line::MARK_TABLE)
         },
         log_num_of_bits: 3,
-        log_min_obj_size: Self::LOG_BYTES,
+        log_bytes_in_region: Self::LOG_BYTES,
     };
 
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
+        name: "ImmixBlockMark",
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Self::DEFRAG_STATE_TABLE),
         log_num_of_bits: 3,
-        log_min_obj_size: Self::LOG_BYTES,
+        log_bytes_in_region: Self::LOG_BYTES,
     };
 
     /// Align the address to a block boundary.
