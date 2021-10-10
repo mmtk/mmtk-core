@@ -373,6 +373,7 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,
+    pub roots: bool,
 }
 
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
@@ -380,7 +381,7 @@ unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
-    pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
+    pub fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<E::VM>) -> Self {
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             for edge in &edges {
@@ -393,6 +394,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
             nodes: vec![],
             mmtk,
             worker: std::ptr::null_mut(),
+            roots,
         }
     }
     pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
@@ -433,6 +435,16 @@ pub trait ProcessEdgesWork:
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
+
+    #[cfg(feature = "sanity")]
+    fn cache_roots_for_sanity_gc(&mut self) {
+        assert!(self.roots);
+        self.mmtk()
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_roots(self.edges.clone());
+    }
 
     #[inline]
     fn process_node(&mut self, object: ObjectReference) {
@@ -497,6 +509,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
         self.process_edges();
         if !self.nodes.is_empty() {
             self.flush();
+        }
+        #[cfg(feature = "sanity")]
+        if self.roots {
+            self.cache_roots_for_sanity_gc();
         }
         trace!("ProcessEdgesWork End");
     }
