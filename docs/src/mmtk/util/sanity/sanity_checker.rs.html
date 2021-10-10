@@ -174,6 +174,34 @@
 <span id="174">174</span>
 <span id="175">175</span>
 <span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::CopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
@@ -188,7 +216,10 @@
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SanityChecker</span> {
+    <span class="doccomment">/// Visited objects</span>
     <span class="ident">refs</span>: <span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// Cached root edges for sanity root scanning</span>
+    <span class="ident">roots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">SanityChecker</span> {
@@ -201,7 +232,18 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">refs</span>: <span class="ident">HashSet::new</span>(),
+            <span class="ident">roots</span>: <span class="macro">vec!</span>[],
         }
+    }
+
+    <span class="doccomment">/// Cache a list of root edges to the sanity checker.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_roots</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">roots</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">roots</span>.<span class="ident">push</span>(<span class="ident">roots</span>)
+    }
+
+    <span class="doccomment">/// Reset roots cache at the end of the sanity gc.</span>
+    <span class="kw">fn</span> <span class="ident">clear_roots_cache</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">roots</span>.<span class="ident">clear</span>();
     }
 }
 
@@ -228,9 +270,22 @@
 
         <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">inside_sanity</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
-        <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-                .<span class="ident">add</span>(<span class="ident">ScanStackRoot</span>::<span class="op">&lt;</span><span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">mutator</span>));
+
+        <span class="comment">// We use the cached roots for sanity gc, based on the assumption that</span>
+        <span class="comment">// the stack scanning triggered by the selected plan is correct and precise.</span>
+        <span class="comment">// FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,</span>
+        <span class="comment">// the stack scanning may be broken. Uncomment the following lines to</span>
+        <span class="comment">// collect the roots again.</span>
+        <span class="comment">// Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`</span>
+        <span class="comment">// in openjdk binding before the second round of roots scanning.</span>
+        <span class="comment">// for mutator in &lt;P::VM as VMBinding&gt;::VMActivePlan::mutators() {</span>
+        <span class="comment">//     scheduler.work_buckets[WorkBucketStage::Prepare]</span>
+        <span class="comment">//         .add(ScanStackRoot::&lt;SanityGCProcessEdges&lt;P::VM&gt;&gt;(mutator));</span>
+        <span class="comment">// }</span>
+        <span class="kw">for</span> <span class="ident">roots</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">sanity_checker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">roots</span> {
+            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Closure</span>].<span class="ident">add</span>(
+                <span class="ident">SanityGCProcessEdges</span>::<span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">roots</span>.<span class="ident">clone</span>(), <span class="bool-val">true</span>, <span class="ident">mmtk</span>),
+            );
         }
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
             .<span class="ident">add</span>(<span class="ident">ScanVMSpecificRoots</span>::<span class="op">&lt;</span><span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
@@ -293,6 +348,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SanityRelease</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>) {
         <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">leave_sanity</span>();
+        <span class="ident">mmtk</span>.<span class="ident">sanity_checker</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">clear_roots_cache</span>();
         <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
                 .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
@@ -325,9 +381,9 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ProcessEdgesWork</span> <span class="kw">for</span> <span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
     <span class="kw">const</span> <span class="ident">OVERWRITE_REFERENCE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
-    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">_roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="self">Self</span> {
-            <span class="ident">base</span>: <span class="ident">ProcessEdgesBase::new</span>(<span class="ident">edges</span>, <span class="ident">mmtk</span>),
+            <span class="ident">base</span>: <span class="ident">ProcessEdgesBase::new</span>(<span class="ident">edges</span>, <span class="ident">roots</span>, <span class="ident">mmtk</span>),
             <span class="comment">// ..Default::default()</span>
         }
     }
