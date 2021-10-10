@@ -10,6 +10,8 @@ on:
 jobs:
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
+        # allow 3 days to run
+        timeout-minutes: 4320
         steps:
           - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
           - name: Check Revisions
@@ -110,6 +112,8 @@ jobs:
 
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
+        # allow 3 days to run
+        timeout-minutes: 4320
         steps:
             - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
             - name: Check Revisions

@@ -22,6 +22,8 @@ jobs:
   # JikesRVM
   jikesrvm-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    # allow 1 day to run
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -78,6 +80,8 @@ jobs:
   # OpenJDK
   openjdk-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    # allow 1 day to run
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
@@ -138,6 +142,8 @@ jobs:
 
   openjdk-mutator-perf:
     runs-on: [self-hosted, Linux, freq-scaling-off]
+    # allow 1 day to run
+    timeout-minutes: 1440
     steps:
       - name: Checkout MMTk Core
         uses: actions/checkout@v2
