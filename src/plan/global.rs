@@ -185,6 +185,15 @@ pub fn create_plan<VM: VMBinding>(
 /// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
 /// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
 ///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
+///
+/// Methods in this trait:
+///
+/// Only methods that will be overridden by each specific plan should be included in this trait. The trait may
+/// provide a default implementation, and each plan can override the implementation. For methods that won't be
+/// overridden, we should implement those methods in BasePlan (or CommonPlan) and call them from there instead.
+/// We should avoid having methods with the same in both Plan and BasePlan, as this may confuse people, and may
+/// call a wrong method by mistake.
+// Note: Some methods that are not overriden can be moved from the trait to BasePlan.
 pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
@@ -319,9 +328,24 @@ pub trait Plan: 'static + Sync + Downcast {
         self.get_total_pages() - self.get_pages_used()
     }
 
+    /// The application code has requested a collection.
     fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
         self.base().handle_user_collection_request(tls, force)
     }
+
+    /// Return whether last GC was an exhaustive attempt to collect the heap.
+    /// For many collectors this is the same as asking whether the last GC was a full heap collection.
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.last_collection_full_heap()
+    }
+
+    /// Return whether last GC is a full GC.
+    fn last_collection_full_heap(&self) -> bool {
+        true
+    }
+
+    /// Force the next collection to be full heap.
+    fn force_full_heap_collection(&self) {}
 
     fn modify_check(&self, object: ObjectReference) {
         if self.base().gc_in_progress_proper() && object.is_movable() {
@@ -642,7 +666,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.release();
     }
 
-    pub fn set_collection_kind(&self) {
+    pub fn set_collection_kind<P: Plan>(&self, plan: &P) {
         self.cur_collection_attempts.store(
             if self.is_user_triggered_collection() {
                 1
@@ -653,13 +677,13 @@ impl<VM: VMBinding> BasePlan<VM> {
         );
 
         let emergency_collection = !self.is_internal_triggered_collection()
-            && self.last_collection_was_exhaustive()
+            && plan.last_collection_was_exhaustive()
             && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
         self.emergency_collection
             .store(emergency_collection, Ordering::Relaxed);
 
         if emergency_collection {
-            self.force_full_heap_collection();
+            plan.force_full_heap_collection();
         }
     }
 
@@ -719,12 +743,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         );
         is_internal_triggered
     }
-
-    fn last_collection_was_exhaustive(&self) -> bool {
-        true
-    }
-
-    fn force_full_heap_collection(&self) {}
 
     pub fn increase_allocation_bytes_by(&self, size: usize) {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
