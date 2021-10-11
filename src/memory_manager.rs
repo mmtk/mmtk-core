@@ -130,18 +130,23 @@ pub fn alloc<VM: VMBinding>(
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
     let gc_extra_header_words = mutator.plan.constraints().gc_extra_header_words;
-    let mut extra_header = std::cmp::max(
-        gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-        align,
-    );
-    if (extra_header & (extra_header - 1)) != 0 {
-        extra_header |= extra_header >> 1;
-        extra_header |= extra_header >> 2;
-        extra_header |= extra_header >> 4;
-        extra_header |= extra_header >> 8;
-        extra_header |= extra_header >> 16;
-        extra_header += 1;
-    }
+    let extra_header = if gc_extra_header_words != 0 {
+        let mut tmp = std::cmp::max(
+            gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
+            align,
+        );
+        if (tmp & (tmp - 1)) != 0 {
+            tmp |= tmp >> 1;
+            tmp |= tmp >> 2;
+            tmp |= tmp >> 4;
+            tmp |= tmp >> 8;
+            tmp |= tmp >> 16;
+            tmp += 1;
+        }
+        tmp
+    } else {
+        0
+    };
     // mutator.alloc(size, align, offset, semantics)
     let rtn = mutator.alloc(size + extra_header, align, offset, semantics);
     rtn + extra_header
