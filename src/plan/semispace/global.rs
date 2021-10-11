@@ -8,11 +8,8 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -21,8 +18,6 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -81,27 +76,31 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<SSProcessEdges<VM>>(&SS_CONSTRAINTS, scheduler);
+            .schedule_common::<Self, SSProcessEdges<VM>, SSCopyContext<VM>>(
+                self,
+                &SS_CONSTRAINTS,
+                scheduler,
+            );
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<SSProcessEdges<VM>>::new());
+        // scheduler.work_buckets[WorkBucketStage::Unconstrained]
+        //     .add(StopMutators::<SSProcessEdges<VM>>::new());
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<SSProcessEdges<VM>>::new());
+        // scheduler.work_buckets[WorkBucketStage::Prepare]
+        //     .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
+        // scheduler.work_buckets[WorkBucketStage::RefClosure]
+        //     .add(ProcessWeakRefs::<SSProcessEdges<VM>>::new());
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, SSCopyContext<VM>>::new(self));
+        // scheduler.work_buckets[WorkBucketStage::Release]
+        //     .add(Release::<Self, SSCopyContext<VM>>::new(self));
         // Scheduling all the gc hooks of analysis routines. It is generally recommended
         // to take advantage of the scheduling system we have in place for more performance
-        #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        // #[cfg(feature = "analysis")]
+        // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        // #[cfg(feature = "sanity")]
+        // scheduler.work_buckets[WorkBucketStage::Final]
+        //     .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
+        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

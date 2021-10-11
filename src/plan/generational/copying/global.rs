@@ -11,7 +11,6 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -21,8 +20,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
@@ -85,42 +82,48 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>, GenCopyCopyContext<VM>>(
+                    self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
             // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-            >::new());
+            // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
+            //     GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
+            // >::new());
         } else {
             debug!("Full heap GC");
             self.common()
-                .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
+                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>, GenCopyCopyContext<VM>>(
+                    self,
+                    &GENCOPY_CONSTRAINTS,
+                    scheduler,
+                );
             // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
+            // scheduler.work_buckets[WorkBucketStage::Unconstrained]
+            //     .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
 
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
-        if is_full_heap {
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
-        } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-            >::new());
-        }
+        // scheduler.work_buckets[WorkBucketStage::Prepare]
+        //     .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
+        // if is_full_heap {
+        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
+        //         .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
+        // } else {
+        //     scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
+        //         GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
+        //     >::new());
+        // }
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
+        // scheduler.work_buckets[WorkBucketStage::Release]
+        //     .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
         // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        // FIXME: missing GcHookWork
+        // #[cfg(feature = "sanity")]
+        // scheduler.work_buckets[WorkBucketStage::Final]
+        //     .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
+        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

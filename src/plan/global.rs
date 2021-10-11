@@ -849,12 +849,45 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.release(tls, full_heap)
     }
 
-    pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
+    pub fn schedule_common<
+        P: Plan<VM = VM>,
+        E: ProcessEdgesWork<VM = VM>,
+        C: CopyContext<VM = VM> + GCWorkerLocal,
+    >(
         &self,
+        plan: &'static P,
         constraints: &'static PlanConstraints,
         scheduler: &GCWorkScheduler<VM>,
     ) {
-        // Schedule finalization
+        use crate::scheduler::gc_work::*;
+
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<E>::new());
+
+        // Prepare global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<P, C>::new(plan));
+
+        // VM-specific weak ref processing
+        scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<E>::new());
+
+        // Release global/collectors/mutators
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<P, C>::new(plan));
+
+        // Analysis GC work
+        #[cfg(feature = "analysis")]
+        {
+            use crate::util::analysis::GcHookWork;
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        }
+
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<P, C>::new(plan));
+        }
+
+        // Finalization
         if !self.base.options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
@@ -865,6 +898,9 @@ impl<VM: VMBinding> CommonPlan<VM> {
                     .add(ForwardFinalization::<E>::new());
             }
         }
+
+        // Set EndOfGC to run at the end
+        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     pub fn stacks_prepared(&self) -> bool {
