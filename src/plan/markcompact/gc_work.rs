@@ -57,8 +57,8 @@ impl<VM: VMBinding> MarkingProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
         Self { base, plan }
     }
@@ -108,8 +108,8 @@ impl<VM: VMBinding> ForwardingProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
         Self { base, plan }
     }
