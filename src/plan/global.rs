@@ -191,9 +191,9 @@ pub fn create_plan<VM: VMBinding>(
 /// Only methods that will be overridden by each specific plan should be included in this trait. The trait may
 /// provide a default implementation, and each plan can override the implementation. For methods that won't be
 /// overridden, we should implement those methods in BasePlan (or CommonPlan) and call them from there instead.
-/// We should avoid having methods with the same in both Plan and BasePlan, as this may confuse people, and may
-/// call a wrong method by mistake.
-// Note: Some methods that are not overriden can be moved from the trait to BasePlan.
+/// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
+/// they may call a wrong method by mistake.
+// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
 pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
