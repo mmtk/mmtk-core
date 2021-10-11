@@ -320,20 +320,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
-        if force || !self.options().ignore_system_g_c {
-            info!("User triggering collection");
-            self.base()
-                .user_triggered_collection
-                .store(true, Ordering::Relaxed);
-            self.base().control_collector_context.request();
-            <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
-        }
-    }
-
-    fn reset_collection_trigger(&self) {
-        self.base()
-            .user_triggered_collection
-            .store(false, Ordering::Relaxed)
+        self.base().handle_user_collection_request(tls, force)
     }
 
     fn modify_check(&self, object: ObjectReference) {
@@ -366,6 +353,8 @@ pub struct BasePlan<VM: VMBinding> {
     pub stacks_prepared: AtomicBool,
     pub emergency_collection: AtomicBool,
     pub user_triggered_collection: AtomicBool,
+    pub internal_triggered_collection: AtomicBool,
+    pub last_internal_triggered_collection: AtomicBool,
     // Has an allocation succeeded since the emergency collection?
     pub allocation_success: AtomicBool,
     // Maximum number of failed attempts by a single thread
@@ -495,6 +484,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
+            internal_triggered_collection: AtomicBool::new(false),
+            last_internal_triggered_collection: AtomicBool::new(false),
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
@@ -541,6 +532,40 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.vm_space.init(vm_map);
             self.vm_space.ensure_mapped();
         }
+    }
+
+    /// The application code has requested a collection.
+    pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
+        if force || !self.options.ignore_system_g_c {
+            info!("User triggering collection");
+            self.user_triggered_collection
+                .store(true, Ordering::Relaxed);
+            self.control_collector_context.request();
+            VM::VMCollection::block_for_gc(tls);
+        }
+    }
+
+    /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
+    // This is not used, as we do not have a concurrent plan.
+    #[allow(unused)]
+    pub fn trigger_internal_collection_request(&self) {
+        self.last_internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.control_collector_context.request();
+    }
+
+    /// Reset collection state information.
+    pub fn reset_collection_trigger(&self) {
+        self.last_internal_triggered_collection.store(
+            self.internal_triggered_collection.load(Ordering::SeqCst),
+            Ordering::Relaxed,
+        );
+        self.internal_triggered_collection
+            .store(false, Ordering::SeqCst);
+        self.user_triggered_collection
+            .store(false, Ordering::Relaxed);
     }
 
     // Depends on what base spaces we use, unsync may be unused.
@@ -666,10 +691,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
     }
 
-    pub fn is_user_triggered_collection(&self) -> bool {
-        self.user_triggered_collection.load(Ordering::Relaxed)
-    }
-
     fn determine_collection_attempts(&self) -> usize {
         if !self.allocation_success.load(Ordering::Relaxed) {
             self.max_collection_attempts.fetch_add(1, Ordering::Relaxed);
@@ -681,9 +702,22 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.max_collection_attempts.load(Ordering::Relaxed)
     }
 
-    fn is_internal_triggered_collection(&self) -> bool {
-        // FIXME
-        false
+    /// Return true if this collection was triggered by application code.
+    pub fn is_user_triggered_collection(&self) -> bool {
+        self.user_triggered_collection.load(Ordering::Relaxed)
+    }
+
+    /// Return true if this collection was triggered internally.
+    pub fn is_internal_triggered_collection(&self) -> bool {
+        let is_internal_triggered = self
+            .last_internal_triggered_collection
+            .load(Ordering::SeqCst);
+        // Remove this assertion when we have concurrent GC.
+        assert!(
+            !is_internal_triggered,
+            "We have no concurrent GC implemented. We should not have internally triggered GC"
+        );
+        is_internal_triggered
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
