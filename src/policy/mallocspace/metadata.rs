@@ -65,10 +65,11 @@ pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec 
 };
 
 pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
+    name: "OffsetMallocBit",
     is_global: false,
     offset: SideMetadataOffset::layout_after(&ACTIVE_PAGE_METADATA_SPEC),
     log_num_of_bits: 0,
-    log_min_obj_size: constants::LOG_MIN_OBJECT_SIZE as usize,
+    log_bytes_in_region: constants::LOG_MIN_OBJECT_SIZE as usize,
 };
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
