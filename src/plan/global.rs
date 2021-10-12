@@ -244,7 +244,9 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn is_gc_enabled(&self) -> bool {
-        self.base().gc_enabled.load(Ordering::SeqCst)
+        self.base()
+            .trigger_gc_when_heap_is_full
+            .load(Ordering::SeqCst)
     }
 
     fn prepare(&mut self, tls: VMWorkerThread);
@@ -365,9 +367,9 @@ BasePlan should contain all plan-related state and functions that are _fundament
 pub struct BasePlan<VM: VMBinding> {
     /// Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
     pub initialized: AtomicBool,
-    /// Whether GC is enabled. This is set to true when enable_collection() is called.
-    /// Only when GC is enabled, we will poll. Otherwise, we allow allocating without triggering a GC.
-    pub gc_enabled: AtomicBool,
+    /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
+    /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
+    pub trigger_gc_when_heap_is_full: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
     pub stacks_prepared: AtomicBool,
@@ -497,7 +499,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             ),
 
             initialized: AtomicBool::new(false),
-            gc_enabled: AtomicBool::new(false),
+            trigger_gc_when_heap_is_full: AtomicBool::new(true),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
             stacks_prepared: AtomicBool::new(false),

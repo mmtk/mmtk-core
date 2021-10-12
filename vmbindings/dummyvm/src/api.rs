@@ -71,6 +71,11 @@ pub extern "C" fn enable_collection(tls: VMThread) {
 }
 
 #[no_mangle]
+pub extern "C" fn disable_collection() {
+    memory_manager::disable_collection(&SINGLETON)
+}
+
+#[no_mangle]
 pub extern "C" fn used_bytes() -> usize {
     memory_manager::used_bytes(&SINGLETON)
 }

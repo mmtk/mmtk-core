@@ -189,29 +189,39 @@ pub fn start_worker<VM: VMBinding>(
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
-    // If we never initialize collection, we do the initialization here.
     if !mmtk.plan.is_initialized() {
+        // If we never initialize collection, we do the initialization here.
         mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
         VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
         mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+        debug_assert!(mmtk.plan.is_gc_enabled(), "GC should be enabled by default");
+    } else {
+        debug_assert!(
+            !mmtk.plan.is_gc_enabled(),
+            "enable_collection() is called when GC is already enabled."
+        );
+        mmtk.plan
+            .base()
+            .trigger_gc_when_heap_is_full
+            .store(true, Ordering::SeqCst);
     }
-
-    debug_assert!(
-        !mmtk.plan.is_gc_enabled(),
-        "enable_collection() is called when GC is already enabled."
-    );
-    mmtk.plan.base().gc_enabled.store(true, Ordering::SeqCst);
 }
 
 /// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
-/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the soft heap limit. However,
-/// there is no guarantee that the physical allocation will succeed. We highly recommend not using this method.
+/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the MMTk's heap size (the soft heap limit).
+/// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation
+/// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
+/// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
+/// behavior.
 pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
         mmtk.plan.is_gc_enabled(),
         "disable_collection() is called when GC is not enabled."
     );
-    mmtk.plan.base().gc_enabled.store(false, Ordering::SeqCst);
+    mmtk.plan
+        .base()
+        .trigger_gc_when_heap_is_full
+        .store(false, Ordering::SeqCst);
 }
 
 /// Process MMTk run-time options.
