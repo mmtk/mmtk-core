@@ -57,10 +57,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<Self, MSProcessEdges<VM>, NoCopy<VM>>(
+            .schedule_common_partially::<Self, MSProcessEdges<VM>, NoCopy<VM>>(
                 self,
                 &MS_CONSTRAINTS,
                 scheduler,
+                // skip finalization: See https://github.com/mmtk/mmtk-core/issues/473
+                true
             );
         // Stop & scan mutators (mutator scanning can happen before STW)
         // scheduler.work_buckets[WorkBucketStage::Unconstrained]
