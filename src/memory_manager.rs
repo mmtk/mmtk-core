@@ -177,18 +177,41 @@ pub fn start_worker<VM: VMBinding>(
     worker.run(mmtk);
 }
 
-/// Allow MMTk to trigger garbage collection. A VM should only call this method when it is ready for the mechanisms required for
-/// collection during the boot process. MMTk will invoke Collection::spawn_worker_thread() to create GC threads during
-/// this funciton call.
+/// Allow MMTk to trigger garbage collection. A VM should call this method when it is ready for the mechanisms required for
+/// collection during the boot process. If a VM ever disable collection through disable_collection(), it should call this method
+/// when it would like to enable collection again.
+/// When this method is called at the first time, it will initialize the GC scheduler and workers. For example, it will invoke
+/// Collection::spawn_worker_thread() to create GC threads. On subsequent calls, it will skip the initialization, and merely set
+/// a flag.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
-    mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
-    VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
-    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    // If we never initialize collection, we do the initialization here.
+    if !mmtk.plan.is_initialized() {
+        mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
+        VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
+        mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    }
+
+    debug_assert!(
+        !mmtk.plan.is_gc_enabled(),
+        "enable_collection() is called when GC is already enabled."
+    );
+    mmtk.plan.base().gc_enabled.store(true, Ordering::SeqCst);
+}
+
+/// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
+/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the soft heap limit. However,
+/// there is no guarantee that the physical allocation will succeed. We highly recommend not using this method.
+pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    debug_assert!(
+        mmtk.plan.is_gc_enabled(),
+        "disable_collection() is called when GC is not enabled."
+    );
+    mmtk.plan.base().gc_enabled.store(false, Ordering::SeqCst);
 }
 
 /// Process MMTk run-time options.

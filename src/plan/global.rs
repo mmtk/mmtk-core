@@ -243,6 +243,10 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
+    fn is_gc_enabled(&self) -> bool {
+        self.base().gc_enabled.load(Ordering::SeqCst)
+    }
+
     fn prepare(&mut self, tls: VMWorkerThread);
     fn release(&mut self, tls: VMWorkerThread);
 
@@ -359,8 +363,11 @@ pub enum GcStatus {
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
 pub struct BasePlan<VM: VMBinding> {
-    // Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
+    /// Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
     pub initialized: AtomicBool,
+    /// Whether GC is enabled. This is set to true when enable_collection() is called.
+    /// Only when GC is enabled, we will poll. Otherwise, we allow allocating without triggering a GC.
+    pub gc_enabled: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
     pub stacks_prepared: AtomicBool,
@@ -490,6 +497,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             ),
 
             initialized: AtomicBool::new(false),
+            gc_enabled: AtomicBool::new(false),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
             stacks_prepared: AtomicBool::new(false),
