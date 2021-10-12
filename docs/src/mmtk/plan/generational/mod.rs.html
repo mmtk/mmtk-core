@@ -75,10 +75,6 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
-<span id="78">78</span>
-<span id="79">79</span>
-<span id="80">80</span>
-<span id="81">81</span>
 </pre><pre class="rust"><code><span class="doccomment">///! Generational plans</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::BarrierSelector</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
@@ -130,10 +126,6 @@
         <span class="ident"><span class="kw">crate</span>::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN</span>,
         <span class="ident"><span class="kw">crate</span>::util::options::NURSERY_SIZE</span>,
     ),
-    <span class="comment">// See https://github.com/mmtk/mmtk-core/issues/451</span>
-    <span class="comment">// When we fix the issue, we should remove this constraint, and let extreme_assertions to check</span>
-    <span class="comment">// duplicate edges for generational plans.</span>
-    <span class="ident">may_trace_duplicate_edges</span>: <span class="bool-val">true</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
 

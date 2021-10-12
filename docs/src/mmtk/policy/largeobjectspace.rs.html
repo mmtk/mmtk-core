@@ -300,6 +300,12 @@
 <span id="300">300</span>
 <span id="301">301</span>
 <span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
@@ -371,7 +377,8 @@
             <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
         );
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
+        <span class="comment">// If this object is freshly allocated, we do not set it as unlogged</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">alloc</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
             <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
         }
 
@@ -489,6 +496,11 @@
                 <span class="kw">let</span> <span class="ident">cell</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
                 <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">copy</span>(<span class="ident">cell</span>, <span class="ident">nursery_object</span>);
                 <span class="self">self</span>.<span class="ident">clear_nursery</span>(<span class="ident">object</span>);
+                <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.</span>
+                <span class="kw">if</span> <span class="ident">nursery_object</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
+                    <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>
+                        .<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
+                }
                 <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
             }
         }
