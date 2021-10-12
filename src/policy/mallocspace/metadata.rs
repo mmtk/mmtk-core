@@ -259,7 +259,7 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
 }
 
 pub(super) fn is_offset_malloc(address: Address) -> bool {
-    unsafe { side_metadata::load(&OFFSET_MALLOC_METADATA_SPEC, address) == 1 } 
+    unsafe { side_metadata::load(&OFFSET_MALLOC_METADATA_SPEC, address) == 1 }
 }
 
 pub(super) fn set_offset_malloc_bit(address: Address) {

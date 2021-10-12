@@ -1,9 +1,12 @@
+use crate::util::constants::BYTES_IN_ADDRESS;
+use crate::util::Address;
 #[cfg(feature = "malloc_jemalloc")]
 pub use jemalloc_sys::{calloc, free, malloc_usable_size, posix_memalign};
 
 #[cfg(feature = "malloc_mimalloc")]
 pub use mimalloc_sys::{
-    mi_calloc as calloc, mi_free as free, mi_malloc_usable_size as malloc_usable_size, mi_calloc_aligned
+    mi_calloc as calloc, mi_calloc_aligned, mi_free as free,
+    mi_malloc_usable_size as malloc_usable_size,
 };
 
 #[cfg(feature = "malloc_hoard")]
@@ -15,44 +18,40 @@ pub use hoard_sys::{calloc, free, malloc_usable_size};
     feature = "malloc_hoard",
 )))]
 pub use libc::{calloc, free, malloc_usable_size, posix_memalign};
-use crate::util::Address;
-use crate::util::constants::BYTES_IN_ADDRESS;
-use crate::util::memory;
 
 pub fn alloc(size: usize) -> Address {
     let raw = unsafe { calloc(1, size) };
-    let address = Address::from_mut_ptr(raw);
-    address
+    Address::from_mut_ptr(raw)
 }
 
-#[cfg(not(any(
-    feature = "malloc_mimalloc",
-    feature = "malloc_hoard",
-)))]
+#[cfg(not(any(feature = "malloc_mimalloc", feature = "malloc_hoard",)))]
 pub fn align_alloc(size: usize, align: usize) -> Address {
-    let mut ptr = 0 as usize as *mut libc::c_void;
+    let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
     if result != 0 {
         return Address::ZERO;
     }
     let address = Address::from_mut_ptr(ptr);
-    memory::zero(address, size);
+    crate::util::memory::zero(address, size);
     address
 }
 
 #[cfg(feature = "malloc_mimalloc")]
 pub fn align_alloc(size: usize, align: usize) -> Address {
     let raw = unsafe { mi_calloc_aligned(1, size, align) };
-    let address = Address::from_mut_ptr(raw);
-    address
+    Address::from_mut_ptr(raw)
 }
 
+// hoard_sys does not provide align_alloc,
+// we have to do it ourselves
 #[cfg(feature = "malloc_hoard")]
 pub fn align_alloc(size: usize, align: usize) -> Address {
     align_offset_alloc(size, align, 0)
 }
 
+// Beside returning the allocation result,
+// this will store the malloc result at (result - BYTES_IN_ADDRESS)
 pub fn align_offset_alloc(size: usize, align: usize, offset: isize) -> Address {
     let actual_size = size + align + BYTES_IN_ADDRESS;
     let address = alloc(actual_size);
@@ -70,7 +69,6 @@ pub fn align_offset_alloc(size: usize, align: usize, offset: isize) -> Address {
 }
 
 pub fn offset_malloc_usable_size(address: Address) -> usize {
-    // let address = Address.from_mut_ptr(ptr);
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     let malloc_res = unsafe { *malloc_res_ptr } as *mut libc::c_void;
     unsafe { malloc_usable_size(malloc_res) }
