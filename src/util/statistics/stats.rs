@@ -244,12 +244,12 @@ impl Stats {
             if c.merge_phases() {
                 print!("{}\t", c.name());
                 if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    print!("\tfreq")
+                    print!("freq\t")
                 }
             } else {
                 print!("{}.other\t{}.stw\t", c.name(), c.name());
                 if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    print!("\tfreq.other\tfreq.stw")
+                    print!("freq.other\tfreq.stw\t")
                 }
             }
         }
