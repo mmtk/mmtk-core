@@ -257,6 +257,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         if offset_malloc_bit {
             trace!("Free memory {:x}", addr);
             offset_free(addr);
+            unsafe { unset_offset_malloc_bit_unsafe(addr) };
         } else {
             let ptr = addr.to_mut_ptr();
             trace!("Free memory {:?}", ptr);
@@ -446,7 +447,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
                             self.free(obj_start, bytes, offset_malloc_bit);
                             trace!("free object {}", object);
                             unsafe { unset_alloc_bit_unsafe(object) };
-                            unsafe { unset_offset_malloc_bit_unsafe(obj_start) };
                         } else {
                             // Live object
                             // This chunk and page are still active.
@@ -628,7 +628,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     self.free(obj_start, bytes, offset_malloc_bit);
                     trace!("free object {}", object);
                     unsafe { unset_alloc_bit_unsafe(object) };
-                    unsafe { unset_offset_malloc_bit_unsafe(obj_start) };
                 } else {
                     // Live object. Unset mark bit
                     unset_mark_bit::<VM>(object, None);
