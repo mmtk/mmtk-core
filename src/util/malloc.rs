@@ -48,18 +48,20 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
     address
 }
 
-#[cfg(not(any(
-    feature = "malloc_hoard",
-)))]
+#[cfg(feature = "malloc_hoard")]
+pub fn align_alloc(size: usize, align: usize) -> Address {
+    align_offset_alloc(size, align, 0)
+}
+
 pub fn align_offset_alloc(size: usize, align: usize, offset: isize) -> Address {
     let actual_size = size + align + BYTES_IN_ADDRESS;
-    let address = align_alloc(actual_size, align);
+    let address = alloc(actual_size);
     if address.is_zero() {
         return address;
     }
-    let mod_offset = offset as usize % align;
-    let mut result = address + align - mod_offset;
-    if mod_offset + BYTES_IN_ADDRESS > align {
+    let mod_offset = (offset % (align as isize)) as usize;
+    let mut result = address.add(1).align_up(align) - mod_offset;
+    if result - BYTES_IN_ADDRESS < address {
         result += align;
     }
     let malloc_res_ptr: *mut usize = (result - BYTES_IN_ADDRESS).to_mut_ptr();

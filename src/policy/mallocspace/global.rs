@@ -203,6 +203,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             address = Address::from_mut_ptr(raw);
         } else if align >= 16 && offset == 0 {
             address = align_alloc(size, align);
+            #[cfg(feature = "malloc_hoard")]
+            { is_offset_malloc = true; }
             debug_assert!(address.is_aligned_to(align), "Address: {:x} is not aligned to the given alignment: {}", address, align);
         } else {
             address = align_offset_alloc(size, align, offset);
@@ -226,8 +228,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
             if is_offset_malloc {
-                set_offset_malloc_bit(address + offset);
-                // set_offset_malloc_bit(address);
+                // set_offset_malloc_bit(address + offset);
+                set_offset_malloc_bit(address);
             }
 
             #[cfg(debug_assertions)]
@@ -421,7 +423,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         let obj_start = VM::VMObjectModel::object_start_ref(object);
                         // let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
                         // let bytes = unsafe { offset_malloc_usable_size(obj_start) };
-                        let offset_malloc_bit = is_offset_malloc(address);
+                        let offset_malloc_bit = is_offset_malloc(obj_start);
                         let bytes = if offset_malloc_bit {
                             offset_malloc_usable_size(obj_start)
                         } else {
@@ -484,7 +486,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     let obj_start = VM::VMObjectModel::object_start_ref(object);
                     // let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
                     // let bytes = unsafe { offset_malloc_usable_size(obj_start) };
-                    let bytes = if is_offset_malloc(address) {
+                    let bytes = if is_offset_malloc(obj_start) {
                         offset_malloc_usable_size(obj_start)
                     } else {
                         unsafe { malloc_usable_size(address.to_mut_ptr()) }
@@ -592,7 +594,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 let obj_start = VM::VMObjectModel::object_start_ref(object);
                 // let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
                 // let bytes = unsafe { offset_malloc_usable_size(obj_start) };
-                let offset_malloc_bit = is_offset_malloc(address);
+                let offset_malloc_bit = is_offset_malloc(obj_start);
                 let bytes = if offset_malloc_bit {
                     offset_malloc_usable_size(obj_start)
                 } else {
