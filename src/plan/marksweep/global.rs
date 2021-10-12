@@ -62,7 +62,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 &MS_CONSTRAINTS,
                 scheduler,
                 // skip finalization: See https://github.com/mmtk/mmtk-core/issues/473
-                true
+                true,
             );
         // Stop & scan mutators (mutator scanning can happen before STW)
         // scheduler.work_buckets[WorkBucketStage::Unconstrained]

@@ -874,7 +874,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         plan: &'static P,
         constraints: &'static PlanConstraints,
         scheduler: &GCWorkScheduler<VM>,
-        skip_finalization: bool
+        skip_finalization: bool,
     ) {
         use crate::scheduler::gc_work::*;
 
