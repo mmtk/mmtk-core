@@ -77,26 +77,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
             .schedule_common::<Self, PPProcessEdges<VM>, NoCopy<VM>>(self, &CONSTRAINTS, scheduler);
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        // scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        //     .add(StopMutators::<PPProcessEdges<VM>>::new());
-        // Prepare global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Prepare]
-        //     .add(Prepare::<Self, NoCopy<VM>>::new(self));
-        // scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //     .add(ProcessWeakRefs::<PPProcessEdges<VM>>::new());
-        // Release global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Release]
-        //     .add(Release::<Self, NoCopy<VM>>::new(self));
-        // Scheduling all the gc hooks of analysis routines. It is generally recommended
-        // to take advantage of the scheduling system we have in place for more performance
-        // #[cfg(feature = "analysis")]
-        // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        // #[cfg(feature = "sanity")]
-        // scheduler.work_buckets[WorkBucketStage::Final]
-        //     .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
-        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

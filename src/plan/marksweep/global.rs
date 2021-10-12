@@ -64,25 +64,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
                 // skip finalization: See https://github.com/mmtk/mmtk-core/issues/473
                 true,
             );
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        // scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        //     .add(StopMutators::<MSProcessEdges<VM>>::new());
-        // Prepare global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Prepare]
-        //     .add(Prepare::<Self, NoCopy<VM>>::new(self));
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
-        // scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //     .add(ProcessWeakRefs::<MSProcessEdges<VM>>::new());
-        // Release global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Release]
-        //     .add(Release::<Self, NoCopy<VM>>::new(self));
-        // #[cfg(feature = "analysis")]
-        // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        // #[cfg(feature = "sanity")]
-        // scheduler.work_buckets[WorkBucketStage::Final]
-        //     .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
-        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

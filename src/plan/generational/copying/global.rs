@@ -75,8 +75,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.request_full_heap_collection();
 
-        // TODO: We should have a schedule_generational
-
         self.base().set_collection_kind();
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
@@ -87,10 +85,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-            //     GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-            // >::new());
         } else {
             debug!("Full heap GC");
             self.common()
@@ -99,31 +93,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            // scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            //     .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
         }
-
-        // Prepare global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Prepare]
-        //     .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
-        // if is_full_heap {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //         .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
-        // } else {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-        //         GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-        //     >::new());
-        // }
-        // Release global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Release]
-        //     .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
-        // Resume mutators
-        // FIXME: missing GcHookWork
-        // #[cfg(feature = "sanity")]
-        // scheduler.work_buckets[WorkBucketStage::Final]
-        //     .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
-        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

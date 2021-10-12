@@ -91,46 +91,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.common()
                 .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
         }
-
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        // #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        // #[allow(clippy::branches_sharing_code)]
-        // if in_defrag {
-        //     scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        //         .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
-        // } else {
-        //     scheduler.work_buckets[WorkBucketStage::Unconstrained]
-        //         .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
-        // }
-        // Prepare global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Prepare]
-        //     .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        // #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        // #[allow(clippy::branches_sharing_code)]
-        // if in_defrag {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-        //         ImmixProcessEdges<VM, { TraceKind::Defrag }>,
-        //     >::new());
-        // } else {
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //         .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
-        // }
-        // Release global/collectors/mutators
-        // scheduler.work_buckets[WorkBucketStage::Release]
-        //     .add(Release::<Self, ImmixCopyContext<VM>>::new(self));
-        // Analysis routine that is ran. It is generally recommended to take advantage
-        // of the scheduling system we have in place for more performance
-        // #[cfg(feature = "analysis")]
-        // scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        // #[cfg(feature = "sanity")]
-        // scheduler.work_buckets[WorkBucketStage::Final]
-        //     .add(ScheduleSanityGC::<Self, ImmixCopyContext<VM>>::new(self));
-        // scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
