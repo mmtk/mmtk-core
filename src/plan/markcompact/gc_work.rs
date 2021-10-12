@@ -6,6 +6,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::util::{Address, ObjectReference};
+use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
@@ -18,6 +19,12 @@ impl<VM: VMBinding> GCWork<VM> for CalcFwdAddr<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.mc_space.calcluate_forwarding_pointer();
+        // FIXME
+        // The following needs to be done right before the second round of root scanning
+        // put here for simplicity since calculating forwarding pointer occurs right
+        // before updating object references(done through another round of root scanning)
+        // and this calculation is done in a single-threaded manner.
+        VM::VMScanning::prepare_for_roots_scanning();
     }
 }
 
