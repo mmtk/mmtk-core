@@ -149,14 +149,7 @@
 <span id="149">149</span>
 <span id="150">150</span>
 <span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
-<span id="157">157</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::block::Block</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="self">self</span>, <span class="kw-2">*</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>},
@@ -180,13 +173,8 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_MARK_STATE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">127</span>;
 
     <span class="doccomment">/// Line mark table (side)</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
-        <span class="ident">name</span>: <span class="string">&quot;ImmixLineMark&quot;</span>,
-        <span class="ident">is_global</span>: <span class="bool-val">false</span>,
-        <span class="ident">offset</span>: <span class="ident">IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET</span>,
-        <span class="ident">log_num_of_bits</span>: <span class="number">3</span>,
-        <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>,
-    };
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
+        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_LINE_MARK</span>;
 
     <span class="doccomment">/// Align the give address to the line boundary.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>

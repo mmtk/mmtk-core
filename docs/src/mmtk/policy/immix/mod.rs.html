@@ -32,20 +32,6 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
-<span id="38">38</span>
-<span id="39">39</span>
-<span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
-<span id="46">46</span>
-<span id="47">47</span>
-<span id="48">48</span>
 </pre><pre class="rust"><code><span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">block</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">chunk</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">defrag</span>;
@@ -54,14 +40,7 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immixspace</span>::<span class="kw-2">*</span>;
 
-<span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">policy::immix::block::Block</span>,
-    <span class="ident">util::metadata::side_metadata</span>::{<span class="ident">SideMetadataOffset</span>, <span class="ident">SideMetadataSpec</span>},
-};
-
-<span class="kw">use</span> <span class="ident"><span class="self">self</span>::chunk::ChunkMap</span>;
-
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mallocspace::metadata::ACTIVE_PAGE_METADATA_SPEC</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block</span>;
 
 <span class="doccomment">/// The max object size for immix: half of a block</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MAX_IMMIX_OBJECT_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">Block::BYTES</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>;
@@ -87,13 +66,6 @@
     <span class="comment">// Number of lines in a block should not exceed BlockState::MARK_MARKED</span>
     <span class="macro">assert!</span>(<span class="ident">Block::LINES</span> <span class="op">/</span> <span class="number">2</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">u8::MAX</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="number">2</span>);
 }
-
-<span class="doccomment">/// The start of immix side metadata is after the last MallocSpace side metadata.</span>
-<span class="kw">const</span> <span class="ident">IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
-    <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>);
-
-<span class="doccomment">/// Immix&#39;s Last local side metadata. Used to calculate `LOCAL_SIDE_METADATA_VM_BASE_OFFSET`.</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LAST_LOCAL_SIDE_METADATA</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">ChunkMap::ALLOC_TABLE</span>;
 </code></pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-search-index-js="../../../../search-index.js" data-search-js="../../../../search.js"></div>
     <script src="../../../../main.js"></script><script src="../../../../source-script.js"></script><script src="../../../../source-files.js"></script>

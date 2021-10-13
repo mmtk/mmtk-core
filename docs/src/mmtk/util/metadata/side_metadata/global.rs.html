@@ -912,6 +912,7 @@
 <span id="912">912</span>
 <span id="913">913</span>
 <span id="914">914</span>
+<span id="915">915</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
@@ -968,12 +969,13 @@
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">SideMetadataSpec</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
         <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(
-            <span class="string">&quot;SideMetadataSpec {{ \
+            <span class="string">&quot;SideMetadataSpec {} {{ \
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_bytes_in_region: 0x{:x} \
             }}&quot;</span>,
+            <span class="self">self</span>.<span class="ident">name</span>,
             <span class="self">self</span>.<span class="ident">is_global</span>,
             <span class="kw">unsafe</span> {
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_absolute_offset</span>() {
@@ -993,8 +995,8 @@
 <span class="comment">// The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
 <span class="kw">pub</span> <span class="ident">union</span> <span class="ident">SideMetadataOffset</span> {
-    <span class="ident">addr</span>: <span class="ident">Address</span>,
-    <span class="ident">rel_offset</span>: <span class="ident">usize</span>,
+    <span class="kw">pub</span> <span class="ident">addr</span>: <span class="ident">Address</span>,
+    <span class="kw">pub</span> <span class="ident">rel_offset</span>: <span class="ident">usize</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">SideMetadataOffset</span> {
