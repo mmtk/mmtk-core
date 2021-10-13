@@ -50,8 +50,9 @@ impl SideMetadataSpec {
         unsafe { self.offset.rel_offset }
     }
 
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "64")]
-    pub const fn upper_bound(&self) -> SideMetadataOffset {
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
         debug_assert!(self.is_absolute_offset());
         SideMetadataOffset {
             addr: unsafe { self.offset.addr }
@@ -59,8 +60,9 @@ impl SideMetadataSpec {
         }
     }
 
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
     #[cfg(target_pointer_width = "32")]
-    pub const fn upper_bound(&self) -> SideMetadataOffset {
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
         if self.is_absolute_offset() {
             SideMetadataOffset {
                 addr: unsafe { self.offset.addr }
@@ -75,6 +77,25 @@ impl SideMetadataSpec {
                     ),
             }
         }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a contiguous side metadata spec (which uses address
+    /// as offset).
+    pub const fn upper_bound_address_for_contiguous(&self) -> Address {
+        debug_assert!(self.is_absolute_offset());
+        unsafe { self.upper_bound_offset().addr }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a chunked side metadata spec (which uses relative offset). Only 32 bit local
+    /// side metadata uses chunked metadata.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
+        debug_assert!(self.is_rel_offset());
+        address_to_meta_chunk_addr(data_addr).add(unsafe { self.upper_bound_offset().rel_offset })
     }
 }
 
@@ -107,8 +128,8 @@ impl fmt::Debug for SideMetadataSpec {
 // The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
 #[derive(Clone, Copy)]
 pub union SideMetadataOffset {
-    pub addr: Address,
-    pub rel_offset: usize,
+    addr: Address,
+    rel_offset: usize,
 }
 
 impl SideMetadataOffset {
@@ -124,7 +145,7 @@ impl SideMetadataOffset {
 
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        spec.upper_bound()
+        spec.upper_bound_offset()
     }
 }
 

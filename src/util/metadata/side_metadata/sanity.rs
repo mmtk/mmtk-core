@@ -397,15 +397,16 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
     let metadata_addr =
         crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
     let metadata_addr_bound = if spec.is_absolute_offset() {
-        unsafe { spec.upper_bound().addr }
+        spec.upper_bound_address_for_contiguous()
     } else {
         #[cfg(target_pointer_width = "32")]
         {
-            crate::util::metadata::side_metadata::helpers_32::address_to_meta_chunk_addr(data_addr)
-                + unsafe { spec.upper_bound().rel_offset }
+            spec.upper_bound_address_for_chunked(data_addr)
         }
         #[cfg(target_pointer_width = "64")]
-        unreachable!()
+        {
+            unreachable!()
+        }
     };
     if metadata_addr >= metadata_addr_bound {
         panic!("We try access metadata address for address {} of spec {} that is not within the bound {}.", data_addr, spec.name, metadata_addr_bound);
