@@ -100,8 +100,8 @@ impl<VM: VMBinding> MyGCProcessEdges<VM> {
 impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type VM = VM;
     // ANCHOR: mygc_process_edges_new
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
