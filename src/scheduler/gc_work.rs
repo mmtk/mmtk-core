@@ -191,41 +191,43 @@ impl<ScanEdges: ProcessEdgesWork> StopMutators<ScanEdges> {
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if worker.is_coordinator() {
-            trace!("stop_all_mutators start");
-            debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
-            <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
-            trace!("stop_all_mutators end");
-            mmtk.scheduler.notify_mutators_paused(mmtk);
-            if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
-                // Prepare mutators if necessary
-                // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
-                if !mmtk.plan.base().stacks_prepared() {
-                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                            worker.tls,
-                            mutator.get_tls(),
-                            mutator,
-                        );
-                    }
-                }
-                // Scan mutators
-                if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
-                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                        .add(ScanStackRoots::<E>::new());
-                } else {
-                    for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                            .add(ScanStackRoot::<E>(mutator));
-                    }
-                }
-            }
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanVMSpecificRoots::<E>::new());
-        } else {
+        // If the VM requires that only the coordinator thread can stop the world,
+        // we delegate the work to the coordinator.
+        if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
             mmtk.scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
+            return;
         }
+
+        trace!("stop_all_mutators start");
+        debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
+        <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
+        trace!("stop_all_mutators end");
+        mmtk.scheduler.notify_mutators_paused(mmtk);
+        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+            // Prepare mutators if necessary
+            // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
+            if !mmtk.plan.base().stacks_prepared() {
+                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
+                        worker.tls,
+                        mutator.get_tls(),
+                        mutator,
+                    );
+                }
+            }
+            // Scan mutators
+            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
+                mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                    .add(ScanStackRoots::<E>::new());
+            } else {
+                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                    mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+                        .add(ScanStackRoot::<E>(mutator));
+                }
+            }
+        }
+        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
     }
 }
 
@@ -242,6 +244,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             // reset the logging info at the end of each GC
             crate::util::edge_logger::reset();
+        }
+
+        if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
+            assert!(worker.is_coordinator(),
+                    "VM only allows coordinator to resume mutators, but the current worker is not the coordinator.");
         }
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
@@ -366,6 +373,7 @@ pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<E::VM>,
+    pub roots: bool,
 }
 
 unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
@@ -373,7 +381,7 @@ unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
 impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
-    pub fn new(edges: Vec<Address>, mmtk: &'static MMTK<E::VM>) -> Self {
+    pub fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<E::VM>) -> Self {
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             for edge in &edges {
@@ -386,6 +394,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
             nodes: vec![],
             mmtk,
             worker: std::ptr::null_mut(),
+            roots,
         }
     }
     pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
@@ -403,6 +412,17 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
     pub fn plan(&self) -> &'static dyn Plan<VM = E::VM> {
         &*self.mmtk.plan
     }
+    /// Pop all nodes from nodes, and clear nodes to an empty vector.
+    #[inline]
+    pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
+        debug_assert!(
+            !self.nodes.is_empty(),
+            "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
+        );
+        let mut new_nodes = vec![];
+        mem::swap(&mut new_nodes, &mut self.nodes);
+        new_nodes
+    }
 }
 
 /// Scan & update a list of object slots
@@ -416,6 +436,16 @@ pub trait ProcessEdgesWork:
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
+    #[cfg(feature = "sanity")]
+    fn cache_roots_for_sanity_gc(&mut self) {
+        assert!(self.roots);
+        self.mmtk()
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .add_roots(self.edges.clone());
+    }
+
     #[inline]
     fn process_node(&mut self, object: ObjectReference) {
         if self.nodes.is_empty() {
@@ -427,22 +457,31 @@ pub trait ProcessEdgesWork:
         // So maximum 1 `ScanObjects` work can be created from `nodes` buffer
     }
 
-    #[cold]
-    fn flush(&mut self) {
-        let mut new_nodes = vec![];
-        mem::swap(&mut new_nodes, &mut self.nodes);
-        let scan_objects_work = ScanObjects::<Self>::new(new_nodes, false);
-
+    /// Create a new scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
+    /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
+    #[inline]
+    fn new_scan_work(&mut self, work_packet: impl GCWork<Self::VM>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
             // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
-            self.worker().do_work(scan_objects_work);
+            self.worker().do_work(work_packet);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(scan_objects_work);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
         }
+    }
+
+    /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
+    /// this method will simply return with no work packet created.
+    #[cold]
+    fn flush(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
+        let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
+        self.new_scan_work(scan_objects_work);
     }
 
     #[inline]
@@ -470,6 +509,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
         self.process_edges();
         if !self.nodes.is_empty() {
             self.flush();
+        }
+        #[cfg(feature = "sanity")]
+        if self.roots {
+            self.cache_roots_for_sanity_gc();
         }
         trace!("ProcessEdgesWork End");
     }

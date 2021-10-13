@@ -1,10 +1,17 @@
-name: Post Code Review Checks (Micro Benchmarks)
+name: Binding Perf Tests (Micro Benchmarks)
 
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened, labeled]
+#     branches:
+#       - master
+
+# Ignore micro benchmarks - micro benchmarking does not seem to be very helpful.
+# We should rethink if we really need it or make it more useful.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+  push:
+    branches-ignore:
+      - '**'
 
 jobs:
   openjdk-microbm:

@@ -85,8 +85,8 @@ impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
         Self { plan, base }
     }
@@ -95,19 +95,10 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        // Evacuate mature objects
+        // Evacuate mature objects; don't trace objects if they are in to-space
         if self.gencopy().tospace().in_space(object) {
-            return self
-                .gencopy()
-                .tospace()
-                .trace_object::<Self, GenCopyCopyContext<VM>>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
-                );
-        }
-        if self.gencopy().fromspace().in_space(object) {
+            return object;
+        } else if self.gencopy().fromspace().in_space(object) {
             return self
                 .gencopy()
                 .fromspace()
@@ -118,6 +109,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
                     unsafe { self.worker().local::<GenCopyCopyContext<VM>>() },
                 );
         }
+
         self.gencopy()
             .gen
             .trace_object_full_heap::<Self, GenCopyCopyContext<VM>>(self, object, unsafe {
