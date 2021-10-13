@@ -54,12 +54,13 @@ impl SideMetadataSpec {
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "SideMetadataSpec {{ \
+            "SideMetadataSpec {} {{ \
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_bytes_in_region: 0x{:x} \
             }}",
+            self.name,
             self.is_global,
             unsafe {
                 if self.is_absolute_offset() {
@@ -79,8 +80,8 @@ impl fmt::Debug for SideMetadataSpec {
 // The fields are made private on purpose. They can only be accessed from SideMetadata which knows whether it is Address or usize.
 #[derive(Clone, Copy)]
 pub union SideMetadataOffset {
-    addr: Address,
-    rel_offset: usize,
+    pub addr: Address,
+    pub rel_offset: usize,
 }
 
 impl SideMetadataOffset {
