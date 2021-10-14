@@ -69,10 +69,12 @@ pub trait SFT {
     /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
-    /// Is the object in the space? For most cases, if we find the sft for an object, that means
-    /// the object is in the space. However, for some spaces, they need a further check.
+    /// Is the object managed by MMTk? For most cases, if we find the sft for an object, that means
+    /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
+    /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
+    /// in the space contain actual MMTk objects. So they need a further check.
     #[inline(always)]
-    fn is_in_space(&self, _object: ObjectReference) -> bool {
+    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
         true
     }
     /// Initialize object metadata (in the header, or in the side metadata).
@@ -113,7 +115,7 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[inline(always)]
-    fn is_in_space(&self, _object: ObjectReference) -> bool {
+    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
         false
     }
 
@@ -254,7 +256,7 @@ impl<'a> SFTMap<'a> {
         if object.to_address().chunk_index() >= self.sft.len() {
             return false;
         }
-        self.get(object.to_address()).is_in_space(object)
+        self.get(object.to_address()).is_mmtk_object(object)
     }
 }
 

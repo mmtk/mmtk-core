@@ -72,7 +72,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     // For malloc space, we need to further check the alloc bit.
-    fn is_in_space(&self, object: ObjectReference) -> bool {
+    fn is_mmtk_object(&self, object: ObjectReference) -> bool {
         is_alloced_by_malloc(object)
     }
 
