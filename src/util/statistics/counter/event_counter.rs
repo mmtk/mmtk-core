@@ -80,10 +80,6 @@ impl Counter for EventCounter {
         self.running = false;
     }
 
-    /**
-     * The phase has changed (from GC to mutator or mutator to GC).
-     * Take action with respect to the last phase if necessary.
-     */
     fn phase_change(&mut self, old_phase: usize) {
         if self.running {
             self.count[old_phase] = self.current_count;
@@ -100,14 +96,14 @@ impl Counter for EventCounter {
         }
     }
 
-    fn print_total(&self, mutator: Option<bool>) {
-        match mutator {
+    fn get_total(&self, other: Option<bool>) -> u64 {
+        match other {
             None => {
                 let mut total = 0;
                 for p in 0..=self.stats.get_phase() {
                     total += self.count[p];
                 }
-                self.print_value(total);
+                total
             }
             Some(m) => {
                 let mut total = 0;
@@ -116,13 +112,17 @@ impl Counter for EventCounter {
                     total += self.count[p];
                     p += 2;
                 }
-                self.print_value(total);
+                total
             }
-        };
+        }
     }
 
-    fn print_min(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_total(&self, other: Option<bool>) {
+        self.print_value(self.get_total(other));
+    }
+
+    fn print_min(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut min = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] < min {
@@ -133,8 +133,8 @@ impl Counter for EventCounter {
         self.print_value(min);
     }
 
-    fn print_max(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_max(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut max = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] > max {

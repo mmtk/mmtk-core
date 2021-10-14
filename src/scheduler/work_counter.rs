@@ -189,8 +189,8 @@ mod perf_event {
     impl WorkCounter for WorkPerfEvent {
         fn start(&mut self) {
             self.running = true;
-            self.pe.reset();
-            self.pe.enable();
+            self.pe.reset().expect("Failed to reset perf event");
+            self.pe.enable().expect("Failed to enable perf event");
         }
         fn stop(&mut self) {
             self.running = true;
@@ -198,7 +198,7 @@ mod perf_event {
             self.base.merge_val(perf_event_value.value as f64);
             // assert not multiplexing
             assert_eq!(perf_event_value.time_enabled, perf_event_value.time_running);
-            self.pe.disable();
+            self.pe.disable().expect("Failed to disable perf event");
         }
         fn name(&self) -> String {
             self.event_name.to_owned()
