@@ -82,7 +82,7 @@ pub trait SFT {
 }
 
 /// Print debug info for SFT. Should be false when committed.
-const DEBUG_SFT: bool = cfg!(debug_assertions) && true;
+const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
