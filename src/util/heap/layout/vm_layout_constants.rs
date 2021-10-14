@@ -4,9 +4,12 @@ use crate::util::Address;
 
 use crate::util::conversions::{chunk_align_down, chunk_align_up};
 
-/** log_2 of the addressable virtual space */
+/// log_2 of the addressable virtual space.
 #[cfg(target_pointer_width = "64")]
-pub const LOG_ADDRESS_SPACE: usize = LOG_SPACE_SIZE_64 + LOG_MAX_SPACES;
+// This used to be LOG_SPACE_SIZE_64 + LOG_MAX_SPACES (45).
+// We increase this as we also use malloc which may give us addresses that is beyond 1 << 45.
+// This affects how much address space we need to reserve for side metadata.
+pub const LOG_ADDRESS_SPACE: usize = 47;
 #[cfg(target_pointer_width = "32")]
 pub const LOG_ADDRESS_SPACE: usize = 32;
 /**

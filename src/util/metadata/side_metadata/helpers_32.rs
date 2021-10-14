@@ -85,9 +85,9 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
 }
 
 #[inline(always)]
-pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
+pub(crate) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
     LOCAL_SIDE_METADATA_BASE_ADDRESS
-        + ((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
+        .add((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
 }
 
 #[inline(always)]

@@ -49,17 +49,66 @@ impl SideMetadataSpec {
         debug_assert!(self.is_rel_offset());
         unsafe { self.offset.rel_offset }
     }
+
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
+    #[cfg(target_pointer_width = "64")]
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+        debug_assert!(self.is_absolute_offset());
+        SideMetadataOffset {
+            addr: unsafe { self.offset.addr }
+                .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+        }
+    }
+
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+        if self.is_absolute_offset() {
+            SideMetadataOffset {
+                addr: unsafe { self.offset.addr }
+                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+            }
+        } else {
+            SideMetadataOffset {
+                rel_offset: unsafe { self.offset.rel_offset }
+                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                        self.log_bytes_in_region,
+                        self.log_num_of_bits,
+                    ),
+            }
+        }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a contiguous side metadata spec (which uses address
+    /// as offset).
+    pub const fn upper_bound_address_for_contiguous(&self) -> Address {
+        debug_assert!(self.is_absolute_offset());
+        unsafe { self.upper_bound_offset().addr }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a chunked side metadata spec (which uses relative offset). Only 32 bit local
+    /// side metadata uses chunked metadata.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
+        debug_assert!(self.is_rel_offset());
+        address_to_meta_chunk_addr(data_addr).add(unsafe { self.upper_bound_offset().rel_offset })
+    }
 }
 
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "SideMetadataSpec {{ \
+            "SideMetadataSpec {} {{ \
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
             **log_bytes_in_region: 0x{:x} \
             }}",
+            self.name,
             self.is_global,
             unsafe {
                 if self.is_absolute_offset() {
@@ -95,31 +144,8 @@ impl SideMetadataOffset {
     }
 
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "64")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        debug_assert!(spec.is_absolute_offset());
-        SideMetadataOffset {
-            addr: unsafe { spec.offset.addr }
-                .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-        }
-    }
-    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "32")]
-    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        if spec.is_absolute_offset() {
-            SideMetadataOffset {
-                addr: unsafe { spec.offset.addr }
-                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-            }
-        } else {
-            SideMetadataOffset {
-                rel_offset: unsafe { spec.offset.rel_offset }
-                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                        spec.log_bytes_in_region,
-                        spec.log_num_of_bits,
-                    ),
-            }
-        }
+        spec.upper_bound_offset()
     }
 }
 
