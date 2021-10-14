@@ -166,18 +166,19 @@ impl<'a> SFTMap<'a> {
     }
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
-        debug!("Update SFT for [{}, {}) as {}", start, start + bytes, space.name());
+        debug!(
+            "Update SFT for [{}, {}) as {}",
+            start,
+            start + bytes,
+            space.name()
+        );
         let first = start.chunk_index();
         let last = conversions::chunk_align_up(start + bytes).chunk_index();
         let start_chunk = chunk_index_to_address(first);
         let end_chunk = chunk_index_to_address(last);
         debug!(
             "Update SFT for {} bytes of [{} #{}, {} #{})",
-            bytes,
-            start_chunk,
-            first,
-            end_chunk,
-            last
+            bytes, start_chunk, first, end_chunk, last
         );
     }
 
