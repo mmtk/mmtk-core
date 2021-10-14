@@ -83,7 +83,7 @@ impl Stats {
         )));
         counters.push(t.clone());
         // If we support perf events, we also measure the task clock event,
-        // which measure sums over the actual time each thread is running,
+        // which sums over the actual time each thread is running,
         // and is analogous to the wall-clock timer as above.
         // This is also useful for measuring the effective CPU frequency as
         // a sanity check.
