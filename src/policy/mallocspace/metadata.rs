@@ -52,13 +52,8 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
 
-pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    name: "OffsetMallocBit",
-    is_global: false,
-    offset: SideMetadataOffset::layout_after(&ACTIVE_PAGE_METADATA_SPEC),
-    log_num_of_bits: 0,
-    log_bytes_in_region: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
+pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
 /// we will go through all the chunks for [address, address + size), and check if they are mapped.
