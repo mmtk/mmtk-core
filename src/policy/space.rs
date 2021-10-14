@@ -69,12 +69,18 @@ pub trait SFT {
     /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
+    /// Is the object in the space? For most cases, if we find the sft for an object, that means
+    /// the object is in the space. However, for some spaces, they need a further check.
+    #[inline(always)]
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
+        true
+    }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 }
 
 /// Print debug info for SFT. Should be false when committed.
-const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
+const DEBUG_SFT: bool = cfg!(debug_assertions) && true;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
@@ -104,6 +110,10 @@ impl SFT for EmptySpaceSFT {
          *
          * panic!("called is_movable() on empty space")
          */
+        false
+    }
+    #[inline(always)]
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
 
@@ -153,19 +163,19 @@ impl<'a> SFTMap<'a> {
         res
     }
 
-    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
+    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
+        debug!("Update SFT for [{}, {}) as {}", start, start + bytes, space.name());
         let first = start.chunk_index();
-        let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-        debug!("Update SFT for [{}, {}) as {}", start, end, space.name());
+        let last = conversions::chunk_align_up(start + bytes).chunk_index();
         let start_chunk = chunk_index_to_address(first);
-        let end_chunk = chunk_index_to_address(first + chunks);
+        let end_chunk = chunk_index_to_address(last);
         debug!(
-            "Update SFT for {} chunks of [{} #{}, {} #{})",
-            chunks,
+            "Update SFT for {} bytes of [{} #{}, {} #{})",
+            bytes,
             start_chunk,
             first,
             end_chunk,
-            first + chunks
+            last
         );
     }
 
@@ -188,13 +198,15 @@ impl<'a> SFTMap<'a> {
     }
 
     /// Update SFT map for the given address range.
-    /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
+    /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
+    /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         if DEBUG_SFT {
-            self.log_update(space, start, chunks);
+            self.log_update(space, start, bytes);
         }
         let first = start.chunk_index();
-        for chunk in first..(first + chunks) {
+        let last = conversions::chunk_align_up(start + bytes).chunk_index();
+        for chunk in first..last {
             self.set(chunk, space);
         }
         if DEBUG_SFT {
@@ -204,7 +216,9 @@ impl<'a> SFTMap<'a> {
 
     // TODO: We should clear a SFT entry when a space releases a chunk.
     #[allow(dead_code)]
-    pub fn clear(&self, chunk_idx: usize) {
+    pub fn clear(&self, chunk_start: Address) {
+        assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
+        let chunk_idx = chunk_start.chunk_index();
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
@@ -227,7 +241,8 @@ impl<'a> SFTMap<'a> {
             // in which case, we still set SFT map again.
             debug_assert!(
                 old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
+                "attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})",
+                chunk,
                 old,
                 new
             );
@@ -236,16 +251,10 @@ impl<'a> SFTMap<'a> {
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
-        let not_in_space = object.to_address().chunk_index() >= self.sft.len()
-            || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
-
-        if not_in_space {
-            // special case - we do not yet have SFT entries for malloc space
-            use crate::policy::mallocspace::is_alloced_by_malloc;
-            is_alloced_by_malloc(object)
-        } else {
-            true
+        if object.to_address().chunk_index() >= self.sft.len() {
+            return false;
         }
+        self.get(object.to_address()).is_in_space(object)
     }
 }
 
@@ -360,8 +369,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             "should only grow space for new chunks at chunk-aligned start address"
         );
         if new_chunk {
-            let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft(), start, chunks);
+            SFT_MAP.update(self.as_sft(), start, bytes);
         }
     }
 
@@ -370,7 +378,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      *  mapped (e.g. for a vm image which is externally mmapped.)
      */
     fn ensure_mapped(&self) {
-        let chunks = conversions::bytes_to_chunks_up(self.common().extent);
         if self
             .common()
             .metadata
@@ -380,7 +387,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.common().start, chunks);
+        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -601,7 +608,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), self.start, bytes_to_chunks_up(self.extent));
+            SFT_MAP.update(space.as_sft(), self.start, self.extent);
         }
     }
 
