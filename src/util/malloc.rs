@@ -19,11 +19,6 @@ pub use hoard_sys::{calloc, free, malloc_usable_size};
 )))]
 pub use libc::{calloc, free, malloc_usable_size, posix_memalign};
 
-pub fn alloc(size: usize) -> Address {
-    let raw = unsafe { calloc(1, size) };
-    Address::from_mut_ptr(raw)
-}
-
 #[cfg(not(any(feature = "malloc_mimalloc", feature = "malloc_hoard",)))]
 pub fn align_alloc(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
@@ -54,7 +49,8 @@ pub fn align_alloc(size: usize, align: usize) -> Address {
 // this will store the malloc result at (result - BYTES_IN_ADDRESS)
 pub fn align_offset_alloc(size: usize, align: usize, offset: isize) -> Address {
     let actual_size = size + align + BYTES_IN_ADDRESS;
-    let address = alloc(actual_size);
+    let raw = unsafe { calloc(1, actual_size) };
+    let address = Address::from_mut_ptr(raw);
     if address.is_zero() {
         return address;
     }
@@ -78,4 +74,47 @@ pub fn offset_free(address: Address) {
     let malloc_res_ptr: *mut usize = (address - BYTES_IN_ADDRESS).to_mut_ptr();
     let malloc_res = unsafe { *malloc_res_ptr } as *mut libc::c_void;
     unsafe { free(malloc_res) };
+}
+
+pub fn get_malloc_usable_size(address: Address, is_offset_malloc: bool) -> usize {
+    if is_offset_malloc {
+        offset_malloc_usable_size(address)
+    } else {
+        unsafe { malloc_usable_size(address.to_mut_ptr()) }
+    }
+}
+
+pub fn alloc(size: usize, align: usize, offset: isize) -> (Address, bool) {
+    let address: Address;
+    let mut is_offset_malloc = false;
+    // malloc returns 16 bytes aligned address.
+    // So if the alignment is smaller than 16 bytes, we do not need to align.
+    if align <= 16 && offset == 0 {
+        let raw = unsafe { calloc(1, size) };
+        address = Address::from_mut_ptr(raw);
+        debug_assert!(address.is_aligned_to(align));
+    } else if align > 16 && offset == 0 {
+        address = align_alloc(size, align);
+        #[cfg(feature = "malloc_hoard")]
+        {
+            is_offset_malloc = true;
+        }
+        debug_assert!(
+            address.is_aligned_to(align),
+            "Address: {:x} is not aligned to the given alignment: {}",
+            address,
+            align
+        );
+    } else {
+        address = align_offset_alloc(size, align, offset);
+        is_offset_malloc = true;
+        debug_assert!(
+            (address + offset).is_aligned_to(align),
+            "Address: {:x} is not aligned to the given alignment: {} at offset: {}",
+            address,
+            align,
+            offset
+        );
+    }
+    (address, is_offset_malloc)
 }
