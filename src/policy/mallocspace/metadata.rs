@@ -5,7 +5,6 @@ use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::LOG_MAX_GLOBAL_SIDE_METADATA_SIZE;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -22,8 +21,7 @@ lazy_static! {
     /// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
     /// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds
-    static ref MAX_METADATA_ADDRESS: Address =
-        ACTIVE_CHUNK_METADATA_SPEC.get_absolute_offset() + (1_usize << LOG_MAX_GLOBAL_SIDE_METADATA_SIZE);
+    pub static ref MAX_METADATA_ADDRESS: Address = ACTIVE_CHUNK_METADATA_SPEC.upper_bound_address_for_contiguous();
 }
 
 /// Metadata spec for the active chunk byte
