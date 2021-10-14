@@ -1,15 +1,14 @@
 use crate::util::alloc_bit;
-use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+use crate::util::conversions;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -39,13 +38,8 @@ lazy_static! {
 /// This is a global side metadata spec even though it is used only by MallocSpace as
 /// we require its space to be contiguous and mapped only once. Otherwise we risk
 /// overwriting the previous mapping.
-pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    name: "MallocActiveChunk",
-    is_global: true,
-    offset: SideMetadataOffset::layout_after(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
-    log_num_of_bits: 3,
-    log_bytes_in_region: LOG_BYTES_IN_CHUNK as usize,
-};
+pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK;
 
 /// Metadata spec for the active page byte
 ///
@@ -57,13 +51,8 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 /// the same time
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
-pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    name: "MallocActivePage",
-    is_global: false,
-    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
-    log_num_of_bits: 3,
-    log_bytes_in_region: constants::LOG_BYTES_IN_PAGE as usize,
-};
+pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
 /// we will go through all the chunks for [address, address + size), and check if they are mapped.
