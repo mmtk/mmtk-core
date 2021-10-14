@@ -49,10 +49,6 @@ pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
         crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
         crate::util::options::NURSERY_SIZE,
     ),
-    // See https://github.com/mmtk/mmtk-core/issues/451
-    // When we fix the issue, we should remove this constraint, and let extreme_assertions to check
-    // duplicate edges for generational plans.
-    may_trace_duplicate_edges: true,
     ..PlanConstraints::default()
 };
 

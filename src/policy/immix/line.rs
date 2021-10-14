@@ -1,5 +1,4 @@
 use super::block::Block;
-use super::IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::{
     util::{Address, ObjectReference},
@@ -23,13 +22,8 @@ impl Line {
     pub const MAX_MARK_STATE: u8 = 127;
 
     /// Line mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        name: "ImmixLineMark",
-        is_global: false,
-        offset: IMMIX_LOCAL_SIDE_METADATA_BASE_OFFSET,
-        log_num_of_bits: 3,
-        log_bytes_in_region: Self::LOG_BYTES,
-    };
+    pub const MARK_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::IX_LINE_MARK;
 
     /// Align the give address to the line boundary.
     #[inline(always)]
