@@ -14,7 +14,7 @@ use std::sync::Mutex;
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
 
-// Shared with each counter
+/// GC stats shared among counters
 pub struct SharedStats {
     phase: AtomicUsize,
     gathering_stats: AtomicBool,
@@ -38,6 +38,10 @@ impl SharedStats {
     }
 }
 
+/// GC statistics
+///
+/// The struct holds basic GC statistics, like the GC count,
+/// and an array of counters.
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
@@ -56,6 +60,8 @@ pub struct Stats {
 impl Stats {
     #[allow(unused)]
     pub fn new(options: &Options) -> Self {
+        // Create a perfmon instance and initialize it
+        // we use perfmon to parse perf event names
         #[cfg(feature = "perf_counter")]
         let perfmon = {
             let mut perfmon: Perfmon = Default::default();
@@ -67,6 +73,7 @@ impl Stats {
             gathering_stats: AtomicBool::new(false),
         });
         let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
+        // We always have a time counter enabled
         let t = Arc::new(Mutex::new(LongCounter::new(
             "time".to_string(),
             shared.clone(),
@@ -75,6 +82,11 @@ impl Stats {
             MonotoneNanoTime {},
         )));
         counters.push(t.clone());
+        // If we support perf events, we also measure the task clock event,
+        // which measure sums over the actual time each thread is running,
+        // and is analogous to the wall-clock timer as above.
+        // This is also useful for measuring the effective CPU frequency as
+        // a sanity check.
         #[cfg(feature = "perf_counter")]
         let task_clock = {
             let t = Arc::new(Mutex::new(LongCounter::new(
@@ -87,6 +99,8 @@ impl Stats {
             counters.push(t.clone());
             t
         };
+        // Read from the MMTK option for a list of perf events we want to
+        // measure, and create corresponding counters
         #[cfg(feature = "perf_counter")]
         for e in &options.phase_perf_events.events {
             counters.push(Arc::new(Mutex::new(LongCounter::new(
@@ -202,6 +216,10 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 c.print_total(None);
+                // If we measure the CPU cycles, we can use that and the task
+                // clock to calculate the CPU frequency. This can be used as a
+                // sanity check in case we have dynamic frequency scaling
+                // or if the cycle readings are bogus
                 #[cfg(feature = "perf_counter")]
                 if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
                     print!(
@@ -243,6 +261,7 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 print!("{}\t", c.name());
+                // Compute the CPU frequency, see print_stats
                 if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
                     print!("freq\t")
                 }

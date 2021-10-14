@@ -64,8 +64,8 @@ impl<T: Diffable> Counter for LongCounter<T> {
         }
     }
 
-    fn get_total(&self, mutator: Option<bool>) -> u64 {
-        match mutator {
+    fn get_total(&self, other: Option<bool>) -> u64 {
+        match other {
             None => self.total_count,
             Some(m) => {
                 let mut total = 0;
@@ -79,12 +79,12 @@ impl<T: Diffable> Counter for LongCounter<T> {
         }
     }
 
-    fn print_total(&self, mutator: Option<bool>) {
-        self.print_value(self.get_total(mutator));
+    fn print_total(&self, other: Option<bool>) {
+        self.print_value(self.get_total(other));
     }
 
-    fn print_min(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_min(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut min = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] < min {
@@ -95,8 +95,8 @@ impl<T: Diffable> Counter for LongCounter<T> {
         self.print_value(min);
     }
 
-    fn print_max(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_max(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut max = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] > max {
