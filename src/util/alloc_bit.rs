@@ -1,35 +1,15 @@
 use atomic::Ordering;
 
-use crate::util::constants;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-/// This is the metadata spec for the alloc-bit.
-///
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
-///
-#[cfg(target_pointer_width = "32")]
-pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    name: "AllocBit",
-    is_global: true,
-    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
-    log_num_of_bits: 0,
-    log_bytes_in_region: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
-
-#[cfg(target_pointer_width = "64")]
-pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    name: "AllocBit",
-    is_global: true,
-    offset: GLOBAL_SIDE_METADATA_BASE_OFFSET,
-    log_num_of_bits: 0,
-    log_bytes_in_region: constants::LOG_MIN_OBJECT_SIZE as usize,
-};
+pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT;
 
 pub const ALLOC_SIDE_METADATA_ADDR: Address = ALLOC_SIDE_METADATA_SPEC.get_absolute_offset();
 
