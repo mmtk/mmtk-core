@@ -246,10 +246,6 @@
         <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="bool-val">false</span>;
     }
 
-    <span class="doccomment">/**
-     * The phase has changed (from GC to mutator or mutator to GC).
-     * Take action with respect to the last phase if necessary.
-     */</span>
     <span class="kw">fn</span> <span class="ident">phase_change</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">old_phase</span>: <span class="ident">usize</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">running</span> {
             <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">old_phase</span>] <span class="op">=</span> <span class="self">self</span>.<span class="ident">current_count</span>;
@@ -266,14 +262,14 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">print_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) {
-        <span class="kw">match</span> <span class="ident">mutator</span> {
+    <span class="kw">fn</span> <span class="ident">get_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+        <span class="kw">match</span> <span class="ident">other</span> {
             <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total</span> <span class="op">=</span> <span class="number">0</span>;
                 <span class="kw">for</span> <span class="ident">p</span> <span class="kw">in</span> <span class="number">0</span>..<span class="op">=</span><span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>() {
                     <span class="ident">total</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
                 }
-                <span class="self">self</span>.<span class="ident">print_value</span>(<span class="ident">total</span>);
+                <span class="ident">total</span>
             }
             <span class="prelude-val">Some</span>(<span class="ident">m</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total</span> <span class="op">=</span> <span class="number">0</span>;
@@ -282,13 +278,17 @@
                     <span class="ident">total</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
                     <span class="ident">p</span> <span class="op">+</span><span class="op">=</span> <span class="number">2</span>;
                 }
-                <span class="self">self</span>.<span class="ident">print_value</span>(<span class="ident">total</span>);
+                <span class="ident">total</span>
             }
-        };
+        }
     }
 
-    <span class="kw">fn</span> <span class="ident">print_min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">mutator</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
+    <span class="kw">fn</span> <span class="ident">print_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">print_value</span>(<span class="self">self</span>.<span class="ident">get_total</span>(<span class="ident">other</span>));
+    }
+
+    <span class="kw">fn</span> <span class="ident">print_min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">other</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
         <span class="kw">while</span> <span class="ident">p</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>() {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>] <span class="op">&lt;</span> <span class="ident">min</span> {
@@ -299,8 +299,8 @@
         <span class="self">self</span>.<span class="ident">print_value</span>(<span class="ident">min</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">print_max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">mutator</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
+    <span class="kw">fn</span> <span class="ident">print_max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">other</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">max</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
         <span class="kw">while</span> <span class="ident">p</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>() {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>] <span class="op">&gt;</span> <span class="ident">max</span> {

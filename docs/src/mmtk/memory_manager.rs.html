@@ -501,7 +501,7 @@
             <span class="kw">if</span> <span class="ident">split</span>[<span class="number">0</span>] <span class="op">=</span><span class="op">=</span> <span class="string">&quot;Threads:&quot;</span> {
                 <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">split</span>[<span class="number">1</span>].<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
                 <span class="kw">if</span> <span class="ident">threads</span> <span class="op">!</span><span class="op">=</span> <span class="number">1</span> {
-                    <span class="macro">warn!</span>(<span class="string">&quot;Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this threadas&quot;</span>, <span class="ident">threads</span>);
+                    <span class="macro">warn!</span>(<span class="string">&quot;Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread&quot;</span>, <span class="ident">threads</span>);
                 }
             }
         }

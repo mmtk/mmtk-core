@@ -405,8 +405,8 @@
     <span class="kw">impl</span> <span class="ident">WorkCounter</span> <span class="kw">for</span> <span class="ident">WorkPerfEvent</span> {
         <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
             <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="bool-val">true</span>;
-            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">reset</span>();
-            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">enable</span>();
+            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">reset</span>().<span class="ident">expect</span>(<span class="string">&quot;Failed to reset perf event&quot;</span>);
+            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">enable</span>().<span class="ident">expect</span>(<span class="string">&quot;Failed to enable perf event&quot;</span>);
         }
         <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
             <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="bool-val">true</span>;
@@ -414,7 +414,7 @@
             <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">merge_val</span>(<span class="ident">perf_event_value</span>.<span class="ident">value</span> <span class="kw">as</span> <span class="ident">f64</span>);
             <span class="comment">// assert not multiplexing</span>
             <span class="macro">assert_eq!</span>(<span class="ident">perf_event_value</span>.<span class="ident">time_enabled</span>, <span class="ident">perf_event_value</span>.<span class="ident">time_running</span>);
-            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">disable</span>();
+            <span class="self">self</span>.<span class="ident">pe</span>.<span class="ident">disable</span>().<span class="ident">expect</span>(<span class="string">&quot;Failed to disable perf event&quot;</span>);
         }
         <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
             <span class="self">self</span>.<span class="ident">event_name</span>.<span class="ident">to_owned</span>()

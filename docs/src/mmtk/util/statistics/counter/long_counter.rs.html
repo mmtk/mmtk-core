@@ -148,6 +148,12 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::stats</span>::{<span class="ident">SharedStats</span>, <span class="ident">MAX_PHASES</span>};
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
@@ -178,6 +184,7 @@
         }
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">running</span>);
         <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="bool-val">true</span>;
+        <span class="self">self</span>.<span class="ident">diffable</span>.<span class="ident">start</span>();
         <span class="self">self</span>.<span class="ident">start_value</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">diffable</span>.<span class="ident">current_value</span>());
     }
 
@@ -187,6 +194,7 @@
         }
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">running</span>);
         <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="self">self</span>.<span class="ident">diffable</span>.<span class="ident">stop</span>();
         <span class="kw">let</span> <span class="ident">current_value</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">diffable</span>.<span class="ident">current_value</span>();
         <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> <span class="ident">T::diff</span>(<span class="kw-2">&amp;</span><span class="ident">current_value</span>, <span class="self">self</span>.<span class="ident">start_value</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>());
         <span class="self">self</span>.<span class="ident">count</span>[<span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>()] <span class="op">+</span><span class="op">=</span> <span class="ident">delta</span>;
@@ -212,9 +220,9 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">print_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) {
-        <span class="kw">match</span> <span class="ident">mutator</span> {
-            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">print_value</span>(<span class="self">self</span>.<span class="ident">total_count</span>),
+    <span class="kw">fn</span> <span class="ident">get_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">u64</span> {
+        <span class="kw">match</span> <span class="ident">other</span> {
+            <span class="prelude-val">None</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">total_count</span>,
             <span class="prelude-val">Some</span>(<span class="ident">m</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total</span> <span class="op">=</span> <span class="number">0</span>;
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">m</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
@@ -222,13 +230,17 @@
                     <span class="ident">total</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
                     <span class="ident">p</span> <span class="op">+</span><span class="op">=</span> <span class="number">2</span>;
                 }
-                <span class="self">self</span>.<span class="ident">print_value</span>(<span class="ident">total</span>);
+                <span class="ident">total</span>
             }
-        };
+        }
     }
 
-    <span class="kw">fn</span> <span class="ident">print_min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">mutator</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
+    <span class="kw">fn</span> <span class="ident">print_total</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">bool</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">print_value</span>(<span class="self">self</span>.<span class="ident">get_total</span>(<span class="ident">other</span>));
+    }
+
+    <span class="kw">fn</span> <span class="ident">print_min</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">other</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">min</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
         <span class="kw">while</span> <span class="ident">p</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>() {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>] <span class="op">&lt;</span> <span class="ident">min</span> {
@@ -239,8 +251,8 @@
         <span class="self">self</span>.<span class="ident">print_value</span>(<span class="ident">min</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">print_max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">mutator</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">mutator</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
+    <span class="kw">fn</span> <span class="ident">print_max</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="ident">bool</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">p</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">other</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="number">1</span> };
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">max</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>];
         <span class="kw">while</span> <span class="ident">p</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">stats</span>.<span class="ident">get_phase</span>() {
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">count</span>[<span class="ident">p</span>] <span class="op">&gt;</span> <span class="ident">max</span> {
