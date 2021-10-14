@@ -145,15 +145,21 @@
 <span id="145">145</span>
 <span id="146">146</span>
 <span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::heap_parameters</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::{<span class="ident">chunk_align_down</span>, <span class="ident">chunk_align_up</span>};
 
-<span class="doccomment">/** log_2 of the addressable virtual space */</span>
+<span class="doccomment">/// log_2 of the addressable virtual space.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_SPACE_SIZE_64</span> <span class="op">+</span> <span class="ident">LOG_MAX_SPACES</span>;
+<span class="comment">// This used to be LOG_SPACE_SIZE_64 + LOG_MAX_SPACES (45).</span>
+<span class="comment">// We increase this as we also use malloc which may give us addresses that is beyond 1 &lt;&lt; 45.</span>
+<span class="comment">// This affects how much address space we need to reserve for side metadata.</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">47</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_ADDRESS_SPACE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">32</span>;
 <span class="doccomment">/**

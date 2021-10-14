@@ -732,6 +732,48 @@
 <span id="732">732</span>
 <span id="733">733</span>
 <span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span>, <span class="ident">ErrorKind</span>, <span class="prelude-ty">Result</span>};
@@ -1109,6 +1151,44 @@
     }
 }
 
+<span class="doccomment">/// This verifies two things:</span>
+<span class="doccomment">/// 1. Check if data_addr is within the address space that we are supposed to use (LOG_ADDRESS_SPACE). If this fails, we log a warning.</span>
+<span class="doccomment">/// 2. Check if metadata address is out of bounds. If this fails, we will panic.</span>
+<span class="kw">fn</span> <span class="ident">verify_metadata_address_bound</span>(<span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+    <span class="macro">assert_eq!</span>(<span class="ident">LOG_ADDRESS_SPACE</span>, <span class="number">32</span>, <span class="string">&quot;We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.&quot;</span>);
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">data_addr_in_address_space</span> <span class="op">=</span> <span class="bool-val">true</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+    <span class="kw">let</span> <span class="ident">data_addr_in_address_space</span> <span class="op">=</span>
+        <span class="ident">data_addr</span> <span class="op">&lt;</span><span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">1usize</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_ADDRESS_SPACE</span>) };
+
+    <span class="kw">if</span> <span class="op">!</span><span class="ident">data_addr_in_address_space</span> {
+        <span class="macro">warn!</span>(
+            <span class="string">&quot;We try get metadata {} for {}, which is not within the address space we should use&quot;</span>,
+            <span class="ident">data_addr</span>, <span class="ident">spec</span>.<span class="ident">name</span>
+        );
+    }
+
+    <span class="kw">let</span> <span class="ident">metadata_addr</span> <span class="op">=</span>
+        <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::address_to_meta_address</span>(<span class="ident">spec</span>, <span class="ident">data_addr</span>);
+    <span class="kw">let</span> <span class="ident">metadata_addr_bound</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">spec</span>.<span class="ident">is_absolute_offset</span>() {
+        <span class="ident">spec</span>.<span class="ident">upper_bound_address_for_contiguous</span>()
+    } <span class="kw">else</span> {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+        {
+            <span class="ident">spec</span>.<span class="ident">upper_bound_address_for_chunked</span>(<span class="ident">data_addr</span>)
+        }
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+        {
+            <span class="macro">unreachable!</span>()
+        }
+    };
+    <span class="kw">if</span> <span class="ident">metadata_addr</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">metadata_addr_bound</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;We try access metadata address for address {} of spec {} that is not within the bound {}.&quot;</span>, <span class="ident">data_addr</span>, <span class="ident">spec</span>.<span class="ident">name</span>, <span class="ident">metadata_addr_bound</span>);
+    }
+}
+
 <span class="doccomment">/// Commits a side metadata bulk zero operation.</span>
 <span class="doccomment">/// Panics if the metadata spec is not valid.</span>
 <span class="doccomment">///</span>
@@ -1149,6 +1229,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_load</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">actual_val</span>: <span class="ident">usize</span>) {
+    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">read</span>().<span class="ident">unwrap</span>();
     <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get</span>(<span class="ident">metadata_spec</span>) {
         <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1182,6 +1263,7 @@
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">verify_store</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">metadata</span>: <span class="ident">usize</span>) {
+    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">let</span> <span class="ident">sanity_map</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CONTENT_SANITY_MAP</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
     <span class="kw">match</span> <span class="ident">sanity_map</span>.<span class="ident">get_mut</span>(<span class="ident">metadata_spec</span>) {
         <span class="prelude-val">Some</span>(<span class="ident">spec_sanity_map</span>) <span class="op">=</span><span class="op">&gt;</span> {
@@ -1238,6 +1320,7 @@
     <span class="ident">val_to_add</span>: <span class="ident">usize</span>,
     <span class="ident">actual_old_val</span>: <span class="ident">usize</span>,
 ) {
+    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">match</span> <span class="ident">do_math</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">val_to_add</span>, <span class="ident">MathOp::Add</span>) {
         <span class="prelude-val">Ok</span>(<span class="ident">expected_old_val</span>) <span class="op">=</span><span class="op">&gt;</span> {
             <span class="macro">assert!</span>(
@@ -1269,6 +1352,7 @@
     <span class="ident">val_to_sub</span>: <span class="ident">usize</span>,
     <span class="ident">actual_old_val</span>: <span class="ident">usize</span>,
 ) {
+    <span class="ident">verify_metadata_address_bound</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
     <span class="kw">match</span> <span class="ident">do_math</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>, <span class="ident">val_to_sub</span>, <span class="ident">MathOp::Sub</span>) {
         <span class="prelude-val">Ok</span>(<span class="ident">expected_old_val</span>) <span class="op">=</span><span class="op">&gt;</span> {
             <span class="macro">assert!</span>(
