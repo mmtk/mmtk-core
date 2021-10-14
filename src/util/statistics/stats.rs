@@ -49,8 +49,6 @@ pub struct Stats {
     // Initialization of libpfm4 is required before we can use `PerfEvent` types
     #[cfg(feature = "perf_counter")]
     perfmon: Perfmon,
-    #[cfg(feature = "perf_counter")]
-    task_clock: Arc<Mutex<LongCounter<PerfEventDiffable>>>,
 
     pub shared: Arc<SharedStats>,
     counters: Mutex<Vec<Arc<Mutex<dyn Counter + Send>>>>,
@@ -82,23 +80,6 @@ impl Stats {
             MonotoneNanoTime {},
         )));
         counters.push(t.clone());
-        // If we support perf events, we also measure the task clock event,
-        // which sums over the actual time each thread is running,
-        // and is analogous to the wall-clock timer as above.
-        // This is also useful for measuring the effective CPU frequency as
-        // a sanity check.
-        #[cfg(feature = "perf_counter")]
-        let task_clock = {
-            let t = Arc::new(Mutex::new(LongCounter::new(
-                "PERF_COUNT_SW_TASK_CLOCK".to_owned(),
-                shared.clone(),
-                true,
-                false,
-                PerfEventDiffable::new("PERF_COUNT_SW_TASK_CLOCK"),
-            )));
-            counters.push(t.clone());
-            t
-        };
         // Read from the MMTK option for a list of perf events we want to
         // measure, and create corresponding counters
         #[cfg(feature = "perf_counter")]
@@ -116,8 +97,6 @@ impl Stats {
             total_time: t,
             #[cfg(feature = "perf_counter")]
             perfmon,
-            #[cfg(feature = "perf_counter")]
-            task_clock,
 
             shared,
             counters: Mutex::new(counters),
@@ -216,31 +195,10 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 c.print_total(None);
-                // If we measure the CPU cycles, we can use that and the task
-                // clock to calculate the CPU frequency. This can be used as a
-                // sanity check in case we have dynamic frequency scaling
-                // or if the cycle readings are bogus
-                #[cfg(feature = "perf_counter")]
-                if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    print!(
-                        "\t{:.2}",
-                        c.get_total(None) as f64
-                            / self.task_clock.lock().unwrap().get_total(None) as f64
-                    )
-                }
             } else {
                 c.print_total(Some(true));
                 print!("\t");
                 c.print_total(Some(false));
-                #[cfg(feature = "perf_counter")]
-                if c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    let task_clock = self.task_clock.lock().unwrap();
-                    print!(
-                        "\t{:.2}\t{:.2}",
-                        c.get_total(Some(true)) as f64 / task_clock.get_total(Some(true)) as f64,
-                        c.get_total(Some(false)) as f64 / task_clock.get_total(Some(false)) as f64
-                    )
-                }
             }
             print!("\t");
         }
@@ -261,15 +219,8 @@ impl Stats {
             let c = iter.lock().unwrap();
             if c.merge_phases() {
                 print!("{}\t", c.name());
-                // Compute the CPU frequency, see print_stats
-                if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    print!("freq\t")
-                }
             } else {
                 print!("{}.other\t{}.stw\t", c.name(), c.name());
-                if cfg!(feature = "perf_counter") && c.name() == "PERF_COUNT_HW_CPU_CYCLES" {
-                    print!("freq.other\tfreq.stw\t")
-                }
             }
         }
         for name in scheduler_stat.keys() {
