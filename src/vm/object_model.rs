@@ -278,17 +278,19 @@ pub mod specs {
                 pub const fn side_first() -> Self {
                     if Self::IS_GLOBAL {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: GLOBAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     } else {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: LOCAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     }
                 }
@@ -297,10 +299,11 @@ pub mod specs {
                     let side_spec = spec.extract_side_spec();
                     debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
                         offset: SideMetadataOffset::layout_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size: $side_min_obj_size as usize,
+                        log_bytes_in_region: $side_min_obj_size as usize,
                     }))
                 }
                 #[inline(always)]
