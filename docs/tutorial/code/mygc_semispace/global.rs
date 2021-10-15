@@ -1,5 +1,4 @@
-// ANCHOR: imports
-use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+// ANCHOR: imports_no_gc_work
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
@@ -10,8 +9,8 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*; // Add
 use crate::scheduler::*; // Modify
+use crate::scheduler::gc_work::*; // Add
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -25,9 +24,15 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
 use std::sync::Arc;
+// ANCHOR_END: imports_no_gc_work
+
+// ANCHOR: imports_gc_work
+use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+//ANCHOR_END: imports_gc_work
+
 // Remove #[allow(unused_imports)].
-// Remove handle_user_collection_request.
-// ANCHOR_END: imports
+// Remove handle_user_collection_request().
+
 
 pub type SelectedPlan<VM> = MyGC<VM>;
 
