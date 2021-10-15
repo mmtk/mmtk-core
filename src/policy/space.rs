@@ -225,6 +225,12 @@ impl<'a> SFTMap<'a> {
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
+    // Currently only used by 32 bits vm map
+    #[allow(dead_code)]
+    pub fn clear_by_index(&self, chunk_idx: usize) {
+        self.set(chunk_idx, &EMPTY_SPACE_SFT)
+    }
+
     fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
