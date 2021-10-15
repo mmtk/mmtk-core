@@ -165,8 +165,9 @@ files.
 <span class="boring">}
 </span></code></pre></pre>
 This adds <code>mygc</code> as a module.</li>
-<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to <code>PlanSelector</code>. This allows MMTk to accept <code>MyGC</code>
-as a command line option for <code>plan</code>, or an environment variable for <code>MMTK_PLAN</code>:
+<li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>. 
+This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>, 
+or an environment variable for <code>MMTK_PLAN</code>:
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -175,18 +176,27 @@ pub enum PlanSelector {
     NoGC,
     SemiSpace,
     GenCopy,
-    MyGC
+    GenImmix,
+    MarkSweep,
+    PageProtect,
+    Immix,
+    // Add this!
+    MyGC,
 }
 <span class="boring">}
 </span></code></pre></pre>
 </li>
-<li><code>mmtk-core/src/plan/global.rs</code>, change <code>create_mutator()</code> and <code>create_plan()</code> to create the <code>MyGC</code> mutator and the <code>MyGC</code> plan
-based on <code>PlanSelector</code>:
+<li><code>mmtk-core/src/plan/global.rs</code>, add new expressions to 
+<code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of 
+the existing plans. These define the location of the mutator and plan's 
+constructors. 
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub fn create_mutator&lt;VM: VMBinding&gt;(
-    tls: OpaquePointer,
+</span>// NOTE: Sections of this code snippet not relevant to this step of the 
+// tutorial (marked by &quot;// ...&quot;) have been omitted.
+pub fn create_mutator&lt;VM: VMBinding&gt;(
+    tls: VMMutatorThread,
     mmtk: &amp;'static MMTK&lt;VM&gt;,
 ) -&gt; Box&lt;Mutator&lt;VM&gt;&gt; {
     Box::new(match mmtk.options.plan {
@@ -194,10 +204,11 @@ based on <code>PlanSelector</code>:
         PlanSelector::SemiSpace =&gt; {
             crate::plan::semispace::mutator::create_ss_mutator(tls, &amp;*mmtk.plan)
         }
-        PlanSelector::GenCopy =&gt; crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+
+        // ...
+
         // Create MyGC mutator based on selector
-        PlanSelector::MyGC =&gt; crate::plan::mygc::mutator::create_mygc_mutator(tls, &amp;*mmtk.plan),
-    })
+        PlanSelector::MyGC =&gt; crate::plan::mygc::mutator::create_mygc_mutator(tls, &amp;*mmtk.plan),    })
 }
 
 pub fn create_plan&lt;VM: VMBinding&gt;(
@@ -205,24 +216,22 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
     vm_map: &amp;'static VMMap,
     mmapper: &amp;'static Mmapper,
     options: Arc&lt;UnsafeOptionsWrapper&gt;,
-    scheduler: &amp;'static MMTkScheduler&lt;VM&gt;,
+    scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
 ) -&gt; Box&lt;dyn Plan&lt;VM = VM&gt;&gt; {
     match plan {
-        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace =&gt; Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy =&gt; Box::new(crate::plan::gencopy::GenCopy::new(
-            vm_map, mmapper, options, scheduler,
-        )),
+
+        // ...
+
         // Create MyGC plan based on selector
         PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(
             vm_map, mmapper, options, scheduler,
         ))
     }
-}
+}       
 <span class="boring">}
 </span></code></pre></pre>
 </li>
@@ -231,8 +240,8 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
 </ol>
 <p>Note that all of the above changes almost exactly copy the NoGC entries in 
 each of these files. However, NoGC has some variants, such as a lock-free 
-variant. For simplicity, those are not needed for this tutorial. Remove references to them in
-the MyGC plan now. </p>
+variant. For simplicity, those are not needed for this tutorial. Remove 
+references to them in the MyGC plan now. </p>
 <ol>
 <li>Within <code>mygc/global.rs</code>, find any use of <code>#[cfg(feature = &quot;mygc_lock_free&quot;)]</code> 
 and delete both it <em>and the line below it</em>.</li>
@@ -240,9 +249,11 @@ and delete both it <em>and the line below it</em>.</li>
 <code>#[cfg(not(feature = &quot;mygc_lock_free&quot;))]</code>, this time without changing the 
 line below it.</li>
 </ol>
-<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new build (<code>MMTK_PLAN=MyGC</code>). Try testing it
-with the each of the three benchmarks. It should work identically to NoGC.</p>
-<p>If you've got to this point, then congratulations! You have created your first working MMTk collector!</p>
+<p>After you rebuild OpenJDK (and <code>mmtk-core</code>), you can run MyGC with your new 
+build (<code>MMTK_PLAN=MyGC</code>). Try testing it with the each of the three benchmarks. 
+It should work identically to NoGC.</p>
+<p>If you've got to this point, then congratulations! You have created your first 
+working MMTk collector!</p>
 <p>At this point, you should familiarise yourself with the MyGC plan if you 
 haven't already. Try answering the following questions by looking at the code 
 and <a href="../further_reading.html">Further Reading</a>: </p>

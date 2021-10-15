@@ -156,7 +156,8 @@ in <code>mmtk-openjdk/repos/openjdk</code>:
 <li>Then, run 
 <code>./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld</code> 
 to run HelloWorld.</li>
-<li>If your program printed out <code>Hello World!</code> as expected, then congratulations, you have MMTk working with OpenJDK!</li>
+<li>If your program printed out <code>Hello World!</code> as expected, then 
+congratulations, you have MMTk working with OpenJDK!</li>
 </ol>
 </li>
 <li>
@@ -201,12 +202,12 @@ more information, see the
 <p>You will be using multiple GC plans in this tutorial. You should
 familiarise yourself with how to do this now.</p>
 <ol>
-<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>. From the same
-build, you can run different GC plans by using the environment variable <code>MMTK_PLAN=[PlanName]</code>.
-Generally you won't need multiple VM builds. However, if you
-do need to keep a build (for instance, to make quick performance
-comparisons), you can do the following: rename either the <code>build</code> folder or the folder generated
-within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>). 
+<li>The OpenJDK build will always generate in <code>mmtk-openjdk/repos/openjdk/build</code>. 
+From the same build, you can run different GC plans by using the environment 
+variable <code>MMTK_PLAN=[PlanName]</code>. Generally you won't need multiple VM builds. 
+However, if you do need to keep a build (for instance, to make quick performance
+comparisons), you can do the following: rename either the <code>build</code> folder or the 
+folder generated within it (eg <code>linux-x86_64-normal-server-$DEBUG_LEVEL</code>). 
 <ol>
 <li>Renaming the <code>build</code> folder is the safest method for this.</li>
 <li>If you rename the internal folder, there is a possibility that the new 
@@ -218,12 +219,12 @@ commands as appropriate.</li>
 writing over will help prevent errors.</li>
 </ol>
 </li>
-<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux benchmark
-should run without issue. If you then run lusearch, it should fail when a 
-collection is triggered. It is possible to increase the heap size enough that 
-no collections will be triggered, but it is okay to let it fail for now. When 
-we build using a proper GC, it will be able to pass. The messages and errors 
-produced should look identical or nearly identical to the log below.
+<li>Try running your build with <code>NoGC</code>. Both HelloWorld and the fannkuchredux 
+benchmark should run without issue. If you then run lusearch, it should fail 
+when a collection is triggered. It is possible to increase the heap size enough 
+that no collections will be triggered, but it is okay to let it fail for now. 
+When we build using a proper GC, it will be able to pass. The messages and 
+errors produced should look identical or nearly identical to the log below.
 <pre><code>$ MMTK_PLAN=NoGC ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
 Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
 Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.

@@ -216,8 +216,9 @@ fn post_copy(
 }
 <span class="boring">}
 </span></code></pre></pre>
-<p>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to
-the one passed to the function. In <code>constraints()</code>, return a reference of <code>MYGC_CONSTRAINTS</code>.</p>
+<p>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to the one 
+passed to the function. In <code>constraints()</code>, return a reference of 
+<code>MYGC_CONSTRAINTS</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -229,8 +230,10 @@ the one passed to the function. In <code>constraints()</code>, return a referenc
     }
 <span class="boring">}
 </span></code></pre></pre>
-<p>We just leave the rest of the functions empty for now and will implement them later.</p>
-<p>Add a constructor to <code>MyGCCopyContext</code> and implement the <code>WorkerLocal</code> trait for <code>MyGCCopyContext</code>.</p>
+<p>We just leave the rest of the functions empty for now and will implement them 
+later.</p>
+<p>Add a constructor to <code>MyGCCopyContext</code> and implement the <code>WorkerLocal</code> trait 
+for <code>MyGCCopyContext</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -281,9 +284,16 @@ Add a new constructor, <code>new()</code>.</p>
 </span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
 <p>Now that they've been added, you should import <code>MyGCCopyContext</code> and
-<code>MyGCProcessEdges</code> into <code>global.rs</code>, which we will be working in for the
+<code>MyGCProcessEdges</code> into <code>mygc/global.rs</code>, which we will be working in for the
 next few steps. </p>
-<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of <code>MyGCCopyContext</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+<span class="boring">}
+</span></code></pre></pre>
+<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of 
+<code>MyGCCopyContext</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -305,8 +315,8 @@ line importing <code>MMTK</code> scheduler to read <code>use crate::scheduler::*
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The <code>StopMutators</code> work
-will invoke code from the bindings to scan threads and other roots, and those scanning work
-will further push work for a transitive closure.</p>
+will invoke code from the bindings to scan threads and other roots, and those 
+scanning work will further push work for a transitive closure.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -330,7 +340,7 @@ remove it and allow user requested collection.</p>
 <p>The collector has a number of steps it needs to perform before each collection.
 We'll add these now.</p>
 <h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
-<p>In <code>global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
+<p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
 call, and add the following code:</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
@@ -380,9 +390,10 @@ This method should return an ObjectReference, and use the
 inline attribute.
 Check if the object passed into the function is null 
 (<code>object.is_null()</code>). If it is, return the object.
-Check if which space the object is in, and forward the call to the policy-specific
-object tracing code. If it is in neither space, forward the call to the common space and let the common space to handle
-object tracing in its spaces (e.g. immortal or large object space):</p>
+Check if which space the object is in, and forward the call to the 
+policy-specific object tracing code. If it is in neither space, forward the 
+call to the common space and let the common space to handle object tracing in 
+its spaces (e.g. immortal or large object space):</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -476,7 +487,7 @@ inline attribute.</p>
 <p>Finally, we need to fill out the functions that are, roughly speaking, 
 run after each collection.</p>
 <h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
-<p>Find the method <code>release()</code> in <code>global.rs</code>. Replace the 
+<p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the 
 <code>unreachable!()</code> call with the following code.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
@@ -487,8 +498,8 @@ run after each collection.</p>
     }
 <span class="boring">}
 </span></code></pre></pre>
-<p>This function is called at the end of a collection. It calls the release routines for the common
-plan spaces and the fromspace.</p>
+<p>This function is called at the end of a collection. It calls the release 
+routines for the common plan spaces and the fromspace.</p>
 <h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
 <p>Go back to <code>mutator.rs</code>. In <code>create_mygc_mutator()</code>, replace 
 <code>mygc_mutator_noop()</code> in the <code>release_func</code> field with <code>mygc_mutator_release()</code>.
