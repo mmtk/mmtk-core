@@ -298,7 +298,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>();
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
         <span class="self">self</span>.<span class="ident">common</span>()
             .<span class="ident">schedule_common</span>::<span class="op">&lt;</span><span class="ident">SSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">SS_CONSTRAINTS</span>, <span class="ident">scheduler</span>);

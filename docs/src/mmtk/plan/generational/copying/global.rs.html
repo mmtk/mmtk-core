@@ -263,6 +263,14 @@
 <span id="263">263</span>
 <span id="264">264</span>
 <span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">GenCopyCopyContext</span>, <span class="ident">GenCopyMatureProcessEdges</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
@@ -329,6 +337,14 @@
         <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
+    <span class="kw">fn</span> <span class="ident">force_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">force_full_heap_collection</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">last_collection_full_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">last_collection_full_heap</span>()
+    }
+
     <span class="kw">fn</span> <span class="ident">gc_init</span>(
         <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
         <span class="ident">heap_size</span>: <span class="ident">usize</span>,
@@ -345,7 +361,7 @@
 
         <span class="comment">// TODO: We should have a schedule_generational</span>
 
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>();
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">is_full_heap</span> {
             <span class="macro">debug!</span>(<span class="string">&quot;Nursery GC&quot;</span>);

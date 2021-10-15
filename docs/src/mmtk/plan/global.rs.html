@@ -905,6 +905,58 @@
 <span id="905">905</span>
 <span id="906">906</span>
 <span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1092,6 +1144,15 @@
 <span class="doccomment">/// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.</span>
 <span class="doccomment">/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or</span>
 <span class="doccomment">///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Methods in this trait:</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Only methods that will be overridden by each specific plan should be included in this trait. The trait may</span>
+<span class="doccomment">/// provide a default implementation, and each plan can override the implementation. For methods that won&#39;t be</span>
+<span class="doccomment">/// overridden, we should implement those methods in BasePlan (or CommonPlan) and call them from there instead.</span>
+<span class="doccomment">/// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and</span>
+<span class="doccomment">/// they may call a wrong method by mistake.</span>
+<span class="comment">// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Plan</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Downcast</span> {
     <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
 
@@ -1226,22 +1287,24 @@
         <span class="self">self</span>.<span class="ident">get_total_pages</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">get_pages_used</span>()
     }
 
+    <span class="doccomment">/// The application code has requested a collection.</span>
     <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">force</span>: <span class="ident">bool</span>) {
-        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">options</span>().<span class="ident">ignore_system_g_c</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;User triggering collection&quot;</span>);
-            <span class="self">self</span>.<span class="ident">base</span>()
-                .<span class="ident">user_triggered_collection</span>
-                .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">control_collector_context</span>.<span class="ident">request</span>();
-            <span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::block_for_gc</span>(<span class="ident">tls</span>);
-        }
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">handle_user_collection_request</span>(<span class="ident">tls</span>, <span class="ident">force</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">reset_collection_trigger</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="ident">base</span>()
-            .<span class="ident">user_triggered_collection</span>
-            .<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::Relaxed</span>)
+    <span class="doccomment">/// Return whether last GC was an exhaustive attempt to collect the heap.</span>
+    <span class="doccomment">/// For many collectors this is the same as asking whether the last GC was a full heap collection.</span>
+    <span class="kw">fn</span> <span class="ident">last_collection_was_exhaustive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">last_collection_full_heap</span>()
     }
+
+    <span class="doccomment">/// Return whether last GC is a full GC.</span>
+    <span class="kw">fn</span> <span class="ident">last_collection_full_heap</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="bool-val">true</span>
+    }
+
+    <span class="doccomment">/// Force the next collection to be full heap.</span>
+    <span class="kw">fn</span> <span class="ident">force_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
 
     <span class="kw">fn</span> <span class="ident">modify_check</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">gc_in_progress_proper</span>() <span class="op">&amp;&amp;</span> <span class="ident">object</span>.<span class="ident">is_movable</span>() {
@@ -1273,6 +1336,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">emergency_collection</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">user_triggered_collection</span>: <span class="ident">AtomicBool</span>,
+    <span class="kw">pub</span> <span class="ident">internal_triggered_collection</span>: <span class="ident">AtomicBool</span>,
+    <span class="kw">pub</span> <span class="ident">last_internal_triggered_collection</span>: <span class="ident">AtomicBool</span>,
     <span class="comment">// Has an allocation succeeded since the emergency collection?</span>
     <span class="kw">pub</span> <span class="ident">allocation_success</span>: <span class="ident">AtomicBool</span>,
     <span class="comment">// Maximum number of failed attempts by a single thread</span>
@@ -1402,6 +1467,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">emergency_collection</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">user_triggered_collection</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            <span class="ident">internal_triggered_collection</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            <span class="ident">last_internal_triggered_collection</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">allocation_success</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">max_collection_attempts</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">cur_collection_attempts</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
@@ -1448,6 +1515,40 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
             <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">ensure_mapped</span>();
         }
+    }
+
+    <span class="doccomment">/// The application code has requested a collection.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">force</span>: <span class="ident">bool</span>) {
+        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">ignore_system_g_c</span> {
+            <span class="macro">info!</span>(<span class="string">&quot;User triggering collection&quot;</span>);
+            <span class="self">self</span>.<span class="ident">user_triggered_collection</span>
+                .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
+            <span class="self">self</span>.<span class="ident">control_collector_context</span>.<span class="ident">request</span>();
+            <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">tls</span>);
+        }
+    }
+
+    <span class="doccomment">/// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).</span>
+    <span class="comment">// This is not used, as we do not have a concurrent plan.</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trigger_internal_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">last_internal_triggered_collection</span>
+            .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
+        <span class="self">self</span>.<span class="ident">internal_triggered_collection</span>
+            .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
+        <span class="self">self</span>.<span class="ident">control_collector_context</span>.<span class="ident">request</span>();
+    }
+
+    <span class="doccomment">/// Reset collection state information.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_collection_trigger</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">last_internal_triggered_collection</span>.<span class="ident">store</span>(
+            <span class="self">self</span>.<span class="ident">internal_triggered_collection</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::Relaxed</span>,
+        );
+        <span class="self">self</span>.<span class="ident">internal_triggered_collection</span>
+            .<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">user_triggered_collection</span>
+            .<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::Relaxed</span>);
     }
 
     <span class="comment">// Depends on what base spaces we use, unsync may be unused.</span>
@@ -1524,7 +1625,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">release</span>();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_collection_kind</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_collection_kind</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="ident">P</span>) {
         <span class="self">self</span>.<span class="ident">cur_collection_attempts</span>.<span class="ident">store</span>(
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_user_triggered_collection</span>() {
                 <span class="number">1</span>
@@ -1535,13 +1636,13 @@ BasePlan should contain all plan-related state and functions that are _fundament
         );
 
         <span class="kw">let</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_internal_triggered_collection</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">last_collection_was_exhaustive</span>()
+            <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">last_collection_was_exhaustive</span>()
             <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">cur_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&gt;</span> <span class="number">1</span>;
         <span class="self">self</span>.<span class="ident">emergency_collection</span>
             .<span class="ident">store</span>(<span class="ident">emergency_collection</span>, <span class="ident">Ordering::Relaxed</span>);
 
         <span class="kw">if</span> <span class="ident">emergency_collection</span> {
-            <span class="self">self</span>.<span class="ident">force_full_heap_collection</span>();
+            <span class="ident">plan</span>.<span class="ident">force_full_heap_collection</span>();
         }
     }
 
@@ -1573,10 +1674,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">gc_status</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">GcStatus::GcProper</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_user_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">user_triggered_collection</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
-    }
-
     <span class="kw">fn</span> <span class="ident">determine_collection_attempts</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">allocation_success</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
             <span class="self">self</span>.<span class="ident">max_collection_attempts</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::Relaxed</span>);
@@ -1588,16 +1685,23 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="self">self</span>.<span class="ident">max_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">is_internal_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="comment">// FIXME</span>
-        <span class="bool-val">false</span>
+    <span class="doccomment">/// Return true if this collection was triggered by application code.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_user_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">user_triggered_collection</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">last_collection_was_exhaustive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="bool-val">true</span>
+    <span class="doccomment">/// Return true if this collection was triggered internally.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_internal_triggered_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="ident">is_internal_triggered</span> <span class="op">=</span> <span class="self">self</span>
+            .<span class="ident">last_internal_triggered_collection</span>
+            .<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
+        <span class="comment">// Remove this assertion when we have concurrent GC.</span>
+        <span class="macro">assert!</span>(
+            <span class="op">!</span><span class="ident">is_internal_triggered</span>,
+            <span class="string">&quot;We have no concurrent GC implemented. We should not have internally triggered GC&quot;</span>
+        );
+        <span class="ident">is_internal_triggered</span>
     }
-
-    <span class="kw">fn</span> <span class="ident">force_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {}
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">increase_allocation_bytes_by</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
         <span class="kw">let</span> <span class="ident">old_allocation_bytes</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">fetch_add</span>(<span class="ident">size</span>, <span class="ident">Ordering::SeqCst</span>);

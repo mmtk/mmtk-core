@@ -311,7 +311,7 @@ will further push work for a transitive closure.</p>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::&lt;Self&gt;(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::&lt;MyGCProcessEdges&lt;VM&gt;&gt;::new());
