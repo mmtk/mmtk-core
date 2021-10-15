@@ -131,19 +131,11 @@ pub fn alloc<VM: VMBinding>(
     debug_assert!(size >= MIN_OBJECT_SIZE);
     let gc_extra_header_words = mutator.plan.constraints().gc_extra_header_words;
     let extra_header = if gc_extra_header_words != 0 {
-        let mut tmp = std::cmp::max(
+        std::cmp::max(
             gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
             align,
-        );
-        if (tmp & (tmp - 1)) != 0 {
-            tmp |= tmp >> 1;
-            tmp |= tmp >> 2;
-            tmp |= tmp >> 4;
-            tmp |= tmp >> 8;
-            tmp |= tmp >> 16;
-            tmp += 1;
-        }
-        tmp
+        )
+        .next_power_of_two()
     } else {
         0
     };

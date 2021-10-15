@@ -258,7 +258,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     pub fn compact(&self) {
         let mut from = self.common.start;
         let end = self.pr.cursor();
-        let mut to = Address::ZERO;
+        let mut to = end;
         while from < end {
             if alloc_bit::is_alloced_object(from) {
                 // clear the alloc bit
