@@ -22,17 +22,24 @@ impl PerfEventDiffable {
 impl Diffable for PerfEventDiffable {
     type Val = PerfEventValue;
 
+    fn start(&mut self) {
+        self.pe.reset().expect("Failed to reset perf evet");
+        self.pe.enable().expect("Failed to enable perf evet");
+    }
+
+    fn stop(&mut self) {
+        self.pe.disable().expect("Failed to disable perf evet");
+    }
+
     fn current_value(&mut self) -> Self::Val {
-        let val = self.pe.read().unwrap();
-        self.pe.enable();
-        self.pe.reset();
+        let val = self.pe.read().expect("Failed to read perf evet");
+        assert_eq!(val.time_enabled, val.time_running, "perf event multiplexed");
         val
     }
 
-    fn diff(current: &Self::Val, _earlier: &Self::Val) -> u64 {
-        // earlier value is not used as the counter is reset after each use
-        assert_eq!(current.time_enabled, current.time_running);
-        current.value as u64
+    fn diff(current: &Self::Val, earlier: &Self::Val) -> u64 {
+        assert!(current.value >= earlier.value, "perf event overflowed");
+        current.value as u64 - earlier.value as u64
     }
 
     fn print_diff(val: u64) {

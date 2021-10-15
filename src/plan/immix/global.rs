@@ -23,6 +23,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -33,6 +34,7 @@ pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
 pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     pub common: CommonPlan<VM>,
+    last_gc_was_defrag: AtomicBool,
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -50,6 +52,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         self.base().collection_required(self, space_full, space)
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.last_gc_was_defrag.load(Ordering::Relaxed)
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -77,7 +83,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         let in_defrag = self.immix_space.decide_whether_to_defrag(
             self.is_emergency_collection(),
@@ -139,7 +145,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release(true);
+        self.last_gc_was_defrag
+            .store(self.immix_space.release(true), Ordering::Relaxed);
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -185,6 +192,7 @@ impl<VM: VMBinding> Immix<VM> {
                 &IMMIX_CONSTRAINTS,
                 global_metadata_specs,
             ),
+            last_gc_was_defrag: AtomicBool::new(false),
         };
 
         {
