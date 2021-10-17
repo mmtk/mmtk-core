@@ -21,8 +21,7 @@ lazy_static! {
     /// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
     /// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds
-    pub static ref MAX_METADATA_ADDRESS: Address =
-        unsafe { ACTIVE_CHUNK_METADATA_SPEC.upper_bound().addr };
+    pub static ref MAX_METADATA_ADDRESS: Address = ACTIVE_CHUNK_METADATA_SPEC.upper_bound_address_for_contiguous();
 }
 
 /// Metadata spec for the active chunk byte
