@@ -295,6 +295,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
 
+            #[cfg(debug_assertions)]
             unsafe {
                 let mut name: [i8; 16] = [0; 16];
                 libc::pthread_getname_np(libc::pthread_self(), name.as_mut_ptr(), 16);

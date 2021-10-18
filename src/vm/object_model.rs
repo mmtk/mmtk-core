@@ -248,6 +248,9 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to be dumped.
     fn dump_object(object: ObjectReference);
+
+    /// Return the object alignment setting of the vm
+    fn object_alignment() -> i32;
 }
 
 pub mod specs {

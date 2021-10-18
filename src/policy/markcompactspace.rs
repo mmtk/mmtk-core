@@ -15,6 +15,7 @@ use atomic::Ordering;
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
+    extra_header: usize,
     // forwarding_pointers: Mutex<HashMap<Address, Address>>,
     // refs: Mutex<HashSet<ObjectReference>>,
 }
@@ -74,6 +75,11 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn init(&mut self, _vm_map: &'static VMMap) {
         self.common().init(self.as_space());
+        self.extra_header = std::cmp::max(
+            GC_EXTRA_HEADER_SIZE,
+            VM::VMObjectModel::object_alignment() as usize,
+        )
+        .next_power_of_two();
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -117,6 +123,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
+            extra_header: 0,
             // forwarding_pointers: Mutex::new(HashMap::new()),
             // refs: Mutex::new(HashSet::new()),
         }
@@ -131,14 +138,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        trace!("trace_mark_object");
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
-            trace!("mark is done for the current object");
-            debug_assert!(
-                crate::util::alloc_bit::is_alloced(object),
-                "{:x}: alloc bit not set",
-                object
-            );
             trace.process_node(object);
         }
         object
@@ -149,6 +154,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
             trace.process_node(object);
         }
@@ -158,13 +168,14 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         //     .unwrap()
         //     .get(&object.to_address())
         //     .unwrap();
+
+        // For markcompact, only one word is required to store the forwarding pointer
+        // and it is always stored in front of the object start address. However, the
+        // number of extra bytes required is determined by the object alignment
         let forwarding_pointer =
             unsafe { (object.to_address() - GC_EXTRA_HEADER_SIZE).load::<Address>() };
-        // debug_assert!(
-        //     new_object == forwarding_pointer,
-        //     "extra header mechanism not working properly"
-        // );
-        unsafe { (forwarding_pointer + GC_EXTRA_HEADER_SIZE).to_object_reference() }
+
+        unsafe { (forwarding_pointer + self.extra_header).to_object_reference() }
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -240,12 +251,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         while from < end {
             if alloc_bit::is_alloced_object(from) {
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj) + GC_EXTRA_HEADER_SIZE;
+                let size = VM::VMObjectModel::get_current_size(obj) + self.extra_header;
 
                 if Self::to_be_compacted(obj) {
-                    // to = allocator::align_allocation_no_fill::<VM>(to, 8, 0);
-                    let extra_header_addr = from - GC_EXTRA_HEADER_SIZE;
-                    unsafe { extra_header_addr.store(to) }
+                    let forwarding_pointer_addr = from - GC_EXTRA_HEADER_SIZE;
+                    unsafe { forwarding_pointer_addr.store(to) }
                     to += size;
                 }
                 from += size;
@@ -264,18 +274,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 // clear the alloc bit
                 alloc_bit::unset_addr_alloc_bit(from);
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj) + GC_EXTRA_HEADER_SIZE;
+                let size = VM::VMObjectModel::get_current_size(obj) + self.extra_header;
 
-                let extra_header_addr = from - crate::util::constants::BYTES_IN_WORD;
-                let forwarding_pointer = unsafe { extra_header_addr.load::<Address>() };
+                let forwarding_pointer_addr = from - GC_EXTRA_HEADER_SIZE;
+                let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
                 if forwarding_pointer != Address::ZERO {
                     to = forwarding_pointer;
-                    let object_addr = forwarding_pointer + GC_EXTRA_HEADER_SIZE;
+                    let object_addr = forwarding_pointer + self.extra_header;
                     // clear forwarding pointer
                     for i in 0..GC_EXTRA_HEADER_SIZE {
                         unsafe {
-                            (to + i).store::<u8>(0);
-                            (extra_header_addr + i).store::<u8>(0);
+                            (forwarding_pointer + self.extra_header - GC_EXTRA_HEADER_SIZE + i)
+                                .store::<u8>(0);
+                            (forwarding_pointer_addr + i).store::<u8>(0);
                         };
                     }
                     let target = unsafe { object_addr.to_object_reference() };
@@ -283,14 +294,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     let dst = target.to_address();
                     // Copy
                     let src = obj.to_address();
-                    for i in 0..size {
+                    for i in 0..(size - self.extra_header) {
                         unsafe { (dst + i).store((src + i).load::<u8>()) };
                     }
                     // update alloc_bit,
                     alloc_bit::set_alloc_bit(target);
                     to += size
                 }
-                // VM::VMObjectModel::dump_object(obj);
                 from += size;
             } else {
                 from += MIN_OBJECT_SIZE

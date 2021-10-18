@@ -23,6 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -133,7 +134,7 @@ pub fn alloc<VM: VMBinding>(
     let extra_header = if gc_extra_header_words != 0 {
         std::cmp::max(
             gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-            align,
+            VM::VMObjectModel::object_alignment() as usize,
         )
         .next_power_of_two()
     } else {
