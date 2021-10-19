@@ -61,7 +61,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             if split[0] == "Threads:" {
                 let threads = split[1].parse::<i32>().unwrap();
                 if threads != 1 {
-                    warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this threadas", threads);
+                    warn!("Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread", threads);
                 }
             }
         }

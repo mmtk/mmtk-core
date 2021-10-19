@@ -19,7 +19,8 @@ entered in `repos/openjdk`.
    3. Then, run 
    `./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap HelloWorld` 
    to run HelloWorld.
-   4. If your program printed out `Hello World!` as expected, then congratulations, you have MMTk working with OpenJDK!
+   4. If your program printed out `Hello World!` as expected, then 
+   congratulations, you have MMTk working with OpenJDK!
    
 2. The Computer Language Benchmarks Game **fannkuchredux** (micro benchmark, 
 allocates a small amount of memory but - depending on heap size and the GC 
@@ -61,12 +62,12 @@ more information, see the
 You will be using multiple GC plans in this tutorial. You should
 familiarise yourself with how to do this now.
 
-1. The OpenJDK build will always generate in `mmtk-openjdk/repos/openjdk/build`. From the same
-build, you can run different GC plans by using the environment variable `MMTK_PLAN=[PlanName]`.
-Generally you won't need multiple VM builds. However, if you
-do need to keep a build (for instance, to make quick performance
-comparisons), you can do the following: rename either the `build` folder or the folder generated
-within it (eg `linux-x86_64-normal-server-$DEBUG_LEVEL`). 
+1. The OpenJDK build will always generate in `mmtk-openjdk/repos/openjdk/build`. 
+From the same build, you can run different GC plans by using the environment 
+variable `MMTK_PLAN=[PlanName]`. Generally you won't need multiple VM builds. 
+However, if you do need to keep a build (for instance, to make quick performance
+comparisons), you can do the following: rename either the `build` folder or the 
+folder generated within it (eg `linux-x86_64-normal-server-$DEBUG_LEVEL`). 
    1. Renaming the `build` folder is the safest method for this.
    2. If you rename the internal folder, there is a possibility that the new 
    build will generate incorrectly. If a build appears to generate strangely 
@@ -75,12 +76,12 @@ within it (eg `linux-x86_64-normal-server-$DEBUG_LEVEL`).
    commands as appropriate.
    4. If you plan to completely overwrite a build, deleting the folder you are 
    writing over will help prevent errors.
-1. Try running your build with `NoGC`. Both HelloWorld and the fannkuchredux benchmark
-should run without issue. If you then run lusearch, it should fail when a 
-collection is triggered. It is possible to increase the heap size enough that 
-no collections will be triggered, but it is okay to let it fail for now. When 
-we build using a proper GC, it will be able to pass. The messages and errors 
-produced should look identical or nearly identical to the log below.
+1. Try running your build with `NoGC`. Both HelloWorld and the fannkuchredux 
+benchmark should run without issue. If you then run lusearch, it should fail 
+when a collection is triggered. It is possible to increase the heap size enough 
+that no collections will be triggered, but it is okay to let it fail for now. 
+When we build using a proper GC, it will be able to pass. The messages and 
+errors produced should look identical or nearly identical to the log below.
     ```
     $ MMTK_PLAN=NoGC ./build/linux-x86_64-normal-server-$DEBUG_LEVEL/jdk/bin/java -XX:+UseThirdPartyHeap -Xms512M -Xmx512M -jar ./dacapo-9.12-MR1-bach.jar lusearch
     Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]

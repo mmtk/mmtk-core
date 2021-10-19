@@ -64,6 +64,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+
     fn gc_init(
         &mut self,
         heap_size: usize,
@@ -80,7 +88,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
         // TODO: We should have a schedule_generational
 
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
             debug!("Nursery GC");

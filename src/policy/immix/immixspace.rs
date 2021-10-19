@@ -290,12 +290,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if super::BLOCK_ONLY {
             return None;
         }
-        let result = self.reusable_blocks.pop();
-        if let Some(block) = result {
-            // println!("Reuse {:?}", block);
-            block.init(copy);
+        loop {
+            if let Some(block) = self.reusable_blocks.pop() {
+                // Skip blocks that should be evacuated.
+                if copy && block.is_defrag_source() {
+                    continue;
+                }
+                block.init(copy);
+                return Some(block);
+            } else {
+                return None;
+            }
         }
-        result
     }
 
     /// Trace and mark objects without evacuation.
@@ -522,11 +528,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            if super::DEFRAG
-                && defrag_threshold != 0
-                && !state.is_reusable()
-                && block.get_holes() > defrag_threshold
-            {
+            if super::DEFRAG && defrag_threshold != 0 && block.get_holes() > defrag_threshold {
                 block.set_as_defrag_source(true);
             } else {
                 block.set_as_defrag_source(false);

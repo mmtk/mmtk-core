@@ -375,6 +375,44 @@ impl SideMetadataSanity {
     }
 }
 
+/// This verifies two things:
+/// 1. Check if data_addr is within the address space that we are supposed to use (LOG_ADDRESS_SPACE). If this fails, we log a warning.
+/// 2. Check if metadata address is out of bounds. If this fails, we will panic.
+fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
+    #[cfg(target_pointer_width = "32")]
+    assert_eq!(LOG_ADDRESS_SPACE, 32, "We assume we use all address space in 32 bits. This seems not true any more, we need a proper check here.");
+    #[cfg(target_pointer_width = "32")]
+    let data_addr_in_address_space = true;
+    #[cfg(target_pointer_width = "64")]
+    let data_addr_in_address_space =
+        data_addr <= unsafe { Address::from_usize(1usize << LOG_ADDRESS_SPACE) };
+
+    if !data_addr_in_address_space {
+        warn!(
+            "We try get metadata {} for {}, which is not within the address space we should use",
+            data_addr, spec.name
+        );
+    }
+
+    let metadata_addr =
+        crate::util::metadata::side_metadata::address_to_meta_address(spec, data_addr);
+    let metadata_addr_bound = if spec.is_absolute_offset() {
+        spec.upper_bound_address_for_contiguous()
+    } else {
+        #[cfg(target_pointer_width = "32")]
+        {
+            spec.upper_bound_address_for_chunked(data_addr)
+        }
+        #[cfg(target_pointer_width = "64")]
+        {
+            unreachable!()
+        }
+    };
+    if metadata_addr >= metadata_addr_bound {
+        panic!("We try access metadata address for address {} of spec {} that is not within the bound {}.", data_addr, spec.name, metadata_addr_bound);
+    }
+}
+
 /// Commits a side metadata bulk zero operation.
 /// Panics if the metadata spec is not valid.
 ///
@@ -415,6 +453,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -448,6 +487,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -504,6 +544,7 @@ pub fn verify_add(
     val_to_add: usize,
     actual_old_val: usize,
 ) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
         Ok(expected_old_val) => {
             assert!(
@@ -535,6 +576,7 @@ pub fn verify_sub(
     val_to_sub: usize,
     actual_old_val: usize,
 ) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
         Ok(expected_old_val) => {
             assert!(
