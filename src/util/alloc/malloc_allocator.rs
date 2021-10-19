@@ -32,6 +32,10 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         self.tls
     }
 
+    fn does_thread_local_allocation(&self) -> bool {
+        false
+    }
+
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         // TODO: We currently ignore the offset field. This is wrong.
         // assert!(offset == 0);

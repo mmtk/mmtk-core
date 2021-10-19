@@ -52,6 +52,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         self.plan
     }
 
+    fn does_thread_local_allocation(&self) -> bool {
+        true
+    }
+
     #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         debug_assert!(
