@@ -21,7 +21,7 @@ pub use hoard_sys::{calloc, free, malloc_usable_size};
 pub use libc::{calloc, free, malloc_usable_size, posix_memalign};
 
 #[cfg(not(any(feature = "malloc_mimalloc", feature = "malloc_hoard",)))]
-fn align_alloc(size: usize, align: usize) -> Address {
+fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -34,7 +34,7 @@ fn align_alloc(size: usize, align: usize) -> Address {
 }
 
 #[cfg(feature = "malloc_mimalloc")]
-fn align_alloc(size: usize, align: usize) -> Address {
+fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     let raw = unsafe { mi_calloc_aligned(1, size, align) };
     Address::from_mut_ptr(raw)
 }
@@ -42,8 +42,8 @@ fn align_alloc(size: usize, align: usize) -> Address {
 // hoard_sys does not provide align_alloc,
 // we have to do it ourselves
 #[cfg(feature = "malloc_hoard")]
-fn align_alloc(size: usize, align: usize) -> Address {
-    align_offset_alloc(size, align, 0)
+fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
+    align_offset_alloc::<VM>(size, align, 0)
 }
 
 // Beside returning the allocation result,
@@ -57,7 +57,8 @@ fn align_offset_alloc<VM: VMBinding>(size: usize, align: usize, offset: isize) -
         return address;
     }
     let mod_offset = (offset % (align as isize)) as isize;
-    let mut result = crate::util::alloc::allocator::align_allocation_no_fill::<VM>(address, align, mod_offset); // address.add(1).align_up(align) - mod_offset;
+    let mut result =
+        crate::util::alloc::allocator::align_allocation_no_fill::<VM>(address, align, mod_offset);
     if result - BYTES_IN_ADDRESS < address {
         result += align;
     }
@@ -101,7 +102,7 @@ pub fn alloc<VM: VMBinding>(size: usize, align: usize, offset: isize) -> (Addres
         address = Address::from_mut_ptr(raw);
         debug_assert!(address.is_aligned_to(align));
     } else if align > 16 && offset == 0 {
-        address = align_alloc(size, align);
+        address = align_alloc::<VM>(size, align);
         #[cfg(feature = "malloc_hoard")]
         {
             is_offset_malloc = true;
