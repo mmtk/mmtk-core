@@ -20,7 +20,12 @@ lazy_static! {
     };
 }
 pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-
+    let space =         mutator
+    .plan
+    .downcast_ref::<FreeListMarkSweep<VM>>()
+    .unwrap()
+    .ms_space();
+    space.zero_mark_bits();
 }
 
 pub fn flms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
