@@ -11,6 +11,7 @@ use crate::scheduler::gc_work::{EndOfGC, Prepare, Release, StopMutators};
 use crate::scheduler::{GCWorkScheduler, GCWorkerLocalPtr};
 use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -127,6 +128,17 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         #[cfg(feature = "freelistmarksweep_lock_free")]
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
+                // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // SideMetadataContext by default, so we don't need to add it here.
+        #[cfg(feature = "global_alloc_bit")]
+        let global_metadata_specs =
+            SideMetadataContext::new_global_specs(&[]);
+        // if global_alloc_bit is NOT enabled,
+        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+        #[cfg(not(feature = "global_alloc_bit"))]
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[
+            ALLOC_SIDE_METADATA_SPEC,
+        ]);
         let ms_space = MarkSweepSpace::new(
             "MSspace",
             true,
@@ -137,7 +149,6 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
             &mut heap,
             scheduler,
         );
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         // let im_space = ImmortalSpace::new(
         //     "IMspace",
@@ -156,7 +167,7 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
             options,
             heap,
             &FLMS_CONSTRAINTS,
-            global_specs,
+            global_metadata_specs,
         );
 
         let res = FreeListMarkSweep {
@@ -176,5 +187,11 @@ impl<VM: VMBinding> FreeListMarkSweep<VM> {
 
     pub fn ms_space(&self) -> &MarkSweepSpace<VM> {
         &self.ms_space
+    }
+
+    /// Verify side metadata specs used in the spaces in Gen.
+    pub fn verify_side_metadata_sanity(&self, sanity: &mut SideMetadataSanity) {
+        self.ms_space.verify_side_metadata_sanity(sanity);
+        self.common.verify_side_metadata_sanity(sanity);
     }
 }

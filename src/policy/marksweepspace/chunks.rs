@@ -3,6 +3,7 @@
 use super::block::{Block, BlockState};
 use super::MarkSweepSpace;
 use crate::util::alloc::free_list_allocator::{BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK};
+use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
     scheduler::*,

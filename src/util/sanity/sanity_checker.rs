@@ -1,7 +1,10 @@
 use crate::plan::CopyContext;
 use crate::plan::Plan;
+use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
+use crate::util::alloc::FreeListAllocator;
+use crate::util::metadata::side_metadata::address_to_meta_address;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
@@ -167,6 +170,23 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
+            // // eprintln!("s {}", object.to_address());
+
+            // if !(object.to_address().as_usize() == 0x40000000000 || crate::util::alloc_bit::is_alloced(object)) {
+            if !(object.to_address().as_usize() == 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
+            
+                // eprintln!("Address {} was found by the danity checker but has no mark bit, meta: {}", object.to_address(), address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), object.to_address()));
+            }
+
+            // if !(object.to_address().as_usize() == 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
+            
+                
+
+            // assert!(object.to_address().as_usize() == 0x40000000000 || crate::util::alloc_bit::is_alloced(object), 
+            // "Address {} was found to be alive by the danity checker but has no alloc bit", object.to_address()
+            
+        // );
+
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
             ProcessEdgesWork::process_node(self, object);
