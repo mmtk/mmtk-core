@@ -18,7 +18,7 @@ use crate::{
     vm::VMBinding,
 };
 
-use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
+use super::{MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET, MarkSweepSpace};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
@@ -32,7 +32,7 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
-        offset: SideMetadataOffset::layout_after(&ALLOC_SIDE_METADATA_SPEC),
+        offset: MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET,
         log_num_of_bits: 3,
         log_min_obj_size: free_list_allocator::LOG_BYTES_IN_BLOCK,
     };

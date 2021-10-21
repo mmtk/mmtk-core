@@ -30,10 +30,17 @@ impl<VM: VMBinding> ProcessEdgesWork for FLMSProcessEdges<VM> {
             return object;
         }
         trace!("Tracing object {}", object);
-        if self.plan.ms_space.in_space(object) {
-            self.plan.ms_space.trace_object::<Self>(self, object)
+        // eprintln!("{:0x}", object.to_address().as_usize());
+        // let r: bool = self.plan.ms_space.in_space(object);
+        // assert!(object.to_address().as_usize() != 0x40000000000, "{}", self.plan.ms_space.in_space(object));
+        if object.to_address().as_usize() != 0x40000000000 {
+            if self.plan.ms_space.in_space(object) {
+                self.plan.ms_space.trace_object::<Self>(self, object)
+            } else {
+                self.plan.common.get_immortal().trace_object::<Self>(self, object)
+            }
         } else {
-            self.plan.common.get_immortal().trace_object::<Self>(self, object)
+            return object
         }
     }
 }
