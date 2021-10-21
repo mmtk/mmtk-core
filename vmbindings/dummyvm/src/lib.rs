@@ -25,6 +25,17 @@ impl VMBinding for DummyVM {
     type VMCollection = collection::VMCollection;
     type VMActivePlan = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
+
+    /// Allowed minimal alignment.
+    const LOG_MIN_ALIGNMENT: usize = 2_usize;
+    /// Allowed minimal alignment in bytes.
+    const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
+
+    /// Allowed maximum alignment as shift by min alignment.    
+    const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;
+
+    /// Allowed maximum alignment in bytes.
+    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
 }
 
 //#[cfg(feature = "dummyvm")]
