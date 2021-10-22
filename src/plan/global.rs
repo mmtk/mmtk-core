@@ -747,7 +747,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     /// Increase the allocation bytes and return the current allocation bytes after increasing
     pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
-        debug!(
+        trace!(
             "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
             old_allocation_bytes,
             size,
@@ -788,7 +788,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.allocation_bytes.store(0, Ordering::SeqCst);
         }
 
-        trace!(
+        debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             plan.get_pages_reserved(),
             plan.get_total_pages()

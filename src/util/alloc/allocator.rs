@@ -122,9 +122,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
-        let plan = self.get_plan();
+        let plan = self.get_plan().base();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
-        let stress_test = plan.base().is_stress_test_gc_enabled();
+        let stress_test = plan.is_stress_test_gc_enabled();
 
         // Information about the previous collection.
         let mut emergency_collection = false;
@@ -140,7 +140,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // If we should do a stress GC now, we tell the alloc_slow_once_stress_test()
                 // so they would avoid try any thread local allocation, and directly call
                 // global acquire and do a poll.
-                let need_poll = is_mutator && plan.base().should_do_stress_gc();
+                let need_poll = is_mutator && plan.should_do_stress_gc();
                 self.alloc_slow_once_stress_test(size, align, offset, need_poll)
             } else {
                 // If we are not doing stress GC, just call the normal alloc_slow_once().
@@ -154,8 +154,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !result.is_zero() {
                 // Report allocation success to assist OutOfMemory handling.
-                if !plan.base().allocation_success.load(Ordering::Relaxed) {
-                    plan.base().allocation_success.store(true, Ordering::SeqCst);
+                if !plan.allocation_success.load(Ordering::Relaxed) {
+                    plan.allocation_success.store(true, Ordering::SeqCst);
                 }
 
                 // When a GC occurs, the resultant address provided by `acquire()` is 0x0.
@@ -166,18 +166,18 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
-                    let _allocation_bytes = plan.base().increase_allocation_bytes_by(size);
+                    let _allocation_bytes = plan.increase_allocation_bytes_by(size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
                     #[cfg(feature = "analysis")]
-                    if _allocation_bytes > plan.base().options.analysis_factor {
+                    if _allocation_bytes > plan.options.analysis_factor {
                         trace!(
                             "Analysis: allocation_bytes = {} more than analysis_factor = {}",
                             _allocation_bytes,
-                            plan.base().options.analysis_factor
+                            plan.options.analysis_factor
                         );
-                        plan.base().analysis_manager.alloc_hook(size, align, offset);
+                        plan.analysis_manager.alloc_hook(size, align, offset);
                     }
                 }
 
@@ -195,7 +195,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 trace!("Emergency collection");
                 // Report allocation success to assist OutOfMemory handling.
                 // This seems odd, but we must allow each OOM to run its course (and maybe give us back memory)
-                let fail_with_oom = !plan.base().allocation_success.swap(true, Ordering::SeqCst);
+                let fail_with_oom = !plan.allocation_success.swap(true, Ordering::SeqCst);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
                     VM::VMCollection::out_of_memory(tls);
