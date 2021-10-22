@@ -12,8 +12,6 @@ python examples/build.py
 
 # Test with DummyVM (each test in a separate run)
 cd vmbindings/dummyvm
-for p in all_plans do
-    for t in $(ls src/tests/ -I mod.rs | sed -n 's/\.rs$//p'); do
-        MMTK_PLAN=$p cargo test -- $t;
-    done;
+for t in $(ls src/tests/ -I mod.rs | sed -n 's/\.rs$//p'); do
+    MMTK_PLAN=$p cargo test -- $t;
 done;
