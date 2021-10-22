@@ -124,7 +124,6 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let tls = self.get_tls();
         let plan = self.get_plan();
         let is_mutator = VM::VMActivePlan::is_mutator(tls);
-        let initialized = plan.is_initialized();
         let stress_test = plan.base().is_stress_test_gc_enabled();
 
         // Information about the previous collection.
@@ -132,11 +131,19 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
-            // let result = self.alloc_slow_once(size, align, offset);
-            let result = if stress_test {
+            let result = if is_mutator && stress_test {
+                // If we are doing stress GC, we invoke the special allow_slow_once call.
+                // allow_slow_once_stress_test() should make sure that every allocation goes
+                // to the slowpath (here) so we can check the allocation bytes and decide
+                // if we need to do a stress GC.
+
+                // If we should do a stress GC now, we tell the alloc_slow_once_stress_test()
+                // so they would avoid try any thread local allocation, and directly call
+                // global acquire and do a poll.
                 let need_poll = is_mutator && plan.base().should_do_stress_gc();
                 self.alloc_slow_once_stress_test(size, align, offset, need_poll)
             } else {
+                // If we are not doing stress GC, just call the normal alloc_slow_once().
                 self.alloc_slow_once(size, align, offset)
             };
 
@@ -235,9 +242,18 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// check (cursor + size < limit) will fail, and jump to this slowpath. In the slowpath, we still allocate from the thread
     /// local buffer, and recompute the limit (remaining buffer size).
     ///
+    /// If an allocator does not do thread local allocation (which returns false for does_thread_local_allocation()), it does
+    /// not need to override this method. The default implementation will simply call allow_slow_once() and it will work fine
+    /// for allocators that do not have thread local allocation.
+    ///
     /// Arguments:
-    /// * `need_poll`: if this is true, the implementation must poll for a GC.
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.
     fn alloc_slow_once_stress_test(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
+        // If an allocator does thread local allocation but does not override this method to provide a correct implementation,
+        // we will log a warning.
         if self.does_thread_local_allocation() && need_poll {
             warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
         }

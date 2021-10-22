@@ -756,12 +756,16 @@ impl<VM: VMBinding> BasePlan<VM> {
         old_allocation_bytes + size
     }
 
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
     pub fn is_stress_test_gc_enabled(&self) -> bool {
         use crate::util::constants::DEFAULT_STRESS_FACTOR;
         self.options.stress_factor != DEFAULT_STRESS_FACTOR
             || self.options.analysis_factor != DEFAULT_STRESS_FACTOR
     }
 
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
     pub fn should_do_stress_gc(&self) -> bool {
         self.initialized.load(Ordering::SeqCst)
             && (self.allocation_bytes.load(Ordering::SeqCst) > self.options.stress_factor)
