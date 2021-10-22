@@ -175,7 +175,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                         trace!(
                             "Analysis: allocation_bytes = {} more than analysis_factor = {}",
                             _allocation_bytes,
-                            base.options.analysis_factor
+                            plan.base().options.analysis_factor
                         );
                         plan.base().analysis_manager.alloc_hook(size, align, offset);
                     }
@@ -251,7 +251,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
     /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.
-    fn alloc_slow_once_stress_test(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
+    fn alloc_slow_once_stress_test(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
         // If an allocator does thread local allocation but does not override this method to provide a correct implementation,
         // we will log a warning.
         if self.does_thread_local_allocation() && need_poll {

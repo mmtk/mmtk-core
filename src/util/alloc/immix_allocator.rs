@@ -76,7 +76,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         let new_cursor = result + size;
 
         if new_cursor > self.limit {
-            trace!("{:?}: Thread local buffer used up, go to alloc slow path", self.tls);
+            trace!(
+                "{:?}: Thread local buffer used up, go to alloc slow path",
+                self.tls
+            );
             if size > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(size, align, offset)
@@ -106,7 +109,13 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         self.acquire_clean_block(size, align, offset)
     }
 
-    fn alloc_slow_once_stress_test(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
+    fn alloc_slow_once_stress_test(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
         trace!("{:?}: alloc_slow_once_stress_test", self.tls);
         // If we are required to make a poll, we call acquire_clean_block() which will acquire memory
         // from the space which includes a GC poll.
@@ -116,7 +125,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             // Set fake limits so later allocation will fail in the fastpath, and end up going to this
             // special slowpath.
             self.set_limit_for_stress();
-            trace!("{:?}: alloc_slow_once_stress_test done - forced stress poll", self.tls);
+            trace!(
+                "{:?}: alloc_slow_once_stress_test done - forced stress poll",
+                self.tls
+            );
             return ret;
         }
 
@@ -126,7 +138,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         let ret = if self.alloc_slow_for_stress {
             // If we are already doing allow_slow for stress test, and reach here, it means we have failed the
             // thread local allocation, and we have to get a new block from the space.
-            trace!("{:?}: alloc_slow_once_stress_test - acquire new block", self.tls);
+            trace!(
+                "{:?}: alloc_slow_once_stress_test - acquire new block",
+                self.tls
+            );
             self.acquire_clean_block(size, align, offset)
         } else {
             // Indicate that we are doing alloc slow for stress test. If the alloc() cannot allocate from
@@ -283,12 +298,22 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         if self.cursor < self.limit {
             let new_limit = unsafe { Address::from_usize(self.limit - self.cursor) };
             self.limit = new_limit;
-            trace!("{:?}: set_limit_for_stress. normal {} -> {}", self.tls, self.limit, new_limit);
+            trace!(
+                "{:?}: set_limit_for_stress. normal {} -> {}",
+                self.tls,
+                self.limit,
+                new_limit
+            );
         }
         if self.large_cursor < self.large_limit {
             let new_lg_limit = unsafe { Address::from_usize(self.large_limit - self.large_cursor) };
             self.large_limit = new_lg_limit;
-            trace!("{:?}: set_limit_for_stress. large {} -> {}", self.tls, self.large_limit, new_lg_limit);
+            trace!(
+                "{:?}: set_limit_for_stress. large {} -> {}",
+                self.tls,
+                self.large_limit,
+                new_lg_limit
+            );
         }
     }
 
@@ -299,12 +324,22 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         if self.limit < self.cursor {
             let new_limit = self.cursor + self.limit.as_usize();
             self.limit = new_limit;
-            trace!("{:?}: restore_limit_for_stress. normal {} -> {}", self.tls, self.limit, new_limit);
+            trace!(
+                "{:?}: restore_limit_for_stress. normal {} -> {}",
+                self.tls,
+                self.limit,
+                new_limit
+            );
         }
         if self.large_limit < self.large_cursor {
             let new_lg_limit = self.large_cursor + self.large_limit.as_usize();
             self.large_limit = new_lg_limit;
-            trace!("{:?}: restore_limit_for_stress. large {} -> {}", self.tls, self.large_limit, new_lg_limit);
+            trace!(
+                "{:?}: restore_limit_for_stress. large {} -> {}",
+                self.tls,
+                self.large_limit,
+                new_lg_limit
+            );
         }
     }
 }

@@ -3,12 +3,8 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
-#[cfg(feature = "analysis")]
-use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use crate::Plan;
-#[cfg(feature = "analysis")]
-use std::sync::atomic::Ordering;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
@@ -41,27 +37,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         // assert!(offset == 0);
         assert!(align <= 16);
 
-        #[cfg(feature = "analysis")]
-        {
-            let base = &self.plan.base();
-            let is_mutator = VM::VMActivePlan::is_mutator(self.tls) && self.plan.is_initialized();
-
-            if is_mutator
-                && base.allocation_bytes.load(Ordering::SeqCst) > base.options.analysis_factor
-            {
-                trace!(
-                    "Analysis: allocation_bytes = {} more than analysis_factor = {}",
-                    base.allocation_bytes.load(Ordering::Relaxed),
-                    base.options.analysis_factor
-                );
-
-                base.allocation_bytes.store(0, Ordering::SeqCst);
-                base.analysis_manager.alloc_hook(size, align, offset);
-            }
-        }
-
         let ret = self.space.alloc(self.tls, size);
-
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,
