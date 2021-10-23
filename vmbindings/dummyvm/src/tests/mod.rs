@@ -4,3 +4,4 @@
 mod issue139;
 mod handle_mmap_oom;
 mod handle_mmap_conflict;
+mod malloc;
