@@ -15,3 +15,4 @@ cd vmbindings/dummyvm
 for t in $(ls src/tests/ -I mod.rs | sed -n 's/\.rs$//p'); do
     cargo test -- $t;
 done;
+
