@@ -52,6 +52,9 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
 
+pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
+
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
 /// we will go through all the chunks for [address, address + size), and check if they are mapped.
 /// If any of the chunks is not mapped, return false. Otherwise return true.
@@ -237,6 +240,18 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
         1,
         Ordering::SeqCst,
     );
+}
+
+pub(super) fn is_offset_malloc(address: Address) -> bool {
+    unsafe { side_metadata::load(&OFFSET_MALLOC_METADATA_SPEC, address) == 1 }
+}
+
+pub(super) fn set_offset_malloc_bit(address: Address) {
+    side_metadata::store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address, 1, Ordering::SeqCst);
+}
+
+pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
+    side_metadata::store(&OFFSET_MALLOC_METADATA_SPEC, address, 0);
 }
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {

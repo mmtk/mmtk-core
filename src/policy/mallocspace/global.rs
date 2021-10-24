@@ -173,6 +173,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 global: global_side_metadata_specs,
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
+                    MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
@@ -187,7 +188,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
@@ -195,17 +196,20 @@ impl<VM: VMBinding> MallocSpace<VM> {
             return unsafe { Address::zero() };
         }
 
-        let raw = unsafe { calloc(1, size) };
-        let address = Address::from_mut_ptr(raw);
-
+        let (address, is_offset_malloc) = alloc::<VM>(size, align, offset);
         if !address.is_zero() {
-            let actual_size = unsafe { malloc_usable_size(raw) };
+            let actual_size = get_malloc_usable_size(address, is_offset_malloc);
+
             // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
             if !is_meta_space_mapped(address, actual_size) {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
+
+            if is_offset_malloc {
+                set_offset_malloc_bit(address);
+            }
 
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
@@ -219,12 +223,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     // XXX optimize: We pass the bytes in to free as otherwise there were multiple
     // indirect call instructions in the generated assembly
-    pub fn free(&self, addr: Address, bytes: usize) {
-        let ptr = addr.to_mut_ptr();
-        trace!("Free memory {:?}", ptr);
-        unsafe {
-            free(ptr);
+    pub fn free(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
+        if offset_malloc_bit {
+            trace!("Free memory {:x}", addr);
+            offset_free(addr);
+            unsafe { unset_offset_malloc_bit_unsafe(addr) };
+        } else {
+            let ptr = addr.to_mut_ptr();
+            trace!("Free memory {:?}", ptr);
+            unsafe {
+                free(ptr);
+            }
         }
+
         self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
 
         #[cfg(debug_assertions)]
@@ -390,14 +401,16 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     if unsafe { is_alloced_object_unsafe(address) } {
                         let object = unsafe { address.to_object_reference() };
                         let obj_start = VM::VMObjectModel::object_start_ref(object);
-                        let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                        let offset_malloc_bit = is_offset_malloc(obj_start);
+                        let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
                         if !is_marked::<VM>(object, None) {
                             // Dead object
                             trace!("Object {} has been allocated but not marked", object);
 
                             // Free object
-                            self.free(obj_start, bytes);
+                            self.free(obj_start, bytes, offset_malloc_bit);
                             trace!("free object {}", object);
                             unsafe { unset_alloc_bit_unsafe(object) };
                         } else {
@@ -443,7 +456,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 if unsafe { is_alloced_object_unsafe(address) } {
                     let object = unsafe { address.to_object_reference() };
                     let obj_start = VM::VMObjectModel::object_start_ref(object);
-                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                    let bytes = get_malloc_usable_size(obj_start, is_offset_malloc(obj_start));
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
@@ -545,7 +559,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if unsafe { is_alloced_object_unsafe(address) } {
                 let object = unsafe { address.to_object_reference() };
                 let obj_start = VM::VMObjectModel::object_start_ref(object);
-                let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                let offset_malloc_bit = is_offset_malloc(obj_start);
+
+                let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
                 #[cfg(debug_assertions)]
                 if ASSERT_ALLOCATION {
@@ -567,7 +584,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     trace!("Object {} has been allocated but not marked", object);
 
                     // Free object
-                    self.free(obj_start, bytes);
+                    self.free(obj_start, bytes, offset_malloc_bit);
                     trace!("free object {}", object);
                     unsafe { unset_alloc_bit_unsafe(object) };
                 } else {
