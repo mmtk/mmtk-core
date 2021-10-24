@@ -38,7 +38,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         // assert!(align <= 16);
         assert!(offset >= 0);
 
-        let ret = self.space.alloc(self.tls, size);
+        let ret = self.space.alloc(self.tls, size, align, offset);
         trace!(
             "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
             size,
