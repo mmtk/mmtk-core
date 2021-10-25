@@ -161,15 +161,9 @@
 <span id="161">161</span>
 <span id="162">162</span>
 <span id="163">163</span>
-<span id="164">164</span>
-<span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_chunks_up</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
@@ -272,11 +266,7 @@
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
-        <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(
-            <span class="self">self</span>.<span class="ident">as_sft</span>(),
-            <span class="ident">AVAILABLE_START</span>,
-            <span class="ident">bytes_to_chunks_up</span>(<span class="ident">total_bytes</span>),
-        );
+        <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {

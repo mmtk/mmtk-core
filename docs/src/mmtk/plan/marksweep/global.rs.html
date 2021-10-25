@@ -180,6 +180,8 @@
 <span id="180">180</span>
 <span id="181">181</span>
 <span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
@@ -243,6 +245,8 @@
     <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
+        <span class="self">self</span>.<span class="ident">common</span>()
+            .<span class="ident">schedule_common</span>::<span class="op">&lt;</span><span class="ident">MSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="ident">MS_CONSTRAINTS</span>, <span class="ident">scheduler</span>);
         <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
             .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">MSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
