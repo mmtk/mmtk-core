@@ -42,11 +42,11 @@ pub trait Collection<VM: VMBinding> {
     /// Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
     /// have assumptions that those calls needs to be within VM internal threads.
     /// As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
-    /// MMTk calls this method to spawn GC threads during [`enable_collection()`](../memory_manager/fn.enable_collection.html).
+    /// MMTk calls this method to spawn GC threads during [`initialize_collection()`](../memory_manager/fn.initialize_collection.html).
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
-    ///   calls `enable_collection()` and passes as an argument.
+    ///   calls `initialize_collection()` and passes as an argument.
     /// * `ctx`: The GC worker context for the GC thread. If `None` is passed, it means spawning a GC thread for the GC controller,
     ///   which does not have a worker context.
     fn spawn_worker_thread(tls: VMThread, ctx: Option<&GCWorker<VM>>);

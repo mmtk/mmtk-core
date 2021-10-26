@@ -38,6 +38,8 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThre
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
 /// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
 /// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
+/// the VM's thread system is ready to spawn GC workers.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance to initialize.
@@ -196,6 +198,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
 /// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
+/// Note this call is not thread safe, only one VM thread should call this.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -216,6 +219,7 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
 /// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
 /// behavior.
+/// Note this call is not thread safe, only one VM thread should call this.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.

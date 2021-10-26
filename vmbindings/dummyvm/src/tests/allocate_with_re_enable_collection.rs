@@ -2,8 +2,8 @@ use crate::api::*;
 use mmtk::util::opaque_pointer::*;
 use mmtk::AllocationSemantics;
 
-/// This test allocates after calling enable_collection(). When we exceed the heap limit, MMTk will trigger a GC. And block_for_gc will be called.
-/// We havent implemented block_for_gc so it will panic. This test is similar to allocate_with_enable_collection, except that we once disabled GC in the test.
+/// This test allocates after calling initialize_collection(). When we exceed the heap limit, MMTk will trigger a GC. And block_for_gc will be called.
+/// We havent implemented block_for_gc so it will panic. This test is similar to allocate_with_initialize_collection, except that we once disabled GC in the test.
 #[test]
 #[should_panic(expected = "block_for_gc is not implemented")]
 pub fn allocate_with_re_enable_collection() {
