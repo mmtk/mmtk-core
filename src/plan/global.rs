@@ -912,22 +912,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         constraints: &'static PlanConstraints,
         scheduler: &GCWorkScheduler<VM>,
     ) {
-        self.schedule_common_partially::<P, E, C>(plan, constraints, scheduler, false)
-    }
-
-    /// Schedule the common work packets unless some work is specified as skip. Currently
-    /// only skip_finalization is provided.
-    pub fn schedule_common_partially<
-        P: Plan<VM = VM>,
-        E: ProcessEdgesWork<VM = VM>,
-        C: CopyContext<VM = VM> + GCWorkerLocal,
-    >(
-        &self,
-        plan: &'static P,
-        constraints: &'static PlanConstraints,
-        scheduler: &GCWorkScheduler<VM>,
-        skip_finalization: bool,
-    ) {
         use crate::scheduler::gc_work::*;
 
         // Stop & scan mutators (mutator scanning can happen before STW)
@@ -957,7 +941,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
 
         // Finalization
-        if !skip_finalization && !self.base.options.no_finalizer {
+        if !self.base.options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
