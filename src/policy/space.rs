@@ -282,7 +282,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             && VM::VMActivePlan::global().should_trigger_gc_when_heap_is_full();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
+        let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -292,8 +292,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
-            if !allow_poll {
-                panic!("GC is not allowed here: collection is not initialized (did you call eanble_collection()?).");
+            if !allow_gc {
+                panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             }
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
@@ -334,8 +334,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 }
                 Err(_) => {
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                    if !allow_poll {
-                        panic!("Physical allocation failed when polling not allowed!");
+                    if !allow_gc {
+                        panic!("Physical allocation failed when GC is not allowed!");
                     }
 
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());

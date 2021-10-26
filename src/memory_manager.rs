@@ -181,8 +181,8 @@ pub fn start_worker<VM: VMBinding>(
 
 /// Initialize the scheduler and GC workers that are required for doing garbage collections.
 /// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready. This should only be called once, and is NOT thread safe. This call
-/// it will invoke Collection::spawn_worker_thread() to create GC threads.
+/// is ready. This should only be called once. This call will invoke Collection::spawn_worker_thread()
+/// to create GC threads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -196,10 +196,6 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
-    debug_assert!(
-        mmtk.plan.should_trigger_gc_when_heap_is_full(),
-        "GC should be enabled by default"
-    );
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
@@ -224,7 +220,7 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation
 /// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
 /// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
-/// behavior.
+/// behavior. This call does not disable explicit GCs (through handle_user_collection_request()).
 /// Note this call is not thread safe, only one VM thread should call this.
 ///
 /// Arguments:
