@@ -189,11 +189,17 @@ pub fn start_worker<VM: VMBinding>(
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
-    assert!(!mmtk.plan.is_initialized(), "MMTk collection has been initialized (was initialize_collection() already called before?)");
+    assert!(
+        !mmtk.plan.is_initialized(),
+        "MMTk collection has been initialized (was initialize_collection() already called before?)"
+    );
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
-    debug_assert!(mmtk.plan.should_trigger_gc_when_heap_is_full(), "GC should be enabled by default");
+    debug_assert!(
+        mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        "GC should be enabled by default"
+    );
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
