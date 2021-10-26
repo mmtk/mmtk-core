@@ -73,7 +73,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
             .schedule_common::<Self, PPProcessEdges<VM>, NoCopy<VM>>(self, &CONSTRAINTS, scheduler);

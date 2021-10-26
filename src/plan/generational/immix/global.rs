@@ -74,6 +74,18 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         GCWorkerLocalPtr::new(c)
     }
 
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.last_gc_was_defrag.load(Ordering::Relaxed)
+    }
+
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
     where
         Self: Sized,
@@ -99,7 +111,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
         let is_full_heap = self.request_full_heap_collection();
 
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         let defrag = if is_full_heap {
             self.immix.decide_whether_to_defrag(
