@@ -9,7 +9,7 @@ pub fn allocate_with_disable_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
     gc_init(MB);
-    enable_collection(VMThread::UNINITIALIZED);
+    initialize_collection(VMThread::UNINITIALIZED);
     let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
     // Allocate 1MB. It should be fine.
     let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);

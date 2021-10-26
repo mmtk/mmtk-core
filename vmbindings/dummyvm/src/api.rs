@@ -66,13 +66,18 @@ pub extern "C" fn start_worker(tls: VMWorkerThread, worker: &'static mut GCWorke
 }
 
 #[no_mangle]
-pub extern "C" fn enable_collection(tls: VMThread) {
-    memory_manager::enable_collection(&SINGLETON, tls)
+pub extern "C" fn initialize_collection(tls: VMThread) {
+    memory_manager::initialize_collection(&SINGLETON, tls)
 }
 
 #[no_mangle]
 pub extern "C" fn disable_collection() {
     memory_manager::disable_collection(&SINGLETON)
+}
+
+#[no_mangle]
+pub extern "C" fn enable_collection() {
+    memory_manager::enable_collection(&SINGLETON)
 }
 
 #[no_mangle]

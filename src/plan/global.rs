@@ -252,7 +252,7 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
-    fn is_gc_enabled(&self) -> bool {
+    fn should_trigger_gc_when_heap_is_full(&self) -> bool {
         self.base()
             .trigger_gc_when_heap_is_full
             .load(Ordering::SeqCst)

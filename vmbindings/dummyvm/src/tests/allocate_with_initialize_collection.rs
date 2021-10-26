@@ -6,11 +6,11 @@ use mmtk::AllocationSemantics;
 /// We havent implemented block_for_gc so it will panic.
 #[test]
 #[should_panic(expected = "block_for_gc is not implemented")]
-pub fn allocate_with_enable_collection() {
+pub fn allocate_with_initialize_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
     gc_init(MB);
-    enable_collection(VMThread::UNINITIALIZED);
+    initialize_collection(VMThread::UNINITIALIZED);
     let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
     // Attempt to allocate 2MB. This will trigger GC.
     let addr = alloc(handle, 2 * MB, 8, 0, AllocationSemantics::Default);

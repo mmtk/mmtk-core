@@ -177,34 +177,37 @@ pub fn start_worker<VM: VMBinding>(
     worker.run(mmtk);
 }
 
-/// Allow MMTk to trigger garbage collection. A VM should call this method when it is ready for the mechanisms required for
-/// collection during the boot process. If a VM ever disable collection through disable_collection(), it should call this method
-/// when it would like to enable collection again.
-/// When this method is called at the first time, it will initialize the GC scheduler and workers. For example, it will invoke
-/// Collection::spawn_worker_thread() to create GC threads. On subsequent calls, it will skip the initialization, and merely set
-/// a flag.
+/// Initialize the scheduler and GC workers that are required for doing garbage collections.
+/// This is a mandatory call for a VM during its boot process once its thread system
+/// is ready. This should only be called once, and is NOT thread safe. This call
+/// it will invoke Collection::spawn_worker_thread() to create GC threads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
-pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
-    if !mmtk.plan.is_initialized() {
-        // If we never initialize collection, we do the initialization here.
-        mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
-        VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
-        mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
-        debug_assert!(mmtk.plan.is_gc_enabled(), "GC should be enabled by default");
-    } else {
-        debug_assert!(
-            !mmtk.plan.is_gc_enabled(),
-            "enable_collection() is called when GC is already enabled."
-        );
-        mmtk.plan
-            .base()
-            .trigger_gc_when_heap_is_full
-            .store(true, Ordering::SeqCst);
-    }
+pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+    assert!(!mmtk.plan.is_initialized(), "MMTk collection has been initialized (was initialize_collection() already called before?)");
+    mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
+    VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
+    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    debug_assert!(mmtk.plan.should_trigger_gc_when_heap_is_full(), "GC should be enabled by default");
+}
+
+/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
+/// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    debug_assert!(
+        !mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        "enable_collection() is called when GC is already enabled."
+    );
+    mmtk.plan
+        .base()
+        .trigger_gc_when_heap_is_full
+        .store(true, Ordering::SeqCst);
 }
 
 /// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
@@ -213,9 +216,12 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) 
 /// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
 /// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
 /// behavior.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
 pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        mmtk.plan.is_gc_enabled(),
+        mmtk.plan.should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
     mmtk.plan

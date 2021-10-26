@@ -4,7 +4,7 @@
 mod issue139;
 mod handle_mmap_oom;
 mod handle_mmap_conflict;
-mod allocate_without_enable_collection;
-mod allocate_with_enable_collection;
+mod allocate_without_initialize_collection;
+mod allocate_with_initialize_collection;
 mod allcoate_with_disable_collection;
 mod allocate_with_re_enable_collection;

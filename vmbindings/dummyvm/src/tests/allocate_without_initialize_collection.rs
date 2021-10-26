@@ -6,7 +6,7 @@ use mmtk::AllocationSemantics;
 /// But as we haven't enabled collection, GC is not initialized, so MMTk will panic.
 #[test]
 #[should_panic(expected = "GC is not allowed here")]
-pub fn allocate_without_enable_collection() {
+pub fn allocate_without_initialize_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
     gc_init(MB);
