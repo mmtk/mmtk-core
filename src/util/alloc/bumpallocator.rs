@@ -85,7 +85,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     // Performs three kinds of allocations: (i) if the hard limit has been met;
     // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
     // factor has been crossed.
-    fn alloc_slow_once_stress_test(
+    fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
         align: usize,
