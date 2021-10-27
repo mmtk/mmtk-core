@@ -226,9 +226,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         let available_blocks = &mut self.available_blocks[bin as usize];
         debug_assert!(available_blocks.size >= size);
-        if available_blocks.size == 40960 {
-            eprintln!("alloc 40960");
-        }
 
         let mut block = available_blocks.first;
 
@@ -495,7 +492,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         // fresh block
 
-        eprintln!("r {}", self.available_blocks[bin as usize].size);
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
         if block.is_zero() {
             // GC
@@ -553,12 +549,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 );
                 if !marked {
                     self.free(cell);
-                } else {
-                    // // eprintln!("u {} meta: {}", cell, address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), cell));
-                    // unset_mark_bit::<VM>(
-                    //     unsafe { cell.to_object_reference() },
-                    //     Some(Ordering::SeqCst),
-                    // );
                 }
             }
             cell += cell_size;
