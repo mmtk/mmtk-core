@@ -124,7 +124,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         // If we are required to make a poll, we call acquire_clean_block() which will acquire memory
         // from the space which includes a GC poll.
         if need_poll {
-            trace!("{:?}: alloc_slow_once_precise_stress going to poll", self.tls);
+            trace!(
+                "{:?}: alloc_slow_once_precise_stress going to poll",
+                self.tls
+            );
             let ret = self.acquire_clean_block(size, align, offset);
             // Set fake limits so later allocation will fail in the fastpath, and end up going to this
             // special slowpath.

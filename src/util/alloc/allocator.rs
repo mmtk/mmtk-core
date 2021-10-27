@@ -176,14 +176,18 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
-                    let allocated_size = if plan.is_precise_stress() || !self.does_thread_local_allocation() {
-                        // For precise stress test, or for allocators that do not have thread local buffer,
-                        // we know exactly how many bytes we allocate.
-                        size
-                    } else {
-                        // For normal stress test, we count the entire thread local buffer size as allocated.
-                        crate::util::conversions::raw_align_up(size, self.get_thread_local_buffer_granularity())
-                    };
+                    let allocated_size =
+                        if plan.is_precise_stress() || !self.does_thread_local_allocation() {
+                            // For precise stress test, or for allocators that do not have thread local buffer,
+                            // we know exactly how many bytes we allocate.
+                            size
+                        } else {
+                            // For normal stress test, we count the entire thread local buffer size as allocated.
+                            crate::util::conversions::raw_align_up(
+                                size,
+                                self.get_thread_local_buffer_granularity(),
+                            )
+                        };
                     let _allocation_bytes = plan.increase_allocation_bytes_by(allocated_size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
