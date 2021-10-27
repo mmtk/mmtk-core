@@ -1,6 +1,4 @@
 use crate::util::address::Address;
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
-
 use std::sync::atomic::Ordering;
 
 use crate::plan::Plan;
@@ -110,6 +108,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn get_space(&self) -> &'static dyn Space<VM>;
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
 
+    /// Does this allocator do thread local allocation? If an allocator does not do thread local allocation,
+    /// each allocation will go to slowpath and will have a check for GC polls.
+    fn does_thread_local_allocation(&self) -> bool;
+
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
     #[inline(never)]
@@ -121,17 +123,31 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
         let plan = self.get_plan().base();
-        let stress_test = plan.options.stress_factor != DEFAULT_STRESS_FACTOR
-            || plan.options.analysis_factor != DEFAULT_STRESS_FACTOR;
+        let is_mutator = VM::VMActivePlan::is_mutator(tls);
+        let stress_test = plan.is_stress_test_gc_enabled();
 
         // Information about the previous collection.
         let mut emergency_collection = false;
         let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
-            let result = self.alloc_slow_once(size, align, offset);
+            let result = if is_mutator && stress_test {
+                // If we are doing stress GC, we invoke the special allow_slow_once call.
+                // allow_slow_once_stress_test() should make sure that every allocation goes
+                // to the slowpath (here) so we can check the allocation bytes and decide
+                // if we need to do a stress GC.
 
-            if !VM::VMActivePlan::is_mutator(tls) {
+                // If we should do a stress GC now, we tell the alloc_slow_once_stress_test()
+                // so they would avoid try any thread local allocation, and directly call
+                // global acquire and do a poll.
+                let need_poll = is_mutator && plan.should_do_stress_gc();
+                self.alloc_slow_once_stress_test(size, align, offset, need_poll)
+            } else {
+                // If we are not doing stress GC, just call the normal alloc_slow_once().
+                self.alloc_slow_once(size, align, offset)
+            };
+
+            if !is_mutator {
                 debug_assert!(!result.is_zero());
                 return result;
             }
@@ -150,7 +166,19 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
-                    plan.increase_allocation_bytes_by(size);
+                    let _allocation_bytes = plan.increase_allocation_bytes_by(size);
+
+                    // This is the allocation hook for the analysis trait. If you want to call
+                    // an analysis counter specific allocation hook, then here is the place to do so
+                    #[cfg(feature = "analysis")]
+                    if _allocation_bytes > plan.options.analysis_factor {
+                        trace!(
+                            "Analysis: allocation_bytes = {} more than analysis_factor = {}",
+                            _allocation_bytes,
+                            plan.options.analysis_factor
+                        );
+                        plan.analysis_manager.alloc_hook(size, align, offset);
+                    }
                 }
 
                 return result;
@@ -196,7 +224,47 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         }
     }
 
+    /// Single slow path allocation attempt. This is called by allocSlow.
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
+
+    /// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to N),
+    /// we would expect for every N bytes allocated, we will trigger a stress GC.
+    /// However, for allocators that do thread local allocation, they may allocate from their thread local buffer
+    /// which does not have a GC poll check, and they may even allocate with the JIT generated allocation
+    /// fastpath which is unaware of stress test GC. For both cases, we are not able to guarantee
+    /// a stress GC is triggered every N bytes. To solve this, when the stress factor is set, we
+    /// will call this method instead of the normal alloc_slow_once(). We expect the implementation of this slow allocation
+    /// will trick the fastpath so every allocation will fail in the fastpath, jump to the slow path and eventually
+    /// call this method again for the actual allocation.
+    ///
+    /// The actual implementation about how to trick the fastpath may vary. For example, our bump pointer allocator will
+    /// set the thread local buffer limit to the buffer size instead of the buffer end address. In this case, every fastpath
+    /// check (cursor + size < limit) will fail, and jump to this slowpath. In the slowpath, we still allocate from the thread
+    /// local buffer, and recompute the limit (remaining buffer size).
+    ///
+    /// If an allocator does not do thread local allocation (which returns false for does_thread_local_allocation()), it does
+    /// not need to override this method. The default implementation will simply call allow_slow_once() and it will work fine
+    /// for allocators that do not have thread local allocation.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.
+    fn alloc_slow_once_stress_test(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
+        // If an allocator does thread local allocation but does not override this method to provide a correct implementation,
+        // we will log a warning.
+        if self.does_thread_local_allocation() && need_poll {
+            warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
+        }
+        self.alloc_slow_once(size, align, offset)
+    }
 }
 
 impl_downcast!(Allocator<VM> where VM: VMBinding);

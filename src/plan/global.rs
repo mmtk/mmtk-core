@@ -406,7 +406,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
-    pub allocation_bytes: AtomicUsize,
+    allocation_bytes: AtomicUsize,
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -754,7 +754,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         is_internal_triggered
     }
 
-    pub fn increase_allocation_bytes_by(&self, size: usize) {
+    /// Increase the allocation bytes and return the current allocation bytes after increasing
+    pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
         trace!(
             "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
@@ -762,25 +763,22 @@ impl<VM: VMBinding> BasePlan<VM> {
             size,
             self.allocation_bytes.load(Ordering::Relaxed),
         );
+        old_allocation_bytes + size
     }
 
-    #[inline]
-    pub(super) fn stress_test_gc_required(&self) -> bool {
-        let stress_factor = self.options.stress_factor;
-        if self.initialized.load(Ordering::SeqCst)
-            && (self.allocation_bytes.load(Ordering::SeqCst) > stress_factor)
-        {
-            trace!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.allocation_bytes.load(Ordering::Relaxed),
-                stress_factor
-            );
-            trace!("Doing stress GC");
-            self.allocation_bytes.store(0, Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        use crate::util::constants::DEFAULT_STRESS_FACTOR;
+        self.options.stress_factor != DEFAULT_STRESS_FACTOR
+            || self.options.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
+
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    pub fn should_do_stress_gc(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
+            && (self.allocation_bytes.load(Ordering::SeqCst) > self.options.stress_factor)
     }
 
     pub(super) fn collection_required<P: Plan>(
@@ -789,7 +787,17 @@ impl<VM: VMBinding> BasePlan<VM> {
         space_full: bool,
         _space: &dyn Space<VM>,
     ) -> bool {
-        let stress_force_gc = self.stress_test_gc_required();
+        let stress_force_gc = self.should_do_stress_gc();
+        if stress_force_gc {
+            debug!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.allocation_bytes.load(Ordering::Relaxed),
+                self.options.stress_factor
+            );
+            debug!("Doing stress GC");
+            self.allocation_bytes.store(0, Ordering::SeqCst);
+        }
+
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             plan.get_pages_reserved(),
