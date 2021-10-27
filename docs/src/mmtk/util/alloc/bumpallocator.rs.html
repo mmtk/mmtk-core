@@ -169,38 +169,7 @@
 <span id="169">169</span>
 <span id="170">170</span>
 <span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
-<span id="175">175</span>
-<span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
-<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
-
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
@@ -209,7 +178,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">VMBinding</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="kw">const</span> <span class="ident">BYTES_IN_PAGE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">12</span>;
 <span class="kw">const</span> <span class="ident">BLOCK_SIZE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span> <span class="op">*</span> <span class="ident">BYTES_IN_PAGE</span>;
@@ -248,6 +217,9 @@
     <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">plan</span>
     }
+    <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="bool-val">true</span>
+    }
 
     <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc&quot;</span>);
@@ -273,15 +245,46 @@
 
     <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc_slow&quot;</span>);
-        <span class="comment">// TODO: internalLimit etc.</span>
-        <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>();
+        <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
+    }
 
-        <span class="kw">if</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
-            <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
-        {
-            <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
+    <span class="comment">// Slow path for allocation if the stress test flag has been enabled. It works</span>
+    <span class="comment">// by manipulating the limit to be below the cursor always.</span>
+    <span class="comment">// Performs three kinds of allocations: (i) if the hard limit has been met;</span>
+    <span class="comment">// (ii) the bump pointer semantics from the fastpath; and (iii) if the stress</span>
+    <span class="comment">// factor has been crossed.</span>
+    <span class="kw">fn</span> <span class="ident">alloc_slow_once_stress_test</span>(
+        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="ident">size</span>: <span class="ident">usize</span>,
+        <span class="ident">align</span>: <span class="ident">usize</span>,
+        <span class="ident">offset</span>: <span class="ident">isize</span>,
+        <span class="ident">need_poll</span>: <span class="ident">bool</span>,
+    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+        <span class="kw">if</span> <span class="ident">need_poll</span> {
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>);
+        }
+
+        <span class="macro">trace!</span>(<span class="string">&quot;alloc_slow stress_test&quot;</span>);
+        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
+        <span class="kw">let</span> <span class="ident">new_cursor</span> <span class="op">=</span> <span class="ident">result</span> <span class="op">+</span> <span class="ident">size</span>;
+
+        <span class="comment">// For stress test, limit is [0, block_size) to artificially make the</span>
+        <span class="comment">// check in the fastpath (alloc()) fail. The real limit is recovered by</span>
+        <span class="comment">// adding it to the current cursor.</span>
+        <span class="kw">if</span> <span class="ident">new_cursor</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">limit</span>.<span class="ident">as_usize</span>() {
+            <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>)
         } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">alloc_slow_once_stress_test</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+            <span class="ident">fill_alignment_gap</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">result</span>);
+            <span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span><span class="op">=</span> <span class="ident">new_cursor</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>;
+            <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">new_cursor</span>;
+            <span class="macro">trace!</span>(
+                <span class="string">&quot;alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
+                <span class="ident">size</span>,
+                <span class="ident">result</span>,
+                <span class="self">self</span>.<span class="ident">cursor</span>,
+                <span class="self">self</span>.<span class="ident">limit</span>
+            );
+            <span class="ident">result</span>
         }
     }
 
@@ -302,65 +305,6 @@
             <span class="ident">limit</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },
             <span class="ident">space</span>,
             <span class="ident">plan</span>,
-        }
-    }
-
-    <span class="comment">// Slow path for allocation if the stress test flag has been enabled. It works</span>
-    <span class="comment">// by manipulating the limit to be below the cursor always.</span>
-    <span class="comment">// Performs three kinds of allocations: (i) if the hard limit has been met;</span>
-    <span class="comment">// (ii) the bump pointer semantics from the fastpath; and (iii) if the stress</span>
-    <span class="comment">// factor has been crossed.</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once_stress_test</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;alloc_slow stress_test&quot;</span>);
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-        <span class="kw">let</span> <span class="ident">new_cursor</span> <span class="op">=</span> <span class="ident">result</span> <span class="op">+</span> <span class="ident">size</span>;
-
-        <span class="comment">// For stress test, limit is [0, block_size) to artificially make the</span>
-        <span class="comment">// check in the fastpath (alloc()) fail. The real limit is recovered by</span>
-        <span class="comment">// adding it to the current cursor.</span>
-        <span class="kw">if</span> <span class="ident">new_cursor</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">limit</span>.<span class="ident">as_usize</span>() {
-            <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>)
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>();
-            <span class="kw">let</span> <span class="ident">is_mutator</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="self">self</span>.<span class="ident">tls</span>) <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>();
-
-            <span class="kw">if</span> <span class="ident">is_mutator</span>
-                <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
-            {
-                <span class="macro">trace!</span>(
-                    <span class="string">&quot;Stress GC: allocation_bytes = {} more than stress_factor = {}&quot;</span>,
-                    <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
-                );
-                <span class="kw">return</span> <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>);
-            }
-
-            <span class="comment">// This is the allocation hook for the analysis trait. If you want to call</span>
-            <span class="comment">// an analysis counter specific allocation hook, then here is the place to do so</span>
-            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-            <span class="kw">if</span> <span class="ident">is_mutator</span>
-                <span class="op">&amp;&amp;</span> <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
-            {
-                <span class="macro">trace!</span>(
-                    <span class="string">&quot;Analysis: allocation_bytes = {} more than analysis_factor = {}&quot;</span>,
-                    <span class="ident">base</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
-                );
-
-                <span class="ident">base</span>.<span class="ident">analysis_manager</span>.<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-            }
-
-            <span class="ident">fill_alignment_gap</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">result</span>);
-            <span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span><span class="op">=</span> <span class="ident">new_cursor</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>;
-            <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">new_cursor</span>;
-            <span class="macro">trace!</span>(
-                <span class="string">&quot;alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}&quot;</span>,
-                <span class="ident">size</span>,
-                <span class="ident">result</span>,
-                <span class="self">self</span>.<span class="ident">cursor</span>,
-                <span class="self">self</span>.<span class="ident">limit</span>
-            );
-            <span class="ident">result</span>
         }
     }
 
