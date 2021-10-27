@@ -957,6 +957,16 @@
 <span id="957">957</span>
 <span id="958">958</span>
 <span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1211,6 +1221,12 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">initialized</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
     }
 
+    <span class="kw">fn</span> <span class="ident">should_trigger_gc_when_heap_is_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">base</span>()
+            .<span class="ident">trigger_gc_when_heap_is_full</span>
+            .<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    }
+
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
 
@@ -1329,8 +1345,11 @@
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="comment">// Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.</span>
+    <span class="doccomment">/// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.</span>
     <span class="kw">pub</span> <span class="ident">initialized</span>: <span class="ident">AtomicBool</span>,
+    <span class="doccomment">/// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow</span>
+    <span class="doccomment">/// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.</span>
+    <span class="kw">pub</span> <span class="ident">trigger_gc_when_heap_is_full</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">gc_status</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GcStatus</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">last_stress_pages</span>: <span class="ident">AtomicUsize</span>,
     <span class="kw">pub</span> <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool</span>,
@@ -1462,6 +1481,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
             ),
 
             <span class="ident">initialized</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            <span class="ident">trigger_gc_when_heap_is_full</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>),
             <span class="ident">gc_status</span>: <span class="ident">Mutex::new</span>(<span class="ident">GcStatus::NotInGC</span>),
             <span class="ident">last_stress_pages</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),

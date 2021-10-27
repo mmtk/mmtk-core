@@ -438,6 +438,51 @@
 <span id="438">438</span>
 <span id="439">439</span>
 <span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -478,6 +523,8 @@
 <span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)</span>
 <span class="doccomment">/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a</span>
 <span class="doccomment">/// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.</span>
+<span class="doccomment">/// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when</span>
+<span class="doccomment">/// the VM&#39;s thread system is ready to spawn GC workers.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance to initialize.</span>
@@ -617,18 +664,61 @@
     <span class="ident">worker</span>.<span class="ident">run</span>(<span class="ident">mmtk</span>);
 }
 
-<span class="doccomment">/// Allow MMTk to trigger garbage collection. A VM should only call this method when it is ready for the mechanisms required for</span>
-<span class="doccomment">/// collection during the boot process. MMTk will invoke Collection::spawn_worker_thread() to create GC threads during</span>
-<span class="doccomment">/// this funciton call.</span>
+<span class="doccomment">/// Initialize the scheduler and GC workers that are required for doing garbage collections.</span>
+<span class="doccomment">/// This is a mandatory call for a VM during its boot process once its thread system</span>
+<span class="doccomment">/// is ready. This should only be called once. This call will invoke Collection::spawn_worker_thread()</span>
+<span class="doccomment">/// to create GC threads.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in</span>
 <span class="doccomment">///   Collection::spawn_worker_thread() so that the VM knows the context.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initialize_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
+    <span class="macro">assert!</span>(
+        <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>(),
+        <span class="string">&quot;MMTk collection has been initialized (was initialize_collection() already called before?)&quot;</span>
+    );
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">initialize</span>(<span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">mmtk</span>, <span class="ident">tls</span>);
     <span class="ident">VM::VMCollection::spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">None</span>); <span class="comment">// spawn controller thread</span>
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">initialized</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+}
+
+<span class="doccomment">/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().</span>
+<span class="doccomment">/// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.</span>
+<span class="doccomment">/// Note this call is not thread safe, only one VM thread should call this.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Arguments:</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="macro">debug_assert!</span>(
+        <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">should_trigger_gc_when_heap_is_full</span>(),
+        <span class="string">&quot;enable_collection() is called when GC is already enabled.&quot;</span>
+    );
+    <span class="ident">mmtk</span>.<span class="ident">plan</span>
+        .<span class="ident">base</span>()
+        .<span class="ident">trigger_gc_when_heap_is_full</span>
+        .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+}
+
+<span class="doccomment">/// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will</span>
+<span class="doccomment">/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the MMTk&#39;s heap size (the soft heap limit).</span>
+<span class="doccomment">/// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation</span>
+<span class="doccomment">/// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory</span>
+<span class="doccomment">/// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this</span>
+<span class="doccomment">/// behavior. This call does not disable explicit GCs (through handle_user_collection_request()).</span>
+<span class="doccomment">/// Note this call is not thread safe, only one VM thread should call this.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Arguments:</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">disable_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="macro">debug_assert!</span>(
+        <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">should_trigger_gc_when_heap_is_full</span>(),
+        <span class="string">&quot;disable_collection() is called when GC is not enabled.&quot;</span>
+    );
+    <span class="ident">mmtk</span>.<span class="ident">plan</span>
+        .<span class="ident">base</span>()
+        .<span class="ident">trigger_gc_when_heap_is_full</span>
+        .<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
 <span class="doccomment">/// Process MMTk run-time options.</span>

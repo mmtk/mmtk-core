@@ -42,11 +42,11 @@ before the GC, and call <code>resume_mutators()</code> after the GC.</p>
 </div></details><details class="rustdoc-toggle" open><summary><div id="tymethod.spawn_worker_thread" class="method has-srclink"><div class="rightside"><a class="srclink" href="../../src/mmtk/vm/collection.rs.html#52" title="goto source code">[src]</a></div><h4 class="code-header">fn <a href="#tymethod.spawn_worker_thread" class="fnname">spawn_worker_thread</a>(tls: <a class="struct" href="../util/opaque_pointer/struct.VMThread.html" title="struct mmtk::util::opaque_pointer::VMThread">VMThread</a>, ctx: <a class="enum" href="https://doc.rust-lang.org/nightly/core/option/enum.Option.html" title="enum core::option::Option">Option</a>&lt;&amp;<a class="struct" href="../scheduler/worker/struct.GCWorker.html" title="struct mmtk::scheduler::worker::GCWorker">GCWorker</a>&lt;VM&gt;&gt;)</h4></div></summary><div class="docblock"><p>Ask the VM to spawn a GC thread for MMTk. A GC thread may later call into the VM through these VM traits. Some VMs
 have assumptions that those calls needs to be within VM internal threads.
 As a result, MMTk does not spawn GC threads itself to avoid breaking this kind of assumptions.
-MMTk calls this method to spawn GC threads during <a href="../memory_manager/fn.enable_collection.html"><code>enable_collection()</code></a>.</p>
+MMTk calls this method to spawn GC threads during <a href="../memory_manager/fn.initialize_collection.html"><code>initialize_collection()</code></a>.</p>
 <p>Arguments:</p>
 <ul>
 <li><code>tls</code>: The thread pointer for the parent thread that we spawn new threads from. This is the same <code>tls</code> when the VM
-calls <code>enable_collection()</code> and passes as an argument.</li>
+calls <code>initialize_collection()</code> and passes as an argument.</li>
 <li><code>ctx</code>: The GC worker context for the GC thread. If <code>None</code> is passed, it means spawning a GC thread for the GC controller,
 which does not have a worker context.</li>
 </ul>

@@ -644,6 +644,10 @@
 <span id="644">644</span>
 <span id="645">645</span>
 <span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -921,10 +925,14 @@
 
     <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, <span class="ident">tls</span>);
-        <span class="comment">// Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.</span>
-        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>);
-        <span class="comment">// Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.</span>
-        <span class="kw">let</span> <span class="ident">allow_poll</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">is_initialized</span>();
+        <span class="comment">// Should we poll to attempt to GC?</span>
+        <span class="comment">// - If tls is collector, we cannot attempt a GC.</span>
+        <span class="comment">// - If gc is disabled, we cannot attempt a GC.</span>
+        <span class="kw">let</span> <span class="ident">should_poll</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>)
+            <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">should_trigger_gc_when_heap_is_full</span>();
+        <span class="comment">// Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.</span>
+        <span class="comment">// initialize_collection() has to be called so we know GC is initialized.</span>
+        <span class="kw">let</span> <span class="ident">allow_gc</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">is_initialized</span>();
 
         <span class="macro">trace!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
         <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_page_resource</span>();
@@ -934,8 +942,8 @@
 
         <span class="kw">if</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">as_space</span>()) {
             <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
-            <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_poll</span> {
-                <span class="macro">panic!</span>(<span class="string">&quot;Collection is not enabled.&quot;</span>);
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_gc</span> {
+                <span class="macro">panic!</span>(<span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
             }
             <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
             <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We have checked that this is mutator</span>
@@ -976,8 +984,8 @@
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> {
                     <span class="comment">// We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.</span>
-                    <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_poll</span> {
-                        <span class="macro">panic!</span>(<span class="string">&quot;Physical allocation failed when polling not allowed!&quot;</span>);
+                    <span class="kw">if</span> <span class="op">!</span><span class="ident">allow_gc</span> {
+                        <span class="macro">panic!</span>(<span class="string">&quot;Physical allocation failed when GC is not allowed!&quot;</span>);
                     }
 
                     <span class="kw">let</span> <span class="ident">gc_performed</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">true</span>, <span class="self">self</span>.<span class="ident">as_space</span>());
