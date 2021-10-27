@@ -57,11 +57,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<Self, MSProcessEdges<VM>, NoCopy<VM>>(
-                self,
-                &MS_CONSTRAINTS,
-                scheduler,
-            );
+            .schedule_common::<Self, MSProcessEdges<VM>>(self, &MS_CONSTRAINTS, scheduler);
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 

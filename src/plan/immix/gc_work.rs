@@ -97,6 +97,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
 
 impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdges<VM, KIND> {
     type VM = VM;
+    type CC = ImmixCopyContext<VM>;
     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {

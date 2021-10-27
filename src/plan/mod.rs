@@ -25,6 +25,8 @@ pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
 pub use global::CopyContext;
 pub(crate) use global::GcStatus;
+#[cfg(feature = "sanity")]
+pub(crate) use global::NoCopy;
 pub use global::Plan;
 
 mod mutator_context;

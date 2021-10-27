@@ -22,3 +22,9 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
         stat.end_of_work(&mut worker.stat);
     }
 }
+
+// pub trait GCWorkContext<VM: VMBinding> {
+//     type PlanType: Plan<VM>;
+//     type CopyContextType: CopyContext<VM = VM>;
+//     type ProcessEdgesWorkType: ProcessEdgesWork<VM = VM, CC = Self::CopyContextType>;
+// }

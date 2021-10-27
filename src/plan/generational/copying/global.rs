@@ -87,7 +87,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>, GenCopyCopyContext<VM>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(
                     self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
@@ -95,7 +95,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         } else {
             debug!("Full heap GC");
             self.common()
-                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>, GenCopyCopyContext<VM>>(
+                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>>(
                     self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,

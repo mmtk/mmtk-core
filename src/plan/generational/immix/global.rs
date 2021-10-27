@@ -128,7 +128,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -136,7 +136,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else if defrag {
             debug!("Full heap GC Defrag");
             self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -144,7 +144,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else {
             debug!("Full heap GC Fast");
             self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,

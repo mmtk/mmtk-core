@@ -92,10 +92,18 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         #[allow(clippy::if_same_then_else)]
         if in_defrag {
             self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Defrag }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
+                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Defrag }>>(
+                    self,
+                    &IMMIX_CONSTRAINTS,
+                    scheduler,
+                );
         } else {
             self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
+                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>>(
+                    self,
+                    &IMMIX_CONSTRAINTS,
+                    scheduler,
+                );
         }
     }
 

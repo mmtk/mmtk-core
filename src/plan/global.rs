@@ -902,11 +902,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     /// Schedule all the common work packets
-    pub fn schedule_common<
-        P: Plan<VM = VM>,
-        E: ProcessEdgesWork<VM = VM>,
-        C: CopyContext<VM = VM> + GCWorkerLocal,
-    >(
+    pub fn schedule_common<P: Plan<VM = VM>, E: ProcessEdgesWork<VM = VM>>(
         &self,
         plan: &'static P,
         constraints: &'static PlanConstraints,
@@ -918,13 +914,13 @@ impl<VM: VMBinding> CommonPlan<VM> {
         scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<E>::new());
 
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<P, C>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<P, E::CC>::new(plan));
 
         // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<E>::new());
 
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<P, C>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<P, E::CC>::new(plan));
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
@@ -937,7 +933,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
         #[cfg(feature = "sanity")]
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
-            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<P, C>::new(plan));
+            scheduler.work_buckets[WorkBucketStage::Final]
+                .add(ScheduleSanityGC::<P, E::CC>::new(plan));
         }
 
         // Finalization

@@ -76,11 +76,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<Self, SSProcessEdges<VM>, SSCopyContext<VM>>(
-                self,
-                &SS_CONSTRAINTS,
-                scheduler,
-            );
+            .schedule_common::<Self, SSProcessEdges<VM>>(self, &SS_CONSTRAINTS, scheduler);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

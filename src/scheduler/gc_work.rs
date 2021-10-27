@@ -434,6 +434,8 @@ pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self>>
 {
     type VM: VMBinding;
+    type CC: CopyContext<VM = Self::VM> + GCWorkerLocal;
+
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
