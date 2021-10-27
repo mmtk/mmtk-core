@@ -69,6 +69,14 @@ pub trait SFT {
     /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
+    /// Is the object managed by MMTk? For most cases, if we find the sft for an object, that means
+    /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
+    /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
+    /// in the space contain actual MMTk objects. So they need a further check.
+    #[inline(always)]
+    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
+        true
+    }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 }
@@ -104,6 +112,10 @@ impl SFT for EmptySpaceSFT {
          *
          * panic!("called is_movable() on empty space")
          */
+        false
+    }
+    #[inline(always)]
+    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
         false
     }
 
@@ -153,19 +165,20 @@ impl<'a> SFTMap<'a> {
         res
     }
 
-    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
-        let first = start.chunk_index();
-        let end = start + (chunks << LOG_BYTES_IN_CHUNK);
-        debug!("Update SFT for [{}, {}) as {}", start, end, space.name());
-        let start_chunk = chunk_index_to_address(first);
-        let end_chunk = chunk_index_to_address(first + chunks);
+    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         debug!(
-            "Update SFT for {} chunks of [{} #{}, {} #{})",
-            chunks,
-            start_chunk,
-            first,
-            end_chunk,
-            first + chunks
+            "Update SFT for [{}, {}) as {}",
+            start,
+            start + bytes,
+            space.name()
+        );
+        let first = start.chunk_index();
+        let last = conversions::chunk_align_up(start + bytes).chunk_index();
+        let start_chunk = chunk_index_to_address(first);
+        let end_chunk = chunk_index_to_address(last);
+        debug!(
+            "Update SFT for {} bytes of [{} #{}, {} #{})",
+            bytes, start_chunk, first, end_chunk, last
         );
     }
 
@@ -188,13 +201,15 @@ impl<'a> SFTMap<'a> {
     }
 
     /// Update SFT map for the given address range.
-    /// It should be used in these cases: 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, chunks: usize) {
+    /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
+    /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         if DEBUG_SFT {
-            self.log_update(space, start, chunks);
+            self.log_update(space, start, bytes);
         }
         let first = start.chunk_index();
-        for chunk in first..(first + chunks) {
+        let last = conversions::chunk_align_up(start + bytes).chunk_index();
+        for chunk in first..last {
             self.set(chunk, space);
         }
         if DEBUG_SFT {
@@ -204,8 +219,16 @@ impl<'a> SFTMap<'a> {
 
     // TODO: We should clear a SFT entry when a space releases a chunk.
     #[allow(dead_code)]
-    pub fn clear(&self, chunk_idx: usize) {
+    pub fn clear(&self, chunk_start: Address) {
+        assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
+        let chunk_idx = chunk_start.chunk_index();
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
+    }
+
+    // Currently only used by 32 bits vm map
+    #[allow(dead_code)]
+    pub fn clear_by_index(&self, chunk_idx: usize) {
+        self.set(chunk_idx, &EMPTY_SPACE_SFT)
     }
 
     fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
@@ -227,7 +250,8 @@ impl<'a> SFTMap<'a> {
             // in which case, we still set SFT map again.
             debug_assert!(
                 old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                "attempt to overwrite a non-empty chunk in SFT map (from {} to {})",
+                "attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})",
+                chunk,
                 old,
                 new
             );
@@ -236,16 +260,10 @@ impl<'a> SFTMap<'a> {
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
-        let not_in_space = object.to_address().chunk_index() >= self.sft.len()
-            || self.get(object.to_address()).name() == EMPTY_SPACE_SFT.name();
-
-        if not_in_space {
-            // special case - we do not yet have SFT entries for malloc space
-            use crate::policy::mallocspace::is_alloced_by_malloc;
-            is_alloced_by_malloc(object)
-        } else {
-            true
+        if object.to_address().chunk_index() >= self.sft.len() {
+            return false;
         }
+        self.get(object.to_address()).is_mmtk_object(object)
     }
 }
 
@@ -257,10 +275,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
-        // Should we poll to attempt to GC? If tls is collector, we cant attempt a GC.
-        let should_poll = VM::VMActivePlan::is_mutator(tls);
-        // Is a GC allowed here? enable_collection() has to be called so we know GC is initialized.
-        let allow_poll = should_poll && VM::VMActivePlan::global().is_initialized();
+        // Should we poll to attempt to GC?
+        // - If tls is collector, we cannot attempt a GC.
+        // - If gc is disabled, we cannot attempt a GC.
+        let should_poll = VM::VMActivePlan::is_mutator(tls)
+            && VM::VMActivePlan::global().should_trigger_gc_when_heap_is_full();
+        // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
+        // initialize_collection() has to be called so we know GC is initialized.
+        let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -270,8 +292,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
-            if !allow_poll {
-                panic!("Collection is not enabled.");
+            if !allow_gc {
+                panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             }
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
@@ -312,8 +334,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 }
                 Err(_) => {
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                    if !allow_poll {
-                        panic!("Physical allocation failed when polling not allowed!");
+                    if !allow_gc {
+                        panic!("Physical allocation failed when GC is not allowed!");
                     }
 
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
@@ -361,8 +383,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            let chunks = conversions::bytes_to_chunks_up(bytes);
-            SFT_MAP.update(self.as_sft(), start, chunks);
+            SFT_MAP.update(self.as_sft(), start, bytes);
         }
     }
 
@@ -371,7 +392,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
      *  mapped (e.g. for a vm image which is externally mmapped.)
      */
     fn ensure_mapped(&self) {
-        let chunks = conversions::bytes_to_chunks_up(self.common().extent);
         if self
             .common()
             .metadata
@@ -381,7 +401,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.common().start, chunks);
+        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -602,7 +622,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), self.start, bytes_to_chunks_up(self.extent));
+            SFT_MAP.update(space.as_sft(), self.start, self.extent);
         }
     }
 

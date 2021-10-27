@@ -71,6 +71,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         true
     }
 
+    // For malloc space, we need to further check the alloc bit.
+    fn is_mmtk_object(&self, object: ObjectReference) -> bool {
+        is_alloced_by_malloc(object)
+    }
+
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
         let page_addr = conversions::page_align_down(object.to_address());
@@ -204,6 +209,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !is_meta_space_mapped(address, actual_size) {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
+                // Update SFT
+                crate::mmtk::SFT_MAP.update(self, address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -325,6 +332,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 self.sweep_chunk_mark_in_header(chunk_start);
             }
         }
+    }
+
+    /// Clean up for an empty chunk
+    fn clean_up_empty_chunk(&self, chunk_start: Address) {
+        // Since the chunk mark metadata is a byte, we don't need synchronization
+        unsafe { unset_chunk_mark_unsafe(chunk_start) };
+        // Clear the SFT entry
+        crate::mmtk::SFT_MAP.clear(chunk_start);
     }
 
     /// This function is called when the mark bits sit on the side metadata.
@@ -495,8 +510,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
         if chunk_is_empty {
-            // Since the chunk mark metadata is a byte, we don't need synchronization
-            unsafe { unset_chunk_mark_unsafe(chunk_start) };
+            self.clean_up_empty_chunk(chunk_start);
         }
 
         debug!(
@@ -614,8 +628,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         if chunk_is_empty {
-            // Since the chunk mark metadata is a byte, we don't need synchronization
-            unsafe { unset_chunk_mark_unsafe(chunk_start) };
+            self.clean_up_empty_chunk(chunk_start);
         }
 
         debug!(
