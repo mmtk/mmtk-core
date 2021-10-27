@@ -64,6 +64,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         true
     }
 
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        crate::policy::immix::block::Block::BYTES
+    }
+
     #[inline(always)]
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         debug_assert!(

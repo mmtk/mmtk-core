@@ -49,6 +49,9 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn does_thread_local_allocation(&self) -> bool {
         true
     }
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        BLOCK_SIZE
+    }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");

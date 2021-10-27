@@ -112,6 +112,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// each allocation will go to slowpath and will have a check for GC polls.
     fn does_thread_local_allocation(&self) -> bool;
 
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
+        unimplemented!()
+    }
+
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
     #[inline(never)]
@@ -131,7 +136,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
-            let result = if is_mutator && stress_test {
+            let result = if is_mutator && stress_test && plan.is_precise_stress() {
                 // If we are doing stress GC, we invoke the special allow_slow_once call.
                 // allow_slow_once_stress_test() should make sure that every allocation goes
                 // to the slowpath (here) so we can check the allocation bytes and decide
@@ -166,7 +171,12 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
-                    let _allocation_bytes = plan.increase_allocation_bytes_by(size);
+                    let allocated_size = if plan.is_precise_stress() || !self.does_thread_local_allocation() {
+                        size
+                    } else {
+                        crate::util::conversions::raw_align_up(size, self.get_thread_local_buffer_granularity())
+                    };
+                    let _allocation_bytes = plan.increase_allocation_bytes_by(allocated_size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
