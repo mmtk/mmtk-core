@@ -38,6 +38,8 @@ pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThre
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
 /// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
 /// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
+/// the VM's thread system is ready to spawn GC workers.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance to initialize.
@@ -177,18 +179,61 @@ pub fn start_worker<VM: VMBinding>(
     worker.run(mmtk);
 }
 
-/// Allow MMTk to trigger garbage collection. A VM should only call this method when it is ready for the mechanisms required for
-/// collection during the boot process. MMTk will invoke Collection::spawn_worker_thread() to create GC threads during
-/// this funciton call.
+/// Initialize the scheduler and GC workers that are required for doing garbage collections.
+/// This is a mandatory call for a VM during its boot process once its thread system
+/// is ready. This should only be called once. This call will invoke Collection::spawn_worker_thread()
+/// to create GC threads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
 ///   Collection::spawn_worker_thread() so that the VM knows the context.
-pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
+    assert!(
+        !mmtk.plan.is_initialized(),
+        "MMTk collection has been initialized (was initialize_collection() already called before?)"
+    );
     mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+}
+
+/// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
+/// See the comments on disable_collection(). If disable_collection() is not used, there is no need to call this function at all.
+/// Note this call is not thread safe, only one VM thread should call this.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    debug_assert!(
+        !mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        "enable_collection() is called when GC is already enabled."
+    );
+    mmtk.plan
+        .base()
+        .trigger_gc_when_heap_is_full
+        .store(true, Ordering::SeqCst);
+}
+
+/// Disallow MMTk to trigger garbage collection. When collection is disabled, you can still allocate through MMTk. But MMTk will
+/// not trigger a GC even if the heap is full. In such a case, the allocation will exceed the MMTk's heap size (the soft heap limit).
+/// However, there is no guarantee that the physical allocation will succeed, and if it succeeds, there is no guarantee that further allocation
+/// will keep succeeding. So if a VM disables collection, it needs to allocate with careful consideration to make sure that the physical memory
+/// allows the amount of allocation. We highly recommend not using this method. However, we support this to accomodate some VMs that require this
+/// behavior. This call does not disable explicit GCs (through handle_user_collection_request()).
+/// Note this call is not thread safe, only one VM thread should call this.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
+    debug_assert!(
+        mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        "disable_collection() is called when GC is not enabled."
+    );
+    mmtk.plan
+        .base()
+        .trigger_gc_when_heap_is_full
+        .store(false, Ordering::SeqCst);
 }
 
 /// Process MMTk run-time options.
