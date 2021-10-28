@@ -150,3 +150,12 @@ impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
     }
 }
 // ANCHOR_END: deref
+
+// ANCHOR: workcontext
+pub struct MyGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for MyGCWorkContext {
+    type PlanType = MyGC<VM>;
+    type CopyContextType = MyGCCopyContext<VM>;
+    type ProcessEdgesWorkType = MyGCProcessEdges<VM>;
+}
+// ANCHOR_END: workcontext
