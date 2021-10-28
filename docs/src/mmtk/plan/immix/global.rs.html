@@ -174,40 +174,6 @@
 <span id="174">174</span>
 <span id="175">175</span>
 <span id="176">176</span>
-<span id="177">177</span>
-<span id="178">178</span>
-<span id="179">179</span>
-<span id="180">180</span>
-<span id="181">181</span>
-<span id="182">182</span>
-<span id="183">183</span>
-<span id="184">184</span>
-<span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
-<span id="189">189</span>
-<span id="190">190</span>
-<span id="191">191</span>
-<span id="192">192</span>
-<span id="193">193</span>
-<span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">ImmixCopyContext</span>, <span class="ident">ImmixProcessEdges</span>, <span class="ident">TraceKind</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
@@ -217,11 +183,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::GcHookWork</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
@@ -229,8 +192,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">mmtk::MMTK</span>, <span class="ident">policy::immix::ImmixSpace</span>, <span class="ident">util::opaque_pointer::VMWorkerThread</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
@@ -302,45 +263,16 @@
             <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">is_user_triggered_collection</span>(),
             <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>,
         );
-        <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
+
         <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>)]</span>
-        <span class="comment">// The two StopMutators have different types parameters, thus we cannot extract the common code before add().</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::branches_sharing_code</span>)]</span>
         <span class="kw">if</span> <span class="ident">in_defrag</span> {
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
-                .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Defrag</span> }<span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="self">self</span>.<span class="ident">common</span>()
+                .<span class="ident">schedule_common</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Defrag</span> }<span class="op">&gt;</span>, <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>, <span class="ident">scheduler</span>);
         } <span class="kw">else</span> {
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
-                .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Fast</span> }<span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="self">self</span>.<span class="ident">common</span>()
+                .<span class="ident">schedule_common</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Fast</span> }<span class="op">&gt;</span>, <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="ident">IMMIX_CONSTRAINTS</span>, <span class="ident">scheduler</span>);
         }
-        <span class="comment">// Prepare global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-            .<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
-        <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>)]</span>
-        <span class="comment">// The two StopMutators have different types parameters, thus we cannot extract the common code before add().</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::branches_sharing_code</span>)]</span>
-        <span class="kw">if</span> <span class="ident">in_defrag</span> {
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>].<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span>
-                <span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Defrag</span> }<span class="op">&gt;</span>,
-            <span class="op">&gt;</span><span class="ident">::new</span>());
-        } <span class="kw">else</span> {
-            <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>, { <span class="ident">TraceKind::Fast</span> }<span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
-        }
-        <span class="comment">// Release global/collectors/mutators</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
-            .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
-        <span class="comment">// Analysis routine that is ran. It is generally recommended to take advantage</span>
-        <span class="comment">// of the scheduling system we have in place for more performance</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcHookWork</span>);
-        <span class="comment">// Resume mutators</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
-            .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
-        <span class="ident">scheduler</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
