@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
+use super::gc_work::{ImmixCopyContext, TraceKind, ImmixGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -92,14 +92,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         #[allow(clippy::if_same_then_else)]
         if in_defrag {
             self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Defrag }>>(
+                .schedule_common::<ImmixGCWorkContext<{ TraceKind::Defrag }>>(
                     self,
                     &IMMIX_CONSTRAINTS,
                     scheduler,
                 );
         } else {
             self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>>(
+                .schedule_common::<ImmixGCWorkContext<{ TraceKind::Fast }>>(
                     self,
                     &IMMIX_CONSTRAINTS,
                     scheduler,

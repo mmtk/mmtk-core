@@ -9,7 +9,6 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
@@ -902,25 +901,25 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     /// Schedule all the common work packets
-    pub fn schedule_common<P: Plan<VM = VM>, E: ProcessEdgesWork<VM = VM>>(
+    pub fn schedule_common<C: GCWorkContext<VM>>(
         &self,
-        plan: &'static P,
+        plan: &'static C::PlanType,
         constraints: &'static PlanConstraints,
         scheduler: &GCWorkScheduler<VM>,
     ) {
         use crate::scheduler::gc_work::*;
 
         // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<E>::new());
+        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<C::ProcessEdgesWorkType>::new());
 
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<P, E::CC>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C::PlanType, C::CopyContextType>::new(plan));
 
         // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<E>::new());
+        scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
 
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<P, E::CC>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<C::PlanType, C::CopyContextType>::new(plan));
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
@@ -934,18 +933,18 @@ impl<VM: VMBinding> CommonPlan<VM> {
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
             scheduler.work_buckets[WorkBucketStage::Final]
-                .add(ScheduleSanityGC::<P, E::CC>::new(plan));
+                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(plan));
         }
 
         // Finalization
         if !self.base.options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
+            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<C::ProcessEdgesWorkType>::new());
             // forward refs
             if constraints.needs_forward_after_liveness {
                 scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(ForwardFinalization::<E>::new());
+                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }
         }
 

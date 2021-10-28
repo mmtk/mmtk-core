@@ -23,8 +23,12 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     }
 }
 
-// pub trait GCWorkContext<VM: VMBinding> {
-//     type PlanType: Plan<VM>;
-//     type CopyContextType: CopyContext<VM = VM>;
-//     type ProcessEdgesWorkType: ProcessEdgesWork<VM = VM, CC = Self::CopyContextType>;
-// }
+use super::gc_work::ProcessEdgesWork;
+use crate::plan::Plan;
+use crate::plan::CopyContext;
+
+pub trait GCWorkContext<VM: VMBinding> {
+    type PlanType: Plan<VM = VM>;
+    type CopyContextType: CopyContext<VM = VM> + GCWorkerLocal;
+    type ProcessEdgesWorkType: ProcessEdgesWork<VM = VM, CC = Self::CopyContextType>;
+}

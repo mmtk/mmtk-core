@@ -1,4 +1,5 @@
 use super::global::GenImmix;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
@@ -187,4 +188,18 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for GenImmixMatureProcessEdg
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct GenImmixNurseryGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for GenImmixNurseryGCWorkContext {
+    type PlanType = GenImmix<VM>;
+    type CopyContextType = GenImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+}
+
+pub(super) struct GenImmixMatureGCWorkContext<const KIND: TraceKind>;
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext<VM> for GenImmixMatureGCWorkContext<KIND> {
+    type PlanType = GenImmix<VM>;
+    type CopyContextType = GenImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;
 }

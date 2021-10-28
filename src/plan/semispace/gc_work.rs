@@ -140,3 +140,10 @@ impl<VM: VMBinding> DerefMut for SSProcessEdges<VM> {
         &mut self.base
     }
 }
+
+pub struct SSGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for SSGCWorkContext {
+    type PlanType = SemiSpace<VM>;
+    type CopyContextType = SSCopyContext<VM>;
+    type ProcessEdgesWorkType = SSProcessEdges<VM>;
+}

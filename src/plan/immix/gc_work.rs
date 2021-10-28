@@ -167,3 +167,10 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KI
         &mut self.base
     }
 }
+
+pub(super) struct ImmixGCWorkContext<const KIND: TraceKind>;
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext<VM> for ImmixGCWorkContext<KIND> {
+    type PlanType = Immix<VM>;
+    type CopyContextType = ImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
+}

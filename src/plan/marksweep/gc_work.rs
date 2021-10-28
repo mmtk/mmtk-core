@@ -119,3 +119,10 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 }
+
+pub struct MSGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for MSGCWorkContext {
+    type PlanType = MarkSweep<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = MSProcessEdges<VM>;
+}

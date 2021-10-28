@@ -57,3 +57,10 @@ impl<VM: VMBinding> DerefMut for PPProcessEdges<VM> {
         &mut self.base
     }
 }
+
+pub struct PPGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for PPGCWorkContext {
+    type PlanType = PageProtect<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = PPProcessEdges<VM>;
+}

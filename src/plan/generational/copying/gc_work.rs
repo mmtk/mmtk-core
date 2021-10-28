@@ -1,4 +1,5 @@
 use super::global::GenCopy;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
@@ -130,4 +131,18 @@ impl<VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct GenCopyNurseryGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for GenCopyNurseryGCWorkContext {
+    type PlanType = GenCopy<VM>;
+    type CopyContextType = GenCopyCopyContext<VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+}
+
+pub(super) struct GenCopyMatureGCWorkContext;
+impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for GenCopyMatureGCWorkContext {
+    type PlanType = GenCopy<VM>;
+    type CopyContextType = GenCopyCopyContext<VM>;
+    type ProcessEdgesWorkType = GenCopyMatureProcessEdges<VM>;
 }
