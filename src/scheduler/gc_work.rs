@@ -33,9 +33,7 @@ pub struct Prepare<C: GCWorkContext> {
 
 impl<C: GCWorkContext> Prepare<C> {
     pub fn new(plan: &'static C::PlanType) -> Self {
-        Self {
-            plan,
-        }
+        Self { plan }
     }
 }
 
@@ -52,7 +50,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(PrepareCollector::<C::CopyContextType>::new());
+            w.local_work_bucket
+                .add(PrepareCollector::<C::CopyContextType>::new());
         }
     }
 }
@@ -107,9 +106,7 @@ pub struct Release<C: GCWorkContext> {
 
 impl<C: GCWorkContext> Release<C> {
     pub fn new(plan: &'static C::PlanType) -> Self {
-        Self {
-            plan,
-        }
+        Self { plan }
     }
 }
 
@@ -127,7 +124,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(ReleaseCollector::<C::CopyContextType>::new());
+            w.local_work_bucket
+                .add(ReleaseCollector::<C::CopyContextType>::new());
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();

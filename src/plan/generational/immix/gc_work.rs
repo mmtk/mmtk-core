@@ -197,7 +197,9 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkCon
     type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
 }
 
-pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(std::marker::PhantomData<VM>);
+pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
 impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
     for GenImmixMatureGCWorkContext<VM, KIND>
 {

@@ -932,16 +932,14 @@ impl<VM: VMBinding> CommonPlan<VM> {
             .add(StopMutators::<C::ProcessEdgesWorkType>::new());
 
         // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<C>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
 
         // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
 
         // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<C>::new(plan));
+        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<C>::new(plan));
 
         // Analysis GC work
         #[cfg(feature = "analysis")]

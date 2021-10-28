@@ -168,7 +168,9 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KI
     }
 }
 
-pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(std::marker::PhantomData<VM>);
+pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
 impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
     for ImmixGCWorkContext<VM, KIND>
 {

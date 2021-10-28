@@ -93,11 +93,12 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                 );
         } else {
             debug!("Full heap GC");
-            self.common().schedule_common::<GenCopyMatureGCWorkContext<VM>>(
-                self,
-                &GENCOPY_CONSTRAINTS,
-                scheduler,
-            );
+            self.common()
+                .schedule_common::<GenCopyMatureGCWorkContext<VM>>(
+                    self,
+                    &GENCOPY_CONSTRAINTS,
+                    scheduler,
+                );
         }
     }
 
