@@ -10,7 +10,6 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocalPtr;
 use crate::scheduler::*;
@@ -129,67 +128,28 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>, GenImmixCopyContext<VM>>(
+                    self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-                GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
-            >::new());
         } else if defrag {
             debug!("Full heap GC Defrag");
             self.common()
-                .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>, GenImmixCopyContext<VM>>(
+                    self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-                GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>,
-            >::new());
         } else {
             debug!("Full heap GC Fast");
             self.common()
-                .schedule_common::<GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>, GenImmixCopyContext<VM>>(
+                    self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-                GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>,
-            >::new());
         }
-
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, GenImmixCopyContext<VM>>::new(self));
-        if is_full_heap {
-            if defrag {
-                scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                    GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>,
-                >::new());
-            } else {
-                scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                    GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>,
-                >::new());
-            }
-        } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>,
-            >::new());
-        }
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, GenImmixCopyContext<VM>>::new(self));
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        {
-            use crate::util::sanity::sanity_checker::*;
-            scheduler.work_buckets[WorkBucketStage::Final]
-                .add(ScheduleSanityGC::<Self, GenImmixCopyContext<VM>>::new(self));
-        }
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
