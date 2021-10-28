@@ -7,11 +7,8 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -19,8 +16,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
@@ -92,45 +87,16 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.base().is_user_triggered_collection(),
             self.base().options.full_heap_system_gc,
         );
-        // Stop & scan mutators (mutator scanning can happen before STW)
+
         // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
         #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        #[allow(clippy::branches_sharing_code)]
         if in_defrag {
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
+            self.common()
+                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Defrag }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
         } else {
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+            self.common()
+                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
         }
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        #[allow(clippy::branches_sharing_code)]
-        if in_defrag {
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                ImmixProcessEdges<VM, { TraceKind::Defrag }>,
-            >::new());
-        } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
-        }
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, ImmixCopyContext<VM>>::new(self));
-        // Analysis routine that is ran. It is generally recommended to take advantage
-        // of the scheduling system we have in place for more performance
-        #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, ImmixCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
