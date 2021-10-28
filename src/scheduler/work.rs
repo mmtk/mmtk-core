@@ -27,6 +27,11 @@ use super::gc_work::ProcessEdgesWork;
 use crate::plan::CopyContext;
 use crate::plan::Plan;
 
+/// This trait provides a group of associated types that are needed to
+/// create GC work packets for a certain plan. For example, `CommonPlan.schedule_common()`
+/// needs this trait to schedule different work packets. For certain plans,
+/// they may need to provide several types that implement this trait, e.g. one for
+/// nursery GC, one for mature GC.
 pub trait GCWorkContext<VM: VMBinding> {
     type PlanType: Plan<VM = VM>;
     type CopyContextType: CopyContext<VM = VM> + GCWorkerLocal;
