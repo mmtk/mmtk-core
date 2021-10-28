@@ -252,6 +252,12 @@ pub trait Plan: 'static + Sync + Downcast {
         self.base().initialized.load(Ordering::SeqCst)
     }
 
+    fn should_trigger_gc_when_heap_is_full(&self) -> bool {
+        self.base()
+            .trigger_gc_when_heap_is_full
+            .load(Ordering::SeqCst)
+    }
+
     fn prepare(&mut self, tls: VMWorkerThread);
     fn release(&mut self, tls: VMWorkerThread);
 
@@ -370,8 +376,11 @@ pub enum GcStatus {
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
 pub struct BasePlan<VM: VMBinding> {
-    // Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
+    /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
+    /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
+    /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
+    pub trigger_gc_when_heap_is_full: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
     pub stacks_prepared: AtomicBool,
@@ -397,7 +406,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub scanned_stacks: AtomicUsize,
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
-    pub allocation_bytes: AtomicUsize,
+    allocation_bytes: AtomicUsize,
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -503,6 +512,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             ),
 
             initialized: AtomicBool::new(false),
+            trigger_gc_when_heap_is_full: AtomicBool::new(true),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
             stacks_prepared: AtomicBool::new(false),
@@ -744,7 +754,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         is_internal_triggered
     }
 
-    pub fn increase_allocation_bytes_by(&self, size: usize) {
+    /// Increase the allocation bytes and return the current allocation bytes after increasing
+    pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
         trace!(
             "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
@@ -752,25 +763,22 @@ impl<VM: VMBinding> BasePlan<VM> {
             size,
             self.allocation_bytes.load(Ordering::Relaxed),
         );
+        old_allocation_bytes + size
     }
 
-    #[inline]
-    pub(super) fn stress_test_gc_required(&self) -> bool {
-        let stress_factor = self.options.stress_factor;
-        if self.initialized.load(Ordering::SeqCst)
-            && (self.allocation_bytes.load(Ordering::SeqCst) > stress_factor)
-        {
-            trace!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.allocation_bytes.load(Ordering::Relaxed),
-                stress_factor
-            );
-            trace!("Doing stress GC");
-            self.allocation_bytes.store(0, Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        use crate::util::constants::DEFAULT_STRESS_FACTOR;
+        self.options.stress_factor != DEFAULT_STRESS_FACTOR
+            || self.options.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
+
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    pub fn should_do_stress_gc(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
+            && (self.allocation_bytes.load(Ordering::SeqCst) > self.options.stress_factor)
     }
 
     pub(super) fn collection_required<P: Plan>(
@@ -779,7 +787,17 @@ impl<VM: VMBinding> BasePlan<VM> {
         space_full: bool,
         _space: &dyn Space<VM>,
     ) -> bool {
-        let stress_force_gc = self.stress_test_gc_required();
+        let stress_force_gc = self.should_do_stress_gc();
+        if stress_force_gc {
+            debug!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.allocation_bytes.load(Ordering::Relaxed),
+                self.options.stress_factor
+            );
+            debug!("Doing stress GC");
+            self.allocation_bytes.store(0, Ordering::SeqCst);
+        }
+
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             plan.get_pages_reserved(),
