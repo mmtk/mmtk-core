@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<GenImmixNurseryGCWorkContext>(
+                .schedule_common::<GenImmixNurseryGCWorkContext<VM>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -137,7 +137,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else if defrag {
             debug!("Full heap GC Defrag");
             self.common()
-                .schedule_common::<GenImmixMatureGCWorkContext<{ TraceKind::Defrag }>>(
+                .schedule_common::<GenImmixMatureGCWorkContext<VM, { TraceKind::Defrag }>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -145,7 +145,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else {
             debug!("Full heap GC Fast");
             self.common()
-                .schedule_common::<GenImmixMatureGCWorkContext<{ TraceKind::Fast }>>(
+                .schedule_common::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,

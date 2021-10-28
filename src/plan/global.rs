@@ -901,7 +901,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 
     /// Schedule all the common work packets
-    pub fn schedule_common<C: GCWorkContext<VM>>(
+    pub fn schedule_common<C: GCWorkContext<VM = VM> + 'static>(
         &self,
         plan: &'static C::PlanType,
         constraints: &'static PlanConstraints,
@@ -915,7 +915,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
         // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<C::PlanType, C::CopyContextType>::new(plan));
+            .add(Prepare::<C>::new(plan));
 
         // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::RefClosure]
@@ -923,7 +923,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<C::PlanType, C::CopyContextType>::new(plan));
+            .add(Release::<C>::new(plan));
 
         // Analysis GC work
         #[cfg(feature = "analysis")]

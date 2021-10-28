@@ -86,14 +86,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<GenCopyNurseryGCWorkContext>(
+                .schedule_common::<GenCopyNurseryGCWorkContext<VM>>(
                     self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
         } else {
             debug!("Full heap GC");
-            self.common().schedule_common::<GenCopyMatureGCWorkContext>(
+            self.common().schedule_common::<GenCopyMatureGCWorkContext<VM>>(
                 self,
                 &GENCOPY_CONSTRAINTS,
                 scheduler,

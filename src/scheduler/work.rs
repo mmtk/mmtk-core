@@ -32,8 +32,9 @@ use crate::plan::Plan;
 /// needs this trait to schedule different work packets. For certain plans,
 /// they may need to provide several types that implement this trait, e.g. one for
 /// nursery GC, one for mature GC.
-pub trait GCWorkContext<VM: VMBinding> {
-    type PlanType: Plan<VM = VM>;
-    type CopyContextType: CopyContext<VM = VM> + GCWorkerLocal;
-    type ProcessEdgesWorkType: ProcessEdgesWork<VM = VM>;
+pub trait GCWorkContext {
+    type VM: VMBinding;
+    type PlanType: Plan<VM = Self::VM>;
+    type CopyContextType: CopyContext<VM = Self::VM> + GCWorkerLocal;
+    type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
 }

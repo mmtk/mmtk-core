@@ -189,17 +189,19 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for GenImmixMatureProcessEdg
     }
 }
 
-pub struct GenImmixNurseryGCWorkContext;
-impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for GenImmixNurseryGCWorkContext {
+pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
+    type VM = VM;
     type PlanType = GenImmix<VM>;
     type CopyContextType = GenImmixCopyContext<VM>;
     type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
 }
 
-pub(super) struct GenImmixMatureGCWorkContext<const KIND: TraceKind>;
-impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext<VM>
-    for GenImmixMatureGCWorkContext<KIND>
+pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
+    for GenImmixMatureGCWorkContext<VM, KIND>
 {
+    type VM = VM;
     type PlanType = GenImmix<VM>;
     type CopyContextType = GenImmixCopyContext<VM>;
     type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;
