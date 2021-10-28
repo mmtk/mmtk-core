@@ -126,7 +126,6 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
     for GenImmixMatureProcessEdges<VM, KIND>
 {
     type VM = VM;
-    type CC = GenImmixCopyContext<VM>;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
@@ -198,7 +197,9 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext<VM> for GenImmixNurseryGCWor
 }
 
 pub(super) struct GenImmixMatureGCWorkContext<const KIND: TraceKind>;
-impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext<VM> for GenImmixMatureGCWorkContext<KIND> {
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext<VM>
+    for GenImmixMatureGCWorkContext<KIND>
+{
     type PlanType = GenImmix<VM>;
     type CopyContextType = GenImmixCopyContext<VM>;
     type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;

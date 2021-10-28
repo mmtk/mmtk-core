@@ -23,7 +23,7 @@ pub struct MSProcessEdges<VM: VMBinding> {
 
 impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     type VM = VM;
-    type CC = NoCopy<VM>;
+
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);

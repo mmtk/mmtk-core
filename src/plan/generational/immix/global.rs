@@ -1,4 +1,6 @@
-use super::gc_work::{GenImmixCopyContext, GenImmixNurseryGCWorkContext, GenImmixMatureGCWorkContext};
+use super::gc_work::{
+    GenImmixCopyContext, GenImmixMatureGCWorkContext, GenImmixNurseryGCWorkContext,
+};
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;

@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, TraceKind, ImmixGCWorkContext};
+use super::gc_work::{ImmixCopyContext, ImmixGCWorkContext, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;

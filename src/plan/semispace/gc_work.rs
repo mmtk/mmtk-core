@@ -92,7 +92,6 @@ impl<VM: VMBinding> SSProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
-    type CC = SSCopyContext<VM>;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);

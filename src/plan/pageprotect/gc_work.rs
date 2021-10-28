@@ -18,7 +18,7 @@ pub struct PPProcessEdges<VM: VMBinding> {
 impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
     const OVERWRITE_REFERENCE: bool = false;
     type VM = VM;
-    type CC = NoCopy<VM>;
+
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<PageProtect<VM>>().unwrap();

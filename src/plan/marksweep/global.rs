@@ -3,7 +3,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::gc_work::{MSSweepChunks, MSGCWorkContext};
+use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;

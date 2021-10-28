@@ -176,7 +176,7 @@ impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type VM = VM;
-    type CC = crate::plan::NoCopy<VM>;
+
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         Self {

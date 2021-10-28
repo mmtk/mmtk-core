@@ -86,7 +86,7 @@ impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
-    type CC = GenCopyCopyContext<VM>;
+
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();

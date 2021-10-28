@@ -18,7 +18,7 @@ impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> ProcessEdgesWork
     for GenNurseryProcessEdges<VM, C>
 {
     type VM = VM;
-    type CC = C;
+
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let gen = base.plan().generational();
