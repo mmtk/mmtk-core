@@ -11,6 +11,7 @@ use crate::scheduler::gc_work::{EndOfGC, Prepare, Release, StopMutators};
 use crate::scheduler::{GCWorkScheduler, GCWorkerLocalPtr};
 use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::alloc::free_list_allocator::BYTES_IN_BLOCK;
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -36,7 +37,21 @@ pub struct FreeListMarkSweep<VM: VMBinding> {
     pub ms_space: MarkSweepSpace<VM>,
 }
 
-pub const FLMS_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+pub const FLMS_CONSTRAINTS: PlanConstraints =         PlanConstraints {
+    moves_objects: false,
+    gc_header_bits: 0,
+    gc_header_words: 0,
+    num_specialized_scans: 0,
+    max_non_los_default_alloc_bytes: BYTES_IN_BLOCK,
+    max_non_los_copy_bytes: BYTES_IN_BLOCK,
+    needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING || crate::util::constants::LAZY_SWEEP,
+    needs_concurrent_workers: false,
+    generate_gc_trace: false,
+    may_trace_duplicate_edges: false,
+    needs_forward_after_liveness: false,
+    needs_log_bit: false,
+    barrier: crate::BarrierSelector::NoBarrier,
+};
 
 impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
     type VM = VM;
