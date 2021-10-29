@@ -25,6 +25,8 @@ impl<VM: VMBinding> GCWork<VM> for CalcFwdAddr<VM> {
         // before updating object references(done through another round of root scanning)
         // and this calculation is done in a single-threaded manner.
         VM::VMScanning::prepare_for_roots_scanning();
+        #[cfg(feature = "extreme_assertions")]
+        crate::util::edge_logger::reset();
     }
 }
 

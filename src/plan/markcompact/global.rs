@@ -24,6 +24,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::vm::ActivePlan;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -107,8 +108,14 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalcFwdAddr::<VM>::new(&self.mc_space));
         // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::RefForwarding]
-            .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
+        // scheduler.work_buckets[WorkBucketStage::RefForwarding]
+        //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
+
+        for mutator in VM::VMActivePlan::mutators() {
+            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
+        }
+
         scheduler.work_buckets[WorkBucketStage::RefForwarding]
             .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
 

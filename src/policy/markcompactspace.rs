@@ -16,8 +16,8 @@ pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     extra_header: usize,
-    // forwarding_pointers: Mutex<HashMap<Address, Address>>,
-    // refs: Mutex<HashSet<ObjectReference>>,
+    // forwarding_pointers: std::sync::Mutex<HashMap<Address, Address>>,
+    // refs: std::sync::Mutex<HashSet<ObjectReference>>,
 }
 
 const GC_MARK_BIT_MASK: usize = 1;
@@ -124,8 +124,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             },
             common,
             extra_header: 0,
-            // forwarding_pointers: Mutex::new(HashMap::new()),
-            // refs: Mutex::new(HashSet::new()),
+            // forwarding_pointers: std::sync::Mutex::new(HashMap::new()),
+            // refs: std::sync::Mutex::new(HashSet::new()),
         }
     }
 
