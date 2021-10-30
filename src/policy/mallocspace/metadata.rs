@@ -101,9 +101,10 @@ fn map_active_chunk_metadata(chunk_start: Address) {
         chunk_start + (size / 2)
     );
 
-    if CHUNK_METADATA.try_map_metadata_space(start, size).is_err() {
-        panic!("failed to mmap meta memory");
-    }
+    assert!(
+        CHUNK_METADATA.try_map_metadata_space(start, size).is_ok(),
+        "failed to mmap meta memory"
+    );
 }
 
 /// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
