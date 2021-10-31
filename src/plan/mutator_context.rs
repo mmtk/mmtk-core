@@ -21,7 +21,7 @@ pub struct MutatorConfig<VM: VMBinding> {
     pub allocator_mapping: &'static EnumMap<AllocationType, AllocatorSelector>,
     /// Mapping between allocator selector and spaces. Each pair represents a mapping.
     /// Put this behind a box, so it is a pointer-sized field.
-    #[allow(clippy::box_vec)]
+    #[allow(clippy::box_collection)]
     pub space_mapping: Box<SpaceMapping<VM>>,
     /// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.
     pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),
