@@ -237,15 +237,15 @@
 }
 
 <span class="kw">impl</span> <span class="ident">MetadataSpec</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_on_side</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_on_side</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="ident">MetadataSpec::OnSide</span>(<span class="kw">_</span>))
     }
 
     <span class="doccomment">/// Extract SideMetadataSpec from a MetadataSpec. Panics if this is not side metadata.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">extract_side_spec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">extract_side_spec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span> {
         <span class="kw">match</span> <span class="self">self</span> {
-            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">spec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">spec</span>,
-            <span class="ident">MetadataSpec::InHeader</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Expect a side spec&quot;</span>),
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">spec</span>) =&gt; <span class="ident">spec</span>,
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Expect a side spec&quot;</span>),
         }
     }
 }
@@ -267,16 +267,16 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
                 <span class="ident">side_metadata::load_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">order</span>)
             } <span class="kw">else</span> {
                 <span class="kw">unsafe</span> { <span class="ident">side_metadata::load</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>()) }
             }
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">VM::VMObjectModel::load_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">mask</span>, <span class="ident">atomic_ordering</span>)
         }
     }
@@ -301,7 +301,7 @@
     <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
 ) {
     <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
                 <span class="ident">side_metadata::store_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>);
             } <span class="kw">else</span> {
@@ -310,7 +310,7 @@
                 }
             }
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">VM::VMObjectModel::store_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">mask</span>, <span class="ident">atomic_ordering</span>);
         }
     }
@@ -339,9 +339,9 @@
     <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
     <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+) -&gt; <span class="ident">bool</span> {
     <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">side_metadata::compare_exchange_atomic</span>(
+        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">side_metadata::compare_exchange_atomic</span>(
             <span class="ident">metadata_spec</span>,
             <span class="ident">object</span>.<span class="ident">to_address</span>(),
             <span class="ident">old_val</span>,
@@ -349,7 +349,7 @@
             <span class="ident">success_order</span>,
             <span class="ident">failure_order</span>,
         ),
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">VM::VMObjectModel::compare_exchange_metadata</span>(
+        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">VM::VMObjectModel::compare_exchange_metadata</span>(
             <span class="ident">metadata_spec</span>,
             <span class="ident">object</span>,
             <span class="ident">old_val</span>,
@@ -378,12 +378,12 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">side_metadata::fetch_add_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">VM::VMObjectModel::fetch_add_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
         }
     }
@@ -406,12 +406,12 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">side_metadata::fetch_sub_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
             <span class="ident">VM::VMObjectModel::fetch_sub_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
         }
     }
@@ -422,7 +422,7 @@
 <span class="doccomment">/// # Arguments:</span>
 <span class="doccomment">/// * `specs` is the input slice of on-side and/or in-header metadata specifications.</span>
 <span class="doccomment">///</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">extract_side_metadata</span>(<span class="ident">specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">MetadataSpec</span>]) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">extract_side_metadata</span>(<span class="ident">specs</span>: <span class="kw-2">&amp;</span>[<span class="ident">MetadataSpec</span>]) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_specs</span> <span class="op">=</span> <span class="macro">vec!</span>[];
     <span class="kw">for</span> <span class="ident">spec</span> <span class="kw">in</span> <span class="ident">specs</span> {
         <span class="kw">if</span> <span class="kw">let</span> <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ss</span>) <span class="op">=</span> <span class="kw-2">*</span><span class="ident">spec</span> {

@@ -3,7 +3,7 @@ This is a generic module to work with metadata including side metadata and in-ob
 <p>This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).</p>
 <p>The new metadata design differentiates per-object metadata (e.g. forwarding-bits and marking-bit) from other types of metadata including per-address (e.g. alloc-bit) and per-X (where X != object size), because the per-object metadata can optionally be kept in the object headers.</p>
 <p>MMTk acknowledges the VM-dependant nature of the in-object metadata, and asks the VM bindings to contribute by implementing the related parts in the <a href="../../vm/object_model/trait.ObjectModel.html">‘ObjectModel’</a>.</p>
-<h1 id="side-metadata" class="section-header"><a href="#side-metadata">Side Metadata</a></h1><h2 id="design" class="section-header"><a href="#design">Design</a></h2>
+<h2 id="side-metadata" class="section-header"><a href="#side-metadata">Side Metadata</a></h2><h3 id="design" class="section-header"><a href="#design">Design</a></h3>
 <p>MMTk side metadata is designed to be <strong>generic</strong>, and <strong>space-</strong> and <strong>time-</strong> efficient.</p>
 <p>It aims to support two categories of metadata:</p>
 <ol>
@@ -18,7 +18,7 @@ This is a generic module to work with metadata including side metadata and in-ob
 <li>Metadata space is only allocated on demand.</li>
 <li>Bulk-zeroing of metadata bits should be possible. For this, the memory space for each metadata bit-set is contiguous per chunk.</li>
 </ol>
-<h3 id="64-bits-targets" class="section-header"><a href="#64-bits-targets">64-bits targets</a></h3>
+<h4 id="64-bits-targets" class="section-header"><a href="#64-bits-targets">64-bits targets</a></h4>
 <p>‌ In 64-bits targets, each MMTk side metadata bit-set is organized as a contiguous space.
 The base address for both the global and the local side metadata are constants (e.g. <code>GLOBAL_SIDE_METADATA_BASE_ADDRESS</code> and <code>LOCAL_SIDE_METADATA_BASE_ADDRESS</code>).</p>
 <p>In this case, a schematic of the local and global side metadata looks like:</p>
@@ -96,7 +96,7 @@ This means, when a new chunk is mapped, the policy-specific side metadata for th
  <span class="op">|</span>        <span class="ident">Not</span> <span class="ident">Mapped</span>           <span class="op">|</span>
  <span class="op">|</span>                             <span class="op">|</span>
  <span class="op">|</span><span class="ident">_____________________________</span><span class="op">|</span>     <span class="op">&lt;</span><span class="op">=</span> <span class="number">4MB</span> <span class="op">*</span> <span class="ident">PolicySpecific_WCR</span></code></pre></div>
-<h1 id="how-to-use" class="section-header"><a href="#how-to-use">How to Use</a></h1><h2 id="declare-metadata-specs" class="section-header"><a href="#declare-metadata-specs">Declare metadata specs</a></h2>
+<h2 id="how-to-use" class="section-header"><a href="#how-to-use">How to Use</a></h2><h3 id="declare-metadata-specs" class="section-header"><a href="#declare-metadata-specs">Declare metadata specs</a></h3>
 <p>For each global metadata bit-set, a constant instance of the <code>MetadataSpec</code> struct should be created.</p>
 <p>If the metadata is per-object and may possibly reside in objects, the constant instance should be created in the VM’s ObjectModel.
 For instance, the forwarding-bits metadata spec should be assigned to <code>LOCAL_FORWARDING_BITS_SPEC</code> in <a href="../../vm/object_model/trait.ObjectModel.html"><code>ObjectModel</code></a>.
@@ -149,7 +149,7 @@ For the first bit-set, <code>offset</code> is <code>GLOBAL_SIDE_METADATA_BASE_AD
 <p>So far, we declared each metadata specs.
 We can now use the in-object metadata through the access functions in the VM bindings ObjectModel.
 For side metadata, the next step is to allocate metadata space.</p>
-<h2 id="create-and-allocate-side-metadata-for-spaces" class="section-header"><a href="#create-and-allocate-side-metadata-for-spaces">Create and allocate side metadata for spaces</a></h2>
+<h3 id="create-and-allocate-side-metadata-for-spaces" class="section-header"><a href="#create-and-allocate-side-metadata-for-spaces">Create and allocate side metadata for spaces</a></h3>
 <p>A space needs to know all global metadata specs and its own policy-specific/local metadata specs in order to calculate and allocate metadata space.
 When a space is created by a plan (e.g. SemiSpace::new), the plan can create its global specs by <code>MetadataContext::new_global_specs(&amp;[GLOBAL_META_1, GLOBAL_META_2])</code>. Then,
 the global specs are passed to each space that the plan creates.</p>
@@ -157,7 +157,7 @@ the global specs are passed to each space that the plan creates.</p>
 Allocating side metadata space and accounting its memory usage is done by <code>SideMetadata</code>. If a space uses <code>CommonSpace</code>, <code>CommonSpace</code> will create <code>SideMetadata</code> and manage
 reserving and allocating metadata space when necessary. If a space does not use <code>CommonSpace</code>, it should create <code>SideMetadata</code> itself and manage allocating metadata space
 as its own responsibility.</p>
-<h2 id="access-side-metadata" class="section-header"><a href="#access-side-metadata">Access side metadata</a></h2>
+<h3 id="access-side-metadata" class="section-header"><a href="#access-side-metadata">Access side metadata</a></h3>
 <p>After mapping the metadata space, the following operations can be performed with a specific metadata spec:</p>
 <ol>
 <li>atomic load</li>
@@ -170,15 +170,15 @@ as its own responsibility.</p>
 <li>bulk zeroing</li>
 </ol>
 </div></details><h2 id="modules" class="section-header"><a href="#modules">Modules</a></h2>
-<div class="item-table"><div class="item-left module-item"><a class="mod" href="global/index.html" title="mmtk::util::metadata::global mod">global</a></div><div class="item-right docblock-short"></div><div class="item-left module-item"><a class="mod" href="header_metadata/index.html" title="mmtk::util::metadata::header_metadata mod">header_metadata</a></div><div class="item-right docblock-short"></div><div class="item-left module-item"><a class="mod" href="log_bit/index.html" title="mmtk::util::metadata::log_bit mod">log_bit</a></div><div class="item-right docblock-short"></div><div class="item-left module-item"><a class="mod" href="side_metadata/index.html" title="mmtk::util::metadata::side_metadata mod">side_metadata</a></div><div class="item-right docblock-short"></div></div><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
-<div class="item-table"><div class="item-left module-item"><a class="enum" href="enum.MetadataSpec.html" title="mmtk::util::metadata::MetadataSpec enum">MetadataSpec</a></div><div class="item-right docblock-short"><p>This struct stores the specification of a metadata bit-set.
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="mod" href="global/index.html" title="mmtk::util::metadata::global mod">global</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="header_metadata/index.html" title="mmtk::util::metadata::header_metadata mod">header_metadata</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="log_bit/index.html" title="mmtk::util::metadata::log_bit mod">log_bit</a></div><div class="item-right docblock-short"></div></div><div class="item-row"><div class="item-left module-item"><a class="mod" href="side_metadata/index.html" title="mmtk::util::metadata::side_metadata mod">side_metadata</a></div><div class="item-right docblock-short"></div></div></div><h2 id="enums" class="section-header"><a href="#enums">Enums</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="enum" href="enum.MetadataSpec.html" title="mmtk::util::metadata::MetadataSpec enum">MetadataSpec</a></div><div class="item-right docblock-short"><p>This struct stores the specification of a metadata bit-set.
 It is used as an input to the (inline) functions provided by the side metadata module.</p>
-</div></div><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
-<div class="item-table"><div class="item-left module-item"><a class="fn" href="fn.compare_exchange_metadata.html" title="mmtk::util::metadata::compare_exchange_metadata fn">compare_exchange_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically compare-and-exchange the specified metadata’s content.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.fetch_add_metadata.html" title="mmtk::util::metadata::fetch_add_metadata fn">fetch_add_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically perform an add operation on the specified metadata’s content.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.fetch_sub_metadata.html" title="mmtk::util::metadata::fetch_sub_metadata fn">fetch_sub_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically perform a subtract operation on the specified metadata’s content.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.load_metadata.html" title="mmtk::util::metadata::load_metadata fn">load_metadata</a></div><div class="item-right docblock-short"><p>A function to load the specified metadata’s content.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.store_metadata.html" title="mmtk::util::metadata::store_metadata fn">store_metadata</a></div><div class="item-right docblock-short"><p>A function to store a value to the specified metadata.</p>
-</div></div></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
+</div></div></div><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.compare_exchange_metadata.html" title="mmtk::util::metadata::compare_exchange_metadata fn">compare_exchange_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically compare-and-exchange the specified metadata’s content.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.fetch_add_metadata.html" title="mmtk::util::metadata::fetch_add_metadata fn">fetch_add_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically perform an add operation on the specified metadata’s content.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.fetch_sub_metadata.html" title="mmtk::util::metadata::fetch_sub_metadata fn">fetch_sub_metadata</a></div><div class="item-right docblock-short"><p>A function to atomically perform a subtract operation on the specified metadata’s content.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.load_metadata.html" title="mmtk::util::metadata::load_metadata fn">load_metadata</a></div><div class="item-right docblock-short"><p>A function to load the specified metadata’s content.</p>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.store_metadata.html" title="mmtk::util::metadata::store_metadata fn">store_metadata</a></div><div class="item-right docblock-short"><p>A function to store a value to the specified metadata.</p>
+</div></div></div></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
     <script src="../../../main.js"></script>
 </body></html>

@@ -43,20 +43,20 @@
 }
 
 <span class="kw">impl</span> <span class="ident">ObjectCounter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">running</span>: <span class="ident">bool</span>, <span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">running</span>: <span class="ident">bool</span>, <span class="ident">counter</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> { <span class="ident">running</span>, <span class="ident">counter</span> }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">RtAnalysis</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ObjectCounter</span> {
-    <span class="kw">fn</span> <span class="ident">alloc_hook</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_size</span>: <span class="ident">usize</span>, <span class="ident">_align</span>: <span class="ident">usize</span>, <span class="ident">_offset</span>: <span class="ident">isize</span>) {
+    <span class="kw">fn</span> <span class="ident">alloc_hook</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_size</span>: <span class="ident">usize</span>, <span class="ident">_align</span>: <span class="ident">usize</span>, <span class="ident">_offset</span>: <span class="ident">isize</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">running</span> {
             <span class="comment">// The analysis routine simply updates the counter when the allocation hook is called</span>
             <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">set_running</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">running</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">set_running</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">running</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">running</span> <span class="op">=</span> <span class="ident">running</span>;
     }
 }

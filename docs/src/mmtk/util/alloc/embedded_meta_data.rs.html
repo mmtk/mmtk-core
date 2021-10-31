@@ -28,12 +28,12 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PAGES_IN_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_PAGES_IN_REGION</span>;
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_metadata_base</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_metadata_base</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident">BYTES_IN_REGION</span>)
 }
 
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_metadata_offset</span>(<span class="ident">address</span>: <span class="ident">Address</span>, <span class="ident">log_coverage</span>: <span class="ident">usize</span>, <span class="ident">log_align</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_metadata_offset</span>(<span class="ident">address</span>: <span class="ident">Address</span>, <span class="ident">log_coverage</span>: <span class="ident">usize</span>, <span class="ident">log_align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     ((<span class="ident">address</span> <span class="op">&amp;</span> <span class="ident">REGION_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> (<span class="ident">log_coverage</span> <span class="op">+</span> <span class="ident">log_align</span>)) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">log_align</span>
 }
 </code></pre></div>

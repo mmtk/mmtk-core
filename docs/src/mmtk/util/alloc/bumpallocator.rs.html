@@ -194,34 +194,34 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_limit</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">cursor</span>: <span class="ident">Address</span>, <span class="ident">limit</span>: <span class="ident">Address</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_limit</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cursor</span>: <span class="ident">Address</span>, <span class="ident">limit</span>: <span class="ident">Address</span>) {
         <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cursor</span>;
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">limit</span>;
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() };
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() };
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rebind</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">rebind</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">reset</span>();
         <span class="self">self</span>.<span class="ident">space</span> <span class="op">=</span> <span class="ident">space</span>;
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Allocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">space</span>
     }
-    <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">plan</span>
     }
-    <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc&quot;</span>);
         <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
         <span class="kw">let</span> <span class="ident">new_cursor</span> <span class="op">=</span> <span class="ident">result</span> <span class="op">+</span> <span class="ident">size</span>;
@@ -243,7 +243,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc_slow&quot;</span>);
         <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
     }
@@ -254,12 +254,12 @@
     <span class="comment">// (ii) the bump pointer semantics from the fastpath; and (iii) if the stress</span>
     <span class="comment">// factor has been crossed.</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow_once_stress_test</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">need_poll</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    ) -&gt; <span class="ident">Address</span> {
         <span class="kw">if</span> <span class="ident">need_poll</span> {
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">true</span>);
         }
@@ -288,7 +288,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMThread</span> {
+    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMThread</span> {
         <span class="self">self</span>.<span class="ident">tls</span>
     }
 }
@@ -298,7 +298,7 @@
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
         <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    ) -&gt; <span class="self">Self</span> {
         <span class="ident">BumpAllocator</span> {
             <span class="ident">tls</span>,
             <span class="ident">cursor</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },
@@ -310,12 +310,12 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">acquire_block</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">stress_test</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    ) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">block_size</span> <span class="op">=</span> (<span class="ident">size</span> <span class="op">+</span> <span class="ident">BLOCK_MASK</span>) <span class="op">&amp;</span> (<span class="op">!</span><span class="ident">BLOCK_MASK</span>);
         <span class="kw">let</span> <span class="ident">acquired_start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">acquire</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">bytes_to_pages</span>(<span class="ident">block_size</span>));
         <span class="kw">if</span> <span class="ident">acquired_start</span>.<span class="ident">is_zero</span>() {

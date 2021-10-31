@@ -194,13 +194,13 @@
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">alloc_pages</span>(<span class="ident">space_descriptor</span>, <span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>, <span class="ident">tls</span>)
     }
 
     <span class="comment">// XXX: In the original code reserve_pages &amp; clear_request explicitly</span>
     <span class="comment">//      acquired a lock.</span>
-    <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">adj_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">adjust_for_metadata</span>(<span class="ident">pages</span>);
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">adj_pages</span>);
         <span class="ident">adj_pages</span>
@@ -233,9 +233,9 @@
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span>;
+    ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span>;
 
-    <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+    <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/**
      * Commit pages to the page budget.  This is called after
@@ -257,17 +257,17 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">get_reserved_pages</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">committed_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">committed_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">get_committed_pages</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonPageResource</span>;
-    <span class="kw">fn</span> <span class="ident">common_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CommonPageResource</span>;
-    <span class="kw">fn</span> <span class="ident">vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span> {
+    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPageResource</span>;
+    <span class="kw">fn</span> <span class="ident">common_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CommonPageResource</span>;
+    <span class="kw">fn</span> <span class="ident">vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span> {
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>
     }
 }
@@ -290,7 +290,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">CommonPageResource</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">contiguous</span>: <span class="ident">bool</span>, <span class="ident">growable</span>: <span class="ident">bool</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">CommonPageResource</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">contiguous</span>: <span class="ident">bool</span>, <span class="ident">growable</span>: <span class="ident">bool</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="ident">CommonPageResource</span> {
         <span class="ident">CommonPageResource</span> {
             <span class="ident">accounting</span>: <span class="ident">PageAccounting::new</span>(),
 
@@ -309,7 +309,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
         <span class="ident">chunks</span>: <span class="ident">usize</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    ) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">head_discontiguous_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head_discontiguous_region</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">new_head</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">vm_map</span>.<span class="ident">allocate_contiguous_chunks</span>(
@@ -329,8 +329,8 @@
     <span class="doccomment">/// space.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_discontiguous_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">head_discontiguous_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">head_discontiguous_region</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="macro">debug_assert!</span>(<span class="ident">chunk</span> <span class="op">=</span><span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">chunk</span>));
-        <span class="kw">if</span> <span class="ident">chunk</span> <span class="op">=</span><span class="op">=</span> <span class="kw-2">*</span><span class="ident">head_discontiguous_region</span> {
+        <span class="macro">debug_assert!</span>(<span class="ident">chunk</span> <span class="op">==</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">chunk</span>));
+        <span class="kw">if</span> <span class="ident">chunk</span> <span class="op">==</span> <span class="kw-2">*</span><span class="ident">head_discontiguous_region</span> {
             <span class="kw-2">*</span><span class="ident">head_discontiguous_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">vm_map</span>.<span class="ident">get_next_contiguous_region</span>(<span class="ident">chunk</span>);
         }
         <span class="self">self</span>.<span class="ident">vm_map</span>.<span class="ident">free_contiguous_chunks</span>(<span class="ident">chunk</span>);
@@ -342,7 +342,7 @@
         <span class="kw-2">*</span><span class="ident">head_discontiguous_region</span> <span class="op">=</span> <span class="ident">Address::ZERO</span>;
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_head_discontiguous_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_head_discontiguous_region</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">head_discontiguous_region</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>()
     }
 }

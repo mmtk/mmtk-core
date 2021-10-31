@@ -154,78 +154,78 @@
 
 <span class="comment">/* Alignment */</span>
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_address_aligned</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_address_aligned</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">addr</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_ADDRESS</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">page_align_down</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">page_align_down</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_page_aligned</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_page_aligned</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_PAGE</span>)
 }
 
 <span class="comment">// const function cannot have conditional expression</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">addr</span>.<span class="ident">align_up</span>(<span class="ident">BYTES_IN_CHUNK</span>)
 }
 
 <span class="comment">// const function cannot have conditional expression</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">addr</span>.<span class="ident">align_down</span>(<span class="ident">BYTES_IN_CHUNK</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_up</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">addr</span>.<span class="ident">align_up</span>(<span class="ident">MMAP_CHUNK_BYTES</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">mmap_chunk_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
     <span class="ident">addr</span>.<span class="ident">align_down</span>(<span class="ident">MMAP_CHUNK_BYTES</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_chunks_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     (<span class="ident">bytes</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">address_to_chunk_index</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">address_to_chunk_index</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">addr</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">chunk</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">chunk</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
     <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">chunk</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) }
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_up</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_up</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     <span class="comment">// See https://github.com/rust-lang/rust/blob/e620d0f337d0643c757bab791fc7d88d63217704/src/libcore/alloc.rs#L192</span>
     <span class="ident">val</span>.<span class="ident">wrapping_add</span>(<span class="ident">align</span>).<span class="ident">wrapping_sub</span>(<span class="number">1</span>) <span class="op">&amp;</span> <span class="op">!</span><span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_down</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_align_down</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">val</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_is_aligned</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="ident">val</span> <span class="op">&amp;</span> <span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>
+<span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">raw_is_aligned</span>(<span class="ident">val</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">val</span> <span class="op">&amp;</span> <span class="ident">align</span>.<span class="ident">wrapping_sub</span>(<span class="number">1</span>) <span class="op">==</span> <span class="number">0</span>
 }
 
 <span class="comment">/* Conversion */</span>
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pages_to_bytes</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pages_to_bytes</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">pages</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
 <span class="doccomment">/// Convert size in bytes to the number of pages (aligned up)</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages_up</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     (<span class="ident">bytes</span> <span class="op">+</span> <span class="ident">BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_pages</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
     <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">bytes_to_pages_up</span>(<span class="ident">bytes</span>);
 
     <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug</span> <span class="op">=</span> <span class="string">&quot;true&quot;</span>) {
         <span class="kw">let</span> <span class="ident">computed_extent</span> <span class="op">=</span> <span class="ident">pages</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
-        <span class="kw">let</span> <span class="ident">bytes_match_pages</span> <span class="op">=</span> <span class="ident">computed_extent</span> <span class="op">=</span><span class="op">=</span> <span class="ident">bytes</span>;
+        <span class="kw">let</span> <span class="ident">bytes_match_pages</span> <span class="op">=</span> <span class="ident">computed_extent</span> <span class="op">==</span> <span class="ident">bytes</span>;
         <span class="macro">assert!</span>(
             <span class="ident">bytes_match_pages</span>,
             <span class="string">&quot;ERROR: number of bytes computed from pages must match original byte amount!\
@@ -240,13 +240,13 @@
 }
 
 <span class="doccomment">/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_formatted_string</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bytes_to_formatted_string</span>(<span class="ident">bytes</span>: <span class="ident">usize</span>) -&gt; <span class="ident">String</span> {
     <span class="kw">const</span> <span class="ident">UNITS</span>: [<span class="kw-2">&amp;</span><span class="ident">str</span>; <span class="number">6</span>] <span class="op">=</span> [<span class="string">&quot;B&quot;</span>, <span class="string">&quot;KiB&quot;</span>, <span class="string">&quot;MiB&quot;</span>, <span class="string">&quot;GiB&quot;</span>, <span class="string">&quot;TiB&quot;</span>, <span class="string">&quot;PiB&quot;</span>];
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">num</span> <span class="op">=</span> <span class="ident">bytes</span>;
     <span class="kw">while</span> <span class="ident">i</span> <span class="op">&lt;</span> <span class="ident">UNITS</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span> {
         <span class="kw">let</span> <span class="ident">new_num</span> <span class="op">=</span> <span class="ident">num</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">10</span>;
-        <span class="kw">if</span> <span class="ident">new_num</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="ident">new_num</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="kw">return</span> <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, <span class="ident">num</span>, <span class="ident">UNITS</span>[<span class="ident">i</span>]);
         }
         <span class="ident">num</span> <span class="op">=</span> <span class="ident">new_num</span>;

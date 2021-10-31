@@ -139,15 +139,15 @@
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Barrier</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>);
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NoBarrier</span>;
 
 <span class="kw">impl</span> <span class="ident">Barrier</span> <span class="kw">for</span> <span class="ident">NoBarrier</span> {
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {}
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_target</span>: <span class="ident">WriteTarget</span>) {}
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {}
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_target</span>: <span class="ident">WriteTarget</span>) {}
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectRememberingBarrier</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> {
@@ -160,7 +160,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">ObjectRememberingBarrier</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">meta</span>: <span class="ident">MetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">meta</span>: <span class="ident">MetadataSpec</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">mmtk</span>,
             <span class="ident">modbuf</span>: <span class="macro">vec!</span>[],
@@ -171,11 +171,11 @@
     <span class="doccomment">/// Attepmt to atomically log an object.</span>
     <span class="doccomment">/// Returns true if the object is not logged previously.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">log_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">log_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span>
                 <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>));
-            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">==</span> <span class="number">0</span> {
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
             <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(
@@ -193,7 +193,7 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">enqueue_node</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">fn</span> <span class="ident">enqueue_node</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
         <span class="comment">// If the objecct is unlogged, log it and push it to mod buffer</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">log_object</span>(<span class="ident">obj</span>) {
             <span class="self">self</span>.<span class="ident">modbuf</span>.<span class="ident">push</span>(<span class="ident">obj</span>);
@@ -206,13 +206,13 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">Barrier</span> <span class="kw">for</span> <span class="ident">ObjectRememberingBarrier</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">cold</span>]</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">modbuf</span> <span class="op">=</span> <span class="macro">vec!</span>[];
-        <span class="ident">std::mem::swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">modbuf</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">modbuf</span>);
+        <span class="ident">std::mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="ident">modbuf</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">modbuf</span>);
         <span class="macro">debug_assert!</span>(
             <span class="op">!</span><span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>].<span class="ident">is_activated</span>(),
             <span class="string">&quot;{:?}&quot;</span>,
-            <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span>
+            <span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span>
         );
         <span class="kw">if</span> <span class="op">!</span><span class="ident">modbuf</span>.<span class="ident">is_empty</span>() {
             <span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Closure</span>]
@@ -221,12 +221,12 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>) {
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>) {
         <span class="kw">match</span> <span class="ident">target</span> {
-            <span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>) =&gt; {
                 <span class="self">self</span>.<span class="ident">enqueue_node</span>(<span class="ident">obj</span>);
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
         }
     }
 }

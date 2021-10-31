@@ -327,10 +327,10 @@
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">PROT_EXEC</span>, <span class="ident">PROT_NONE</span>, <span class="ident">PROT_READ</span>, <span class="ident">PROT_WRITE</span>};
 <span class="kw">use</span> <span class="ident">std::io</span>::{<span class="ident">Error</span>, <span class="prelude-ty">Result</span>};
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">result_is_mapped</span>(<span class="ident">result</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">result_is_mapped</span>(<span class="ident">result</span>: <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
     <span class="kw">match</span> <span class="ident">result</span> {
-        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
-        <span class="prelude-val">Err</span>(<span class="ident">err</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">err</span>.<span class="ident">raw_os_error</span>().<span class="ident">unwrap</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">libc::EEXIST</span>,
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="bool-val">false</span>,
+        <span class="prelude-val">Err</span>(<span class="ident">err</span>) =&gt; <span class="ident">err</span>.<span class="ident">raw_os_error</span>().<span class="ident">unwrap</span>() <span class="op">==</span> <span class="ident">libc::EEXIST</span>,
     }
 }
 
@@ -349,7 +349,7 @@
 <span class="doccomment">/// the memory has been reserved by mmtk (e.g. after the use of mmap_noreserve()). Otherwise using this function</span>
 <span class="doccomment">/// may corrupt others&#39; data.</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span> <span class="comment">// Zeroing is not neceesary for some OS/s</span>
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">dzmmap</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">dzmmap</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_READ</span> <span class="op">|</span> <span class="ident">PROT_WRITE</span> <span class="op">|</span> <span class="ident">PROT_EXEC</span>;
     <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED</span>;
     <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>);
@@ -365,7 +365,7 @@
 <span class="doccomment">/// This function mmaps the memory and guarantees to zero all mapped memory.</span>
 <span class="doccomment">/// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span> <span class="comment">// Zeroing is not neceesary for some OS/s</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dzmmap_noreplace</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dzmmap_noreplace</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_READ</span> <span class="op">|</span> <span class="ident">PROT_WRITE</span> <span class="op">|</span> <span class="ident">PROT_EXEC</span>;
     <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span>;
     <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>);
@@ -381,7 +381,7 @@
 <span class="doccomment">/// This function does not reserve swap space for this mapping, which means there is no guarantee that writes to the</span>
 <span class="doccomment">/// mapping can always be successful. In case of out of physical memory, one may get a segfault for writing to the mapping.</span>
 <span class="doccomment">/// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mmap_noreserve</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mmap_noreserve</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_NONE</span>;
     <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span>
         <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span> <span class="op">|</span> <span class="ident">libc::MAP_NORESERVE</span>;
@@ -393,7 +393,7 @@
     <span class="ident">size</span>: <span class="ident">usize</span>,
     <span class="ident">prot</span>: <span class="ident">libc::c_int</span>,
     <span class="ident">flags</span>: <span class="ident">libc::c_int</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">ptr</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">to_mut_ptr</span>();
     <span class="ident">wrap_libc_call</span>(
         <span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">libc::mmap</span>(<span class="ident">start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>, <span class="op">-</span><span class="number">1</span>, <span class="number">0</span>) },
@@ -401,34 +401,34 @@
     )
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">munmap</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">munmap</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="ident">wrap_libc_call</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">libc::munmap</span>(<span class="ident">start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>) }, <span class="number">0</span>)
 }
 
 <span class="doccomment">/// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mmap_error</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">error</span>: <span class="ident">Error</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="op">!</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mmap_error</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">error</span>: <span class="ident">Error</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) -&gt; <span class="op">!</span> {
     <span class="kw">use</span> <span class="ident">std::io::ErrorKind</span>;
 
     <span class="kw">match</span> <span class="ident">error</span>.<span class="ident">kind</span>() {
         <span class="comment">// From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.</span>
-        <span class="ident">ErrorKind::OutOfMemory</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">ErrorKind::OutOfMemory</span> =&gt; {
             <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>);
             <span class="macro">unreachable!</span>()
         }
         <span class="comment">// Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.</span>
         <span class="comment">// TODO: We may be able to remove this now.</span>
-        <span class="ident">ErrorKind::Other</span> <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="ident">ErrorKind::Other</span> =&gt; {
             <span class="comment">// further check the error</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">os_errno</span>) <span class="op">=</span> <span class="ident">error</span>.<span class="ident">raw_os_error</span>() {
                 <span class="comment">// If it is OOM, we invoke out_of_memory() through the VM interface.</span>
-                <span class="kw">if</span> <span class="ident">os_errno</span> <span class="op">=</span><span class="op">=</span> <span class="ident">libc::ENOMEM</span> {
+                <span class="kw">if</span> <span class="ident">os_errno</span> <span class="op">==</span> <span class="ident">libc::ENOMEM</span> {
                     <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>);
                     <span class="macro">unreachable!</span>()
                 }
             }
         }
-        <span class="ident">ErrorKind::AlreadyExists</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?&quot;</span>),
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> {}
+        <span class="ident">ErrorKind::AlreadyExists</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Failed to mmap, the address is already mapped. Should MMTk quanrantine the address range first?&quot;</span>),
+        <span class="kw">_</span> =&gt; {}
     }
     <span class="macro">panic!</span>(<span class="string">&quot;Unexpected mmap failure: {:?}&quot;</span>, <span class="ident">error</span>)
 }
@@ -441,10 +441,10 @@
     <span class="comment">// MAP_FIXED_NOREPLACE returns EEXIST if already mapped</span>
     <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span>;
     <span class="kw">match</span> <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>) {
-        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">panic!</span>(<span class="string">&quot;{} of size {} is not mapped&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>),
-        <span class="prelude-val">Err</span>(<span class="ident">e</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;{} of size {} is not mapped&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>),
+        <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
             <span class="macro">assert!</span>(
-                <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">std::io::ErrorKind::AlreadyExists</span>,
+                <span class="ident">e</span>.<span class="ident">kind</span>() <span class="op">==</span> <span class="ident">std::io::ErrorKind::AlreadyExists</span>,
                 <span class="string">&quot;Failed to check mapped: {:?}&quot;</span>,
                 <span class="ident">e</span>
             );
@@ -452,23 +452,23 @@
     }
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">munprotect</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">munprotect</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="ident">wrap_libc_call</span>(
         <span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">libc::mprotect</span>(<span class="ident">start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>, <span class="ident">PROT_READ</span> <span class="op">|</span> <span class="ident">PROT_WRITE</span> <span class="op">|</span> <span class="ident">PROT_EXEC</span>) },
         <span class="number">0</span>,
     )
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mprotect</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mprotect</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="ident">wrap_libc_call</span>(
         <span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">libc::mprotect</span>(<span class="ident">start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>, <span class="ident">PROT_NONE</span>) },
         <span class="number">0</span>,
     )
 }
 
-<span class="kw">fn</span> <span class="ident">wrap_libc_call</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PartialEq</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">T</span>, <span class="ident">expect</span>: <span class="ident">T</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+<span class="kw">fn</span> <span class="ident">wrap_libc_call</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">PartialEq</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Fn</span>() -&gt; <span class="ident">T</span>, <span class="ident">expect</span>: <span class="ident">T</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">f</span>();
-    <span class="kw">if</span> <span class="ident">ret</span> <span class="op">=</span><span class="op">=</span> <span class="ident">expect</span> {
+    <span class="kw">if</span> <span class="ident">ret</span> <span class="op">==</span> <span class="ident">expect</span> {
         <span class="prelude-val">Ok</span>(())
     } <span class="kw">else</span> {
         <span class="prelude-val">Err</span>(<span class="ident">std::io::Error::last_os_error</span>())
@@ -480,13 +480,13 @@
 <span class="doccomment">/// If we would need to parsable memory maps, I would suggest using a library instead which saves us the trouble to deal with portability.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_process_memory_maps</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_process_memory_maps</span>() -&gt; <span class="ident">String</span> {
     <span class="comment">// print map</span>
     <span class="kw">use</span> <span class="ident">std::fs::File</span>;
     <span class="kw">use</span> <span class="ident">std::io::Read</span>;
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">data</span> <span class="op">=</span> <span class="ident">String::new</span>();
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="op">=</span> <span class="ident">File::open</span>(<span class="string">&quot;/proc/self/maps&quot;</span>).<span class="ident">unwrap</span>();
-    <span class="ident">f</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">data</span>).<span class="ident">unwrap</span>();
+    <span class="ident">f</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;mut</span> <span class="ident">data</span>).<span class="ident">unwrap</span>();
     <span class="ident">data</span>
 }
 

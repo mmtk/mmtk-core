@@ -442,7 +442,7 @@
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
         <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+    ) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/// A function to store a value to the specified per-object metadata.</span>
     <span class="doccomment">///</span>
@@ -484,7 +484,7 @@
         <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
         <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
         <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
+    ) -&gt; <span class="ident">bool</span>;
 
     <span class="doccomment">/// A function to atomically perform an add operation on the specified per-object metadata&#39;s content.</span>
     <span class="doccomment">///</span>
@@ -502,7 +502,7 @@
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">val</span>: <span class="ident">usize</span>,
         <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+    ) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/// A function to atomically perform a subtract operation on the specified per-object metadata&#39;s content.</span>
     <span class="doccomment">///</span>
@@ -520,7 +520,7 @@
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">val</span>: <span class="ident">usize</span>,
         <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+    ) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/// Copy an object and return the address of the new object. Usually in the implementation of this method,</span>
     <span class="doccomment">/// `alloc_copy()` and `post_copy()` from a plan&#39;s [`CopyContext`](../trait.CopyContext.html) are used for copying.</span>
@@ -532,8 +532,8 @@
     <span class="kw">fn</span> <span class="ident">copy</span>(
         <span class="ident">from</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
+        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+    ) -&gt; <span class="ident">ObjectReference</span>;
 
     <span class="doccomment">/// Copy an object. This is required</span>
     <span class="doccomment">/// for delayed-copy collectors such as compacting collectors. During the</span>
@@ -546,7 +546,7 @@
     <span class="doccomment">/// * `from`: The address of the object to be copied.</span>
     <span class="doccomment">/// * `to`: The target location.</span>
     <span class="doccomment">/// * `region: The start of the region that was reserved for this object.</span>
-    <span class="kw">fn</span> <span class="ident">copy_to</span>(<span class="ident">from</span>: <span class="ident">ObjectReference</span>, <span class="ident">to</span>: <span class="ident">ObjectReference</span>, <span class="ident">region</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span>;
+    <span class="kw">fn</span> <span class="ident">copy_to</span>(<span class="ident">from</span>: <span class="ident">ObjectReference</span>, <span class="ident">to</span>: <span class="ident">ObjectReference</span>, <span class="ident">region</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span>;
 
     <span class="doccomment">/// Return the reference that an object will be referred to after it is copied</span>
     <span class="doccomment">/// to the specified region. Used in delayed-copy collectors such as compacting</span>
@@ -555,13 +555,13 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `from`: The object to be copied.</span>
     <span class="doccomment">/// * `to`: The region to be copied to.</span>
-    <span class="kw">fn</span> <span class="ident">get_reference_when_copied_to</span>(<span class="ident">from</span>: <span class="ident">ObjectReference</span>, <span class="ident">to</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
+    <span class="kw">fn</span> <span class="ident">get_reference_when_copied_to</span>(<span class="ident">from</span>: <span class="ident">ObjectReference</span>, <span class="ident">to</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ObjectReference</span>;
 
     <span class="doccomment">/// Return the size used by an object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `object`: The object to be queried.</span>
-    <span class="kw">fn</span> <span class="ident">get_current_size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span>;
+    <span class="kw">fn</span> <span class="ident">get_current_size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/// Get the type descriptor for an object.</span>
     <span class="doccomment">///</span>
@@ -569,13 +569,13 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `reference`: The object to be queried.</span>
-    <span class="kw">fn</span> <span class="ident">get_type_descriptor</span>(<span class="ident">reference</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">i8</span>];
+    <span class="kw">fn</span> <span class="ident">get_type_descriptor</span>(<span class="ident">reference</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">i8</span>];
 
     <span class="doccomment">/// Return the lowest address of the storage associated with an object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `object`: The object to be queried.</span>
-    <span class="kw">fn</span> <span class="ident">object_start_ref</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span>;
+    <span class="kw">fn</span> <span class="ident">object_start_ref</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span>;
 
     <span class="doccomment">/// Return an address guaranteed to be inside the storage associated</span>
     <span class="doccomment">/// with an object.</span>
@@ -583,7 +583,7 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `object`: The object to be queried.</span>
     <span class="comment">// FIXME: this doesn&#39;t seem essential. E.g. `get_object_end_address` or `object_start_ref` can cover its functionality.</span>
-    <span class="kw">fn</span> <span class="ident">ref_to_address</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span>;
+    <span class="kw">fn</span> <span class="ident">ref_to_address</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span>;
 
     <span class="doccomment">/// Dump debugging information for an object.</span>
     <span class="doccomment">///</span>
@@ -606,18 +606,18 @@
     <span class="comment">// This macro is invoked in define_vm_metadata_global_spec or define_vm_metadata_local_spec.</span>
     <span class="comment">// Use those two to define a new VM metadata spec.</span>
     <span class="macro">macro_rules!</span> <span class="ident">define_vm_metadata_spec</span> {
-        (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_bits</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span>: <span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_bits</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">side_min_obj_size</span>: <span class="ident">expr</span>) =&gt; {
             <span class="kw">pub</span> <span class="kw">struct</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span>(<span class="ident">MetadataSpec</span>);
             <span class="kw">impl</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span> {
                 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_NUM_BITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_bits</span>;
                 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IS_GLOBAL</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>;
-                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">in_header</span>(<span class="ident">bit_offset</span>: <span class="ident">isize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">in_header</span>(<span class="ident">bit_offset</span>: <span class="ident">isize</span>) -&gt; <span class="self">Self</span> {
                     <span class="self">Self</span>(<span class="ident">MetadataSpec::InHeader</span>(<span class="ident">HeaderMetadataSpec</span> {
                         <span class="ident">bit_offset</span>,
                         <span class="ident">num_of_bits</span>: <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_NUM_BITS</span>,
                     }))
                 }
-                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">side_first</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">side_first</span>() -&gt; <span class="self">Self</span> {
                     <span class="kw">if</span> <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span> {
                         <span class="self">Self</span>(<span class="ident">MetadataSpec::OnSide</span>(<span class="ident">SideMetadataSpec</span> {
                             <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span>),
@@ -636,10 +636,10 @@
                         }))
                     }
                 }
-                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">side_after</span>(<span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">side_after</span>(<span class="ident">spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>) -&gt; <span class="self">Self</span> {
                     <span class="macro">debug_assert!</span>(<span class="ident">spec</span>.<span class="ident">is_on_side</span>());
                     <span class="kw">let</span> <span class="ident">side_spec</span> <span class="op">=</span> <span class="ident">spec</span>.<span class="ident">extract_side_spec</span>();
-                    <span class="macro">debug_assert!</span>(<span class="ident">side_spec</span>.<span class="ident">is_global</span> <span class="op">=</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>);
+                    <span class="macro">debug_assert!</span>(<span class="ident">side_spec</span>.<span class="ident">is_global</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>);
                     <span class="self">Self</span>(<span class="ident">MetadataSpec::OnSide</span>(<span class="ident">SideMetadataSpec</span> {
                         <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span>),
                         <span class="ident">is_global</span>: <span class="ident"><span class="self">Self</span>::IS_GLOBAL</span>,
@@ -649,17 +649,17 @@
                     }))
                 }
                 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">as_spec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span> {
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">as_spec</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span> {
                     <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>
                 }
-                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">num_bits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+                <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">num_bits</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
                     <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_bits</span>
                 }
             }
             <span class="kw">impl</span> <span class="ident">std::ops::Deref</span> <span class="kw">for</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">spec_name</span> {
                 <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">MetadataSpec</span>;
                 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-                <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
+                <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
                     <span class="self">self</span>.<span class="ident">as_spec</span>()
                 }
             }

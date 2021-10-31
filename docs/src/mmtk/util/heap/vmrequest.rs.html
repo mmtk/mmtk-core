@@ -96,25 +96,25 @@
 }
 
 <span class="kw">impl</span> <span class="ident">VMRequest</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_discontiguous</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_discontiguous</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">VMRequest::Discontiguous</span> { .. })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">common64bit</span>(<span class="ident">top</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">common64bit</span>(<span class="ident">top</span>: <span class="ident">bool</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">VMRequest::Extent</span> {
             <span class="ident">extent</span>: <span class="ident">MAX_SPACE_EXTENT</span>,
             <span class="ident">top</span>,
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">discontiguous</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">discontiguous</span>() -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="ident"><span class="self">Self</span>::common64bit</span>(<span class="bool-val">false</span>);
         }
         <span class="ident">VMRequest::Discontiguous</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="ident"><span class="self">Self</span>::common64bit</span>(<span class="bool-val">false</span>);
         }
@@ -124,14 +124,14 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fraction</span>(<span class="ident">frac</span>: <span class="ident">f32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fraction</span>(<span class="ident">frac</span>: <span class="ident">f32</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="ident"><span class="self">Self</span>::common64bit</span>(<span class="bool-val">false</span>);
         }
         <span class="ident">VMRequest::Fraction</span> { <span class="ident">frac</span>, <span class="ident">top</span>: <span class="bool-val">false</span> }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">high_fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">high_fixed_size</span>(<span class="ident">mb</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="ident"><span class="self">Self</span>::common64bit</span>(<span class="bool-val">true</span>);
         }
@@ -141,7 +141,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_extent</span>(<span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">top</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fixed_extent</span>(<span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">top</span>: <span class="ident">bool</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">return</span> <span class="ident"><span class="self">Self</span>::common64bit</span>(<span class="ident">top</span>);
         }

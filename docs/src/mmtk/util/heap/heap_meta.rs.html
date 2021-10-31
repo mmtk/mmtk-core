@@ -50,7 +50,6 @@
 <span id="50">50</span>
 <span id="51">51</span>
 <span id="52">52</span>
-<span id="53">53</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicUsize</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
@@ -62,7 +61,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">HeapMeta</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">HeapMeta</span> {
             <span class="ident">heap_cursor</span>: <span class="ident">start</span>,
             <span class="ident">heap_limit</span>: <span class="ident">end</span>,
@@ -70,7 +69,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reserve</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">top</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reserve</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">extent</span>: <span class="ident">usize</span>, <span class="ident">top</span>: <span class="ident">bool</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">top</span> {
             <span class="self">self</span>.<span class="ident">heap_limit</span> <span class="op">-</span><span class="op">=</span> <span class="ident">extent</span>;
             <span class="self">self</span>.<span class="ident">heap_limit</span>
@@ -80,27 +79,26 @@
             <span class="ident">start</span>
         };
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">heap_cursor</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">heap_limit</span> {
-            <span class="macro">panic!</span>(
-                <span class="string">&quot;Out of virtual address space at {} ({} &gt; {})&quot;</span>,
-                <span class="self">self</span>.<span class="ident">heap_cursor</span> <span class="op">-</span> <span class="ident">extent</span>,
-                <span class="self">self</span>.<span class="ident">heap_cursor</span>,
-                <span class="self">self</span>.<span class="ident">heap_limit</span>
-            );
-        }
+        <span class="macro">assert!</span>(
+            <span class="self">self</span>.<span class="ident">heap_cursor</span> <span class="op">&lt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">heap_limit</span>,
+            <span class="string">&quot;Out of virtual address space at {} ({} &gt; {})&quot;</span>,
+            <span class="self">self</span>.<span class="ident">heap_cursor</span> <span class="op">-</span> <span class="ident">extent</span>,
+            <span class="self">self</span>.<span class="ident">heap_cursor</span>,
+            <span class="self">self</span>.<span class="ident">heap_limit</span>
+        );
 
         <span class="ident">ret</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_discontig_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_discontig_start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="ident">heap_cursor</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_discontig_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_discontig_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="ident">heap_limit</span> <span class="op">-</span> <span class="number">1</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_total_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_total_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">total_pages</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
     }
 }

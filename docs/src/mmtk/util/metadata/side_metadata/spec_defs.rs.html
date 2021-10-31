@@ -201,7 +201,7 @@
     <span class="comment">// Internal patterns</span>
 
     <span class="comment">// Define the first spec with offset at either GLOBAL/LOCAL_SIDE_METADATA_BASE_OFFSET</span>
-    (@<span class="ident">first_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+    (@<span class="ident">first_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>)) =&gt; {
         <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),
             <span class="ident">is_global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>,
@@ -211,7 +211,7 @@
         };
     };
     <span class="comment">// Define any spec that follows a previous spec. The new spec will be created and laid out after the previous spec.</span>
-    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
+    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
         <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="ident">SideMetadataSpec</span> {
             <span class="ident">name</span>: <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),
             <span class="ident">is_global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global</span>,
@@ -222,14 +222,14 @@
         <span class="macro">define_side_metadata_specs!</span>(@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>)<span class="kw-2">*</span>);
     };
     <span class="comment">// Define the last spec with the given identifier.</span>
-    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>,) <span class="op">=</span><span class="op">&gt;</span> {
+    (@<span class="ident">prev_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>: <span class="ident">ident</span> <span class="kw">as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>,) =&gt; {
         <span class="kw">pub</span> <span class="kw">const</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec</span>;
     };
 
     <span class="comment">// The actual macro</span>
 
     <span class="comment">// This is the pattern that should be used outside this macro.</span>
-    (<span class="ident">last_spec_as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global0</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits0</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region0</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {
+    (<span class="ident">last_spec_as</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">last_spec_ident</span>: <span class="ident">ident</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span>: <span class="ident">ident</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global0</span>: <span class="ident">expr</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits0</span>: <span class="ident">expr</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region0</span>: <span class="ident">expr</span>), $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">tail</span>:<span class="ident">tt</span>)<span class="kw-2">*</span>) =&gt; {
         <span class="comment">// Defines the first spec</span>
         <span class="macro">define_side_metadata_specs!</span>(@<span class="ident">first_spec</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name0</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">is_global0</span>, <span class="ident">log_num_of_bits</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_num_of_bits0</span>, <span class="ident">log_bytes_in_region</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">log_bytes_in_region0</span>));
         <span class="comment">// The rest specs</span>
@@ -270,7 +270,7 @@
     <span class="kw">fn</span> <span class="ident">first_global_spec</span>() {
         <span class="macro">define_side_metadata_specs!</span>(<span class="ident">last_spec_as</span> <span class="ident">LAST_GLOBAL_SPEC</span>, <span class="ident">TEST_SPEC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">true</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),);
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
@@ -280,7 +280,7 @@
     <span class="kw">fn</span> <span class="ident">first_local_spec</span>() {
         <span class="macro">define_side_metadata_specs!</span>(<span class="ident">last_spec_as</span> <span class="ident">LAST_LOCAL_SPEC</span>, <span class="ident">TEST_SPEC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="number">3</span>),);
         <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_SPEC</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC</span>, <span class="ident">LAST_LOCAL_SPEC</span>);
@@ -295,12 +295,12 @@
         );
 
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
 
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
 
@@ -317,17 +317,17 @@
         );
 
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
 
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC1</span>));
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
 
         <span class="macro">assert!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC2</span>));
+        <span class="macro">assert!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_SPEC2</span>));
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">log_num_of_bits</span>, <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_SPEC3</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">5</span>);
 
@@ -348,24 +348,24 @@
         );
 
         <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">0</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">3</span>);
 
         <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_GSPEC1</span>));
+        <span class="macro">assert!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_GSPEC1</span>));
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">1</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">4</span>);
 
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_GSPEC2</span>, <span class="ident">LAST_GLOBAL_SPEC</span>);
 
         <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_LSPEC1</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
+        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">log_num_of_bits</span>, <span class="number">2</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC1</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">5</span>);
 
         <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">TEST_LSPEC2</span>.<span class="ident">is_global</span>);
-        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">offset</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_LSPEC1</span>));
+        <span class="macro">assert!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">offset</span> <span class="op">==</span> <span class="ident">SideMetadataOffset::layout_after</span>(<span class="kw-2">&amp;</span><span class="ident">TEST_LSPEC1</span>));
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">log_num_of_bits</span>, <span class="number">3</span>);
         <span class="macro">assert_eq!</span>(<span class="ident">TEST_LSPEC2</span>.<span class="ident">log_bytes_in_region</span>, <span class="number">6</span>);
 

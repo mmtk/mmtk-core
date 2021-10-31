@@ -533,9 +533,6 @@
 <span id="533">533</span>
 <span id="534">534</span>
 <span id="535">535</span>
-<span id="536">536</span>
-<span id="537">537</span>
-<span id="538">538</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mmapper::MapState</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
@@ -589,7 +586,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">FragmentedMapper</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="macro">write!</span>(<span class="ident">f</span>, <span class="string">&quot;FragmentedMapper({})&quot;</span>, <span class="ident">MMAP_NUM_CHUNKS</span>)
     }
 }
@@ -618,7 +615,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">quarantine_address_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">quarantine_address_range</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>);
         <span class="comment">// Iterate over the slabs covered</span>
         <span class="kw">while</span> <span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">end</span> {
@@ -650,7 +647,7 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>);
         <span class="comment">// Iterate over the slabs covered</span>
         <span class="kw">while</span> <span class="ident">start</span> <span class="op">&lt;</span> <span class="ident">end</span> {
@@ -675,10 +672,7 @@
 
                 <span class="kw">let</span> <span class="ident">mmap_start</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::chunk_index_to_address</span>(<span class="ident">base</span>, <span class="ident">chunk</span>);
                 <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MapState::transition_to_mapped</span>(<span class="ident">entry</span>, <span class="ident">mmap_start</span>);
-                <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_err</span>() {
-                    <span class="kw">return</span> <span class="ident">res</span>;
-                }
+                <span class="ident">MapState::transition_to_mapped</span>(<span class="ident">entry</span>, <span class="ident">mmap_start</span>)<span class="question-mark">?</span>;
             }
             <span class="ident">start</span> <span class="op">=</span> <span class="ident">high</span>;
         }
@@ -691,14 +685,14 @@
      * @param addr The address in question.
      * @return {@code true} if the given address has been mmapped
      */</span>
-    <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">mapped</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">slab_table</span>(<span class="ident">addr</span>);
         <span class="kw">match</span> <span class="ident">mapped</span> {
-            <span class="prelude-val">Some</span>(<span class="ident">mapped</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">mapped</span>) =&gt; {
                 <span class="ident">mapped</span>[<span class="ident"><span class="self">Self</span>::chunk_index</span>(<span class="ident"><span class="self">Self</span>::slab_align_down</span>(<span class="ident">addr</span>), <span class="ident">addr</span>)].<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
-                    <span class="op">=</span><span class="op">=</span> <span class="ident">MapState::Mapped</span>
+                    <span class="op">==</span> <span class="ident">MapState::Mapped</span>
             }
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
+            <span class="kw">_</span> =&gt; <span class="bool-val">false</span>,
         }
     }
 
@@ -730,7 +724,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">FragmentedMapper</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">lock</span>: <span class="ident">Mutex::new</span>(()),
             <span class="ident">free_slab_index</span>: <span class="number">0</span>,
@@ -740,12 +734,12 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">new_slab</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">new_slab</span>() -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">mapped</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Slab</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">box</span> <span class="kw">unsafe</span> { <span class="ident">transmute</span>([<span class="ident">MapState::Unmapped</span>; <span class="ident">MMAP_NUM_CHUNKS</span>]) };
         <span class="ident">mapped</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">hash</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">initial</span> <span class="op">=</span> (<span class="ident">addr</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">MMAP_SLAB_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_MMAP_SLAB_BYTES</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">hash</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">while</span> <span class="ident">initial</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
@@ -755,11 +749,11 @@
         <span class="ident">hash</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">slab_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">slab_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
         <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() }.<span class="ident">get_or_optionally_allocate_slab_table</span>(<span class="ident">addr</span>, <span class="bool-val">false</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_or_allocate_slab_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">Slab</span> {
+    <span class="kw">fn</span> <span class="ident">get_or_allocate_slab_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Slab</span> {
         <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() }
             .<span class="ident">get_or_optionally_allocate_slab_table</span>(<span class="ident">addr</span>, <span class="bool-val">true</span>)
             .<span class="ident">unwrap</span>()
@@ -767,34 +761,34 @@
 
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::mut_from_ref</span>)]</span>
-    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mut_self</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">Self</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="kw">_</span>)
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">mut_self</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="self">Self</span> {
+        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_or_optionally_allocate_slab_table</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">addr</span>: <span class="ident">Address</span>,
         <span class="ident">allocate</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="ident">addr</span> <span class="op">!</span><span class="op">=</span> <span class="ident">SENTINEL</span>);
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">addr</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">MMAP_SLAB_MASK</span>) };
         <span class="kw">let</span> <span class="ident">hash</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::hash</span>(<span class="ident">base</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident">hash</span>; <span class="comment">// Use &#39;index&#39; to iterate over the hash table so that we remember where we started</span>
         <span class="kw">loop</span> {
             <span class="comment">/* Check for a hash-table hit.  Should be the frequent case. */</span>
-            <span class="kw">if</span> <span class="ident">base</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] {
+            <span class="kw">if</span> <span class="ident">base</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] {
                 <span class="kw">return</span> <span class="self">self</span>.<span class="ident">slab_table_for</span>(<span class="ident">addr</span>, <span class="ident">index</span>);
             }
             <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
 
             <span class="comment">/* Check whether another thread has allocated a slab while we were acquiring the lock */</span>
-            <span class="kw">if</span> <span class="ident">base</span> <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] {
+            <span class="kw">if</span> <span class="ident">base</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] {
                 <span class="comment">// drop(guard);</span>
                 <span class="kw">return</span> <span class="self">self</span>.<span class="ident">slab_table_for</span>(<span class="ident">addr</span>, <span class="ident">index</span>);
             }
 
             <span class="comment">/* Check for a free slot */</span>
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] <span class="op">=</span><span class="op">=</span> <span class="ident">SENTINEL</span> {
+            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">slab_map</span>[<span class="ident">index</span>] <span class="op">==</span> <span class="ident">SENTINEL</span> {
                 <span class="kw">if</span> <span class="op">!</span><span class="ident">allocate</span> {
                     <span class="comment">// drop(guard);</span>
                     <span class="kw">return</span> <span class="prelude-val">None</span>;
@@ -810,7 +804,7 @@
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">slab_table_for</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_addr</span>: <span class="ident">Address</span>, <span class="ident">index</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">slab_table_for</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_addr</span>: <span class="ident">Address</span>, <span class="ident">index</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Slab</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">slab_table</span>[<span class="ident">index</span>].<span class="ident">is_some</span>());
         <span class="self">self</span>.<span class="ident">slab_table</span>[<span class="ident">index</span>].<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">x</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="ident">Slab</span>)
     }
@@ -820,7 +814,7 @@
      * at the correct index in the slabTable.
      * @param index slab table index
      */</span>
-    <span class="kw">fn</span> <span class="ident">commit_free_slab</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) {
+    <span class="kw">fn</span> <span class="ident">commit_free_slab</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">index</span>: <span class="ident">usize</span>) {
         <span class="macro">assert!</span>(
             <span class="self">self</span>.<span class="ident">free_slab_index</span> <span class="op">&lt;</span> <span class="ident">MAX_SLABS</span>,
             <span class="string">&quot;All free slabs used: virtual address space is exhausled.&quot;</span>
@@ -828,13 +822,13 @@
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">slab_table</span>[<span class="ident">index</span>].<span class="ident">is_none</span>());
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">free_slabs</span>[<span class="self">self</span>.<span class="ident">free_slab_index</span>].<span class="ident">is_some</span>());
         <span class="ident">::std::mem::swap</span>(
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">slab_table</span>[<span class="ident">index</span>],
-            <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">free_slabs</span>[<span class="self">self</span>.<span class="ident">free_slab_index</span>],
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">slab_table</span>[<span class="ident">index</span>],
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">free_slabs</span>[<span class="self">self</span>.<span class="ident">free_slab_index</span>],
         );
         <span class="self">self</span>.<span class="ident">free_slab_index</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">base</span>: <span class="ident">Address</span>, <span class="ident">chunk</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">base</span>: <span class="ident">Address</span>, <span class="ident">chunk</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
         <span class="ident">base</span> <span class="op">+</span> (<span class="ident">chunk</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>)
     }
 
@@ -842,7 +836,7 @@
      * @param addr an address
      * @return the base address of the enclosing slab
      */</span>
-    <span class="kw">fn</span> <span class="ident">slab_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">slab_align_down</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">addr</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">MMAP_SLAB_MASK</span>) }
     }
 
@@ -850,7 +844,7 @@
      * @param addr an address
      * @return the base address of the next slab
      */</span>
-    <span class="kw">fn</span> <span class="ident">slab_limit</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">slab_limit</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
         <span class="ident"><span class="self">Self</span>::slab_align_down</span>(<span class="ident">addr</span>) <span class="op">+</span> <span class="ident">MMAP_SLAB_EXTENT</span>
     }
 
@@ -859,14 +853,14 @@
      * @param addr Address within a chunk (could be in the next slab)
      * @return The index of the chunk within the slab (could be beyond the end of the slab)
      */</span>
-    <span class="kw">fn</span> <span class="ident">chunk_index</span>(<span class="ident">slab</span>: <span class="ident">Address</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">chunk_index</span>(<span class="ident">slab</span>: <span class="ident">Address</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">delta</span> <span class="op">=</span> <span class="ident">addr</span> <span class="op">-</span> <span class="ident">slab</span>;
         <span class="ident">delta</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_MMAP_CHUNK_BYTES</span>
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">FragmentedMapper</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::new</span>()
     }
 }
@@ -884,11 +878,11 @@
     <span class="kw">const</span> <span class="ident">FIXED_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">start</span>;
     <span class="kw">const</span> <span class="ident">MAX_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">FRAGMENTED_MMAPPER_TEST_REGION</span>.<span class="ident">size</span>;
 
-    <span class="kw">fn</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">pages_to_chunks_up</span>(<span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
         <span class="ident">conversions::raw_align_up</span>(<span class="ident">pages</span>, <span class="ident">MMAP_CHUNK_BYTES</span>) <span class="op">/</span> <span class="ident">MMAP_CHUNK_BYTES</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">get_chunk_map_state</span>(<span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="ident">FragmentedMapper</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MapState</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_chunk_map_state</span>(<span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="ident">FragmentedMapper</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">MapState</span><span class="op">&gt;</span> {
         <span class="macro">assert_eq!</span>(<span class="ident">conversions::mmap_chunk_align_up</span>(<span class="ident">chunk</span>), <span class="ident">chunk</span>);
         <span class="kw">let</span> <span class="ident">mapped</span> <span class="op">=</span> <span class="ident">mmapper</span>.<span class="ident">slab_table</span>(<span class="ident">chunk</span>);
         <span class="ident">mapped</span>.<span class="ident">map</span>(<span class="op">|</span><span class="ident">m</span><span class="op">|</span> {

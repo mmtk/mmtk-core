@@ -122,13 +122,13 @@
 
 <span class="comment">// Clippy says we need this...</span>
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ControllerCollectorContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::new</span>()
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ControllerCollectorContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="ident">ControllerCollectorContext</span> {
             <span class="ident">request_sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">RequestSync</span> {
                 <span class="ident">request_count</span>: <span class="number">0</span>,
@@ -189,7 +189,7 @@
     <span class="kw">fn</span> <span class="ident">wait_for_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">request_sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="ident">guard</span>.<span class="ident">last_request_count</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
-        <span class="kw">while</span> <span class="ident">guard</span>.<span class="ident">last_request_count</span> <span class="op">=</span><span class="op">=</span> <span class="ident">guard</span>.<span class="ident">request_count</span> {
+        <span class="kw">while</span> <span class="ident">guard</span>.<span class="ident">last_request_count</span> <span class="op">==</span> <span class="ident">guard</span>.<span class="ident">request_count</span> {
             <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">request_condvar</span>.<span class="ident">wait</span>(<span class="ident">guard</span>).<span class="ident">unwrap</span>();
         }
     }

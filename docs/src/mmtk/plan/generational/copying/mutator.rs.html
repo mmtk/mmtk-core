@@ -86,11 +86,11 @@
 <span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_prepare</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">_mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
     <span class="comment">// Do nothing</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gencopy_mutator_release</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
     <span class="comment">// reset nursery allocator</span>
     <span class="kw">let</span> <span class="ident">bump_allocator</span> <span class="op">=</span> <span class="kw">unsafe</span> {
         <span class="ident">mutator</span>
@@ -104,16 +104,16 @@
 
 <span class="macro">lazy_static!</span> {
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationType</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">enum_map!</span> {
-        <span class="ident">AllocationType::Default</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
-        <span class="ident">AllocationType::Immortal</span> <span class="op">|</span> <span class="ident">AllocationType::Code</span> <span class="op">|</span> <span class="ident">AllocationType::LargeCode</span> <span class="op">|</span> <span class="ident">AllocationType::ReadOnly</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>),
-        <span class="ident">AllocationType::Los</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector::LargeObject</span>(<span class="number">0</span>),
+        <span class="ident">AllocationType::Default</span> =&gt; <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
+        <span class="ident">AllocationType::Immortal</span> <span class="op">|</span> <span class="ident">AllocationType::Code</span> <span class="op">|</span> <span class="ident">AllocationType::LargeCode</span> <span class="op">|</span> <span class="ident">AllocationType::ReadOnly</span> =&gt; <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>),
+        <span class="ident">AllocationType::Los</span> =&gt; <span class="ident">AllocatorSelector::LargeObject</span>(<span class="number">0</span>),
     };
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_gencopy_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+) -&gt; <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">gencopy</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
     <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">MutatorConfig</span> {
         <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>,

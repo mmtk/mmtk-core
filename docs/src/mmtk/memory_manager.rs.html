@@ -531,8 +531,8 @@
 <span class="doccomment">/// * `heap_size`: The heap size for the MMTk instance in bytes.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>) {
     <span class="kw">match</span> <span class="ident"><span class="kw">crate</span>::util::logger::try_init</span>() {
-        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">debug!</span>(<span class="string">&quot;MMTk initialized the logger.&quot;</span>),
-        <span class="prelude-val">Err</span>(<span class="kw">_</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">debug!</span>(
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(<span class="string">&quot;MMTk initialized the logger.&quot;</span>),
+        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">debug!</span>(
             <span class="string">&quot;MMTk failed to initialize the logger. Possibly a logger has been initialized by user.&quot;</span>
         ),
     }
@@ -542,10 +542,10 @@
         <span class="kw">use</span> <span class="ident">std::io::Read</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">status</span> <span class="op">=</span> <span class="ident">File::open</span>(<span class="string">&quot;/proc/self/status&quot;</span>).<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">contents</span> <span class="op">=</span> <span class="ident">String::new</span>();
-        <span class="ident">status</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">contents</span>).<span class="ident">unwrap</span>();
+        <span class="ident">status</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;mut</span> <span class="ident">contents</span>).<span class="ident">unwrap</span>();
         <span class="kw">for</span> <span class="ident">line</span> <span class="kw">in</span> <span class="ident">contents</span>.<span class="ident">lines</span>() {
             <span class="kw">let</span> <span class="ident">split</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">line</span>.<span class="ident">split</span>(<span class="string">&#39;\t&#39;</span>).<span class="ident">collect</span>();
-            <span class="kw">if</span> <span class="ident">split</span>[<span class="number">0</span>] <span class="op">=</span><span class="op">=</span> <span class="string">&quot;Threads:&quot;</span> {
+            <span class="kw">if</span> <span class="ident">split</span>[<span class="number">0</span>] <span class="op">==</span> <span class="string">&quot;Threads:&quot;</span> {
                 <span class="kw">let</span> <span class="ident">threads</span> <span class="op">=</span> <span class="ident">split</span>[<span class="number">1</span>].<span class="ident">parse</span>::<span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
                 <span class="kw">if</span> <span class="ident">threads</span> <span class="op">!</span><span class="op">=</span> <span class="number">1</span> {
                     <span class="macro">warn!</span>(<span class="string">&quot;Current process has {} threads, process-wide perf event measurement will only include child threads spawned from this thread&quot;</span>, <span class="ident">threads</span>);
@@ -570,7 +570,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bind_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="ident"><span class="kw">crate</span>::plan::create_mutator</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>)
 }
 
@@ -586,7 +586,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mutator`: A reference to the mutator.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
     <span class="ident">mutator</span>.<span class="ident">flush</span>()
 }
 
@@ -600,12 +600,12 @@
 <span class="doccomment">/// * `offset`: Offset associated with the alignment.</span>
 <span class="doccomment">/// * `semantics`: The allocation semantic required for the allocation.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">size</span>: <span class="ident">usize</span>,
     <span class="ident">align</span>: <span class="ident">usize</span>,
     <span class="ident">offset</span>: <span class="ident">isize</span>,
     <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+) -&gt; <span class="ident">Address</span> {
     <span class="comment">// MMTk has assumptions about minimal object size.</span>
     <span class="comment">// We need to make sure that all allocations comply with the min object size.</span>
     <span class="comment">// Ideally, we check the allocation size, and if it is smaller, we transparently allocate the min</span>
@@ -627,7 +627,7 @@
 <span class="doccomment">/// * `bytes`: The size of the space allocated for the object (in bytes).</span>
 <span class="doccomment">/// * `semantics`: The allocation semantics used for the allocation.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">post_alloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">refer</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">bytes</span>: <span class="ident">usize</span>,
     <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
@@ -644,7 +644,7 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">AllocatorSelector</span> {
+) -&gt; <span class="ident">AllocatorSelector</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">semantics</span>]
 }
 
@@ -656,7 +656,7 @@
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-    <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) {
     <span class="ident">worker</span>.<span class="ident">init</span>(<span class="ident">tls</span>);
@@ -727,7 +727,7 @@
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `name`: The name of the option.</span>
 <span class="doccomment">/// * `value`: The value of the option (as a string).</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">process</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">process</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
     <span class="comment">// Note that currently we cannot process options for setting plan,</span>
     <span class="comment">// as we have set plan when creating an MMTK instance, and processing options is after creating on an instance.</span>
     <span class="comment">// The only way to set plan is to use the env var &#39;MMTK_PLAN&#39;.</span>
@@ -741,7 +741,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">used_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">used_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_pages_used</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
@@ -749,19 +749,19 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_free_pages</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
 <span class="doccomment">/// Return the starting address of the heap. *Note that currently MMTk uses</span>
 <span class="doccomment">/// a fixed address range as heap.*</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">starting_heap_address</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">starting_heap_address</span>() -&gt; <span class="ident">Address</span> {
     <span class="ident">HEAP_START</span>
 }
 
 <span class="doccomment">/// Return the ending address of the heap. *Note that currently MMTk uses</span>
 <span class="doccomment">/// a fixed address range as heap.*</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">last_heap_address</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">last_heap_address</span>() -&gt; <span class="ident">Address</span> {
     <span class="ident">HEAP_END</span>
 }
 
@@ -769,7 +769,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">total_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">total_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_total_pages</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
@@ -786,7 +786,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_live_object</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_live_object</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">object</span>.<span class="ident">is_live</span>()
 }
 
@@ -795,7 +795,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_object</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_object</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">object</span>.<span class="ident">is_mapped</span>()
 }
 
@@ -810,7 +810,7 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `address`: The address to query.</span>
 <span class="comment">// TODO: Do we really need this function? Can a runtime always use is_mapped_object()?</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">address</span>.<span class="ident">is_mapped</span>()
 }
 
@@ -912,7 +912,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_finalized_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_finalized_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
     <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
         <span class="macro">warn!</span>(<span class="string">&quot;get_object_for_finalization() is called when no_finalizer = true&quot;</span>);
     }
@@ -929,7 +929,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_of_workers</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">num_of_workers</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">num_workers</span>()
 }
 
@@ -965,7 +965,7 @@
 
 <span class="doccomment">/// Add a callback to be notified after the transitive closure is finished.</span>
 <span class="doccomment">/// The callback should return true if it add more work packets to the closure bucket.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_closure_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">f</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span><span class="op">&gt;</span>) {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_closure_end</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">f</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span>) {
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">on_closure_end</span>(<span class="ident">f</span>)
 }
 </code></pre></div>

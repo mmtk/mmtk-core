@@ -164,7 +164,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">FinalizableProcessor</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">candidates</span>: <span class="macro">vec!</span>[],
             <span class="ident">nursery_index</span>: <span class="number">0</span>,
@@ -172,32 +172,32 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
         <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">push</span>(<span class="ident">object</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">get_forwarded_finalizable</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(
-        <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>,
+        <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="ident">e</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">return_for_finalize</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(
-        <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>,
+        <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="ident">e</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>, <span class="ident">nursery</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">nursery</span>: <span class="ident">bool</span>) {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">nursery</span> { <span class="self">self</span>.<span class="ident">nursery_index</span> } <span class="kw">else</span> { <span class="number">0</span> };
 
         <span class="comment">// We should go through ready_for_finalize objects and keep them alive.</span>
         <span class="comment">// Unlike candidates, those objects are known to be alive. This means</span>
         <span class="comment">// theoratically we could do the following loop at any time in a GC (not necessarily after closure phase).</span>
         <span class="comment">// But we have to iterate through candidates after closure.</span>
-        <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">append</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">ready_for_finalize</span>);
+        <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">ready_for_finalize</span>);
 
         <span class="kw">for</span> <span class="ident">reff</span> <span class="kw">in</span> <span class="self">self</span>
             .<span class="ident">candidates</span>
@@ -227,14 +227,14 @@
         <span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">E</span> <span class="kw">as</span> <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span><span class="ident">::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::schedule_finalization</span>(<span class="ident">tls</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">e</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">E</span>, <span class="ident">_nursery</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">_nursery</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">candidates</span>
             .<span class="ident">iter_mut</span>()
             .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">reff</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">reff</span> <span class="op">=</span> <span class="ident">FinalizableProcessor::get_forwarded_finalizable</span>(<span class="ident">e</span>, <span class="kw-2">*</span><span class="ident">reff</span>));
         <span class="ident">e</span>.<span class="ident">flush</span>();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ready_object</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ready_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">ready_for_finalize</span>.<span class="ident">pop</span>()
     }
 }
@@ -243,7 +243,7 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Finalization</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Finalization</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">finalizable_processor</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">finalizable_processor</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="macro">debug!</span>(
             <span class="string">&quot;Finalization, {} objects in candidates, {} objects ready to finalize&quot;</span>,
@@ -253,7 +253,7 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">E::new</span>(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, <span class="ident">mmtk</span>);
         <span class="ident">w</span>.<span class="ident">set_worker</span>(<span class="ident">worker</span>);
-        <span class="ident">finalizable_processor</span>.<span class="ident">scan</span>(<span class="ident">worker</span>.<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">w</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="ident">finalizable_processor</span>.<span class="ident">scan</span>(<span class="ident">worker</span>.<span class="ident">tls</span>, <span class="kw-2">&amp;mut</span> <span class="ident">w</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
         <span class="macro">debug!</span>(
             <span class="string">&quot;Finished finalization, {} objects in candidates, {} objects ready to finalize&quot;</span>,
             <span class="ident">finalizable_processor</span>.<span class="ident">candidates</span>.<span class="ident">len</span>(),
@@ -262,7 +262,7 @@
     }
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">Finalization</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span>(<span class="ident">PhantomData</span>)
     }
 }
@@ -271,16 +271,16 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ForwardFinalization</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>);
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ForwardFinalization</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Forward finalization&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">finalizable_processor</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">finalizable_processor</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">w</span> <span class="op">=</span> <span class="ident">E::new</span>(<span class="macro">vec!</span>[], <span class="bool-val">false</span>, <span class="ident">mmtk</span>);
-        <span class="ident">finalizable_processor</span>.<span class="ident">forward</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">w</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="ident">finalizable_processor</span>.<span class="ident">forward</span>(<span class="kw-2">&amp;mut</span> <span class="ident">w</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
         <span class="macro">trace!</span>(<span class="string">&quot;Finished forwarding finlizable&quot;</span>);
     }
 }
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">ForwardFinalization</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span>(<span class="ident">PhantomData</span>)
     }
 }

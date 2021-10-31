@@ -66,7 +66,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `object`: The object reference.</span>
-    <span class="kw">fn</span> <span class="ident">get_referent</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
+    <span class="kw">fn</span> <span class="ident">get_referent</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
 
     <span class="doccomment">/// Set the referent in a reference.</span>
     <span class="doccomment">///</span>
@@ -83,10 +83,10 @@
     <span class="doccomment">/// * `reference`: The address of the reference. This may or may not be the address of a heap object, depending on the VM.</span>
     <span class="doccomment">/// * `tls`: The GC thread that is processing this reference.</span>
     <span class="kw">fn</span> <span class="ident">process_reference</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(
-        <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">T</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">reference</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
+    ) -&gt; <span class="ident">ObjectReference</span>;
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>

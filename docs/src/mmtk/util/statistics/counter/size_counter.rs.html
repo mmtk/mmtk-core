@@ -90,14 +90,14 @@
  * counting the number of events, the other for counting the volume).
  */</span>
 <span class="kw">impl</span> <span class="ident">SizeCounter</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">units</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">volume</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">units</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">volume</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">SizeCounter</span> { <span class="ident">units</span>, <span class="ident">volume</span> }
     }
 
     <span class="doccomment">/**
      * Increment the event counter by provided value
      */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">u64</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">u64</span>) {
         <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
         <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc_by</span>(<span class="ident">size</span>);
     }
@@ -105,7 +105,7 @@
     <span class="doccomment">/**
      * Start this counter
      */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>();
         <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>();
     }
@@ -113,7 +113,7 @@
     <span class="doccomment">/**
      * Stop this counter
      */</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stop</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">units</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>();
         <span class="self">self</span>.<span class="ident">volume</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">stop</span>();
     }

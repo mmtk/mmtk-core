@@ -211,7 +211,7 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GCWorkerLocal</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
 }
 
 <span class="doccomment">/// This struct will be accessed during trace_object(), which is performance critical.</span>
@@ -219,7 +219,7 @@
 <span class="doccomment">/// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorkerLocalPtr</span> {
-    <span class="ident">data</span>: <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">c_void</span>,
+    <span class="ident">data</span>: <span class="kw-2">*mut</span> <span class="ident">c_void</span>,
     <span class="comment">// Save the type name for debug builds, so we can later do type check</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
     <span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
@@ -232,9 +232,9 @@
         <span class="ident">ty</span>: <span class="string">&quot;uninitialized&quot;</span>,
     };
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="ident">worker_local</span>: <span class="ident">W</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="ident">worker_local</span>: <span class="ident">W</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">GCWorkerLocalPtr</span> {
-            <span class="ident">data</span>: <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">worker_local</span>)) <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">c_void</span>,
+            <span class="ident">data</span>: <span class="ident">Box::into_raw</span>(<span class="ident">Box::new</span>(<span class="ident">worker_local</span>)) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">c_void</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
             <span class="ident">ty</span>: <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>(),
         }
@@ -242,10 +242,10 @@
 
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// The user needs to guarantee that the type supplied here is the same type used to create this pointer.</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_type</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span> {
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_type</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">W</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.<span class="ident">ty</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>());
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">data</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">W</span>)
+        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">data</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">W</span>)
     }
 }
 
@@ -274,7 +274,7 @@
         <span class="ident">scheduler</span>: <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,
         <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    ) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">upgrade</span>().<span class="ident">unwrap</span>();
         <span class="self">Self</span> {
             <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread::UNINITIALIZED</span>),
@@ -292,7 +292,7 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">bucket</span>: <span class="ident">WorkBucketStage</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">bucket</span>: <span class="ident">WorkBucketStage</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">is_activated</span>() {
             <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">add_with_priority</span>(<span class="number">1000</span>, <span class="kw">box</span> <span class="ident">work</span>);
             <span class="kw">return</span>;
@@ -304,38 +304,38 @@
     }
 
     <span class="attribute">#[<span class="ident">cold</span>]</span>
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buffer</span> <span class="op">=</span> <span class="ident">Vec::with_capacity</span>(<span class="ident">LOCALLY_CACHED_WORKS</span>);
-        <span class="ident">std::mem::swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">buffer</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>);
+        <span class="ident">std::mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="ident">buffer</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>);
         <span class="kw">for</span> (<span class="ident">bucket</span>, <span class="ident">work</span>) <span class="kw">in</span> <span class="ident">buffer</span> {
             <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">add_with_priority</span>(<span class="number">1000</span>, <span class="ident">work</span>);
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_coordinator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_coordinator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">is_coordinator</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>
     }
 
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// The user needs to guarantee that the type supplied here is the same type used to create this pointer.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">local</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">W</span> {
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">local</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">W</span> {
         <span class="self">self</span>.<span class="ident">local</span>.<span class="ident">as_type</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_local</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="ident">GCWorkerLocalPtr</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_local</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">local</span>: <span class="ident">GCWorkerLocalPtr</span>) {
         <span class="self">self</span>.<span class="ident">local</span> <span class="op">=</span> <span class="ident">local</span>;
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
     }
 
@@ -343,7 +343,7 @@
         <span class="ident">work</span>.<span class="ident">do_work</span>(<span class="self">self</span>, <span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">unwrap</span>());
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">mmtk</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mmtk</span>);
         <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="kw">loop</span> {
@@ -367,7 +367,7 @@
         <span class="ident">workers</span>: <span class="ident">usize</span>,
         <span class="ident">scheduler</span>: <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="ident">Arc::new</span>(<span class="self">Self</span> {
             <span class="ident">workers</span>: (<span class="number">0</span>..<span class="ident">workers</span>)
                 .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">GCWorker::new</span>(<span class="ident">i</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>(), <span class="bool-val">false</span>, <span class="ident">sender</span>.<span class="ident">clone</span>()))
@@ -375,16 +375,16 @@
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">len</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">iter</span>().<span class="ident">filter</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">is_parked</span>()).<span class="ident">count</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">parked_workers</span>() <span class="op">=</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">parked_workers</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn_workers</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {

@@ -40,25 +40,25 @@
 <span class="doccomment">/// specifically implements the unsynchronized thread-local component</span>
 <span class="doccomment">/// (ie the &#39;fast-path&#39;) of the trace mechanism.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">TraceLocal</span>: <span class="ident">TransitiveClosure</span> {
-    <span class="kw">fn</span> <span class="ident">process_roots</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">process_root_edge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>, <span class="ident">untraced</span>: <span class="ident">bool</span>);
-    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span>;
-    <span class="kw">fn</span> <span class="ident">complete_trace</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">process_interior_edge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">ObjectReference</span>, <span class="ident">slot</span>: <span class="ident">Address</span>, <span class="ident">root</span>: <span class="ident">bool</span>);
-    <span class="kw">fn</span> <span class="ident">overwrite_reference_during_trace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">process_roots</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">process_root_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>, <span class="ident">untraced</span>: <span class="ident">bool</span>);
+    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
+    <span class="kw">fn</span> <span class="ident">complete_trace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
+    <span class="kw">fn</span> <span class="ident">process_interior_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">ObjectReference</span>, <span class="ident">slot</span>: <span class="ident">Address</span>, <span class="ident">root</span>: <span class="ident">bool</span>);
+    <span class="kw">fn</span> <span class="ident">overwrite_reference_during_trace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">report_delayed_root_edge</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>);
-    <span class="kw">fn</span> <span class="ident">will_not_move_in_current_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span>;
-    <span class="kw">fn</span> <span class="ident">get_forwarded_reference</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    <span class="kw">fn</span> <span class="ident">report_delayed_root_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>);
+    <span class="kw">fn</span> <span class="ident">will_not_move_in_current_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span>;
+    <span class="kw">fn</span> <span class="ident">get_forwarded_reference</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
     }
-    <span class="kw">fn</span> <span class="ident">get_forwarded_referent</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    <span class="kw">fn</span> <span class="ident">get_forwarded_referent</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>.<span class="ident">get_forwarded_reference</span>(<span class="ident">object</span>)
     }
-    <span class="kw">fn</span> <span class="ident">retain_referent</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    <span class="kw">fn</span> <span class="ident">retain_referent</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
     }
 }

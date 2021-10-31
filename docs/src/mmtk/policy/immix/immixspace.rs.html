@@ -638,17 +638,17 @@
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="self">self</span>.<span class="ident">get_name</span>()
     }
-    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">ForwardingWord::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     }
-    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident"><span class="kw">super</span>::DEFRAG</span>
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
@@ -658,23 +658,23 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>
     }
-    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>) {
+    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>) {
         <span class="self">self</span>
     }
-    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">pr</span>
     }
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>
     }
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
         <span class="ident"><span class="kw">super</span>::validate_features</span>();
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">init</span>(<span class="self">self</span>.<span class="ident">as_space</span>());
     }
-    <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
+    <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
         <span class="macro">panic!</span>(<span class="string">&quot;immixspace only releases pages enmasse&quot;</span>)
     }
 }
@@ -684,7 +684,7 @@
     <span class="kw">const</span> <span class="ident">MARKED_STATE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">1</span>;
 
     <span class="doccomment">/// Get side metadata specs</span>
-    <span class="kw">fn</span> <span class="ident">side_metadata_specs</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">side_metadata_specs</span>() -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span> {
         <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span><span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
             <span class="macro">vec!</span>[
                 <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">Block::DEFRAG_STATE_TABLE</span>),
@@ -707,10 +707,10 @@
         <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">heap</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">HeapMeta</span>,
+        <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
         <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    ) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
             <span class="ident">SpaceOptions</span> {
                 <span class="ident">name</span>,
@@ -746,13 +746,13 @@
     }
 
     <span class="doccomment">/// Get the number of defrag headroom pages.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">defrag_headroom_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">defrag_headroom_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">defrag_headroom_pages</span>(<span class="self">self</span>)
     }
 
     <span class="doccomment">/// Check if current GC is a defrag GC.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_defrag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">in_defrag</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">in_defrag</span>()
     }
 
@@ -764,24 +764,24 @@
         <span class="ident">collection_attempts</span>: <span class="ident">usize</span>,
         <span class="ident">user_triggered_collection</span>: <span class="ident">bool</span>,
         <span class="ident">full_heap_system_gc</span>: <span class="ident">bool</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    ) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">decide_whether_to_defrag</span>(
             <span class="ident">emergency_collection</span>,
             <span class="ident">collect_whole_heap</span>,
             <span class="ident">collection_attempts</span>,
             <span class="ident">user_triggered_collection</span>,
-            <span class="self">self</span>.<span class="ident">reusable_blocks</span>.<span class="ident">len</span>() <span class="op">=</span><span class="op">=</span> <span class="number">0</span>,
+            <span class="self">self</span>.<span class="ident">reusable_blocks</span>.<span class="ident">len</span>() <span class="op">==</span> <span class="number">0</span>,
             <span class="ident">full_heap_system_gc</span>,
         );
         <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">in_defrag</span>()
     }
 
     <span class="doccomment">/// Get work packet scheduler</span>
-    <span class="kw">fn</span> <span class="ident">scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">scheduler</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) {
         <span class="kw">if</span> <span class="ident">major_gc</span> {
             <span class="comment">// Update mark_state</span>
             <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">is_on_side</span>() {
@@ -799,7 +799,7 @@
         <span class="comment">// Prepare each block for GC</span>
         <span class="kw">let</span> <span class="ident">threshold</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">defrag_spill_threshold</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
         <span class="comment">// # Safety: ImmixSpace reference is always valid within this collection cycle.</span>
-        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="self">Self</span>) };
+        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="self">Self</span>) };
         <span class="kw">let</span> <span class="ident">work_packets</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">chunk_map</span>
             .<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> <span class="kw">box</span> <span class="ident">PrepareBlockState</span> {
@@ -824,7 +824,7 @@
 
     <span class="doccomment">/// Release for the immix space. This is called when a GC finished.</span>
     <span class="doccomment">/// Return whether this GC was a defrag GC, as a plan may want to know this.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">major_gc</span>: <span class="ident">bool</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">did_defrag</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">in_defrag</span>();
         <span class="kw">if</span> <span class="ident">major_gc</span> {
             <span class="comment">// Update line_unavail_state for hole searching afte this GC.</span>
@@ -841,7 +841,7 @@
         }
         <span class="comment">// Sweep chunks and blocks</span>
         <span class="comment">// # Safety: ImmixSpace reference is always valid within this collection cycle.</span>
-        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw">const</span> <span class="self">Self</span>) };
+        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="self">Self</span>) };
         <span class="kw">let</span> <span class="ident">work_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">chunk_map</span>.<span class="ident">generate_sweep_tasks</span>(<span class="ident">space</span>);
         <span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">bulk_add</span>(<span class="ident">work_packets</span>);
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::DEFRAG</span> {
@@ -857,7 +857,7 @@
     }
 
     <span class="doccomment">/// Allocate a clean block.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_clean_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">copy</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_clean_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">copy</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">block_address</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">acquire</span>(<span class="ident">tls</span>, <span class="ident">Block::PAGES</span>);
         <span class="kw">if</span> <span class="ident">block_address</span>.<span class="ident">is_zero</span>() {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
@@ -870,7 +870,7 @@
     }
 
     <span class="doccomment">/// Pop a reusable block from the reusable block list.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reusable_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">copy</span>: <span class="ident">bool</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_reusable_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">copy</span>: <span class="ident">bool</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -892,9 +892,9 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fast_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>.<span class="ident">trace_object_without_moving</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
     }
 
@@ -902,11 +902,11 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="macro">debug_assert!</span>(
             <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
@@ -924,9 +924,9 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_without_moving</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">attempt_mark</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) {
             <span class="comment">// Mark block and lines</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
@@ -947,11 +947,11 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_with_opportunistic_copy</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="kw">let</span> <span class="ident">forwarding_status</span> <span class="op">=</span> <span class="ident">ForwardingWord::attempt_to_forward</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="kw">if</span> <span class="ident">ForwardingWord::state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_status</span>) {
@@ -992,7 +992,7 @@
 
     <span class="doccomment">/// Atomically mark an object.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">attempt_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">mark_state</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">attempt_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">mark_state</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
                 <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
@@ -1000,7 +1000,7 @@
                 <span class="prelude-val">None</span>,
                 <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
             ) <span class="kw">as</span> <span class="ident">u8</span>;
-            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">=</span><span class="op">=</span> <span class="ident">mark_state</span> {
+            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">==</span> <span class="ident">mark_state</span> {
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
 
@@ -1021,19 +1021,19 @@
 
     <span class="doccomment">/// Check if an object is marked.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_marked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">mark_state</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_marked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">mark_state</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
             <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
             <span class="ident">object</span>,
             <span class="prelude-val">None</span>,
             <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
         ) <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="ident">old_value</span> <span class="op">=</span><span class="op">=</span> <span class="ident">mark_state</span>
+        <span class="ident">old_value</span> <span class="op">==</span> <span class="ident">mark_state</span>
     }
 
     <span class="doccomment">/// Check if an object is pinned.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_pinned</span>(<span class="ident">_object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_pinned</span>(<span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="comment">// TODO(wenyuzhao): Object pinning not supported yet.</span>
         <span class="bool-val">false</span>
     }
@@ -1045,7 +1045,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// Returns None if the search could not find any more holes.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_next_available_lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">search_start</span>: <span class="ident">Line</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_next_available_lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">search_start</span>: <span class="ident">Line</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="kw">let</span> <span class="ident">unavail_state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">line_unavail_state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
         <span class="kw">let</span> <span class="ident">current_state</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">line_mark_state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>);
@@ -1061,14 +1061,14 @@
             }
             <span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
-        <span class="kw">if</span> <span class="ident">cursor</span> <span class="op">=</span><span class="op">=</span> <span class="ident">mark_data</span>.<span class="ident">len</span>() {
+        <span class="kw">if</span> <span class="ident">cursor</span> <span class="op">==</span> <span class="ident">mark_data</span>.<span class="ident">len</span>() {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Line::forward</span>(<span class="ident">search_start</span>, <span class="ident">cursor</span> <span class="op">-</span> <span class="ident">start_cursor</span>);
         <span class="comment">// Find limit</span>
         <span class="kw">while</span> <span class="ident">cursor</span> <span class="op">&lt;</span> <span class="ident">mark_data</span>.<span class="ident">len</span>() {
             <span class="kw">let</span> <span class="ident">mark</span> <span class="op">=</span> <span class="ident">mark_data</span>.<span class="ident">get</span>(<span class="ident">cursor</span>);
-            <span class="kw">if</span> <span class="ident">mark</span> <span class="op">=</span><span class="op">=</span> <span class="ident">unavail_state</span> <span class="op">|</span><span class="op">|</span> <span class="ident">mark</span> <span class="op">=</span><span class="op">=</span> <span class="ident">current_state</span> {
+            <span class="kw">if</span> <span class="ident">mark</span> <span class="op">==</span> <span class="ident">unavail_state</span> <span class="op">|</span><span class="op">|</span> <span class="ident">mark</span> <span class="op">==</span> <span class="ident">current_state</span> {
                 <span class="kw">break</span>;
             }
             <span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
@@ -1100,7 +1100,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">PrepareBlockState</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="ident">defrag_threshold</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">defrag_threshold</span>.<span class="ident">unwrap_or</span>(<span class="number">0</span>);
         <span class="comment">// Clear object mark table for this chunk</span>
         <span class="ident"><span class="self">Self</span>::reset_object_mark</span>(<span class="self">self</span>.<span class="ident">chunk</span>);
@@ -1108,7 +1108,7 @@
         <span class="kw">for</span> <span class="ident">block</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">blocks</span>() {
             <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">get_state</span>();
             <span class="comment">// Skip unallocated blocks.</span>
-            <span class="kw">if</span> <span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BlockState::Unallocated</span> {
+            <span class="kw">if</span> <span class="ident">state</span> <span class="op">==</span> <span class="ident">BlockState::Unallocated</span> {
                 <span class="kw">continue</span>;
             }
             <span class="comment">// Check if this block needs to be defragmented.</span>
@@ -1138,7 +1138,7 @@
         <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
         <span class="ident">concurrent</span>: <span class="ident">bool</span>,
         <span class="ident">immix_space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">Edges::VM</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    ) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">buffer</span>,
             <span class="ident">concurrent</span>,
@@ -1148,12 +1148,12 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ScanObjectsAndMarkLines</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;ScanObjectsAndMarkLines&quot;</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">closure</span> <span class="op">=</span> <span class="ident">ObjectsClosure</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mmtk</span>, <span class="macro">vec!</span>[], <span class="ident">worker</span>);
         <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">buffer</span> {
             <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::scan_object</span>(
-                <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">closure</span>,
+                <span class="kw-2">&amp;mut</span> <span class="ident">closure</span>,
                 <span class="kw-2">*</span><span class="ident">object</span>,
                 <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread::UNINITIALIZED</span>),
             );

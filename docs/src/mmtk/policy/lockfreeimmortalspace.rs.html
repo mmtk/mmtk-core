@@ -204,17 +204,17 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SFT</span> <span class="kw">for</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">str</span> {
         <span class="self">self</span>.<span class="ident">get_name</span>()
     }
-    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">unimplemented!</span>()
     }
-    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">unimplemented!</span>()
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">unimplemented!</span>()
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
@@ -224,24 +224,24 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>
     }
-    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>) {
+    <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>) {
         <span class="self">self</span>
     }
-    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="macro">unimplemented!</span>()
     }
-    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="macro">unimplemented!</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
+    <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
         <span class="macro">panic!</span>(<span class="string">&quot;immortalspace only releases pages enmasse&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
+    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
         <span class="kw">let</span> <span class="ident">total_pages</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::global</span>()
             .<span class="ident">base</span>()
             .<span class="ident">heap</span>
@@ -269,14 +269,14 @@
         <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="ident">AVAILABLE_START</span>, <span class="ident">total_bytes</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)) };
         <span class="kw">let</span> <span class="ident">data_pages</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="ident">cursor</span>);
         <span class="kw">let</span> <span class="ident">meta_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">metadata</span>.<span class="ident">calculate_reserved_pages</span>(<span class="ident">data_pages</span>);
         <span class="ident">data_pages</span> <span class="op">+</span> <span class="ident">meta_pages</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">pages</span>);
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">fetch_add</span>(<span class="ident">bytes</span>, <span class="ident">Ordering::Relaxed</span>)) };
         <span class="kw">if</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">limit</span> {
@@ -292,13 +292,13 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// We have to override the default implementation because</span>
     <span class="doccomment">/// LockFreeImmortalSpace doesn&#39;t have a common space</span>
-    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
+    <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {
         <span class="string">&quot;LockFreeImmortalSpace&quot;</span>
     }
 
     <span class="doccomment">/// We have to override the default implementation because</span>
     <span class="doccomment">/// LockFreeImmortalSpace doesn&#39;t put metadata in a common space</span>
-    <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">SideMetadataSanity</span>) {
+    <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SideMetadataSanity</span>) {
         <span class="ident">side_metadata_sanity_checker</span>
             .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">metadata</span>)
     }
@@ -310,7 +310,7 @@
         <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
         <span class="ident">slow_path_zeroing</span>: <span class="ident">bool</span>,
         <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    ) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">name</span>,
             <span class="ident">cursor</span>: <span class="ident">AtomicUsize::new</span>(<span class="ident">AVAILABLE_START</span>.<span class="ident">as_usize</span>()),

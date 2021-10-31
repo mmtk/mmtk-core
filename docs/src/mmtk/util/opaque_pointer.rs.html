@@ -66,26 +66,26 @@
 <span class="comment">// This is done by transmute (unsafe).</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OpaquePointer</span>(<span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">c_void</span>);
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">OpaquePointer</span>(<span class="kw-2">*mut</span> <span class="ident">c_void</span>);
 
 <span class="comment">// We never really dereference an opaque pointer in mmtk-core.</span>
 <span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">OpaquePointer</span> {}
 <span class="kw">unsafe</span> <span class="kw">impl</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">OpaquePointer</span> {}
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">OpaquePointer</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::UNINITIALIZED</span>
     }
 }
 
 <span class="kw">impl</span> <span class="ident">OpaquePointer</span> {
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNINITIALIZED</span>: <span class="self">Self</span> <span class="op">=</span> <span class="self">Self</span>(<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*</span><span class="kw-2">mut</span> <span class="ident">c_void</span>);
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNINITIALIZED</span>: <span class="self">Self</span> <span class="op">=</span> <span class="self">Self</span>(<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">c_void</span>);
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_address</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_address</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">OpaquePointer</span>(<span class="ident">addr</span>.<span class="ident">to_mut_ptr</span>::<span class="op">&lt;</span><span class="ident">c_void</span><span class="op">&gt;</span>())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_null</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_null</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">is_null</span>()
     }
 }

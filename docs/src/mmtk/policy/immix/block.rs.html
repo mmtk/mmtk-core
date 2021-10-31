@@ -401,31 +401,31 @@
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">BlockState</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">u8</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">u8</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident"><span class="self">Self</span>::MARK_UNALLOCATED</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::Unallocated</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_UNMARKED</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::Unmarked</span>,
-            <span class="ident"><span class="self">Self</span>::MARK_MARKED</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::Marked</span>,
-            <span class="ident">unavailable_lines</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> },
+            <span class="ident"><span class="self">Self</span>::MARK_UNALLOCATED</span> =&gt; <span class="ident">BlockState::Unallocated</span>,
+            <span class="ident"><span class="self">Self</span>::MARK_UNMARKED</span> =&gt; <span class="ident">BlockState::Unmarked</span>,
+            <span class="ident"><span class="self">Self</span>::MARK_MARKED</span> =&gt; <span class="ident">BlockState::Marked</span>,
+            <span class="ident">unavailable_lines</span> =&gt; <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> },
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">BlockState</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">u8</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">BlockState</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">state</span>: <span class="ident">BlockState</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">match</span> <span class="ident">state</span> {
-            <span class="ident">BlockState::Unallocated</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::MARK_UNALLOCATED</span>,
-            <span class="ident">BlockState::Unmarked</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::MARK_UNMARKED</span>,
-            <span class="ident">BlockState::Marked</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">BlockState::MARK_MARKED</span>,
-            <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">unavailable_lines</span>,
+            <span class="ident">BlockState::Unallocated</span> =&gt; <span class="ident">BlockState::MARK_UNALLOCATED</span>,
+            <span class="ident">BlockState::Unmarked</span> =&gt; <span class="ident">BlockState::MARK_UNMARKED</span>,
+            <span class="ident">BlockState::Marked</span> =&gt; <span class="ident">BlockState::MARK_MARKED</span>,
+            <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> } =&gt; <span class="ident">unavailable_lines</span>,
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">BlockState</span> {
     <span class="doccomment">/// Test if the block is reuasable.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_reusable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">is_reusable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">BlockState::Reusable</span> { .. })
     }
 }
@@ -458,14 +458,14 @@
         <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK</span>;
 
     <span class="doccomment">/// Align the address to a block boundary.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
         <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
     }
 
     <span class="doccomment">/// Get the block from a given address.</span>
     <span class="doccomment">/// The address must be block-aligned.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
         <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
         <span class="self">Self</span>(<span class="ident">address</span>)
     }
@@ -473,37 +473,37 @@
     <span class="doccomment">/// Get the block containing the given address.</span>
     <span class="doccomment">/// The input address does not need to be aligned.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">containing</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">containing</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span>(<span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>).<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>))
     }
 
     <span class="doccomment">/// Get block start address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="number">0</span>
     }
 
     <span class="doccomment">/// Get block end address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="number">0</span>.<span class="ident">add</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
     }
 
     <span class="doccomment">/// Get the chunk containing the block.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Chunk</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Chunk</span> {
         <span class="ident">Chunk::from</span>(<span class="ident">Chunk::align</span>(<span class="self">self</span>.<span class="number">0</span>))
     }
 
     <span class="doccomment">/// Get the address range of the block&#39;s line mark table.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">line_mark_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MetadataByteArrayRef</span><span class="op">&lt;</span>{ <span class="ident">Block::LINES</span> }<span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">line_mark_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MetadataByteArrayRef</span><span class="op">&lt;</span>{ <span class="ident">Block::LINES</span> }<span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="ident">MetadataByteArrayRef</span>::<span class="op">&lt;</span>{ <span class="ident">Block::LINES</span> }<span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="ident">Line::MARK_TABLE</span>, <span class="self">self</span>.<span class="ident">start</span>(), <span class="ident"><span class="self">Self</span>::BYTES</span>)
     }
 
     <span class="doccomment">/// Get block mark state.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">BlockState</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_state</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">BlockState</span> {
         <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span>
             <span class="ident">side_metadata::load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::MARK_TABLE</span>, <span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>) <span class="kw">as</span> <span class="ident">u8</span>;
         <span class="ident">byte</span>.<span class="ident">into</span>()
@@ -522,12 +522,12 @@
 
     <span class="doccomment">/// Test if the block is marked for defragmentation.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_defrag_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_defrag_source</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span>
             <span class="ident">side_metadata::load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>, <span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>)
                 <span class="kw">as</span> <span class="ident">u8</span>;
-        <span class="macro">debug_assert!</span>(<span class="ident">byte</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">byte</span> <span class="op">=</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>);
-        <span class="ident">byte</span> <span class="op">=</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>
+        <span class="macro">debug_assert!</span>(<span class="ident">byte</span> <span class="op">==</span> <span class="number">0</span> <span class="op">|</span><span class="op">|</span> <span class="ident">byte</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>);
+        <span class="ident">byte</span> <span class="op">==</span> <span class="ident"><span class="self">Self</span>::DEFRAG_SOURCE_STATE</span>
     }
 
     <span class="doccomment">/// Mark the block for defragmentation.</span>
@@ -555,7 +555,7 @@
 
     <span class="doccomment">/// Get the number of holes.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_holes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_holes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span>
             <span class="ident">side_metadata::load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::DEFRAG_STATE_TABLE</span>, <span class="self">self</span>.<span class="ident">start</span>(), <span class="ident">Ordering::SeqCst</span>)
                 <span class="kw">as</span> <span class="ident">u8</span>;
@@ -585,7 +585,7 @@
     <span class="doccomment">/// Get the range of lines within the block.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">start</span>())..<span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">end</span>())
     }
@@ -596,22 +596,22 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">mark_histogram</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Histogram</span>,
+        <span class="ident">mark_histogram</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Histogram</span>,
         <span class="ident">line_mark_state</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    ) -&gt; <span class="ident">bool</span> {
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
             <span class="kw">match</span> <span class="self">self</span>.<span class="ident">get_state</span>() {
-                <span class="ident">BlockState::Unallocated</span> <span class="op">=</span><span class="op">&gt;</span> <span class="bool-val">false</span>,
-                <span class="ident">BlockState::Unmarked</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">BlockState::Unallocated</span> =&gt; <span class="bool-val">false</span>,
+                <span class="ident">BlockState::Unmarked</span> =&gt; {
                     <span class="comment">// Release the block if it is allocated but not marked by the current GC.</span>
                     <span class="ident">space</span>.<span class="ident">release_block</span>(<span class="kw-2">*</span><span class="self">self</span>);
                     <span class="bool-val">true</span>
                 }
-                <span class="ident">BlockState::Marked</span> <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="ident">BlockState::Marked</span> =&gt; {
                     <span class="comment">// The block is live.</span>
                     <span class="bool-val">false</span>
                 }
-                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
+                <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
             }
         } <span class="kw">else</span> {
             <span class="comment">// Calculate number of marked lines and holes.</span>
@@ -632,7 +632,7 @@
                 }
             }
 
-            <span class="kw">if</span> <span class="ident">marked_lines</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+            <span class="kw">if</span> <span class="ident">marked_lines</span> <span class="op">==</span> <span class="number">0</span> {
                 <span class="comment">// Release the block if non of its lines are marked.</span>
                 <span class="ident">space</span>.<span class="ident">release_block</span>(<span class="kw-2">*</span><span class="self">self</span>);
                 <span class="bool-val">true</span>
@@ -662,7 +662,7 @@
     <span class="doccomment">/// Get the number of blocks between the given two blocks.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">steps_between</span>(<span class="ident">start</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">end</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">steps_between</span>(<span class="ident">start</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">end</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="kw">if</span> <span class="ident">start</span> <span class="op">&gt;</span> <span class="ident">end</span> {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
@@ -671,12 +671,12 @@
     }
     <span class="doccomment">/// result = block_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">forward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
     }
     <span class="doccomment">/// result = block_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">forward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&gt;</span> <span class="ident">usize::MAX</span> <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -684,12 +684,12 @@
     }
     <span class="doccomment">/// result = block_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">backward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
     }
     <span class="doccomment">/// result = block_address - count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">backward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&lt;</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -706,7 +706,7 @@
 <span class="kw">impl</span> <span class="ident">BlockList</span> {
     <span class="doccomment">/// Get number of blocks in this list.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>().<span class="ident">len</span>()
     }
 
@@ -718,7 +718,7 @@
 
     <span class="doccomment">/// Pop a block out of the list.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>().<span class="ident">pop</span>()
     }
 
@@ -730,7 +730,7 @@
 
     <span class="doccomment">/// Get an array of all reusable blocks stored in this BlockList.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>()
     }
 }

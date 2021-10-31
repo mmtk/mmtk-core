@@ -238,8 +238,8 @@
 <span class="kw">impl</span> <span class="ident">SpaceDescriptor</span> {
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNINITIALIZED</span>: <span class="self">Self</span> <span class="op">=</span> <span class="ident">SpaceDescriptor</span>(<span class="number">0</span>);
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_descriptor_from_heap_range</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SpaceDescriptor</span> {
-        <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">end</span> <span class="op">=</span><span class="op">=</span> <span class="ident">vm_layout_constants::HEAP_END</span>;
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_descriptor_from_heap_range</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">end</span>: <span class="ident">Address</span>) -&gt; <span class="ident">SpaceDescriptor</span> {
+        <span class="kw">let</span> <span class="ident">top</span> <span class="op">=</span> <span class="ident">end</span> <span class="op">==</span> <span class="ident">vm_layout_constants::HEAP_END</span>;
         <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="kw">let</span> <span class="ident">space_index</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">start</span> <span class="op">&gt;</span> <span class="ident">vm_layout_constants::HEAP_END</span> {
                 <span class="ident">::std::usize::MAX</span>
@@ -259,12 +259,12 @@
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">start</span>.<span class="ident">is_zero</span>() <span class="op">&amp;&amp;</span> <span class="ident">chunks</span> <span class="op">&gt;</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">chunks</span> <span class="op">&lt;</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">SIZE_BITS</span>));
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">BASE_EXPONENT</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">exponent</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">while</span> (<span class="ident">tmp</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>) <span class="op">&amp;&amp;</span> ((<span class="ident">tmp</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="op">=</span><span class="op">=</span> <span class="number">0</span>) {
+        <span class="kw">while</span> (<span class="ident">tmp</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span>) <span class="op">&amp;&amp;</span> ((<span class="ident">tmp</span> <span class="op">&amp;</span> <span class="number">1</span>) <span class="op">==</span> <span class="number">0</span>) {
             <span class="ident">tmp</span> <span class="op">&gt;</span><span class="op">&gt;</span><span class="op">=</span> <span class="number">1</span>;
             <span class="ident">exponent</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
         }
         <span class="kw">let</span> <span class="ident">mantissa</span> <span class="op">=</span> <span class="ident">tmp</span>;
-        <span class="macro">debug_assert!</span>((<span class="ident">tmp</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">BASE_EXPONENT</span> <span class="op">+</span> <span class="ident">exponent</span>)) <span class="op">=</span><span class="op">=</span> <span class="ident">start</span>.<span class="ident">as_usize</span>());
+        <span class="macro">debug_assert!</span>((<span class="ident">tmp</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">BASE_EXPONENT</span> <span class="op">+</span> <span class="ident">exponent</span>)) <span class="op">==</span> <span class="ident">start</span>.<span class="ident">as_usize</span>());
         <span class="ident">SpaceDescriptor</span>(
             (<span class="ident">mantissa</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">MANTISSA_SHIFT</span>)
                 <span class="op">|</span> (<span class="ident">exponent</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">EXPONENT_SHIFT</span>)
@@ -277,7 +277,7 @@
         )
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_descriptor</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="ident">SpaceDescriptor</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_descriptor</span>() -&gt; <span class="ident">SpaceDescriptor</span> {
         <span class="kw">let</span> <span class="ident">next</span> <span class="op">=</span>
             <span class="ident">DISCONTIGUOUS_SPACE_INDEX</span>.<span class="ident">fetch_add</span>(<span class="ident">DISCONTIG_INDEX_INCREMENT</span>, <span class="ident">Ordering::Relaxed</span>);
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">SpaceDescriptor</span>(<span class="ident">next</span>);
@@ -285,26 +285,26 @@
         <span class="ident">ret</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="number">0</span> <span class="op">=</span><span class="op">=</span> <span class="ident">SpaceDescriptor::UNINITIALIZED</span>.<span class="number">0</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="number">0</span> <span class="op">==</span> <span class="ident">SpaceDescriptor::UNINITIALIZED</span>.<span class="number">0</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_contiguous</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">TYPE_CONTIGUOUS</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">TYPE_CONTIGUOUS</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_contiguous</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">TYPE_CONTIGUOUS</span>) <span class="op">==</span> <span class="ident">TYPE_CONTIGUOUS</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_contiguous_hi</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-        (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">TYPE_MASK</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">TYPE_CONTIGUOUS_HI</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_contiguous_hi</span>(<span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">TYPE_MASK</span>) <span class="op">==</span> <span class="ident">TYPE_CONTIGUOUS_HI</span>
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_start</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_start</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_parameters</span>;
         <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="ident">get_index</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">heap_parameters::LOG_SPACE_SIZE_64</span>) }
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_start</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_start</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">is_contiguous</span>());
 
         <span class="kw">let</span> <span class="ident">descriptor</span> <span class="op">=</span> <span class="self">self</span>.<span class="number">0</span>;
@@ -314,19 +314,19 @@
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_extent</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_extent</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="ident">vm_layout_constants::SPACE_SIZE_64</span>
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_extent</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_extent</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">is_contiguous</span>());
         <span class="kw">let</span> <span class="ident">chunks</span> <span class="op">=</span> (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">SIZE_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">SIZE_SHIFT</span>;
         <span class="ident">chunks</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">vm_layout_constants::LOG_BYTES_IN_CHUNK</span>
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_index</span>(<span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_index</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         (<span class="self">self</span>.<span class="number">0</span> <span class="op">&amp;</span> <span class="ident">INDEX_MASK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">INDEX_SHIFT</span>
     }
 }

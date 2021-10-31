@@ -122,7 +122,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">std::fmt::Debug</span> <span class="kw">for</span> <span class="ident">TreadMill</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std::fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
         <span class="ident">f</span>.<span class="ident">debug_struct</span>(<span class="string">&quot;TreadMill&quot;</span>)
             .<span class="ident">field</span>(<span class="string">&quot;from&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">from_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>())
             .<span class="ident">field</span>(<span class="string">&quot;to&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">to_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>())
@@ -133,7 +133,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">TreadMill</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="ident">TreadMill</span> {
             <span class="ident">from_space</span>: <span class="ident">Mutex::new</span>(<span class="ident">HashSet::new</span>()),
             <span class="ident">to_space</span>: <span class="ident">Mutex::new</span>(<span class="ident">HashSet::new</span>()),
@@ -152,7 +152,7 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">collect_nursery</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">vals</span> <span class="op">=</span> <span class="ident">guard</span>.<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">collect</span>();
         <span class="ident">guard</span>.<span class="ident">clear</span>();
@@ -160,7 +160,7 @@
         <span class="ident">vals</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collect</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">from_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="ident">vals</span> <span class="op">=</span> <span class="ident">guard</span>.<span class="ident">iter</span>().<span class="ident">copied</span>().<span class="ident">collect</span>();
         <span class="ident">guard</span>.<span class="ident">clear</span>();
@@ -191,30 +191,30 @@
         <span class="self">self</span>.<span class="ident">to_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">insert</span>(<span class="ident">cell</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_space_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_space_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">to_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">is_empty</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_space_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_space_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">from_space</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">is_empty</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">nursery_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">nursery_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">collect_nursery</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">is_empty</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flip</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
-        <span class="ident">swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">alloc_nursery</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">collect_nursery</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flip</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
+        <span class="ident">swap</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">alloc_nursery</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">collect_nursery</span>);
         <span class="comment">// println!(&quot;an &lt;-&gt; cn&quot;);</span>
         <span class="kw">if</span> <span class="ident">full_heap</span> {
-            <span class="ident">swap</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">from_space</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="ident">to_space</span>);
+            <span class="ident">swap</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">from_space</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">to_space</span>);
             <span class="comment">// println!(&quot;fs &lt;-&gt; ts&quot;);</span>
         }
     }
 }
 
 <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">TreadMill</span> {
-    <span class="kw">fn</span> <span class="ident">default</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::new</span>()
     }
 }

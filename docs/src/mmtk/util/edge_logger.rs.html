@@ -59,7 +59,7 @@
 }
 
 <span class="doccomment">/// Whether we should check duplicate edges. This depends on the actual plan.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_check_duplicate_edges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_check_duplicate_edges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
     <span class="comment">// If a plan allows tracing duplicate edges, we should not run this check.</span>
     <span class="op">!</span><span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">may_trace_duplicate_edges</span>
 }

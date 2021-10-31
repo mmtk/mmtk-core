@@ -726,7 +726,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">fmt::Debug</span> <span class="kw">for</span> <span class="ident">HeaderMetadataSpec</span> {
-    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">fmt::Result</span> {
+    <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">fmt::Result</span> {
         <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(
             <span class="string">&quot;HeaderMetadataSpec {{ \
             **bit_offset: 0x{:x} \
@@ -744,14 +744,14 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="macro">debug_assert!</span>(<span class="ident">optional_mask</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">8</span>,<span class="string">&quot;optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})&quot;</span>, <span class="ident">metadata_spec</span>);
 
     <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required</span>
     <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="ident">BITS_IN_BYTE</span> {
         <span class="macro">debug_assert!</span>(
             (<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>)
-                <span class="op">=</span><span class="op">=</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
+                <span class="op">==</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
                     <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>),
             <span class="string">&quot;Metadata &lt;&lt; 8-bits: ({:?}) stretches over two bytes!&quot;</span>,
             <span class="ident">metadata_spec</span>
@@ -769,7 +769,7 @@
         };
 
         ((<span class="ident">byte_val</span> <span class="op">&amp;</span> <span class="ident">mask</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">bit_shift</span>) <span class="kw">as</span> <span class="ident">usize</span>
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BITS_IN_BYTE</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="ident">BITS_IN_BYTE</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span>.<span class="ident">into</span>(),
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be byte aligned!&quot;</span>,
@@ -786,7 +786,7 @@
                 (<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">byte_offset</span>).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>().<span class="ident">into</span>()
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BIT_IN_U16</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="ident">BIT_IN_U16</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U16</span>,
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!&quot;</span>,
@@ -803,7 +803,7 @@
                 (<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">u16_offset</span>).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>().<span class="ident">into</span>()
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BITS_IN_U32</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="ident">BITS_IN_U32</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U32</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -818,7 +818,7 @@
                 (<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">u32_offset</span>).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u32</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">usize</span>
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BITS_IN_WORD</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="ident">BITS_IN_WORD</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_WORD</span>,
             <span class="string">&quot;Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!&quot;</span>,
@@ -861,7 +861,7 @@
     <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             (<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>)
-                <span class="op">=</span><span class="op">=</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
+                <span class="op">==</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
                     <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>),
             <span class="string">&quot;Metadata &lt;&lt; 8-bits: ({:?}) stretches over two bytes!&quot;</span>,
             <span class="ident">metadata_spec</span>
@@ -892,7 +892,7 @@
                 <span class="ident">byte_addr</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">new_byte_val</span>);
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">8</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span>.<span class="ident">into</span>(),
             <span class="string">&quot;Metadata 8-bits: ({:?}) bit_offset must be byte-aligned!&quot;</span>,
@@ -929,7 +929,7 @@
                 <span class="ident">byte_addr</span>.<span class="ident">store</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u8</span>);
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">16</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">16</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U16</span>,
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!&quot;</span>,
@@ -967,7 +967,7 @@
                 <span class="ident">u16_addr</span>.<span class="ident">store</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u16</span>);
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">32</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">32</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U32</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -1005,7 +1005,7 @@
                 <span class="ident">u32_addr</span>.<span class="ident">store</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u32</span>);
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">64</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">64</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_WORD</span>,
             <span class="string">&quot;Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!&quot;</span>,
@@ -1060,12 +1060,12 @@
     <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
     <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
     <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+) -&gt; <span class="ident">bool</span> {
     <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required</span>
     <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             (<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span> <span class="kw">as</span> <span class="ident">isize</span>)
-                <span class="op">=</span><span class="op">=</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
+                <span class="op">==</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
                     <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>),
             <span class="string">&quot;Metadata &lt;&lt; 8-bits: ({:?}) stretches over two bytes!&quot;</span>,
             <span class="ident">metadata_spec</span>
@@ -1090,7 +1090,7 @@
                 )
                 .<span class="ident">is_ok</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">8</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span>.<span class="ident">into</span>(),
             <span class="string">&quot;Metadata 8-bits: ({:?}) bit_offset must be byte-aligned!&quot;</span>,
@@ -1118,7 +1118,7 @@
                 )
                 .<span class="ident">is_ok</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">16</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">16</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U16</span>,
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!&quot;</span>,
@@ -1146,7 +1146,7 @@
                 )
                 .<span class="ident">is_ok</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">32</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">32</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U32</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -1174,7 +1174,7 @@
                 )
                 .<span class="ident">is_ok</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">64</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">64</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_WORD</span>,
             <span class="string">&quot;Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!&quot;</span>,
@@ -1214,12 +1214,12 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required</span>
     <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             (<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>)
-                <span class="op">=</span><span class="op">=</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
+                <span class="op">==</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
                     <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>),
             <span class="string">&quot;Metadata &lt;&lt; 8-bits: ({:?}) stretches over two bytes!&quot;</span>,
             <span class="ident">metadata_spec</span>
@@ -1245,7 +1245,7 @@
                 }
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">8</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span>.<span class="ident">into</span>(),
             <span class="string">&quot;Metadata 8-bits: ({:?}) bit_offset must be byte-aligned!&quot;</span>,
@@ -1258,7 +1258,7 @@
                 .<span class="ident">fetch_add</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u8</span>, <span class="ident">order</span>)
                 .<span class="ident">into</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">16</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">16</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U16</span>,
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!&quot;</span>,
@@ -1271,7 +1271,7 @@
                 .<span class="ident">fetch_add</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u16</span>, <span class="ident">order</span>)
                 .<span class="ident">into</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">32</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">32</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U32</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -1283,7 +1283,7 @@
             (<span class="kw-2">*</span>(<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">u32_offset</span>).<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">AtomicU32</span><span class="op">&gt;</span>()).<span class="ident">fetch_add</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="ident">order</span>)
                 <span class="kw">as</span> <span class="ident">usize</span>
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">64</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">64</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_WORD</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -1306,12 +1306,12 @@
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">val</span>: <span class="ident">usize</span>,
     <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+) -&gt; <span class="ident">usize</span> {
     <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required</span>
     <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             (<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>)
-                <span class="op">=</span><span class="op">=</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
+                <span class="op">==</span> ((<span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span> <span class="op">+</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="kw">as</span> <span class="ident">isize</span> <span class="op">-</span> <span class="number">1</span>)
                     <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>),
             <span class="string">&quot;Metadata &lt;&lt; 8-bits: ({:?}) stretches over two bytes!&quot;</span>,
             <span class="ident">metadata_spec</span>
@@ -1337,7 +1337,7 @@
                 }
             }
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">8</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">8</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_BYTE</span>.<span class="ident">into</span>(),
             <span class="string">&quot;Metadata 8-bits: ({:?}) bit_offset must be byte-aligned!&quot;</span>,
@@ -1350,7 +1350,7 @@
                 .<span class="ident">fetch_sub</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u8</span>, <span class="ident">order</span>)
                 .<span class="ident">into</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">16</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">16</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U16</span>,
             <span class="string">&quot;Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!&quot;</span>,
@@ -1363,7 +1363,7 @@
                 .<span class="ident">fetch_sub</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u16</span>, <span class="ident">order</span>)
                 .<span class="ident">into</span>()
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">32</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">32</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_U32</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,
@@ -1375,7 +1375,7 @@
             (<span class="kw-2">*</span>(<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">u32_offset</span>).<span class="ident">to_ptr</span>::<span class="op">&lt;</span><span class="ident">AtomicU32</span><span class="op">&gt;</span>()).<span class="ident">fetch_sub</span>(<span class="ident">val</span> <span class="kw">as</span> <span class="ident">u32</span>, <span class="ident">order</span>)
                 <span class="kw">as</span> <span class="ident">usize</span>
         }
-    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">=</span><span class="op">=</span> <span class="number">64</span> {
+    } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">metadata_spec</span>.<span class="ident">num_of_bits</span> <span class="op">==</span> <span class="number">64</span> {
         <span class="macro">debug_assert!</span>(
             <span class="ident">metadata_spec</span>.<span class="ident">bit_offset</span>.<span class="ident">trailing_zeros</span>() <span class="kw">as</span> <span class="ident">usize</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">LOG_BITS_IN_WORD</span>,
             <span class="string">&quot;Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!&quot;</span>,

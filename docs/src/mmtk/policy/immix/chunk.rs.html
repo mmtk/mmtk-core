@@ -253,33 +253,33 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BLOCKS</span>;
 
     <span class="doccomment">/// Align the give address to the chunk boundary.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
         <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
     }
 
     <span class="doccomment">/// Get the chunk from a given address.</span>
     <span class="doccomment">/// The address must be chunk-aligned.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
         <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
         <span class="self">Self</span>(<span class="ident">address</span>)
     }
 
     <span class="doccomment">/// Get chunk start address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="number">0</span>
     }
 
     <span class="doccomment">/// Get a range of blocks within this chunk.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">Block::from</span>(<span class="ident">Block::align</span>(<span class="self">self</span>.<span class="number">0</span>));
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">Block::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident"><span class="self">Self</span>::BLOCKS</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">Block::LOG_BYTES</span>));
         <span class="ident">start</span>..<span class="ident">end</span>
     }
 
     <span class="doccomment">/// Sweep this chunk.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mark_histogram</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Histogram</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">sweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mark_histogram</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Histogram</span>) {
         <span class="kw">let</span> <span class="ident">line_mark_state</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
             <span class="prelude-val">None</span>
         } <span class="kw">else</span> {
@@ -298,7 +298,7 @@
             }
         }
         <span class="comment">// Set this chunk as free if there is not live blocks.</span>
-        <span class="kw">if</span> <span class="ident">allocated_blocks</span> <span class="op">=</span><span class="op">=</span> <span class="number">0</span> {
+        <span class="kw">if</span> <span class="ident">allocated_blocks</span> <span class="op">==</span> <span class="number">0</span> {
             <span class="ident">space</span>.<span class="ident">chunk_map</span>.<span class="ident">set</span>(<span class="kw-2">*</span><span class="self">self</span>, <span class="ident">ChunkState::Free</span>)
         }
     }
@@ -307,7 +307,7 @@
 <span class="kw">impl</span> <span class="ident">Step</span> <span class="kw">for</span> <span class="ident">Chunk</span> {
     <span class="doccomment">/// Get the number of chunks between the given two chunks.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">steps_between</span>(<span class="ident">start</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">end</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">steps_between</span>(<span class="ident">start</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">end</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">start</span> <span class="op">&gt;</span> <span class="ident">end</span> {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -315,12 +315,12 @@
     }
     <span class="doccomment">/// result = chunk_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">forward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
     }
     <span class="doccomment">/// result = chunk_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">forward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&gt;</span> <span class="ident">usize::MAX</span> <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -328,12 +328,12 @@
     }
     <span class="doccomment">/// result = chunk_address + count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">fn</span> <span class="ident">backward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
     }
     <span class="doccomment">/// result = chunk_address - count * block_size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">backward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&lt;</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
@@ -361,7 +361,7 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">ALLOC_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
         <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_CHUNK_MARK</span>;
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">chunk_range</span>: <span class="ident">Mutex::new</span>(<span class="ident">Chunk::ZERO</span>..<span class="ident">Chunk::ZERO</span>),
         }
@@ -370,16 +370,16 @@
     <span class="doccomment">/// Set chunk state</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Chunk</span>, <span class="ident">state</span>: <span class="ident">ChunkState</span>) {
         <span class="comment">// Do nothing if the chunk is already in the expected state.</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">chunk</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">state</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">chunk</span>) <span class="op">==</span> <span class="ident">state</span> {
             <span class="kw">return</span>;
         }
         <span class="comment">// Update alloc byte</span>
         <span class="kw">unsafe</span> { <span class="ident">side_metadata::store</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::ALLOC_TABLE</span>, <span class="ident">chunk</span>.<span class="ident">start</span>(), <span class="ident">state</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="kw">as</span> <span class="kw">_</span>) };
         <span class="comment">// If this is a newly allcoated chunk, then expand the chunk range.</span>
-        <span class="kw">if</span> <span class="ident">state</span> <span class="op">=</span><span class="op">=</span> <span class="ident">ChunkState::Allocated</span> {
+        <span class="kw">if</span> <span class="ident">state</span> <span class="op">==</span> <span class="ident">ChunkState::Allocated</span> {
             <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">chunk</span>.<span class="ident">start</span>().<span class="ident">is_zero</span>());
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">range</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">chunk_range</span>.<span class="ident">lock</span>();
-            <span class="kw">if</span> <span class="ident">range</span>.<span class="ident">start</span> <span class="op">=</span><span class="op">=</span> <span class="ident">Chunk::ZERO</span> {
+            <span class="kw">if</span> <span class="ident">range</span>.<span class="ident">start</span> <span class="op">==</span> <span class="ident">Chunk::ZERO</span> {
                 <span class="ident">range</span>.<span class="ident">start</span> <span class="op">=</span> <span class="ident">chunk</span>;
                 <span class="ident">range</span>.<span class="ident">end</span> <span class="op">=</span> <span class="ident">Chunk::forward</span>(<span class="ident">chunk</span>, <span class="number">1</span>);
             } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">chunk</span> <span class="op">&lt;</span> <span class="ident">range</span>.<span class="ident">start</span> {
@@ -391,29 +391,29 @@
     }
 
     <span class="doccomment">/// Get chunk state</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Chunk</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ChunkState</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Chunk</span>) -&gt; <span class="ident">ChunkState</span> {
         <span class="kw">let</span> <span class="ident">byte</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">side_metadata::load</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::ALLOC_TABLE</span>, <span class="ident">chunk</span>.<span class="ident">start</span>()) <span class="kw">as</span> <span class="ident">u8</span> };
         <span class="kw">match</span> <span class="ident">byte</span> {
-            <span class="number">0</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ChunkState::Free</span>,
-            <span class="number">1</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ChunkState::Allocated</span>,
-            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable!</span>(),
+            <span class="number">0</span> =&gt; <span class="ident">ChunkState::Free</span>,
+            <span class="number">1</span> =&gt; <span class="ident">ChunkState::Allocated</span>,
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
         }
     }
 
     <span class="doccomment">/// A range of all chunks in the heap.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Chunk</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">chunk_range</span>.<span class="ident">lock</span>().<span class="ident">clone</span>()
     }
 
     <span class="doccomment">/// Helper function to create per-chunk processing work packets.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_tasks</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">func</span>: <span class="kw">impl</span> <span class="ident">Fn</span>(<span class="ident">Chunk</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="ident">func</span>: <span class="kw">impl</span> <span class="ident">Fn</span>(<span class="ident">Chunk</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">work_packets</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">vec!</span>[];
         <span class="kw">for</span> <span class="ident">chunk</span> <span class="kw">in</span> <span class="self">self</span>
             .<span class="ident">all_chunks</span>()
-            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="kw-2">*</span><span class="ident">c</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">ChunkState::Allocated</span>)
+            .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">c</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="kw-2">*</span><span class="ident">c</span>) <span class="op">==</span> <span class="ident">ChunkState::Allocated</span>)
         {
             <span class="ident">work_packets</span>.<span class="ident">push</span>(<span class="ident">func</span>(<span class="ident">chunk</span>));
         }
@@ -424,7 +424,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">generate_sweep_tasks</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">mark_histograms</span>.<span class="ident">lock</span>().<span class="ident">clear</span>();
         <span class="self">self</span>.<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> <span class="kw">box</span> <span class="ident">SweepChunk</span> { <span class="ident">space</span>, <span class="ident">chunk</span> })
     }
@@ -438,10 +438,10 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SweepChunk</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">histogram</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">new_histogram</span>();
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">chunk_map</span>.<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">chunk</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">ChunkState::Allocated</span> {
-            <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">sweep</span>(<span class="self">self</span>.<span class="ident">space</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">histogram</span>);
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">chunk_map</span>.<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">chunk</span>) <span class="op">==</span> <span class="ident">ChunkState::Allocated</span> {
+            <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">sweep</span>(<span class="self">self</span>.<span class="ident">space</span>, <span class="kw-2">&amp;mut</span> <span class="ident">histogram</span>);
         }
         <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">add_completed_mark_histogram</span>(<span class="ident">histogram</span>);
     }

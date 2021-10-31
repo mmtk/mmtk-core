@@ -3,12 +3,12 @@ This is a simple module to log edges and check for duplicate edges.</p>
 <p>It uses a hash-set to keep track of edge, and is so very expensive.
 We currently only use this as part of the <code>extreme_assertions</code> feature.</p>
 </div></details><h2 id="structs" class="section-header"><a href="#structs">Structs</a></h2>
-<div class="item-table"><div class="item-left module-item"><a class="struct" href="struct.EDGE_LOG.html" title="mmtk::util::edge_logger::EDGE_LOG struct">EDGE_LOG</a></div><div class="item-right docblock-short"></div></div><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
-<div class="item-table"><div class="item-left module-item"><a class="fn" href="fn.log_edge.html" title="mmtk::util::edge_logger::log_edge fn">log_edge</a></div><div class="item-right docblock-short"><p>Logs an edge.
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.EDGE_LOG.html" title="mmtk::util::edge_logger::EDGE_LOG struct">EDGE_LOG</a></div><div class="item-right docblock-short"></div></div></div><h2 id="functions" class="section-header"><a href="#functions">Functions</a></h2>
+<div class="item-table"><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.log_edge.html" title="mmtk::util::edge_logger::log_edge fn">log_edge</a></div><div class="item-right docblock-short"><p>Logs an edge.
 Panics if the edge was already logged.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.reset.html" title="mmtk::util::edge_logger::reset fn">reset</a></div><div class="item-right docblock-short"><p>Reset the edge logger by clearing the hash-set of edges.
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.reset.html" title="mmtk::util::edge_logger::reset fn">reset</a></div><div class="item-right docblock-short"><p>Reset the edge logger by clearing the hash-set of edges.
 This function is called at the end of each GC iteration.</p>
-</div><div class="item-left module-item"><a class="fn" href="fn.should_check_duplicate_edges.html" title="mmtk::util::edge_logger::should_check_duplicate_edges fn">should_check_duplicate_edges</a></div><div class="item-right docblock-short"><p>Whether we should check duplicate edges. This depends on the actual plan.</p>
-</div></div></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.should_check_duplicate_edges.html" title="mmtk::util::edge_logger::should_check_duplicate_edges fn">should_check_duplicate_edges</a></div><div class="item-right docblock-short"><p>Whether we should check duplicate edges. This depends on the actual plan.</p>
+</div></div></div></section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-search-index-js="../../../search-index.js" data-search-js="../../../search.js"></div>
     <script src="../../../main.js"></script>
 </body></html>

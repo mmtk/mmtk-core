@@ -141,12 +141,12 @@
     <span class="kw">pub</span> <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationType</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Mapping between allocator selector and spaces. Each pair represents a mapping.</span>
     <span class="doccomment">/// Put this behind a box, so it is a pointer-sized field.</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::box_vec</span>)]</span>
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::box_collection</span>)]</span>
     <span class="kw">pub</span> <span class="ident">space_mapping</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">SpaceMapping</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.</span>
-    <span class="kw">pub</span> <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
+    <span class="kw">pub</span> <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
     <span class="doccomment">/// Plan-specific code for mutator release. The VMWorkerThread is the worker thread that executes this release function.</span>
-    <span class="kw">pub</span> <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
+    <span class="kw">pub</span> <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> (<span class="kw">dyn</span> <span class="ident">Fn</span>(<span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">VMWorkerThread</span>) <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Sync</span>),
 }
 
 <span class="doccomment">/// A mutator is a per-thread data structure that manages allocations and barriers. It is usually highly coupled with the language VM.</span>
@@ -168,21 +168,21 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MutatorContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">prepare_func</span>)(<span class="self">self</span>, <span class="ident">tls</span>)
     }
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         (<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">config</span>.<span class="ident">release_func</span>)(<span class="self">self</span>, <span class="ident">tls</span>)
     }
 
     <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.</span>
     <span class="kw">fn</span> <span class="ident">alloc</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">allocator</span>: <span class="ident">AllocationType</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span> {
+    ) -&gt; <span class="ident">Address</span> {
         <span class="kw">unsafe</span> {
             <span class="self">self</span>.<span class="ident">allocators</span>
                 .<span class="ident">get_allocator_mut</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">allocator</span>])
@@ -191,7 +191,7 @@
     }
 
     <span class="comment">// Note that this method is slow, and we expect VM bindings that care about performance to implement allocation fastpath sequence in their bindings.</span>
-    <span class="kw">fn</span> <span class="ident">post_alloc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">refer</span>: <span class="ident">ObjectReference</span>, <span class="ident">_bytes</span>: <span class="ident">usize</span>, <span class="ident">allocator</span>: <span class="ident">AllocationType</span>) {
+    <span class="kw">fn</span> <span class="ident">post_alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">refer</span>: <span class="ident">ObjectReference</span>, <span class="ident">_bytes</span>: <span class="ident">usize</span>, <span class="ident">allocator</span>: <span class="ident">AllocationType</span>) {
         <span class="kw">unsafe</span> {
             <span class="self">self</span>.<span class="ident">allocators</span>
                 .<span class="ident">get_allocator_mut</span>(<span class="self">self</span>.<span class="ident">config</span>.<span class="ident">allocator_mapping</span>[<span class="ident">allocator</span>])
@@ -200,12 +200,12 @@
         .<span class="ident">initialize_object_metadata</span>(<span class="ident">refer</span>, <span class="bool-val">true</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMMutatorThread</span> {
+    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span> {
         <span class="self">self</span>.<span class="ident">mutator_tls</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span> {
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">barrier</span>
+    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span> {
+        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">barrier</span>
     }
 }
 
@@ -215,26 +215,26 @@
 <span class="comment">// TODO: We should be able to remove this trait, as we removed per-plan mutator implementation, and there is no other type that implements this trait.</span>
 <span class="comment">// The Mutator struct above is the only type that implements this trait. We should be able to merge them.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">MutatorContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
     <span class="kw">fn</span> <span class="ident">alloc</span>(
-        <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>,
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">allocator</span>: <span class="ident">AllocationType</span>,
-    ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">post_alloc</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">refer</span>: <span class="ident">ObjectReference</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">allocator</span>: <span class="ident">AllocationType</span>);
-    <span class="kw">fn</span> <span class="ident">flush_remembered_sets</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    ) -&gt; <span class="ident">Address</span>;
+    <span class="kw">fn</span> <span class="ident">post_alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">refer</span>: <span class="ident">ObjectReference</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">allocator</span>: <span class="ident">AllocationType</span>);
+    <span class="kw">fn</span> <span class="ident">flush_remembered_sets</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">flush</span>();
     }
-    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) {
+    <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="self">self</span>.<span class="ident">flush_remembered_sets</span>();
     }
-    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">VMMutatorThread</span>;
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span>;
+    <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span>;
+    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span>;
 
-    <span class="kw">fn</span> <span class="ident">record_modified_node</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">fn</span> <span class="ident">record_modified_node</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
         <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">post_write_barrier</span>(<span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>));
     }
 }

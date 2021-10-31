@@ -246,7 +246,7 @@
 
 <span class="doccomment">/// Attempt to become the worker thread who will forward the object.</span>
 <span class="doccomment">/// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attempt_to_forward</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attempt_to_forward</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
     <span class="kw">loop</span> {
         <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
@@ -277,13 +277,13 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spin_and_get_forwarded_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">forwarding_bits</span>: <span class="ident">usize</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+) -&gt; <span class="ident">ObjectReference</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">forwarding_bits</span> <span class="op">=</span> <span class="ident">forwarding_bits</span>;
-    <span class="kw">while</span> <span class="ident">forwarding_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BEING_FORWARDED</span> {
+    <span class="kw">while</span> <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">BEING_FORWARDED</span> {
         <span class="ident">forwarding_bits</span> <span class="op">=</span> <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
     }
 
-    <span class="kw">if</span> <span class="ident">forwarding_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">FORWARDED</span> {
+    <span class="kw">if</span> <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">FORWARDED</span> {
         <span class="ident">read_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     } <span class="kw">else</span> {
         <span class="macro">panic!</span>(
@@ -299,8 +299,8 @@
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">CC</span>: <span class="ident">CopyContext</span><span class="op">&gt;</span>(
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-    <span class="ident">copy_context</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">CC</span>,
-) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+    <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CC</span>,
+) -&gt; <span class="ident">ObjectReference</span> {
     <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::copy</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
     <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">new_object</span>);
@@ -327,7 +327,7 @@
 
 <span class="doccomment">/// Return the forwarding bits for a given `ObjectReference`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_forwarding_status</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_forwarding_status</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
     <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
         <span class="ident">object</span>,
@@ -336,24 +336,24 @@
     )
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">FORWARDED</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">==</span> <span class="ident">FORWARDED</span>
 }
 
-<span class="kw">fn</span> <span class="ident">is_being_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">=</span><span class="op">=</span> <span class="ident">BEING_FORWARDED</span>
+<span class="kw">fn</span> <span class="ident">is_being_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">==</span> <span class="ident">BEING_FORWARDED</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_forwarded_or_being_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_forwarded_or_being_forwarded</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">forwarding_bits</span> <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">bool</span> {
-    <span class="ident">forwarding_bits</span> <span class="op">=</span><span class="op">=</span> <span class="ident">BEING_FORWARDED</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">BEING_FORWARDED</span>
 }
 
 <span class="doccomment">/// Zero the forwarding bits of an object.</span>
@@ -370,7 +370,7 @@
 
 <span class="doccomment">/// Read the forwarding pointer of an object.</span>
 <span class="doccomment">/// This function is called on forwarded/being_forwarded objects.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">ObjectReference</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">read_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
     <span class="macro">debug_assert!</span>(
         <span class="ident">is_forwarded_or_being_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
         <span class="string">&quot;read_forwarding_pointer called for object {:?} that has not started forwarding!&quot;</span>,
@@ -419,14 +419,14 @@
 <span class="doccomment">/// Otherwise, returns `Some(shift)`, where `shift` is the left shift needed on forwarding bits.</span>
 <span class="doccomment">///</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_endian</span> <span class="op">=</span> <span class="string">&quot;little&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">isize</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">isize</span><span class="op">&gt;</span> {
     <span class="kw">use</span> <span class="ident">std::ops::Deref</span>;
     <span class="comment">// if both forwarding bits and forwarding pointer are in-header</span>
     <span class="kw">match</span> (
         <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">deref</span>(),
         <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>.<span class="ident">deref</span>(),
     ) {
-        (<span class="ident">MetadataSpec::InHeader</span>(<span class="ident">fp</span>), <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">fb</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+        (<span class="ident">MetadataSpec::InHeader</span>(<span class="ident">fp</span>), <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">fb</span>)) =&gt; {
             <span class="kw">let</span> <span class="ident">maybe_shift</span> <span class="op">=</span> <span class="ident">fb</span>.<span class="ident">bit_offset</span> <span class="op">-</span> <span class="ident">fp</span>.<span class="ident">bit_offset</span>;
             <span class="kw">if</span> <span class="ident">maybe_shift</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> <span class="op">&amp;&amp;</span> <span class="ident">maybe_shift</span> <span class="op">&lt;</span> <span class="ident">constants::BITS_IN_WORD</span> <span class="kw">as</span> <span class="ident">isize</span> {
                 <span class="prelude-val">Some</span>(<span class="ident">maybe_shift</span>)
@@ -434,12 +434,12 @@
                 <span class="prelude-val">None</span>
             }
         }
-        <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">None</span>,
+        <span class="kw">_</span> =&gt; <span class="prelude-val">None</span>,
     }
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_endian</span> <span class="op">=</span> <span class="string">&quot;big&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">isize</span><span class="op">&gt;</span> {
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>() -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">isize</span><span class="op">&gt;</span> {
     <span class="macro">unimplemented!</span>()
 }
 </code></pre></div>
