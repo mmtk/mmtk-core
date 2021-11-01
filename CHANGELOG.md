@@ -1,3 +1,47 @@
+0.8.0 (2021-11-01)
+===
+
+GC Plans
+---
+* Added `schedule_common()` to schedule the common work packets for all the plans.
+* Added proepr implementation for checking and triggering full heap collection for all the plans.
+* Fixed a bug that collection triggers were not properly cleared after a GC.
+* Fixed a bug that objects in generational copying's or semispace's tospace were traced.
+
+Policies
+---
+* Added a parameter `roots: bool` to `ProcessEdgesWork::new()` to indicate whether the packet contains root edges.
+* Refactored `ImmixProcessEdges.trace_object()` so it can deal with both defrag GC and fast GC.
+* Fixed a bug in Immix that recyclable blocks were not defragment source which could cause OOM without attempting
+  to evacuate recyclable blocks.
+* Fixed a bug that nursery large objects had their unlogged bits set, and were treated as mature objects.
+* Fixed a bug that SFT entries were not set for `MallocSpace`.
+* Fixed a bug that SFT entries may not be correctly set if the start address is not chunk aligned.
+
+Allocators
+---
+* Supported proper stress test for all the allocators.
+* Supported proper alignment and offset for `MallocAllocator`.
+
+API
+---
+* (Breaking change) Renamed `enable_collection()` to `initialize_collection()`.
+* Added `enable_collection()` and `disable_collection()`. When MMTk collection is disabled, MMTk allows allocation without
+  triggering GCs.
+* Added `COORDINATOR_ONLY_STW` to the `Collection` trait. If this is set, the `StopMutators` work can only done by the MMTk
+  coordinator thread. Otherwise, any GC thread may be used to stop mutators.
+
+Misc
+---
+* Added assertions in `extreme_assertions` to check if side metadata access is within their bounds.
+* Added `SideMetadataSpec.name` to help debug.
+* Added a macro in `util::metadata::side_metadata::spec_defs` to help define side metadata specs without
+  explicitly laying out specs and providing offsets for each spec.
+* Renamed `SideMetadataSpec.log_min_obj_size` to `SideMetadataSpec.log_bytes_in_region` to avoid ambiguity.
+* Fixed some issues and outdated code in the MMTk tutorial.
+* Fixed a bug that may cause incorrect perf event values.
+
+
 0.7.0 (2021-09-22)
 ===
 
