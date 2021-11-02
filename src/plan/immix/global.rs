@@ -92,9 +92,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         #[allow(clippy::if_same_then_else)]
         if in_defrag {
             scheduler
-                .schedule_common_packets::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(self);
+                .schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(self);
         } else {
-            scheduler.schedule_common_packets::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(self);
+            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
     }
 

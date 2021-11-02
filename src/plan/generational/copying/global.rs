@@ -85,10 +85,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
             debug!("Nursery GC");
-            scheduler.schedule_common_packets::<GenCopyNurseryGCWorkContext<VM>>(self);
+            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
         } else {
             debug!("Full heap GC");
-            scheduler.schedule_common_packets::<GenCopyMatureGCWorkContext<VM>>(self);
+            scheduler.schedule_common_work::<GenCopyMatureGCWorkContext<VM>>(self);
         }
     }
 

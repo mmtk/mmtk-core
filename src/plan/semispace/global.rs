@@ -75,7 +75,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.schedule_common_packets::<SSGCWorkContext<VM>>(self);
+        scheduler.schedule_common_work::<SSGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

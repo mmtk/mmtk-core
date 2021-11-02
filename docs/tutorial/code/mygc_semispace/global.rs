@@ -97,7 +97,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.schedule_common_packets::<MyGCWorkContext<VM>>(self);
+        scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
 

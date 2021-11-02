@@ -75,7 +75,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.schedule_common_packets::<PPGCWorkContext<VM>>(self);
+        scheduler.schedule_common_work::<PPGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

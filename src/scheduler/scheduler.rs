@@ -146,7 +146,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Schedule all the common work packets
-    pub fn schedule_common_packets<C: GCWorkContext<VM = VM> + 'static>(
+    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static>(
         &self,
         plan: &'static C::PlanType,
     ) {
