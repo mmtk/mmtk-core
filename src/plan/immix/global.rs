@@ -91,17 +91,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
         #[allow(clippy::if_same_then_else)]
         if in_defrag {
-            self.common()
-                .schedule_common::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(
-                    self,
-                    scheduler,
-                );
+            scheduler
+                .schedule_common_packets::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(self);
         } else {
-            self.common()
-                .schedule_common::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(
-                    self,
-                    scheduler,
-                );
+            scheduler.schedule_common_packets::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
     }
 

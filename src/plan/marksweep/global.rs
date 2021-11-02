@@ -56,8 +56,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.common()
-            .schedule_common::<MSGCWorkContext<VM>>(self, scheduler);
+        scheduler.schedule_common_packets::<MSGCWorkContext<VM>>(self);
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 

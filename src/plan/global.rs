@@ -918,62 +918,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.release(tls, full_heap)
     }
 
-    /// Schedule all the common work packets
-    pub fn schedule_common<C: GCWorkContext<VM = VM> + 'static>(
-        &self,
-        plan: &'static C::PlanType,
-        scheduler: &GCWorkScheduler<VM>,
-    ) {
-        use crate::scheduler::gc_work::*;
-
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<C::ProcessEdgesWorkType>::new());
-
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
-
-        // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
-
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<C>::new(plan));
-
-        // Analysis GC work
-        #[cfg(feature = "analysis")]
-        {
-            use crate::util::analysis::GcHookWork;
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        }
-
-        // Sanity
-        #[cfg(feature = "sanity")]
-        {
-            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
-            scheduler.work_buckets[WorkBucketStage::Final]
-                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(
-                    plan,
-                ));
-        }
-
-        // Finalization
-        if !self.base.options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-            // finalization
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(Finalization::<C::ProcessEdgesWorkType>::new());
-            // forward refs
-            if plan.constraints().needs_forward_after_liveness {
-                scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
-            }
-        }
-
-        // Set EndOfGC to run at the end
-        scheduler.set_finalizer(Some(EndOfGC));
-    }
-
     pub fn stacks_prepared(&self) -> bool {
         self.base.stacks_prepared()
     }
