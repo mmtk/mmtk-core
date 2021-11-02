@@ -13,7 +13,7 @@ use enum_map::EnumMap;
 
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
+        AllocationType::Default => AllocatorSelector::BumpPointerAllocBit(0),
         AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
         AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
@@ -27,7 +27,10 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), markcompact.mc_space()),
+            (
+                AllocatorSelector::BumpPointerAllocBit(0),
+                markcompact.mc_space(),
+            ),
             (
                 AllocatorSelector::BumpPointer(1),
                 markcompact.common.get_immortal(),
