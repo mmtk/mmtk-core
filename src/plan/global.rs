@@ -353,12 +353,11 @@ pub trait Plan: 'static + Sync + Downcast {
     fn force_full_heap_collection(&self) {}
 
     fn modify_check(&self, object: ObjectReference) {
-        if self.base().gc_in_progress_proper() && object.is_movable() {
-            panic!(
-                "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
-                object
-            );
-        }
+        assert!(
+            !(self.base().gc_in_progress_proper() && object.is_movable()),
+            "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
+            object
+        );
     }
 }
 

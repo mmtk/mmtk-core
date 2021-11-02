@@ -137,10 +137,7 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                let res = MapState::transition_to_mapped(entry, mmap_start);
-                if res.is_err() {
-                    return res;
-                }
+                MapState::transition_to_mapped(entry, mmap_start)?;
             }
             start = high;
         }

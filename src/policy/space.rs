@@ -292,9 +292,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
             debug!("Collection required");
-            if !allow_gc {
-                panic!("GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-            }
+            assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
@@ -334,9 +332,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 }
                 Err(_) => {
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
-                    if !allow_gc {
-                        panic!("Physical allocation failed when GC is not allowed!");
-                    }
+                    assert!(
+                        allow_gc,
+                        "Physical allocation failed when GC is not allowed!"
+                    );
 
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
@@ -571,12 +570,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
             _ => unreachable!(),
         };
 
-        if extent != raw_align_up(extent, BYTES_IN_CHUNK) {
-            panic!(
-                "{} requested non-aligned extent: {} bytes",
-                rtn.name, extent
-            );
-        }
+        assert!(
+            extent == raw_align_up(extent, BYTES_IN_CHUNK),
+            "{} requested non-aligned extent: {} bytes",
+            rtn.name,
+            extent
+        );
 
         let start: Address;
         if let VMRequest::Fixed { start: _start, .. } = vmrequest {
@@ -586,9 +585,12 @@ impl<VM: VMBinding> CommonSpace<VM> {
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
             start = heap.reserve(extent, top);
         }
-        if start != chunk_align_up(start) {
-            panic!("{} starting on non-aligned boundary: {}", rtn.name, start);
-        }
+        assert!(
+            start == chunk_align_up(start),
+            "{} starting on non-aligned boundary: {}",
+            rtn.name,
+            start
+        );
 
         rtn.contiguous = true;
         rtn.start = start;

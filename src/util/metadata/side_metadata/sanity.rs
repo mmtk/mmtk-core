@@ -185,18 +185,12 @@ fn verify_no_overlap_chunked(spec_1: &SideMetadataSpec, spec_2: &SideMetadataSpe
 /// * `g_specs`: the slice of global specifications to be checked
 ///
 fn verify_global_specs(g_specs: &[SideMetadataSpec]) -> Result<()> {
-    let v = verify_global_specs_total_size(g_specs);
-    if v.is_err() {
-        return v;
-    }
+    verify_global_specs_total_size(g_specs)?;
 
     for spec_1 in g_specs {
         for spec_2 in g_specs {
             if spec_1 != spec_2 {
-                let v = verify_no_overlap_contiguous(spec_1, spec_2);
-                if v.is_err() {
-                    return v;
-                }
+                verify_no_overlap_contiguous(spec_1, spec_2)?;
             }
         }
     }
@@ -245,21 +239,15 @@ impl SideMetadataSanity {
     fn verify_local_specs(&self) -> Result<()> {
         let local_specs = self.get_all_specs(false);
 
-        let v = verify_local_specs_size(&local_specs);
-        if v.is_err() {
-            return v;
-        }
+        verify_local_specs_size(&local_specs)?;
 
         for spec_1 in &local_specs {
             for spec_2 in &local_specs {
                 if spec_1 != spec_2 {
                     #[cfg(target_pointer_width = "64")]
-                    let v = verify_no_overlap_contiguous(spec_1, spec_2);
+                    verify_no_overlap_contiguous(spec_1, spec_2)?;
                     #[cfg(target_pointer_width = "32")]
-                    let v = verify_no_overlap_chunked(spec_1, spec_2);
-                    if v.is_err() {
-                        return v;
-                    }
+                    verify_no_overlap_chunked(spec_1, spec_2)?;
                 }
             }
         }
@@ -306,12 +294,11 @@ impl SideMetadataSanity {
 
         for spec in &metadata_context.global {
             // Make sure all input global specs are actually global
-            if !spec.is_global {
-                panic!(
-                    "Policy-specific spec {:#?} detected in the global specs: {:#?}",
-                    spec, metadata_context.global
-                );
-            }
+            assert!(
+                spec.is_global,
+                "Policy-specific spec {:#?} detected in the global specs: {:#?}",
+                spec, metadata_context.global
+            );
             // On the first call to the function, initialise the content sanity map, and
             // on the future calls, checks the global metadata specs have not changed
             if first_call {
@@ -337,12 +324,11 @@ impl SideMetadataSanity {
 
         for spec in &metadata_context.local {
             // Make sure all input local specs are actually local
-            if spec.is_global {
-                panic!(
-                    "Global spec {:#?} detected in the policy-specific specs: {:#?}",
-                    spec, metadata_context.local
-                );
-            }
+            assert!(
+                !spec.is_global,
+                "Global spec {:#?} detected in the policy-specific specs: {:#?}",
+                spec, metadata_context.local
+            );
             // The first call from each policy inserts the relevant (spec, hashmap) pair.
             // Future calls only check that the metadata specs have not changed.
             // This should work with multi mmtk instances, because the local side metadata specs are assumed to be constant per policy.
@@ -408,9 +394,13 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
             unreachable!()
         }
     };
-    if metadata_addr >= metadata_addr_bound {
-        panic!("We try access metadata address for address {} of spec {} that is not within the bound {}.", data_addr, spec.name, metadata_addr_bound);
-    }
+    assert!(
+        metadata_addr < metadata_addr_bound,
+        "We try access metadata address for address {} of spec {} that is not within the bound {}.",
+        data_addr,
+        spec.name,
+        metadata_addr_bound
+    );
 }
 
 /// Commits a side metadata bulk zero operation.

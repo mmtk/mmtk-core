@@ -103,6 +103,6 @@ impl Diffable for MonotoneNanoTime {
     }
 
     fn print_diff(val: u64) {
-        print!("{}", format!("{:.*}", 2, val as f64 / 1e6f64));
+        print!("{:.*}", 2, val as f64 / 1e6f64);
     }
 }
