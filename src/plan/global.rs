@@ -922,7 +922,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn schedule_common<C: GCWorkContext<VM = VM> + 'static>(
         &self,
         plan: &'static C::PlanType,
-        constraints: &'static PlanConstraints,
         scheduler: &GCWorkScheduler<VM>,
     ) {
         use crate::scheduler::gc_work::*;
@@ -965,7 +964,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(Finalization::<C::ProcessEdgesWorkType>::new());
             // forward refs
-            if constraints.needs_forward_after_liveness {
+            if plan.constraints().needs_forward_after_liveness {
                 scheduler.work_buckets[WorkBucketStage::RefForwarding]
                     .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }

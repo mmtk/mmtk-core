@@ -131,7 +131,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             self.common()
                 .schedule_common::<GenImmixNurseryGCWorkContext<VM>>(
                     self,
-                    &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
         } else if defrag {
@@ -139,7 +138,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             self.common()
                 .schedule_common::<GenImmixMatureGCWorkContext<VM, { TraceKind::Defrag }>>(
                     self,
-                    &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
         } else {
@@ -147,7 +145,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             self.common()
                 .schedule_common::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(
                     self,
-                    &GENIMMIX_CONSTRAINTS,
                     scheduler,
                 );
         }

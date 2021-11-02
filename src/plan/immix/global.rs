@@ -94,14 +94,12 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.common()
                 .schedule_common::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(
                     self,
-                    &IMMIX_CONSTRAINTS,
                     scheduler,
                 );
         } else {
             self.common()
                 .schedule_common::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(
                     self,
-                    &IMMIX_CONSTRAINTS,
                     scheduler,
                 );
         }

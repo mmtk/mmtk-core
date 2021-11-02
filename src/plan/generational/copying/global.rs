@@ -88,7 +88,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             self.common()
                 .schedule_common::<GenCopyNurseryGCWorkContext<VM>>(
                     self,
-                    &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
         } else {
@@ -96,7 +95,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             self.common()
                 .schedule_common::<GenCopyMatureGCWorkContext<VM>>(
                     self,
-                    &GENCOPY_CONSTRAINTS,
                     scheduler,
                 );
         }
