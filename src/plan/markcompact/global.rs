@@ -108,6 +108,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalcFwdAddr::<VM>::new(&self.mc_space));
         // do another trace to update references
+        // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
 

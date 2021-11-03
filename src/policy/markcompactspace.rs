@@ -9,8 +9,6 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, object_forwarding, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
-// use std::collections::{HashMap, HashSet};
-// use std::sync::Mutex;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -162,12 +160,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
             trace.process_node(object);
         }
-        // let new_object = *self
-        //     .forwarding_pointers
-        //     .lock()
-        //     .unwrap()
-        //     .get(&object.to_address())
-        //     .unwrap();
 
         // For markcompact, only one word is required to store the forwarding pointer
         // and it is always stored in front of the object start address. However, the
@@ -306,7 +298,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 from += MIN_OBJECT_SIZE
             }
         }
-        // reset the bump pointer and clear forwarding_pointers map
+        // reset the bump pointer
         self.pr.reset_cursor(to);
     }
 }
