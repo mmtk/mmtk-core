@@ -138,9 +138,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else {
             debug!("Full heap GC Fast");
             scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(
-                    self,
-                );
+                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
     }
 
