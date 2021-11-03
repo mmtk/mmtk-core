@@ -113,6 +113,10 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         self.acquire_clean_block(size, align, offset)
     }
 
+    /// This is called when precise stress is used. We try use the thread local buffer for
+    /// the allocation (after restoring the correct limit for thread local buffer). If we cannot
+    /// allocate from thread local buffer, we will go to the actual slowpath. After allocation,
+    /// we will set the fake limit so future allocations will fail the slowpath and get here as well.
     fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
