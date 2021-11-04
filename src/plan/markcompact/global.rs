@@ -70,7 +70,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
-        self.mc_space.init(&vm_map);
+        self.mc_space.init(vm_map);
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -187,7 +187,7 @@ impl<VM: VMBinding> MarkCompact<VM> {
                 options,
                 heap,
                 &MARKCOMPACT_CONSTRAINTS,
-                global_metadata_specs.clone(),
+                global_metadata_specs,
             ),
         };
 
