@@ -99,4 +99,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     fn dump_object(_object: ObjectReference) {
         unimplemented!()
     }
+
+    fn object_alignment() -> i32 { 
+        unimplemented!() 
+    }
 }

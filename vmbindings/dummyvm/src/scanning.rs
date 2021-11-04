@@ -29,4 +29,7 @@ impl Scanning<DummyVM> for VMScanning {
     fn supports_return_barrier() -> bool {
         unimplemented!()
     }
+    fn prepare_for_roots_scanning() { 
+        unimplemented!()
+    }
 }
