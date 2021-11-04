@@ -49,6 +49,9 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn does_thread_local_allocation(&self) -> bool {
         true
     }
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        BLOCK_SIZE
+    }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
@@ -77,12 +80,12 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         self.acquire_block(size, align, offset, false)
     }
 
-    // Slow path for allocation if the stress test flag has been enabled. It works
-    // by manipulating the limit to be below the cursor always.
+    // Slow path for allocation if the precise stress test has been enabled.
+    // It works by manipulating the limit to be below the cursor always.
     // Performs three kinds of allocations: (i) if the hard limit has been met;
     // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
     // factor has been crossed.
-    fn alloc_slow_once_stress_test(
+    fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
         align: usize,

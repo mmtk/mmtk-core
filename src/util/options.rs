@@ -194,6 +194,12 @@ options! {
     stress_factor:         usize                [always_valid] = DEFAULT_STRESS_FACTOR,
     // How frequent (every X bytes) should we run analysis (a STW event that collects data)
     analysis_factor:       usize                [always_valid] = DEFAULT_STRESS_FACTOR,
+    // Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
+    // and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
+    // the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
+    // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
+    // factor (e.g. tens of metabytes).
+    precise_stress:        bool                 [always_valid] = true,
     // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
