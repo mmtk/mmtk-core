@@ -1011,6 +1011,12 @@
 <span id="1011">1011</span>
 <span id="1012">1012</span>
 <span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1784,6 +1790,12 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
         <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
             <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+    }
+
+    <span class="doccomment">/// Check if we should do precise stress test. If so, we need to check for stress GCs for every allocation.</span>
+    <span class="doccomment">/// Otherwise, we only check in the allocation slow path.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_precise_stress</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">precise_stress</span>
     }
 
     <span class="doccomment">/// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds</span>

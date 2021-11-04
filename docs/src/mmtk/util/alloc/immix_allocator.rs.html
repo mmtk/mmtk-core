@@ -343,6 +343,17 @@
 <span id="343">343</span>
 <span id="344">344</span>
 <span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::line</span>::<span class="kw-2">*</span>;
@@ -409,6 +420,10 @@
         <span class="bool-val">true</span>
     }
 
+    <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block::BYTES</span>
+    }
+
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">debug_assert!</span>(
@@ -454,24 +469,31 @@
         <span class="self">self</span>.<span class="ident">acquire_clean_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once_stress_test</span>(
+    <span class="doccomment">/// This is called when precise stress is used. We try use the thread local buffer for</span>
+    <span class="doccomment">/// the allocation (after restoring the correct limit for thread local buffer). If we cannot</span>
+    <span class="doccomment">/// allocate from thread local buffer, we will go to the actual slowpath. After allocation,</span>
+    <span class="doccomment">/// we will set the fake limit so future allocations will fail the slowpath and get here as well.</span>
+    <span class="kw">fn</span> <span class="ident">alloc_slow_once_precise_stress</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">need_poll</span>: <span class="ident">bool</span>,
     ) -&gt; <span class="ident">Address</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_stress_test&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_precise_stress&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
         <span class="comment">// If we are required to make a poll, we call acquire_clean_block() which will acquire memory</span>
         <span class="comment">// from the space which includes a GC poll.</span>
         <span class="kw">if</span> <span class="ident">need_poll</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_stress_test going to poll&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
+            <span class="macro">trace!</span>(
+                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress going to poll&quot;</span>,
+                <span class="self">self</span>.<span class="ident">tls</span>
+            );
             <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">acquire_clean_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
             <span class="comment">// Set fake limits so later allocation will fail in the fastpath, and end up going to this</span>
             <span class="comment">// special slowpath.</span>
             <span class="self">self</span>.<span class="ident">set_limit_for_stress</span>();
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: alloc_slow_once_stress_test done - forced stress poll&quot;</span>,
+                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress done - forced stress poll&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>
             );
             <span class="kw">return</span> <span class="ident">ret</span>;
@@ -484,7 +506,7 @@
             <span class="comment">// If we are already doing allow_slow for stress test, and reach here, it means we have failed the</span>
             <span class="comment">// thread local allocation, and we have to get a new block from the space.</span>
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: alloc_slow_once_stress_test - acquire new block&quot;</span>,
+                <span class="string">&quot;{:?}: alloc_slow_once_precise_stress - acquire new block&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>
             );
             <span class="self">self</span>.<span class="ident">acquire_clean_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
@@ -495,7 +517,7 @@
             <span class="self">self</span>.<span class="ident">alloc_slow_for_stress</span> <span class="op">=</span> <span class="bool-val">true</span>;
             <span class="comment">// Try allocate. The allocator will try allocate from thread local buffer, if that fails, it will</span>
             <span class="comment">// get a clean block.</span>
-            <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_stress_test - alloc()&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;{:?}: alloc_slow_once_precise_stress - alloc()&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
             <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
             <span class="comment">// Indicate that we finish the alloc slow for stress test.</span>
             <span class="self">self</span>.<span class="ident">alloc_slow_for_stress</span> <span class="op">=</span> <span class="bool-val">false</span>;

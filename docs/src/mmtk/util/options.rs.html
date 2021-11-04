@@ -380,6 +380,12 @@
 <span id="380">380</span>
 <span id="381">381</span>
 <span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
@@ -576,6 +582,12 @@
     <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
     <span class="comment">// How frequent (every X bytes) should we run analysis (a STW event that collects data)</span>
     <span class="ident">analysis_factor</span>:       <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
+    <span class="comment">// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness</span>
+    <span class="comment">// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches</span>
+    <span class="comment">// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.</span>
+    <span class="comment">// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress</span>
+    <span class="comment">// factor (e.g. tens of metabytes).</span>
+    <span class="ident">precise_stress</span>:        <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
     <span class="comment">// The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
     <span class="comment">// FIXME: This value is set for JikesRVM. We need a proper way to set options.</span>
     <span class="comment">//   We need to set these values programmatically in VM specific code.</span>

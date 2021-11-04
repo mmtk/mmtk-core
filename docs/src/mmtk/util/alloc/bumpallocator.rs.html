@@ -169,6 +169,9 @@
 <span id="169">169</span>
 <span id="170">170</span>
 <span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 
@@ -220,6 +223,9 @@
     <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
+    <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="ident">BLOCK_SIZE</span>
+    }
 
     <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;alloc&quot;</span>);
@@ -248,12 +254,12 @@
         <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
     }
 
-    <span class="comment">// Slow path for allocation if the stress test flag has been enabled. It works</span>
-    <span class="comment">// by manipulating the limit to be below the cursor always.</span>
+    <span class="comment">// Slow path for allocation if the precise stress test has been enabled.</span>
+    <span class="comment">// It works by manipulating the limit to be below the cursor always.</span>
     <span class="comment">// Performs three kinds of allocations: (i) if the hard limit has been met;</span>
     <span class="comment">// (ii) the bump pointer semantics from the fastpath; and (iii) if the stress</span>
     <span class="comment">// factor has been crossed.</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once_stress_test</span>(
+    <span class="kw">fn</span> <span class="ident">alloc_slow_once_precise_stress</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
         <span class="ident">align</span>: <span class="ident">usize</span>,
