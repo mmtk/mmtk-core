@@ -101,6 +101,6 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     }
 
     fn object_alignment() -> i32 { 
-        unimplemented!() 
+        8
     }
 }
