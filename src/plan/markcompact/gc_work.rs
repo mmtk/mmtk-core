@@ -11,31 +11,33 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
-pub struct CalcFwdAddr<VM: VMBinding> {
+// iterate through the heap and calculate the new location of live objects
+pub struct CalculateForwardingAddress<VM: VMBinding> {
     mc_space: &'static MarkCompactSpace<VM>,
 }
 
-impl<VM: VMBinding> GCWork<VM> for CalcFwdAddr<VM> {
+impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        self.mc_space.calcluate_forwarding_pointer();
+        self.mc_space.calculate_forwarding_pointer();
         // FIXME
         // The following needs to be done right before the second round of root scanning
         // put here for simplicity since calculating forwarding pointer occurs right
         // before updating object references(done through another round of root scanning)
         // and this calculation is done in a single-threaded manner.
-        VM::VMScanning::prepare_for_roots_scanning();
+        VM::VMScanning::prepare_for_roots_re_scanning();
         #[cfg(feature = "extreme_assertions")]
         crate::util::edge_logger::reset();
     }
 }
 
-impl<VM: VMBinding> CalcFwdAddr<VM> {
+impl<VM: VMBinding> CalculateForwardingAddress<VM> {
     pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
         Self { mc_space }
     }
 }
 
+// compact live objects based on forwarding pointers calculated before
 pub struct Compact<VM: VMBinding> {
     mc_space: &'static MarkCompactSpace<VM>,
 }
@@ -53,6 +55,7 @@ impl<VM: VMBinding> Compact<VM> {
     }
 }
 
+// Transitive closure to mark live objects
 pub struct MarkingProcessEdges<VM: VMBinding> {
     plan: &'static MarkCompact<VM>,
     base: ProcessEdgesBase<MarkingProcessEdges<VM>>,
@@ -104,6 +107,7 @@ impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
     }
 }
 
+// Transitive closure to update object references
 pub struct ForwardingProcessEdges<VM: VMBinding> {
     plan: &'static MarkCompact<VM>,
     base: ProcessEdgesBase<ForwardingProcessEdges<VM>>,

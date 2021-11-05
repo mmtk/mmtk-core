@@ -1,18 +1,20 @@
-use super::gc_work::{CalcFwdAddr, Compact, ForwardingProcessEdges, MarkingProcessEdges};
+use super::gc_work::{
+    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
+};
 use crate::mmtk::MMTK;
-use crate::plan::global::BasePlan; //Modify
-use crate::plan::global::CommonPlan; // Add
+use crate::plan::global::BasePlan;
+use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-// Add
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::markcompactspace::MarkCompactSpace;
+use crate::policy::markcompactspace::GC_EXTRA_HEADER_WORD;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*; // Add
-use crate::scheduler::*; // Modify
+use crate::scheduler::gc_work::*;
+use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(not(feature = "global_alloc_bit"))]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
@@ -30,8 +32,6 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
-// pub const ALLOC_MARKCOMPACT: AllocationSemantics = AllocationSemantics::Default; // Add
-
 pub struct MarkCompact<VM: VMBinding> {
     pub mc_space: MarkCompactSpace<VM>,
     pub common: CommonPlan<VM>,
@@ -41,7 +41,7 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 1,
-    gc_extra_header_words: 1,
+    gc_extra_header_words: GC_EXTRA_HEADER_WORD,
     num_specialized_scans: 2,
     ..PlanConstraints::default()
 };
@@ -58,6 +58,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
+        // mark compact does not use a threadlocal copy allocator
+        // therefore, NoCopy is used instead of CopyContext
         let mut c = NoCopy::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
@@ -106,7 +108,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(ProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
 
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
-            .add(CalcFwdAddr::<VM>::new(&self.mc_space));
+            .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]

@@ -294,19 +294,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
-
-            #[cfg(debug_assertions)]
-            unsafe {
-                let mut name: [i8; 16] = [0; 16];
-                libc::pthread_getname_np(libc::pthread_self(), name.as_mut_ptr(), 16);
-                let c_str: &std::ffi::CStr = std::ffi::CStr::from_ptr(name.as_ptr());
-                let thread: &str = c_str.to_str().unwrap();
-                info!(
-                    "mutator: {} will be blocked and wait for gc to finish.",
-                    thread
-                );
-            }
-
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
