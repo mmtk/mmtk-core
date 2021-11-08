@@ -253,8 +253,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
 
-        // Reset the triggering information.
-        mmtk.plan.base().reset_collection_trigger();
+        debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
 
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
     }
@@ -343,6 +342,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
                         base.scanned_stacks.load(Ordering::Relaxed),
                         mutators
                     );
+                    debug_assert_eq!(base.scanned_stacks.load(Ordering::SeqCst), 0);
                     <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                         false, worker.tls,
                     );
