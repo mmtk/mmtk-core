@@ -112,6 +112,15 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// each allocation will go to slowpath and will have a check for GC polls.
     fn does_thread_local_allocation(&self) -> bool;
 
+    /// At which granularity the allocator acquires memory from the global space and use them as thread local buffer.
+    /// For example, bump pointer allocator acquire memory at 32KB blocks. Depending on the actual size for the current object,
+    /// they always acquire memory of N*32KB (N>=1). Thus bump pointer allocator returns 32KB for this method.
+    /// Only allocators that do thread local allocation need to implement this method.
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
+        unimplemented!()
+    }
+
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
     #[inline(never)]
@@ -131,19 +140,20 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         let mut previous_result_zero = false;
         loop {
             // Try to allocate using the slow path
-            let result = if is_mutator && stress_test {
-                // If we are doing stress GC, we invoke the special allow_slow_once call.
-                // allow_slow_once_stress_test() should make sure that every allocation goes
+            let result = if is_mutator && stress_test && plan.is_precise_stress() {
+                // If we are doing precise stress GC, we invoke the special allow_slow_once call.
+                // alloc_slow_once_precise_stress() should make sure that every allocation goes
                 // to the slowpath (here) so we can check the allocation bytes and decide
                 // if we need to do a stress GC.
 
-                // If we should do a stress GC now, we tell the alloc_slow_once_stress_test()
+                // If we should do a stress GC now, we tell the alloc_slow_once_precise_stress()
                 // so they would avoid try any thread local allocation, and directly call
                 // global acquire and do a poll.
                 let need_poll = is_mutator && plan.should_do_stress_gc();
-                self.alloc_slow_once_stress_test(size, align, offset, need_poll)
+                self.alloc_slow_once_precise_stress(size, align, offset, need_poll)
             } else {
-                // If we are not doing stress GC, just call the normal alloc_slow_once().
+                // If we are not doing precise stress GC, just call the normal alloc_slow_once().
+                // Normal stress test only checks for stress GC in the slowpath.
                 self.alloc_slow_once(size, align, offset)
             };
 
@@ -166,7 +176,19 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 // called by acquire(). In order to not double count the allocation, we only
                 // update allocation bytes if the previous result wasn't 0x0.
                 if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
-                    let _allocation_bytes = plan.increase_allocation_bytes_by(size);
+                    let allocated_size =
+                        if plan.is_precise_stress() || !self.does_thread_local_allocation() {
+                            // For precise stress test, or for allocators that do not have thread local buffer,
+                            // we know exactly how many bytes we allocate.
+                            size
+                        } else {
+                            // For normal stress test, we count the entire thread local buffer size as allocated.
+                            crate::util::conversions::raw_align_up(
+                                size,
+                                self.get_thread_local_buffer_granularity(),
+                            )
+                        };
+                    let _allocation_bytes = plan.increase_allocation_bytes_by(allocated_size);
 
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
@@ -251,7 +273,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
     /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.
-    fn alloc_slow_once_stress_test(
+    fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
         align: usize,

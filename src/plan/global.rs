@@ -772,6 +772,12 @@ impl<VM: VMBinding> BasePlan<VM> {
             || self.options.analysis_factor != DEFAULT_STRESS_FACTOR
     }
 
+    /// Check if we should do precise stress test. If so, we need to check for stress GCs for every allocation.
+    /// Otherwise, we only check in the allocation slow path.
+    pub fn is_precise_stress(&self) -> bool {
+        self.options.precise_stress
+    }
+
     /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
     /// the stress factor, we should do a stress GC.
     pub fn should_do_stress_gc(&self) -> bool {
