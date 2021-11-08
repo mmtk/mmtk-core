@@ -23,7 +23,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::Collection;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -130,19 +129,20 @@ pub fn alloc<VM: VMBinding>(
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
-    let gc_extra_header_words = mutator.plan.constraints().gc_extra_header_words;
-    let extra_header = if gc_extra_header_words != 0 {
-        std::cmp::max(
-            gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-            VM::VMObjectModel::object_alignment() as usize,
-        )
-        .next_power_of_two()
-    } else {
-        0
-    };
-    // mutator.alloc(size, align, offset, semantics)
-    let rtn = mutator.alloc(size + extra_header, align, offset, semantics);
-    rtn + extra_header
+    mutator.alloc(size, align, offset, semantics)
+
+    // let gc_extra_header_words = mutator.plan.constraints().gc_extra_header_words;
+    // let extra_header = if gc_extra_header_words != 0 {
+    //     std::cmp::max(
+    //         gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
+    //         VM::VMObjectModel::object_alignment() as usize,
+    //     )
+    //     .next_power_of_two()
+    // } else {
+    //     0
+    // };
+    // let rtn = mutator.alloc(size + extra_header, align, offset, semantics);
+    // rtn + extra_header
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

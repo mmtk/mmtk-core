@@ -253,6 +253,9 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
         mmtk.plan.base().set_gc_status(GcStatus::NotInGC);
 
+        // Reset the triggering information.
+        mmtk.plan.base().reset_collection_trigger();
+
         debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
 
         <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);

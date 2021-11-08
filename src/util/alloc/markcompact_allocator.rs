@@ -7,7 +7,7 @@ use crate::util::Address;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
-// A thin wrapper of bump allocator
+// A thin wrapper(specific implementation) of bump allocator
 // reserve extra bytes when allocating
 #[repr(C)]
 pub struct MarkCompactAllocator<VM: VMBinding> {
