@@ -28,7 +28,7 @@ use crate::plan::CopyContext;
 use crate::plan::Plan;
 
 /// This trait provides a group of associated types that are needed to
-/// create GC work packets for a certain plan. For example, `CommonPlan.schedule_common()`
+/// create GC work packets for a certain plan. For example, `GCWorkScheduler.schedule_common_work()`
 /// needs this trait to schedule different work packets. For certain plans,
 /// they may need to provide several types that implement this trait, e.g. one for
 /// nursery GC, one for mature GC.
