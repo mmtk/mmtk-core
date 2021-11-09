@@ -100,6 +100,14 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
+
+        // self.common()
+        //     .schedule_common::<Self, MarkingProcessEdges<VM>, NoCopy<VM>>(
+        //         self,
+        //         &MARKCOMPACT_CONSTRAINTS,
+        //         scheduler,
+        //     );
+
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MarkingProcessEdges<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]

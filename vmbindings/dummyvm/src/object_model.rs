@@ -80,6 +80,18 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
+    fn get_size_when_copied(object: ObjectReference) -> usize {
+        Self::get_current_size(object)
+    }
+
+    fn get_align_when_copied(_object: ObjectReference) -> usize {
+        ::std::mem::size_of::<usize>()
+    }
+
+    fn get_align_offset_when_copied(_object: ObjectReference) -> isize {
+        0
+    }
+
     fn get_reference_when_copied_to(_from: ObjectReference, _to: Address) -> ObjectReference {
         unimplemented!()
     }
@@ -100,7 +112,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn object_alignment() -> i32 { 
+    fn object_alignment() -> i32 {
         8
     }
 }

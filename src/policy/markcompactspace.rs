@@ -1,4 +1,5 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::{LOG_BYTES_IN_WORD, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
@@ -243,6 +244,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 let size = VM::VMObjectModel::get_current_size(obj) + self.header_reserved_in_bytes;
 
                 if Self::to_be_compacted(obj) {
+                    let size = VM::VMObjectModel::get_size_when_copied(obj)
+                        + self.header_reserved_in_bytes;
+                    let align = VM::VMObjectModel::get_align_when_copied(obj);
+                    let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+                    to = align_allocation_no_fill::<VM>(to, align, offset);
                     let forwarding_pointer_addr = from - GC_EXTRA_HEADER_BYTES;
                     unsafe { forwarding_pointer_addr.store(to) }
                     to += size;
