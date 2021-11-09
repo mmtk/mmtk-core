@@ -289,14 +289,16 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     //         (forwarding_pointer_addr + i).store::<u8>(0);
                     //     };
                     // }
+
                     let target = unsafe { object_addr.to_object_reference() };
-                    // copy obj to target
-                    let dst = target.to_address();
-                    // Copy
-                    let src = obj.to_address();
-                    for i in 0..(size - self.header_reserved_in_bytes) {
-                        unsafe { (dst + i).store((src + i).load::<u8>()) };
-                    }
+                    // // copy obj to target
+                    // let dst = target.to_address();
+                    // // Copy
+                    // let src = obj.to_address();
+                    // for i in 0..(size - self.header_reserved_in_bytes) {
+                    //     unsafe { (dst + i).store((src + i).load::<u8>()) };
+                    // }
+                    VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
                     // update alloc_bit,
                     alloc_bit::set_alloc_bit(target);
                     to += size
