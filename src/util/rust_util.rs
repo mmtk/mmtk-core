@@ -14,25 +14,25 @@ use std::sync::atomic::Ordering;
 /// Otherwise, return false. This function is thread safe so only the first call that makes the number
 /// reach limit will return true.
 pub fn increment_and_check_limit(u: &AtomicUsize, limit: usize) -> bool {
-    let old = u.fetch_add(1, Ordering::SeqCst);
-
-    if old + 1 >= limit {
-        loop {
-            let current = u.load(Ordering::Relaxed);
-            if current < limit {
-                return false;
-            } else if u.compare_exchange(
-                current,
-                current - limit,
-                Ordering::Release,
-                Ordering::Relaxed,
-            ) == Ok(current)
-            {
-                return true;
-            }
+    match u.fetch_update(Ordering::SeqCst, Ordering::Relaxed, |current| {
+        // New value after increment
+        let new_val = current + 1;
+        if new_val < limit {
+            // If the new value is smaller than limit, set to the new value.
+            Some(new_val)
+        } else if new_val == limit {
+            // If the new value equals the limit, reset to 0
+            Some(0)
+        } else {
+            // If the new value is larger than the limit, this should not happen as
+            // we increment by 1 and we should have reset it to zero when the value ever reaches limit.
+            unreachable!()
         }
+    }) {
+        // We are not returning None from the update func, so Err is unreachable.
+        Err(_) => unreachable!(),
+        Ok(old) => old + 1 == limit,
     }
-    false
 }
 
 #[cfg(test)]
