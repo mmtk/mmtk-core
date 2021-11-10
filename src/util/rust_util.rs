@@ -44,7 +44,7 @@ mod tests {
     fn test_increment_and_check_limit() {
         let counter = AtomicUsize::new(0);
         // Let a large number of threads to compete
-        let nthreads = 100000;
+        let nthreads = 1000;
         // Limit is the same as thread number so each thread will run exactly once, and the limit is reached exactly once.
         let limit = nthreads;
         let limit_reached = AtomicUsize::new(0);
