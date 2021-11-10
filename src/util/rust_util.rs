@@ -13,6 +13,9 @@ use std::sync::atomic::Ordering;
 /// Increment the atomic number by 1. If the number reaches limit, return true and reset the number.
 /// Otherwise, return false. This function is thread safe so only the first call that makes the number
 /// reach limit will return true.
+// clippy suggests to use match new_val.cmp(limit) { Ordering::Greater => ..., Ordering::Equal => ..., Ordering::Less => ... },
+// which is unnecessary. Plus clippy lists a known issue with match/ordering that it is slower than if.
+#[allow(clippy::comparison_chain)]
 pub fn increment_and_check_limit(u: &AtomicUsize, limit: usize) -> bool {
     match u.fetch_update(Ordering::SeqCst, Ordering::Relaxed, |current| {
         // New value after increment
@@ -25,7 +28,7 @@ pub fn increment_and_check_limit(u: &AtomicUsize, limit: usize) -> bool {
             Some(0)
         } else {
             // If the new value is larger than the limit, this should not happen as
-            // we increment by 1 and we should have reset it to zero when the value ever reaches limit.
+            // we increment by 1 and we should have reset it to zero when the value ever reaches the limit.
             unreachable!()
         }
     }) {
