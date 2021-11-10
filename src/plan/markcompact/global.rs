@@ -1,6 +1,5 @@
-use super::gc_work::{
-    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
-};
+use super::gc_work::UpdateReferences;
+use super::gc_work::{CalculateForwardingAddress, Compact, MarkingProcessEdges};
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -26,7 +25,6 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::ActivePlan;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -101,6 +99,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
 
+        // TODO use schedule_common once it can work with markcompact
         // self.common()
         //     .schedule_common::<Self, MarkingProcessEdges<VM>, NoCopy<VM>>(
         //         self,
@@ -118,22 +117,26 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
-        // TODO investigate why the following will create duplicate edges
-        // scheduler.work_buckets[WorkBucketStage::RefForwarding]
-        //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
-
-        for mutator in VM::VMActivePlan::mutators() {
-            scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
-        }
-
-        scheduler.work_buckets[WorkBucketStage::RefForwarding]
-            .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
-
+        scheduler.work_buckets[WorkBucketStage::RefForwarding].add(UpdateReferences::<VM>::new());
         scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<Self, NoCopy<VM>>::new(self));
 
+        // Finalization
+        // if !self.base().options.no_finalizer {
+        //     use crate::util::finalizable_processor::Finalization;
+        //     // finalization
+        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
+        //         .add(Finalization::<ForwardingProcessEdges<VM>>::new()); // needs to be processed after calculate forwarding pointer
+        //                                                                  // forward refs
+        // }
+
+        // Analysis GC work
+        #[cfg(feature = "analysis")]
+        {
+            use crate::util::analysis::GcHookWork;
+            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        }
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final].add(
             crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self, NoCopy<VM>>::new(self),

@@ -35,7 +35,9 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        alloc_bit::is_alloced(object)
+        // Sanity checker cannot use this method to do the verification
+        // since the mark bit will be cleared during the second trace(update forwarding pointer)
+        Self::is_marked(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -223,7 +225,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         true
     }
 
-    pub fn to_be_compacted(object: ObjectReference) -> bool {
+    pub fn is_marked(object: ObjectReference) -> bool {
         let old_value = load_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             object,
@@ -232,6 +234,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
         let mark_bit = old_value & GC_MARK_BIT_MASK;
         mark_bit != 0
+    }
+
+    pub fn to_be_compacted(object: ObjectReference) -> bool {
+        Self::is_marked(object)
     }
 
     pub fn calculate_forwarding_pointer(&self) {
@@ -282,22 +288,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                         GC_EXTRA_HEADER_BYTES,
                     );
                     crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
-                    // for i in 0..GC_EXTRA_HEADER_BYTES {
-                    //     unsafe {
-                    //         (forwarding_pointer + self.header_reserved_in_bytes - GC_EXTRA_HEADER_BYTES + i)
-                    //             .store::<u8>(0);
-                    //         (forwarding_pointer_addr + i).store::<u8>(0);
-                    //     };
-                    // }
-
+                    // copy object
                     let target = unsafe { object_addr.to_object_reference() };
-                    // // copy obj to target
-                    // let dst = target.to_address();
-                    // // Copy
-                    // let src = obj.to_address();
-                    // for i in 0..(size - self.header_reserved_in_bytes) {
-                    //     unsafe { (dst + i).store((src + i).load::<u8>()) };
-                    // }
                     VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
                     // update alloc_bit,
                     alloc_bit::set_alloc_bit(target);

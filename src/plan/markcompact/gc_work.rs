@@ -5,10 +5,13 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
+use crate::scheduler::WorkBucketStage;
 use crate::util::{Address, ObjectReference};
+use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 // iterate through the heap and calculate the new location of live objects
@@ -34,6 +37,32 @@ impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
 impl<VM: VMBinding> CalculateForwardingAddress<VM> {
     pub fn new(mc_space: &'static MarkCompactSpace<VM>) -> Self {
         Self { mc_space }
+    }
+}
+
+pub struct UpdateReferences<VM: VMBinding> {
+    p: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        // TODO investigate why the following will create duplicate edges
+        // scheduler.work_buckets[WorkBucketStage::RefForwarding]
+        //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
+        for mutator in VM::VMActivePlan::mutators() {
+            mmtk.scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
+        }
+
+        mmtk.scheduler.work_buckets[WorkBucketStage::RefForwarding]
+            .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
+    }
+}
+
+impl<VM: VMBinding> UpdateReferences<VM> {
+    pub fn new() -> Self {
+        Self { p: PhantomData }
     }
 }
 
