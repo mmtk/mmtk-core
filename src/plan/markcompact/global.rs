@@ -155,7 +155,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_extra_header_bytes(&self) -> usize {
-        self.mc_space.header_reserved_in_bytes
+        self.mc_space.get_header_reserved_in_bytes()
     }
 }
 

@@ -49,7 +49,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let extra_header = self.get_plan().get_extra_header_bytes()
+        let extra_header = self.get_plan().get_extra_header_bytes();
         let rtn = self
             .bump_allocator
             .alloc(size + extra_header, align, offset);

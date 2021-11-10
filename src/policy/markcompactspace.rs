@@ -121,6 +121,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         }
     }
 
+    pub fn get_header_reserved_in_bytes(&self) -> usize {
+        self.header_reserved_in_bytes
+    }
+
     pub fn prepare(&self) {}
 
     pub fn release(&self) {}
