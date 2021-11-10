@@ -49,17 +49,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let gc_extra_header_words = self.get_plan().constraints().gc_extra_header_words;
-        let extra_header = if gc_extra_header_words != 0 {
-            std::cmp::max(
-                gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-                VM::MAX_ALIGNMENT,
-            )
-            .next_power_of_two()
-        } else {
-            0
-        };
-
+        let extra_header = self.get_plan().get_extra_header_bytes()
         let rtn = self
             .bump_allocator
             .alloc(size + extra_header, align, offset);

@@ -73,8 +73,6 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn init(&mut self, _vm_map: &'static VMMap) {
         self.common().init(self.as_space());
-        self.header_reserved_in_bytes =
-            std::cmp::max(GC_EXTRA_HEADER_BYTES, VM::MAX_ALIGNMENT).next_power_of_two();
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -118,7 +116,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            header_reserved_in_bytes: 0,
+            header_reserved_in_bytes: std::cmp::max(GC_EXTRA_HEADER_BYTES, VM::MAX_ALIGNMENT)
+                .next_power_of_two(),
         }
     }
 

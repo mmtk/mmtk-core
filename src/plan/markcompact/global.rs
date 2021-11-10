@@ -155,11 +155,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn get_extra_header_bytes(&self) -> usize {
-        std::cmp::max(
-            MARKCOMPACT_CONSTRAINTS.gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-            VM::MAX_ALIGNMENT,
-        )
-        .next_power_of_two()
+        self.mc_space.header_reserved_in_bytes
     }
 }
 
