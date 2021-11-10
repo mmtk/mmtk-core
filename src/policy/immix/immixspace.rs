@@ -58,7 +58,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        if !super::DEFRAG {
+            // If defrag is disabled, we won't forward objects.
+            self.is_marked(object, self.mark_state)
+        } else {
+            self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        }
     }
     fn is_movable(&self) -> bool {
         super::DEFRAG
