@@ -73,11 +73,8 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn init(&mut self, _vm_map: &'static VMMap) {
         self.common().init(self.as_space());
-        self.header_reserved_in_bytes = std::cmp::max(
-            GC_EXTRA_HEADER_BYTES,
-            VM::VMObjectModel::object_alignment() as usize,
-        )
-        .next_power_of_two();
+        self.header_reserved_in_bytes =
+            std::cmp::max(GC_EXTRA_HEADER_BYTES, VM::MAX_ALIGNMENT).next_power_of_two();
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {

@@ -40,6 +40,8 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
     }
 }
 
+// create another round of root scanning work packets
+// to update object references
 pub struct UpdateReferences<VM: VMBinding> {
     p: PhantomData<VM>,
 }

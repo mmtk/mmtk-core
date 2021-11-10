@@ -4,7 +4,6 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 // A thin wrapper(specific implementation) of bump allocator
@@ -54,7 +53,7 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         let extra_header = if gc_extra_header_words != 0 {
             std::cmp::max(
                 gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-                VM::VMObjectModel::object_alignment() as usize,
+                VM::MAX_ALIGNMENT,
             )
             .next_power_of_two()
         } else {

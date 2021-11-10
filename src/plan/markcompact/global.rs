@@ -25,7 +25,6 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -106,7 +105,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         //         &MARKCOMPACT_CONSTRAINTS,
         //         scheduler,
         //     );
-
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MarkingProcessEdges<VM>>::new());
         scheduler.work_buckets[WorkBucketStage::Prepare]
@@ -159,7 +157,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn get_extra_header_bytes(&self) -> usize {
         std::cmp::max(
             MARKCOMPACT_CONSTRAINTS.gc_extra_header_words * crate::util::constants::BYTES_IN_WORD,
-            VM::VMObjectModel::object_alignment() as usize,
+            VM::MAX_ALIGNMENT,
         )
         .next_power_of_two()
     }
