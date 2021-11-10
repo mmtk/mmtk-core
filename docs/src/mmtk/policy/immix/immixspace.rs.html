@@ -582,6 +582,11 @@
 <span id="582">582</span>
 <span id="583">583</span>
 <span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -642,7 +647,12 @@
         <span class="self">self</span>.<span class="ident">get_name</span>()
     }
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">ForwardingWord::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+        <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::DEFRAG</span> {
+            <span class="comment">// If defrag is disabled, we won&#39;t forward objects.</span>
+            <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>)
+        } <span class="kw">else</span> {
+            <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">ForwardingWord::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+        }
     }
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident"><span class="kw">super</span>::DEFRAG</span>
