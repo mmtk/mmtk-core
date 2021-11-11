@@ -84,8 +84,22 @@ impl FinalizableProcessor {
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
-    pub fn forward<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    // pub fn forward<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+    //     self.candidates
+    //         .iter_mut()
+    //         .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
+    //     e.flush();
+    // }
+
+    pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
+            .iter_mut()
+            .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
+        e.flush();
+    }
+
+    pub fn forward_finalizable<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
+        self.ready_for_finalize
             .iter_mut()
             .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
         e.flush();
@@ -128,11 +142,14 @@ impl<E: ProcessEdgesWork> Finalization<E> {
 pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("Forward finalization");
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk);
-        finalizable_processor.forward(&mut w, mmtk.plan.is_current_gc_nursery());
+        w.set_worker(worker);
+        finalizable_processor.forward_candidate(&mut w, mmtk.plan.is_current_gc_nursery());
+
+        finalizable_processor.forward_finalizable(&mut w, mmtk.plan.is_current_gc_nursery());
         trace!("Finished forwarding finlizable");
     }
 }

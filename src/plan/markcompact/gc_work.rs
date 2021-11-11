@@ -23,14 +23,6 @@ impl<VM: VMBinding> GCWork<VM> for CalculateForwardingAddress<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         self.mc_space.calculate_forwarding_pointer();
-        // FIXME
-        // The following needs to be done right before the second round of root scanning
-        // put here for simplicity since calculating forwarding pointer occurs right
-        // before updating object references(done through another round of root scanning)
-        // and this calculation is done in a single-threaded manner.
-        VM::VMScanning::prepare_for_roots_re_scanning();
-        #[cfg(feature = "extreme_assertions")]
-        crate::util::edge_logger::reset();
     }
 }
 
@@ -49,6 +41,12 @@ pub struct UpdateReferences<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        // The following needs to be done right before the second round of root scanning
+        VM::VMScanning::prepare_for_roots_re_scanning();
+
+        #[cfg(feature = "extreme_assertions")]
+        crate::util::edge_logger::reset();
+
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());

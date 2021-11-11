@@ -1,5 +1,7 @@
-use super::gc_work::UpdateReferences;
-use super::gc_work::{CalculateForwardingAddress, Compact, MarkingProcessEdges};
+use super::gc_work::{
+    CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
+    UpdateReferences,
+};
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -40,6 +42,7 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 1,
     gc_extra_header_words: GC_EXTRA_HEADER_WORD,
     num_specialized_scans: 2,
+    // needs_forward_after_liveness: true, // enable this once finalizable_processor can work with markcompact
     ..PlanConstraints::default()
 };
 
@@ -121,13 +124,14 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(Release::<Self, NoCopy<VM>>::new(self));
 
         // Finalization
-        // if !self.base().options.no_finalizer {
-        //     use crate::util::finalizable_processor::Finalization;
-        //     // finalization
-        //     scheduler.work_buckets[WorkBucketStage::RefClosure]
-        //         .add(Finalization::<ForwardingProcessEdges<VM>>::new()); // needs to be processed after calculate forwarding pointer
-        //                                                                  // forward refs
-        // }
+        if !self.base().options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            scheduler.work_buckets[WorkBucketStage::RefClosure]
+                .add(Finalization::<MarkingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
+        }
 
         // Analysis GC work
         #[cfg(feature = "analysis")]
