@@ -127,8 +127,12 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         if !self.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
+            // treat finalizable objects as roots and perform a closure (marking)
+            // must be done before calculating forwarding pointers
             scheduler.work_buckets[WorkBucketStage::RefClosure]
                 .add(Finalization::<MarkingProcessEdges<VM>>::new());
+            // update finalizable object references
+            // must be done before compacting
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }

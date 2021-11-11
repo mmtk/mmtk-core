@@ -36,8 +36,7 @@ impl<VM: VMBinding> Allocators<VM> {
     /// The selector needs to be valid, and points to an allocator that has been initialized.
     pub unsafe fn get_allocator(&self, selector: AllocatorSelector) -> &dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index)
-            | AllocatorSelector::BumpPointerAllocBit(index) => {
+            AllocatorSelector::BumpPointer(index) => {
                 self.bump_pointer[index as usize].assume_init_ref()
             }
             AllocatorSelector::LargeObject(index) => {
@@ -58,8 +57,7 @@ impl<VM: VMBinding> Allocators<VM> {
         selector: AllocatorSelector,
     ) -> &mut dyn Allocator<VM> {
         match selector {
-            AllocatorSelector::BumpPointer(index)
-            | AllocatorSelector::BumpPointerAllocBit(index) => {
+            AllocatorSelector::BumpPointer(index) => {
                 self.bump_pointer[index as usize].assume_init_mut()
             }
             AllocatorSelector::LargeObject(index) => {
@@ -88,8 +86,7 @@ impl<VM: VMBinding> Allocators<VM> {
 
         for &(selector, space) in space_mapping.iter() {
             match selector {
-                AllocatorSelector::BumpPointer(index)
-                | AllocatorSelector::BumpPointerAllocBit(index) => {
+                AllocatorSelector::BumpPointer(index) => {
                     ret.bump_pointer[index as usize].write(BumpAllocator::new(
                         mutator_tls.0,
                         space,
@@ -151,6 +148,5 @@ pub enum AllocatorSelector {
     LargeObject(u8),
     Malloc(u8),
     Immix(u8),
-    BumpPointerAllocBit(u8),
     MarkCompact(u8),
 }
