@@ -366,10 +366,6 @@ pub trait Plan: 'static + Sync + Downcast {
             object
         );
     }
-
-    fn get_extra_header_bytes(&self) -> usize {
-        0
-    }
 }
 
 impl_downcast!(Plan assoc VM);

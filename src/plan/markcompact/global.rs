@@ -12,7 +12,6 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::markcompactspace::MarkCompactSpace;
-use crate::policy::markcompactspace::GC_EXTRA_HEADER_WORD;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
@@ -40,7 +39,6 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     moves_objects: true,
     gc_header_bits: 2,
     gc_header_words: 1,
-    gc_extra_header_words: GC_EXTRA_HEADER_WORD,
     num_specialized_scans: 2,
     // needs_forward_after_liveness: true, // enable this once finalizable_processor can work with markcompact
     ..PlanConstraints::default()
@@ -160,10 +158,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
     fn get_collection_reserve(&self) -> usize {
         0
-    }
-
-    fn get_extra_header_bytes(&self) -> usize {
-        self.mc_space.get_header_reserved_in_bytes()
     }
 }
 

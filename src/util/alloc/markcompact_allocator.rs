@@ -6,8 +6,8 @@ use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
 
-// A thin wrapper(specific implementation) of bump allocator
-// reserve extra bytes when allocating
+/// A thin wrapper(specific implementation) of bump allocator
+/// reserve extra bytes when allocating
 #[repr(C)]
 pub struct MarkCompactAllocator<VM: VMBinding> {
     bump_allocator: BumpAllocator<VM>,
@@ -49,12 +49,11 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        let extra_header = self.get_plan().get_extra_header_bytes();
         let rtn = self
             .bump_allocator
-            .alloc(size + extra_header, align, offset);
+            .alloc(size + Self::HEADER_RESERVED_IN_BYTES, align, offset);
         // return the actual object start address
-        rtn + extra_header
+        rtn + Self::HEADER_RESERVED_IN_BYTES
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
@@ -80,6 +79,8 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
 }
 
 impl<VM: VMBinding> MarkCompactAllocator<VM> {
+    pub const HEADER_RESERVED_IN_BYTES: usize =
+        crate::policy::markcompactspace::MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES;
     pub fn new(
         tls: VMThread,
         space: &'static dyn Space<VM>,

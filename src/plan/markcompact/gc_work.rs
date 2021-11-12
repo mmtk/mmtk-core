@@ -14,7 +14,7 @@ use crate::MMTK;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-// iterate through the heap and calculate the new location of live objects
+/// iterate through the heap and calculate the new location of live objects
 pub struct CalculateForwardingAddress<VM: VMBinding> {
     mc_space: &'static MarkCompactSpace<VM>,
 }
@@ -32,8 +32,8 @@ impl<VM: VMBinding> CalculateForwardingAddress<VM> {
     }
 }
 
-// create another round of root scanning work packets
-// to update object references
+/// create another round of root scanning work packets
+/// to update object references
 pub struct UpdateReferences<VM: VMBinding> {
     p: PhantomData<VM>,
 }
@@ -66,7 +66,7 @@ impl<VM: VMBinding> UpdateReferences<VM> {
     }
 }
 
-// compact live objects based on forwarding pointers calculated before
+/// compact live objects based on forwarding pointers calculated before
 pub struct Compact<VM: VMBinding> {
     mc_space: &'static MarkCompactSpace<VM>,
 }
@@ -136,7 +136,7 @@ impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
     }
 }
 
-// Transitive closure to update object references
+/// Transitive closure to update object references
 pub struct ForwardingProcessEdges<VM: VMBinding> {
     plan: &'static MarkCompact<VM>,
     base: ProcessEdgesBase<ForwardingProcessEdges<VM>>,

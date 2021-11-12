@@ -11,7 +11,6 @@ pub struct PlanConstraints {
     pub moves_objects: bool,
     pub gc_header_bits: usize,
     pub gc_header_words: usize,
-    pub gc_extra_header_words: usize,
     pub num_specialized_scans: usize,
     /// Size (in bytes) beyond which new regular objects must be allocated to the LOS.
     /// This usually depends on the restriction of the default allocator, e.g. block size for Immix,
@@ -40,7 +39,6 @@ impl PlanConstraints {
             moves_objects: false,
             gc_header_bits: 0,
             gc_header_words: 0,
-            gc_extra_header_words: 0,
             num_specialized_scans: 0,
             max_non_los_default_alloc_bytes: MAX_INT,
             max_non_los_copy_bytes: MAX_INT,

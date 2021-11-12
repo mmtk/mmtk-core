@@ -13,7 +13,6 @@ use atomic::Ordering;
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
-    header_reserved_in_bytes: usize,
 }
 
 const GC_MARK_BIT_MASK: usize = 1;
@@ -81,6 +80,13 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 }
 
 impl<VM: VMBinding> MarkCompactSpace<VM> {
+    pub const HEADER_RESERVED_IN_BYTES: usize = if VM::MAX_ALIGNMENT > GC_EXTRA_HEADER_BYTES {
+        VM::MAX_ALIGNMENT
+    } else {
+        GC_EXTRA_HEADER_BYTES
+    }
+    .next_power_of_two();
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
@@ -116,13 +122,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 MonotonePageResource::new_contiguous(common.start, common.extent, 0, vm_map)
             },
             common,
-            header_reserved_in_bytes: std::cmp::max(GC_EXTRA_HEADER_BYTES, VM::MAX_ALIGNMENT)
-                .next_power_of_two(),
         }
-    }
-
-    pub fn get_header_reserved_in_bytes(&self) -> usize {
-        self.header_reserved_in_bytes
     }
 
     pub fn prepare(&self) {}
@@ -167,7 +167,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let forwarding_pointer =
             unsafe { (object.to_address() - GC_EXTRA_HEADER_BYTES).load::<Address>() };
 
-        unsafe { (forwarding_pointer + self.header_reserved_in_bytes).to_object_reference() }
+        unsafe { (forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES).to_object_reference() }
     }
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
@@ -247,17 +247,18 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         while from < end {
             if alloc_bit::is_alloced_object(from) {
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj) + self.header_reserved_in_bytes;
+                let size =
+                    VM::VMObjectModel::get_current_size(obj) + Self::HEADER_RESERVED_IN_BYTES;
 
                 if Self::to_be_compacted(obj) {
-                    let size = VM::VMObjectModel::get_size_when_copied(obj)
-                        + self.header_reserved_in_bytes;
+                    let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
+                        + Self::HEADER_RESERVED_IN_BYTES;
                     let align = VM::VMObjectModel::get_align_when_copied(obj);
                     let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
                     to = align_allocation_no_fill::<VM>(to, align, offset);
                     let forwarding_pointer_addr = from - GC_EXTRA_HEADER_BYTES;
                     unsafe { forwarding_pointer_addr.store(to) }
-                    to += size;
+                    to += copied_size;
                 }
                 from += size;
             } else {
@@ -275,16 +276,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 // clear the alloc bit
                 alloc_bit::unset_addr_alloc_bit(from);
                 let obj = unsafe { from.to_object_reference() };
-                let size = VM::VMObjectModel::get_current_size(obj) + self.header_reserved_in_bytes;
+                let size =
+                    VM::VMObjectModel::get_current_size(obj) + Self::HEADER_RESERVED_IN_BYTES;
 
                 let forwarding_pointer_addr = from - GC_EXTRA_HEADER_BYTES;
                 let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
                 if forwarding_pointer != Address::ZERO {
+                    let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
+                        + Self::HEADER_RESERVED_IN_BYTES;
                     to = forwarding_pointer;
-                    let object_addr = forwarding_pointer + self.header_reserved_in_bytes;
+                    let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
                     // clear forwarding pointer
                     crate::util::memory::zero(
-                        forwarding_pointer + self.header_reserved_in_bytes - GC_EXTRA_HEADER_BYTES,
+                        forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES - GC_EXTRA_HEADER_BYTES,
                         GC_EXTRA_HEADER_BYTES,
                     );
                     crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
@@ -293,7 +297,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                     VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
                     // update alloc_bit,
                     alloc_bit::set_alloc_bit(target);
-                    to += size
+                    to += copied_size
                 }
                 from += size;
             } else {
