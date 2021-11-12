@@ -731,7 +731,12 @@ impl<VM: VMBinding> BasePlan<VM> {
     /// is thread safe and we guarantee only one thread will return true.
     pub fn inform_stack_scanned(&self, n_mutators: usize) -> bool {
         let old = self.scanned_stacks.fetch_add(1, Ordering::SeqCst);
-        debug_assert!(old < n_mutators, "The number of scanned stacks ({}) is more than the number of mutators ({})", old, n_mutators);
+        debug_assert!(
+            old < n_mutators,
+            "The number of scanned stacks ({}) is more than the number of mutators ({})",
+            old,
+            n_mutators
+        );
         let scanning_done = old + 1 == n_mutators;
         if scanning_done {
             self.stacks_prepared.store(true, Ordering::SeqCst);
