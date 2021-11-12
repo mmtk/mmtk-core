@@ -200,7 +200,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         }
 
         trace!("stop_all_mutators start");
-        debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
+        mmtk.plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
@@ -317,8 +317,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         );
         self.0.flush();
 
-        if crate::util::rust_util::increment_and_check_limit(&base.scanned_stacks, mutators) {
-            debug_assert_eq!(base.scanned_stacks.load(Ordering::SeqCst), 0);
+        if mmtk.plan.base().inform_stack_scanned(mutators) {
             <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );

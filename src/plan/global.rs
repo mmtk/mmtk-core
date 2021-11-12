@@ -382,7 +382,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub trigger_gc_when_heap_is_full: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
-    pub stacks_prepared: AtomicBool,
     pub emergency_collection: AtomicBool,
     pub user_triggered_collection: AtomicBool,
     pub internal_triggered_collection: AtomicBool,
@@ -401,8 +400,10 @@ pub struct BasePlan<VM: VMBinding> {
     pub heap: HeapMeta,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
-    // A counter for per-mutator stack scanning
-    pub scanned_stacks: AtomicUsize,
+    /// A counter for per-mutator stack scanning
+    scanned_stacks: AtomicUsize,
+    /// Have we scanned all the stacks?
+    stacks_prepared: AtomicBool,
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
     allocation_bytes: AtomicUsize,
@@ -712,8 +713,30 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    /// Are the stacks scanned?
     pub fn stacks_prepared(&self) -> bool {
         self.stacks_prepared.load(Ordering::SeqCst)
+    }
+
+    /// Prepare for stack scanning. This is usually used with `inform_stack_scanned()`.
+    /// This should be called before doing stack scanning.
+    pub fn prepare_for_stack_scanning(&self) {
+        self.scanned_stacks.store(0, Ordering::SeqCst);
+        self.stacks_prepared.store(false, Ordering::SeqCst);
+    }
+
+    /// Inform that 1 stack has been scanned. The argument `n_mutators` indicates the
+    /// total stacks we should scan. This method returns true if the number of scanned
+    /// stacks equals the total mutator count. Otherwise it returns false. This method
+    /// is thread safe and we guarantee only one thread will return true.
+    pub fn inform_stack_scanned(&self, n_mutators: usize) -> bool {
+        let old = self.scanned_stacks.fetch_add(1, Ordering::SeqCst);
+        debug_assert!(old < n_mutators, "The number of scanned stacks ({}) is more than the number of mutators ({})", old, n_mutators);
+        let scanning_done = old + 1 == n_mutators;
+        if scanning_done {
+            self.stacks_prepared.store(true, Ordering::SeqCst);
+        }
+        scanning_done
     }
 
     pub fn gc_in_progress(&self) -> bool {
