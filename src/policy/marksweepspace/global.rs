@@ -32,10 +32,7 @@ use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockSta
             FreeListPageResource, HeapMeta, VMRequest,
         }, metadata::{self, MetadataSpec, load_metadata, side_metadata::{self, SideMetadataContext, SideMetadataSpec, address_to_meta_address}, store_metadata}}, vm::VMBinding};
 
-use super::{
-    super::space::{CommonSpace, Space, SFT},
-    chunks::ChunkMap,
-};
+use super::{super::space::{CommonSpace, Space, SFT}, chunks::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
 
 pub struct MarkSweepSpace<VM: VMBinding> {
@@ -176,7 +173,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-
+        // eprintln!("check mark {}", object.to_address());
         if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             // eprintln!("m {} meta: {}", object.to_address(), address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), object.to_address()));
@@ -188,23 +185,23 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
         
     pub fn zero_mark_bits(&self) {
+        // eprintln!("b zero all {} {}", self.chunk_map.all_chunks().start.start(), self.chunk_map.all_chunks().end.start());
         use crate::vm::*;
         for chunk in self.chunk_map.all_chunks() {
+            // eprintln!("b zero {}", chunk.start());
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
             }
         }
     }
 
-    pub fn acquire_block(&self) -> Address {
-        // acquire 64kB block from the global pool
-        todo!()
+    pub fn record_new_block(&self, block: Address) {
+        let block = Block::from(block);
+        block.init();
+        self.chunk_map.set(block.chunk(), ChunkState::Allocated);
     }
 
-    pub fn return_block(&self) {
-        // return freed 64kB block
-        todo!()
-    }
+
 
     #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
@@ -213,6 +210,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn reset(&mut self) {
         // do nothing
+        self.zero_mark_bits();
     }
 
     pub fn block_level_sweep(&self) {

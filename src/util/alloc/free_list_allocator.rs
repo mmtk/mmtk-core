@@ -255,7 +255,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             debug_assert!(self.available_blocks[FreeListAllocator::<VM>::mi_bin(size) as usize].is_empty());
             return self.alloc_slow(size, align, offset)
         }
-        addr
+        // eprintln!("a {}", addr);
+;        addr
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
@@ -687,10 +688,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
         eprintln!("r {}", self.available_blocks[bin as usize].size);
         let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+
         if block.is_zero() {
             // GC, I guess
             return block;
         }
+        self.space.record_new_block(block);
+        // eprintln!("b > 0x{:0x} {}", block, self.available_blocks[bin as usize].size);
 
         // construct free list
         let block_end = block + BYTES_IN_BLOCK;
@@ -756,7 +760,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
-        // eprintln!("f {}", addr);
+        eprintln!("f {}", addr);
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
