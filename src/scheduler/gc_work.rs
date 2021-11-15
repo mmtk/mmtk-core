@@ -200,7 +200,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         }
 
         trace!("stop_all_mutators start");
-        debug_assert_eq!(mmtk.plan.base().scanned_stacks.load(Ordering::SeqCst), 0);
+        mmtk.plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
@@ -316,40 +316,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
             worker.tls,
         );
         self.0.flush();
-        let old = base.scanned_stacks.fetch_add(1, Ordering::SeqCst);
-        trace!(
-            "mutator {:?} old scanned_stacks = {}, new scanned_stacks = {}",
-            self.0.get_tls(),
-            old,
-            base.scanned_stacks.load(Ordering::Relaxed)
-        );
 
-        if old + 1 >= mutators {
-            loop {
-                let current = base.scanned_stacks.load(Ordering::Relaxed);
-                if current < mutators {
-                    break;
-                } else if base.scanned_stacks.compare_exchange(
-                    current,
-                    current - mutators,
-                    Ordering::Release,
-                    Ordering::Relaxed,
-                ) == Ok(current)
-                {
-                    trace!(
-                        "mutator {:?} old scanned_stacks = {}, new scanned_stacks = {}, number_of_mutators = {}",
-                        self.0.get_tls(),
-                        current,
-                        base.scanned_stacks.load(Ordering::Relaxed),
-                        mutators
-                    );
-                    <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
-                        false, worker.tls,
-                    );
-                    base.set_gc_status(GcStatus::GcProper);
-                    break;
-                }
-            }
+        if mmtk.plan.base().inform_stack_scanned(mutators) {
+            <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
+                false, worker.tls,
+            );
+            base.set_gc_status(GcStatus::GcProper);
         }
     }
 }
