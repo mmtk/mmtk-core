@@ -1,10 +1,10 @@
-use crate::policy::immix::ImmixCopyContext;
 use crate::plan::barriers::ObjectRememberingBarrier;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::immix::GenImmix;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
+use crate::policy::immix::ImmixCopyContext;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};

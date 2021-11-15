@@ -1,7 +1,6 @@
 use super::global::Immix;
-use crate::policy::space::Space;
 use crate::policy::immix::ImmixCopyContext;
-use crate::policy::copy_context::NoCopy;
+use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -69,9 +68,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
                 )
             }
         } else {
-            self.immix()
-                .common
-                .trace_object::<Self>(self, object)
+            self.immix().common.trace_object::<Self>(self, object)
         }
     }
 

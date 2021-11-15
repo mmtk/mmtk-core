@@ -1,7 +1,7 @@
 use super::global::GenCopy;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::policy::space::Space;
 use crate::policy::copyspace::CopySpaceCopyContext;
+use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -36,15 +36,12 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
         if self.gencopy().tospace().in_space(object) {
             return object;
         } else if self.gencopy().fromspace().in_space(object) {
-            return self
-                .gencopy()
-                .fromspace()
-                .trace_object::<Self>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    self.worker(),
-                );
+            return self.gencopy().fromspace().trace_object::<Self>(
+                self,
+                object,
+                super::global::ALLOC_SS,
+                self.worker(),
+            );
         }
 
         self.gencopy()

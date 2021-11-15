@@ -8,6 +8,7 @@ use crate::plan::immix::gc_work::TraceKind;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -21,7 +22,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
-use crate::policy::immix::ImmixCopyContext;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -64,10 +64,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &GENIMMIX_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &'static self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         let mut c = ImmixCopyContext {
             plan_constraints: &GENIMMIX_CONSTRAINTS,
             copy_allocator: crate::util::alloc::ImmixAllocator::new(
@@ -81,7 +78,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 Some(&self.immix),
                 self,
                 true,
-            )
+            ),
         };
         c.init(tls);
         GCWorkerLocalPtr::new(c)

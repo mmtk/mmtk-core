@@ -4,12 +4,12 @@ use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics as AllocationType;
+use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
-use crate::policy::copyspace::CopySpaceCopyContext;
 use enum_map::enum_map;
 use enum_map::EnumMap;
 

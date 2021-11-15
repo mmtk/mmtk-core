@@ -4,8 +4,8 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::space::Space;
 use crate::policy::copy_context::NoCopy;
+use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -17,8 +17,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
-    plan::global::CommonPlan,
-    policy::largeobjectspace::LargeObjectSpace,
+    plan::global::CommonPlan, policy::largeobjectspace::LargeObjectSpace,
     util::opaque_pointer::VMWorkerThread,
 };
 use enum_map::EnumMap;
@@ -41,10 +40,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         let mut c = NoCopy::<VM>::new();
         c.init(tls);
         GCWorkerLocalPtr::new(c)

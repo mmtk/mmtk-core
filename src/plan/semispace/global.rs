@@ -49,13 +49,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &SS_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &'static self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         use crate::policy::copyspace::CopySpaceCopyContext;
-        use crate::util::opaque_pointer::VMThread;
         use crate::util::alloc::BumpAllocator;
+        use crate::util::opaque_pointer::VMThread;
         let mut c = CopySpaceCopyContext {
             plan_constraints: &SS_CONSTRAINTS,
             copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, &self.copyspace0, self),

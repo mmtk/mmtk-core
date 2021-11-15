@@ -1,7 +1,6 @@
 use super::global::SemiSpace;
-use crate::policy::space::Space;
 use crate::policy::copyspace::CopySpaceCopyContext;
-use crate::policy::copy_context::NoCopy;
+use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -40,18 +39,14 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         if self.ss().tospace().in_space(object) {
             object
         } else if self.ss().fromspace().in_space(object) {
-            self.ss()
-                .fromspace()
-                .trace_object::<Self>(
-                    self,
-                    object,
-                    super::global::ALLOC_SS,
-                    self.worker(),
-                )
+            self.ss().fromspace().trace_object::<Self>(
+                self,
+                object,
+                super::global::ALLOC_SS,
+                self.worker(),
+            )
         } else {
-            self.ss()
-                .common
-                .trace_object::<Self>(self, object)
+            self.ss().common.trace_object::<Self>(self, object)
         }
     }
 }

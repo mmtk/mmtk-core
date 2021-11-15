@@ -3,8 +3,8 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::space::Space;
 use crate::policy::copy_context::NoCopy;
+use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
 use crate::scheduler::GCWorkerLocalPtr;
@@ -41,10 +41,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         let mut c = NoCopy::<VM>::new();
         c.init(tls);
         GCWorkerLocalPtr::new(c)

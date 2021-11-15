@@ -5,9 +5,9 @@ use super::{
     defrag::Defrag,
 };
 use crate::plan::ObjectsClosure;
+use crate::policy::copy_context::CopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
-use crate::policy::copy_context::CopyContext;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -590,10 +590,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
     }
 }
 
-use crate::util::alloc::ImmixAllocator;
-use crate::util::alloc::Allocator;
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkerLocal;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::ImmixAllocator;
 use crate::util::object_forwarding;
 
 /// Immix copy allocator

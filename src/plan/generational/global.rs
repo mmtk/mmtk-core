@@ -4,7 +4,6 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::copy_context::NoCopy;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::conversions;

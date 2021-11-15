@@ -81,3 +81,4 @@ pub use crate::plan::{
     AllocationSemantics, BarrierSelector, Mutator, MutatorContext, Plan, TraceLocal,
     TransitiveClosure,
 };
+pub use crate::policy::copy_context::CopyContext;

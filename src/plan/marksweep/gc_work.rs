@@ -1,5 +1,5 @@
-use crate::policy::copy_context::NoCopy;
 use crate::plan::global::Plan;
+use crate::policy::copy_context::NoCopy;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
 use crate::policy::mallocspace::MallocSpace;
@@ -40,9 +40,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
         if self.plan.ms_space().in_space(object) {
             self.plan.ms_space().trace_object::<Self>(self, object)
         } else {
-            self.plan
-                .common()
-                .trace_object::<Self>(self, object)
+            self.plan.common().trace_object::<Self>(self, object)
         }
     }
 }

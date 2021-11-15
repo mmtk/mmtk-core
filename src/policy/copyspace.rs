@@ -1,8 +1,9 @@
-use crate::plan::TransitiveClosure;
 use crate::plan::AllocationSemantics;
+use crate::plan::TransitiveClosure;
 use crate::policy::copy_context::CopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
@@ -17,7 +18,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::scheduler::GCWorker;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -263,10 +263,10 @@ impl<VM: VMBinding> CopySpace<VM> {
 }
 
 use crate::plan::PlanConstraints;
-use crate::util::alloc::BumpAllocator;
-use crate::util::alloc::Allocator;
-use crate::util::opaque_pointer::VMWorkerThread;
 use crate::scheduler::GCWorkerLocal;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::BumpAllocator;
+use crate::util::opaque_pointer::VMWorkerThread;
 
 pub struct CopySpaceCopyContext<VM: VMBinding> {
     pub plan_constraints: &'static PlanConstraints,
@@ -284,13 +284,9 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
         self.copy_allocator.tls = tls.0;
     }
 
-    fn prepare(&mut self) {
+    fn prepare(&mut self) {}
 
-    }
-
-    fn release(&mut self) {
-
-    }
+    fn release(&mut self) {}
 
     #[inline(always)]
     fn alloc_copy(
@@ -327,6 +323,7 @@ impl<VM: VMBinding> GCWorkerLocal for CopySpaceCopyContext<VM> {
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub fn rebind(&mut self, space: &CopySpace<VM>) {
-        self.copy_allocator.rebind(unsafe { &*{space as *const _} });
+        self.copy_allocator
+            .rebind(unsafe { &*{ space as *const _ } });
     }
 }

@@ -1,5 +1,5 @@
-use super::gc_work::TraceKind;
 use super::gc_work::ImmixGCWorkContext;
+use super::gc_work::TraceKind;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -7,6 +7,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -21,7 +22,6 @@ use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use crate::policy::immix::ImmixCopyContext;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -59,10 +59,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &IMMIX_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &'static self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         let mut c = ImmixCopyContext {
             plan_constraints: &IMMIX_CONSTRAINTS,
             copy_allocator: crate::util::alloc::ImmixAllocator::new(
@@ -76,7 +73,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
                 Some(&self.immix_space),
                 self,
                 true,
-            )
+            ),
         };
         c.init(tls);
         GCWorkerLocalPtr::new(c)

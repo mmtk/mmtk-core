@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyNurseryGCWorkContext, GenCopyMatureGCWorkContext};
+use super::gc_work::{GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -8,6 +8,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -23,7 +24,6 @@ use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::policy::copyspace::CopySpaceCopyContext;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
@@ -43,12 +43,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &GENCOPY_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &'static self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
-        use crate::util::opaque_pointer::VMThread;
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         use crate::util::alloc::BumpAllocator;
+        use crate::util::opaque_pointer::VMThread;
         let mut c = CopySpaceCopyContext {
             plan_constraints: &GENCOPY_CONSTRAINTS,
             copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, self.tospace(), self),

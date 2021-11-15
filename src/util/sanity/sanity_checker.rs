@@ -1,5 +1,5 @@
-use crate::plan::CopyContext;
 use crate::plan::Plan;
+use crate::policy::copy_context::CopyContext;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::{Address, ObjectReference};

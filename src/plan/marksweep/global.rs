@@ -1,12 +1,12 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::policy::copy_context::NoCopy;
 use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::copy_context::NoCopy;
 use crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
@@ -97,10 +97,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &MS_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
+    fn create_worker_local(&self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         let mut c = NoCopy::<VM>::new();
         c.init(tls);
         GCWorkerLocalPtr::new(c)

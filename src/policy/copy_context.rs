@@ -1,10 +1,10 @@
-use crate::util::VMWorkerThread;
+use crate::plan::AllocationSemantics;
+use crate::plan::PlanConstraints;
+use crate::scheduler::GCWorkerLocal;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
-use crate::plan::PlanConstraints;
-use crate::plan::AllocationSemantics;
-use crate::scheduler::GCWorkerLocal;
 use std::marker::PhantomData;
 
 /// A GC worker's context for copying GCs.
