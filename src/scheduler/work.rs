@@ -24,7 +24,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
 }
 
 use super::gc_work::ProcessEdgesWork;
-use crate::plan::CopyContext;
+use crate::policy::copy_context::CopyContext;
 use crate::plan::Plan;
 
 /// This trait provides a group of associated types that are needed to

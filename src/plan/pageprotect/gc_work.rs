@@ -1,5 +1,5 @@
 use super::global::PageProtect;
-use crate::plan::global::NoCopy;
+use crate::policy::copy_context::NoCopy;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};

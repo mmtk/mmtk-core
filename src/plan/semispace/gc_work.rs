@@ -1,6 +1,7 @@
 use super::global::SemiSpace;
 use crate::policy::space::Space;
 use crate::policy::copyspace::CopySpaceCopyContext;
+use crate::policy::copy_context::NoCopy;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -48,7 +49,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
                     self.worker(),
                 )
         } else {
-            use crate::plan::global::NoCopy;
             self.ss()
                 .common
                 .trace_object::<Self, NoCopy<VM>>(self, object)

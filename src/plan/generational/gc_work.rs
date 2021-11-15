@@ -1,5 +1,5 @@
 use crate::plan::generational::global::Gen;
-use crate::plan::CopyContext;
+use crate::policy::copy_context::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWorkerLocal;

@@ -6,7 +6,8 @@ use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::Ordering;
 
-use crate::plan::{AllocationSemantics, CopyContext};
+use crate::plan::AllocationSemantics;
+use crate::policy::copy_context::CopyContext;
 use crate::vm::VMBinding;
 
 const FORWARDING_NOT_TRIGGERED_YET: usize = 0b00;

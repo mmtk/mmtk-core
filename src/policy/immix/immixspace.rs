@@ -7,6 +7,7 @@ use super::{
 use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::copy_context::CopyContext;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -23,7 +24,7 @@ use crate::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
-    AllocationSemantics, CopyContext, MMTK,
+    AllocationSemantics, MMTK,
 };
 use atomic::Ordering;
 use std::{

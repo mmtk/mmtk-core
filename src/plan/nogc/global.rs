@@ -1,9 +1,10 @@
-use crate::plan::global::{BasePlan, NoCopy};
+use crate::plan::global::BasePlan;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
+use crate::policy::copy_context::NoCopy;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
 use crate::scheduler::GCWorkerLocalPtr;

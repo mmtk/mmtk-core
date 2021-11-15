@@ -4,6 +4,7 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::copyspace::CopySpace;
+use crate::policy::copy_context::NoCopy;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::conversions;
@@ -182,7 +183,7 @@ impl<VM: VMBinding> Gen<VM> {
                 worker,
             );
         }
-        self.common.trace_object::<T, crate::plan::global::NoCopy<VM>>(trace, object)
+        self.common.trace_object::<T, NoCopy<VM>>(trace, object)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.

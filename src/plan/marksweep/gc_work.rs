@@ -1,4 +1,4 @@
-use crate::plan::global::NoCopy;
+use crate::policy::copy_context::NoCopy;
 use crate::plan::global::Plan;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;

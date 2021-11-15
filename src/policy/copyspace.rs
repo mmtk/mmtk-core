@@ -1,5 +1,6 @@
 use crate::plan::TransitiveClosure;
-use crate::plan::{AllocationSemantics, CopyContext};
+use crate::plan::AllocationSemantics;
+use crate::policy::copy_context::CopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
