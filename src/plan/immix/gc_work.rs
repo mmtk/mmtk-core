@@ -1,80 +1,10 @@
 use super::global::Immix;
-use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWorkerLocal;
-use crate::util::alloc::{Allocator, ImmixAllocator};
-use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::{
-    plan::CopyContext,
-    util::opaque_pointer::{VMThread, VMWorkerThread},
-};
 use std::ops::{Deref, DerefMut};
-
-/// Immix copy allocator
-// pub struct ImmixCopyContext<VM: VMBinding> {
-//     immix: ImmixAllocator<VM>,
-// }
-
-// impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
-//     type VM = VM;
-
-//     fn constraints(&self) -> &'static PlanConstraints {
-//         &super::global::IMMIX_CONSTRAINTS
-//     }
-//     fn init(&mut self, tls: VMWorkerThread) {
-//         self.immix.tls = tls.0;
-//     }
-//     fn prepare(&mut self) {
-//         self.immix.reset()
-//     }
-//     fn release(&mut self) {
-//         self.immix.reset()
-//     }
-//     #[inline(always)]
-//     fn alloc_copy(
-//         &mut self,
-//         _original: ObjectReference,
-//         bytes: usize,
-//         align: usize,
-//         offset: isize,
-//         _semantics: crate::AllocationSemantics,
-//     ) -> Address {
-//         self.immix.alloc(bytes, align, offset)
-//     }
-//     #[inline(always)]
-//     fn post_copy(
-//         &mut self,
-//         obj: ObjectReference,
-//         _tib: Address,
-//         _bytes: usize,
-//         _semantics: crate::AllocationSemantics,
-//     ) {
-//         object_forwarding::clear_forwarding_bits::<VM>(obj);
-//     }
-// }
-
-// impl<VM: VMBinding> ImmixCopyContext<VM> {
-//     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
-//         Self {
-//             immix: ImmixAllocator::new(
-//                 VMThread::UNINITIALIZED,
-//                 Some(&mmtk.plan.downcast_ref::<Immix<VM>>().unwrap().immix_space),
-//                 &*mmtk.plan,
-//                 true,
-//             ),
-//         }
-//     }
-// }
-
-// impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
-//     fn init(&mut self, tls: VMWorkerThread) {
-//         CopyContext::init(self, tls);
-//     }
-// }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(in crate::plan) enum TraceKind {

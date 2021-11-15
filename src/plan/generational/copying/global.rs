@@ -1,6 +1,5 @@
 use super::gc_work::GenCopyMatureProcessEdges;
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::mmtk::MMTK;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -48,7 +47,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     fn create_worker_local(
         &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         use crate::util::opaque_pointer::VMThread;
         use crate::util::alloc::BumpAllocator;

@@ -17,7 +17,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
-use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use crate::policy::immix::ImmixCopyContext;
@@ -61,7 +61,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn create_worker_local(
         &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = ImmixCopyContext {
             plan_constraints: &IMMIX_CONSTRAINTS,

@@ -21,7 +21,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
-use crate::MMTK;
 use crate::policy::immix::ImmixCopyContext;
 
 use enum_map::EnumMap;
@@ -68,7 +67,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     fn create_worker_local(
         &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         let mut c = ImmixCopyContext {
             plan_constraints: &GENIMMIX_CONSTRAINTS,

@@ -1,5 +1,4 @@
 use super::gc_work::SSProcessEdges;
-use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -53,7 +52,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn create_worker_local(
         &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
         use crate::policy::copyspace::CopySpaceCopyContext;
         use crate::util::opaque_pointer::VMThread;

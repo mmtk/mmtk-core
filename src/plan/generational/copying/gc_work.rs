@@ -1,76 +1,10 @@
 use super::global::GenCopy;
-use crate::plan::CopyContext;
-use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWorkerLocal;
-use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
-
-// pub struct GenCopyCopyContext<VM: VMBinding> {
-//     plan: &'static GenCopy<VM>,
-//     ss: BumpAllocator<VM>,
-// }
-
-// impl<VM: VMBinding> CopyContext for GenCopyCopyContext<VM> {
-//     type VM = VM;
-
-//     fn constraints(&self) -> &'static PlanConstraints {
-//         &super::global::GENCOPY_CONSTRAINTS
-//     }
-//     fn init(&mut self, tls: VMWorkerThread) {
-//         self.ss.tls = tls.0;
-//     }
-//     fn prepare(&mut self) {
-//         self.ss.rebind(self.plan.tospace());
-//     }
-//     fn release(&mut self) {
-//         // self.ss.rebind(Some(self.plan.tospace()));
-//     }
-//     #[inline(always)]
-//     fn alloc_copy(
-//         &mut self,
-//         _original: ObjectReference,
-//         bytes: usize,
-//         align: usize,
-//         offset: isize,
-//         _semantics: crate::AllocationSemantics,
-//     ) -> Address {
-//         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
-//         self.ss.alloc(bytes, align, offset)
-//     }
-//     #[inline(always)]
-//     fn post_copy(
-//         &mut self,
-//         obj: ObjectReference,
-//         tib: Address,
-//         bytes: usize,
-//         semantics: crate::AllocationSemantics,
-//     ) {
-//         crate::plan::generational::generational_post_copy::<VM>(obj, tib, bytes, semantics)
-//     }
-// }
-
-// impl<VM: VMBinding> GenCopyCopyContext<VM> {
-//     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
-//         let plan = &mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
-//         Self {
-//             plan,
-//             // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
-//             ss: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
-//         }
-//     }
-// }
-
-// impl<VM: VMBinding> GCWorkerLocal for GenCopyCopyContext<VM> {
-//     fn init(&mut self, tls: VMWorkerThread) {
-//         CopyContext::init(self, tls);
-//     }
-// }
 
 pub struct GenCopyMatureProcessEdges<VM: VMBinding> {
     plan: &'static GenCopy<VM>,

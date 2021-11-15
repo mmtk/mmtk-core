@@ -1,4 +1,3 @@
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -106,9 +105,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn create_worker_local(
         &self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = NoCopy::new(mmtk);
+        let mut c = NoCopy::<VM>::new();
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

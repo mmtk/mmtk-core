@@ -103,7 +103,7 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
 }
 
 impl<VM: VMBinding> NoCopy<VM> {
-    pub fn new(_mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new() -> Self {
         Self(PhantomData)
     }
 }
@@ -201,7 +201,6 @@ pub trait Plan: 'static + Sync + Downcast {
     fn create_worker_local(
         &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
@@ -259,7 +258,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread);
-    fn prepare_collector(&self, worker: &mut GCWorker<Self::VM>) {}
+    fn prepare_collector(&self, _worker: &mut GCWorker<Self::VM>) {}
     fn release(&mut self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
