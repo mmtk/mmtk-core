@@ -18,7 +18,7 @@ use crate::{
     vm::VMBinding,
 };
 
-use super::{MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET, MarkSweepSpace};
+use super::{MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET, MarkSweepSpace, chunks::Chunk};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
@@ -112,6 +112,19 @@ impl Block {
             }
             _ => unreachable!(),
         }
+    }
+
+    /// Get the chunk containing the block.
+    #[inline(always)]
+    pub fn chunk(&self) -> Chunk {
+        Chunk::from(Chunk::align(self.0))
+    }
+
+    /// Initialize a clean block after acquired from page-resource.
+    #[inline]
+    pub fn init(&self) {
+        // eprintln!("i {}", self.0);
+        self.set_state( BlockState::Unmarked);
     }
 
     /// Deinitalize a block before releasing.

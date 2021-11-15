@@ -96,8 +96,7 @@ impl<VM: VMBinding> Plan for FreeListMarkSweep<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        self.ms_space.block_level_sweep();
-        // self.ms_space.eager_sweep(tls);
+        // self.ms_space.block_level_sweep();
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

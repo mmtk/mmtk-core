@@ -25,7 +25,7 @@ pub fn flms_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWo
     .downcast_ref::<FreeListMarkSweep<VM>>()
     .unwrap()
     .ms_space();
-    space.zero_mark_bits();
+    // eprintln!("mutator prepare");
 }
 
 pub fn flms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
