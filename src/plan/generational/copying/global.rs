@@ -1,6 +1,5 @@
-use super::gc_work::GenCopyMatureProcessEdges;
+use super::gc_work::{GenCopyNurseryGCWorkContext, GenCopyMatureGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -90,20 +89,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
             debug!("Nursery GC");
-            self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, CopySpaceCopyContext<VM>>, CopySpaceCopyContext<VM>>(
-                    self,
-                    &GENCOPY_CONSTRAINTS,
-                    scheduler,
-                );
+            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
         } else {
             debug!("Full heap GC");
-            self.common()
-                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>, CopySpaceCopyContext<VM>>(
-                    self,
-                    &GENCOPY_CONSTRAINTS,
-                    scheduler,
-                );
+            scheduler.schedule_common_work::<GenCopyMatureGCWorkContext<VM>>(self);
         }
     }
 

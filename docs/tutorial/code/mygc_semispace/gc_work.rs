@@ -150,3 +150,13 @@ impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
     }
 }
 // ANCHOR_END: deref
+
+// ANCHOR: workcontext
+pub struct MyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MyGC<VM>;
+    type CopyContextType = MyGCCopyContext<VM>;
+    type ProcessEdgesWorkType = MyGCProcessEdges<VM>;
+}
+// ANCHOR_END: workcontext

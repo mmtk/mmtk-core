@@ -1,4 +1,4 @@
-use super::gc_work::SSProcessEdges;
+use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -77,15 +77,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        use crate::policy::copyspace::CopySpaceCopyContext;
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.common()
-            .schedule_common::<Self, SSProcessEdges<VM>, CopySpaceCopyContext<VM>>(
-                self,
-                &SS_CONSTRAINTS,
-                scheduler,
-            );
+        scheduler.schedule_common_work::<SSGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
