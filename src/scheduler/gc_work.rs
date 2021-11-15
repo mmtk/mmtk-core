@@ -27,34 +27,31 @@ impl<VM: VMBinding> CoordinatorWork<VM> for ScheduleCollection {}
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
-pub struct Prepare<P: Plan, W: CopyContext + GCWorkerLocal> {
-    pub plan: &'static P,
-    _p: PhantomData<W>,
+pub struct Prepare<C: GCWorkContext> {
+    pub plan: &'static C::PlanType,
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> Prepare<P, W> {
-    pub fn new(plan: &'static P) -> Self {
-        Self {
-            plan,
-            _p: PhantomData,
-        }
+impl<C: GCWorkContext> Prepare<C> {
+    pub fn new(plan: &'static C::PlanType) -> Self {
+        Self { plan }
     }
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for Prepare<P, W> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Prepare Global");
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
-        let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
+        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(PrepareMutator::<P::VM>::new(mutator));
+                .add(PrepareMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(PrepareCollector::<W>::new());
+            w.local_work_bucket
+                .add(PrepareCollector::<C::CopyContextType>::new());
         }
     }
 }
@@ -103,35 +100,32 @@ impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for PrepareCollec
 /// We assume this work packet is the only running work packet that accesses plan, and there should
 /// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may
 /// be a race condition.
-pub struct Release<P: Plan, W: CopyContext + GCWorkerLocal> {
-    pub plan: &'static P,
-    _p: PhantomData<W>,
+pub struct Release<C: GCWorkContext> {
+    pub plan: &'static C::PlanType,
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> Release<P, W> {
-    pub fn new(plan: &'static P) -> Self {
-        Self {
-            plan,
-            _p: PhantomData,
-        }
+impl<C: GCWorkContext> Release<C> {
+    pub fn new(plan: &'static C::PlanType) -> Self {
+        Self { plan }
     }
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for Release<P, W> {
-    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
+impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
+    fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        <P::VM as VMBinding>::VMCollection::vm_release();
+        <C::VM as VMBinding>::VMCollection::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
-        let plan_mut: &mut P = unsafe { &mut *(self.plan as *const _ as *mut _) };
+        let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
-                .add(ReleaseMutator::<P::VM>::new(mutator));
+                .add(ReleaseMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(ReleaseCollector::<W>::new());
+            w.local_work_bucket
+                .add(ReleaseCollector::<C::CopyContextType>::new());
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -406,6 +400,7 @@ pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self>>
 {
     type VM: VMBinding;
+
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;

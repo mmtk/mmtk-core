@@ -1,4 +1,4 @@
-use super::gc_work::PPProcessEdges;
+use super::gc_work::PPGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
 use crate::plan::global::GcStatus;
@@ -75,8 +75,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.common()
-            .schedule_common::<Self, PPProcessEdges<VM>, NoCopy<VM>>(self, &CONSTRAINTS, scheduler);
+        scheduler.schedule_common_work::<PPGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

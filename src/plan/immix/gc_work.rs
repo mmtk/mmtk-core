@@ -97,6 +97,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
 
 impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdges<VM, KIND> {
     type VM = VM;
+
     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -165,4 +166,16 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KI
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
+    for ImmixGCWorkContext<VM, KIND>
+{
+    type VM = VM;
+    type PlanType = Immix<VM>;
+    type CopyContextType = ImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
 }

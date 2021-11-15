@@ -1,5 +1,6 @@
-use super::gc_work::{GenImmixCopyContext, GenImmixMatureProcessEdges};
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
+use super::gc_work::{
+    GenImmixCopyContext, GenImmixMatureGCWorkContext, GenImmixNurseryGCWorkContext,
+};
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -127,28 +128,17 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
         if !is_full_heap {
             debug!("Nursery GC");
-            self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>, GenImmixCopyContext<VM>>(
-                    self,
-                    &GENIMMIX_CONSTRAINTS,
-                    scheduler,
-                );
+            scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
         } else if defrag {
             debug!("Full heap GC Defrag");
-            self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>, GenImmixCopyContext<VM>>(
+            scheduler
+                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Defrag }>>(
                     self,
-                    &GENIMMIX_CONSTRAINTS,
-                    scheduler,
                 );
         } else {
             debug!("Full heap GC Fast");
-            self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>, GenImmixCopyContext<VM>>(
-                    self,
-                    &GENIMMIX_CONSTRAINTS,
-                    scheduler,
-                );
+            scheduler
+                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
     }
 

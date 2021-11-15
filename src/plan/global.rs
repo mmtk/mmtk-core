@@ -9,7 +9,6 @@ use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
@@ -950,61 +949,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.release();
         self.los.release(full_heap);
         self.base.release(tls, full_heap)
-    }
-
-    /// Schedule all the common work packets
-    pub fn schedule_common<
-        P: Plan<VM = VM>,
-        E: ProcessEdgesWork<VM = VM>,
-        C: CopyContext<VM = VM> + GCWorkerLocal,
-    >(
-        &self,
-        plan: &'static P,
-        constraints: &'static PlanConstraints,
-        scheduler: &GCWorkScheduler<VM>,
-    ) {
-        use crate::scheduler::gc_work::*;
-
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<E>::new());
-
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(Prepare::<P, C>::new(plan));
-
-        // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<E>::new());
-
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release].add(Release::<P, C>::new(plan));
-
-        // Analysis GC work
-        #[cfg(feature = "analysis")]
-        {
-            use crate::util::analysis::GcHookWork;
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        }
-
-        // Sanity
-        #[cfg(feature = "sanity")]
-        {
-            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
-            scheduler.work_buckets[WorkBucketStage::Final].add(ScheduleSanityGC::<P, C>::new(plan));
-        }
-
-        // Finalization
-        if !self.base.options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-            // finalization
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
-            // forward refs
-            if constraints.needs_forward_after_liveness {
-                scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(ForwardFinalization::<E>::new());
-            }
-        }
-
-        // Set EndOfGC to run at the end
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     pub fn stacks_prepared(&self) -> bool {

@@ -132,6 +132,17 @@ scheduler's prepare stage and resumes the mutators. The `StopMutators` work
 will invoke code from the bindings to scan threads and other roots, and those 
 scanning work will further push work for a transitive closure.
 
+Though you can add those work packets by yourself, `GCWorkScheduler` provides a
+method `schedule_common_work()` that will add common work packets for you.
+
+To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext`
+and implement the trait `GCWorkContext` for it. We create this type in `gc_work.rs`.
+
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:workcontext}}
+
+Then we implement `schedule_collection()` using `MyGCWorkContext` and `schedule_common_work()`.
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:schedule_collection}}
 ```
