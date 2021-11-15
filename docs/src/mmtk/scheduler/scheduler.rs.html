@@ -351,6 +351,61 @@
 <span id="351">351</span>
 <span id="352">352</span>
 <span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">WorkerGroup</span>};
@@ -496,6 +551,61 @@
             <span class="ident">open_next</span>(<span class="ident">Release</span>);
             <span class="ident">open_next</span>(<span class="ident">Final</span>);
         }
+    }
+
+    <span class="doccomment">/// Schedule all the common work packets</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">schedule_common_work</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C::PlanType</span>,
+    ) {
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
+        <span class="comment">// Stop &amp; scan mutators (mutator scanning can happen before STW)</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>]
+            .<span class="ident">add</span>(<span class="ident">StopMutators</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+
+        <span class="comment">// Prepare global/collectors/mutators</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>].<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
+
+        <span class="comment">// VM-specific weak ref processing</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+            .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+
+        <span class="comment">// Release global/collectors/mutators</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
+
+        <span class="comment">// Analysis GC work</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
+        {
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::GcHookWork</span>;
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcHookWork</span>);
+        }
+
+        <span class="comment">// Sanity</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
+        {
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>;
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
+                .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="ident">C::PlanType</span>, <span class="ident">C::CopyContextType</span><span class="op">&gt;</span><span class="ident">::new</span>(
+                    <span class="ident">plan</span>,
+                ));
+        }
+
+        <span class="comment">// Finalization</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor</span>::{<span class="ident">Finalization</span>, <span class="ident">ForwardFinalization</span>};
+            <span class="comment">// finalization</span>
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">Finalization</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="comment">// forward refs</span>
+            <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span> {
+                <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
+                    .<span class="ident">add</span>(<span class="ident">ForwardFinalization</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            }
+        }
+
+        <span class="comment">// Set EndOfGC to run at the end</span>
+        <span class="self">self</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 
     <span class="kw">fn</span> <span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">buckets</span>: <span class="kw-2">&amp;</span>[<span class="ident">WorkBucketStage</span>]) -&gt; <span class="ident">bool</span> {

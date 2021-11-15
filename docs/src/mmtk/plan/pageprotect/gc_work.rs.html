@@ -56,6 +56,15 @@
 <span id="56">56</span>
 <span id="57">57</span>
 <span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::PageProtect</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::NoCopy</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
@@ -76,6 +85,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ProcessEdgesWork</span> <span class="kw">for</span> <span class="ident">PPProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">const</span> <span class="ident">OVERWRITE_REFERENCE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
     <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase::new</span>(<span class="ident">edges</span>, <span class="ident">roots</span>, <span class="ident">mmtk</span>);
         <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">plan</span>().<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>();
@@ -113,6 +123,14 @@
     <span class="kw">fn</span> <span class="ident">deref_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::Target</span> {
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">base</span>
     }
+}
+
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PPGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">std::marker::PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkContext</span> <span class="kw">for</span> <span class="ident">PPGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+    <span class="kw">type</span> <span class="ident">PlanType</span> <span class="op">=</span> <span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">CopyContextType</span> <span class="op">=</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">ProcessEdgesWorkType</span> <span class="op">=</span> <span class="ident">PPProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-search-index-js="../../../../search-index.js" data-search-js="../../../../search.js"></div>

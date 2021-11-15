@@ -192,12 +192,7 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
-<span id="195">195</span>
-<span id="196">196</span>
-<span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSProcessEdges</span>};
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">SSCopyContext</span>, <span class="ident">SSGCWorkContext</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
@@ -274,12 +269,7 @@
     <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
-        <span class="self">self</span>.<span class="ident">common</span>()
-            .<span class="ident">schedule_common</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">SSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">SSCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
-                <span class="self">self</span>,
-                <span class="kw-2">&amp;</span><span class="ident">SS_CONSTRAINTS</span>,
-                <span class="ident">scheduler</span>,
-            );
+        <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">SSGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {

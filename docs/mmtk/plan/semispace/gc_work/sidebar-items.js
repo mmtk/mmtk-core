@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["SSCopyContext",""],["SSProcessEdges",""]]});
+initSidebarItems({"struct":[["SSCopyContext",""],["SSGCWorkContext",""],["SSProcessEdges",""]]});

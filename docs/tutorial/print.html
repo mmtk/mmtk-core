@@ -594,6 +594,7 @@ use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -1106,19 +1107,28 @@ it stops all mutators, runs the
 scheduler's prepare stage and resumes the mutators. The <code>StopMutators</code> work
 will invoke code from the bindings to scan threads and other roots, and those 
 scanning work will further push work for a transitive closure.</p>
+<p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
+method <code>schedule_common_work()</code> that will add common work packets for you.</p>
+<p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code>
+and implement the trait <code>GCWorkContext</code> for it. We create this type in <code>gc_work.rs</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
+</span>pub struct MyGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
+impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
+    type VM = VM;
+    type PlanType = MyGC&lt;VM&gt;;
+    type CopyContextType = MyGCCopyContext&lt;VM&gt;;
+    type ProcessEdgesWorkType = MyGCProcessEdges&lt;VM&gt;;
+}
+
+Then we implement `schedule_collection()` using `MyGCWorkContext` and `schedule_common_work()`.
+
+```rust
+    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
         self.base().set_collection_kind::&lt;Self&gt;(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::&lt;MyGCProcessEdges&lt;VM&gt;&gt;::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
     }
 <span class="boring">}
 </span></code></pre></pre>

@@ -550,11 +550,6 @@
 <span id="550">550</span>
 <span id="551">551</span>
 <span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -584,34 +579,31 @@
 <span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
 <span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
 <span class="doccomment">/// be a race condition.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
-    <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C::PlanType</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">plan</span>,
-            <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
-        }
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span><span class="op">&gt;</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C::PlanType</span>) -&gt; <span class="self">Self</span> {
+        <span class="self">Self</span> { <span class="ident">plan</span> }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>) {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Prepare</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Prepare Global&quot;</span>);
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
-        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;mut</span> <span class="ident">P</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
+        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;mut</span> <span class="ident">C::PlanType</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
         <span class="ident">plan_mut</span>.<span class="ident">prepare</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
 
-        <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
+        <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">C::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
-                .<span class="ident">add</span>(<span class="ident">PrepareMutator</span>::<span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
+                .<span class="ident">add</span>(<span class="ident">PrepareMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
         <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>().<span class="ident">workers</span> {
-            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">PrepareCollector</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>
+                .<span class="ident">add</span>(<span class="ident">PrepareCollector</span>::<span class="op">&lt;</span><span class="ident">C::CopyContextType</span><span class="op">&gt;</span><span class="ident">::new</span>());
         }
     }
 }
@@ -660,35 +652,32 @@
 <span class="doccomment">/// We assume this work packet is the only running work packet that accesses plan, and there should</span>
 <span class="doccomment">/// be no other concurrent work packet that accesses plan (read or write). Otherwise, there may</span>
 <span class="doccomment">/// be a race condition.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>,
-    <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C::PlanType</span>,
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">P</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> {
-            <span class="ident">plan</span>,
-            <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
-        }
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span><span class="op">&gt;</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">C::PlanType</span>) -&gt; <span class="self">Self</span> {
+        <span class="self">Self</span> { <span class="ident">plan</span> }
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span>, <span class="ident">W</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">P</span>, <span class="ident">W</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span>) {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
-        <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::vm_release</span>();
+        <span class="op">&lt;</span><span class="ident">C::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::vm_release</span>();
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
-        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;mut</span> <span class="ident">P</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
+        <span class="kw">let</span> <span class="ident">plan_mut</span>: <span class="kw-2">&amp;mut</span> <span class="ident">C::PlanType</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span>.<span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
         <span class="ident">plan_mut</span>.<span class="ident">release</span>(<span class="ident">worker</span>.<span class="ident">tls</span>);
 
-        <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">P::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
+        <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="op">&lt;</span><span class="ident">C::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMActivePlan::mutators</span>() {
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
-                .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">P::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
+                .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
         <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>().<span class="ident">workers</span> {
-            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">ReleaseCollector</span>::<span class="op">&lt;</span><span class="ident">W</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>
+                .<span class="ident">add</span>(<span class="ident">ReleaseCollector</span>::<span class="op">&lt;</span><span class="ident">C::CopyContextType</span><span class="op">&gt;</span><span class="ident">::new</span>());
         }
         <span class="comment">// TODO: Process weak references properly</span>
         <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>.<span class="ident">clear</span>();
@@ -963,6 +952,7 @@
     <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Sized</span> <span class="op">+</span> <span class="ident">DerefMut</span> <span class="op">+</span> <span class="ident">Deref</span><span class="op">&lt;</span><span class="ident">Target</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="op">&gt;</span>
 {
     <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
+
     <span class="kw">const</span> <span class="ident">CAPACITY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4096</span>;
     <span class="kw">const</span> <span class="ident">OVERWRITE_REFERENCE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
     <span class="kw">const</span> <span class="ident">SCAN_OBJECTS_IMMEDIATELY</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
