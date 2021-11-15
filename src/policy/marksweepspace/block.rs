@@ -117,6 +117,19 @@ impl Block {
         }
     }
 
+    /// Get the chunk containing the block.
+    #[inline(always)]
+    pub fn chunk(&self) -> Chunk {
+        Chunk::from(Chunk::align(self.0))
+    }
+
+    /// Initialize a clean block after acquired from page-resource.
+    #[inline]
+    pub fn init(&self) {
+        // eprintln!("i {}", self.0);
+        self.set_state( BlockState::Unmarked);
+    }
+
     /// Deinitalize a block before releasing.
     #[inline]
     pub fn deinit(&self) {

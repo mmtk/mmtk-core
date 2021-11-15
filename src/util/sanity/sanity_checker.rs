@@ -172,10 +172,10 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             }
             // // eprintln!("s {}", object.to_address());
 
-            // if !(object.to_address().as_usize() == 0x40000000000 || crate::util::alloc_bit::is_alloced(object)) {
-            if !(object.to_address().as_usize() == 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
+            // eprintln!("check sanity {}", object.to_address());
+            if !( crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
             
-                // eprintln!("Address {} was found by the sanity checker but has no mark bit, meta: {}", object.to_address(), address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), object.to_address()));
+                eprintln!("sanity {}", object.to_address());
             }
 
             // if !(object.to_address().as_usize() == 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
