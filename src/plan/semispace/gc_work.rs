@@ -40,7 +40,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         } else if self.ss().fromspace().in_space(object) {
             self.ss()
                 .fromspace()
-                .trace_object_new::<Self>(
+                .trace_object::<Self>(
                     self,
                     object,
                     super::global::ALLOC_SS,

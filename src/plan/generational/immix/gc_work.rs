@@ -55,7 +55,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
             if KIND == TraceKind::Fast {
                 return self.plan.immix.fast_trace_object(self, object);
             } else {
-                return self.plan.immix.trace_object_new(
+                return self.plan.immix.trace_object(
                     self,
                     object,
                     AllocationSemantics::Default,

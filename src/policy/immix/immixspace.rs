@@ -326,28 +326,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
         semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
-    ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
-        debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
-            "{:x}: alloc bit not set",
-            object
-        );
-        if Block::containing::<VM>(object).is_defrag_source() {
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
-        } else {
-            self.trace_object_without_moving(trace, object)
-        }
-    }
-
-    /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
-    #[inline(always)]
-    pub fn trace_object_new(
-        &self,
-        trace: &mut impl TransitiveClosure,
-        object: ObjectReference,
-        semantics: AllocationSemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         let copy_context = unsafe { worker.local::<ImmixCopyContext<VM>>() };

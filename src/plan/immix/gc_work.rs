@@ -58,7 +58,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
             if KIND == TraceKind::Fast {
                 self.immix().immix_space.fast_trace_object(self, object)
             } else {
-                self.immix().immix_space.trace_object_new(
+                self.immix().immix_space.trace_object(
                     self,
                     object,
                     super::global::ALLOC_IMMIX,

@@ -29,7 +29,7 @@ impl<VM: VMBinding, C: CopyContext + GCWorkerLocal> ProcessEdgesWork
             return object;
         }
         self.gen
-            .trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
+            .trace_object_nursery(self, object, self.worker())
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {

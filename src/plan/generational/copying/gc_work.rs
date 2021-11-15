@@ -36,7 +36,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             return self
                 .gencopy()
                 .fromspace()
-                .trace_object_new::<Self>(
+                .trace_object::<Self>(
                     self,
                     object,
                     super::global::ALLOC_SS,

@@ -183,50 +183,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut C,
-    ) -> ObjectReference {
-        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        debug_assert!(
-            self.from_space(),
-            "Trace object called for object ({:?}) in to-space",
-            object
-        );
-
-        #[cfg(feature = "global_alloc_bit")]
-        debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
-            "{:x}: alloc bit not set",
-            object
-        );
-
-        trace!("attempting to forward");
-        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
-
-        trace!("checking if object is being forwarded");
-        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            trace!("... yes it is");
-            let new_object =
-                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
-            trace!("Returning");
-            new_object
-        } else {
-            trace!("... no it isn't. Copying");
-            let new_object =
-                object_forwarding::forward_object::<VM, _>(object, semantics, copy_context);
-            trace!("Forwarding pointer");
-            trace.process_node(new_object);
-            trace!("Copied [{:?} -> {:?}]", object, new_object);
-            new_object
-        }
-    }
-
-    #[inline]
-    pub fn trace_object_new<T: TransitiveClosure>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
