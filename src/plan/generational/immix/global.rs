@@ -1,4 +1,4 @@
-use super::gc_work::{GenImmixCopyContext, GenImmixMatureProcessEdges};
+use super::gc_work::GenImmixMatureProcessEdges;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -22,6 +22,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::MMTK;
+use crate::policy::immix::ImmixCopyContext;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -65,11 +66,25 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = GenImmixCopyContext::new(mmtk);
+        let mut c = ImmixCopyContext {
+            plan_constraints: &GENIMMIX_CONSTRAINTS,
+            copy_allocator: crate::util::alloc::ImmixAllocator::new(
+                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
+                Some(&self.immix),
+                self,
+                false,
+            ),
+            defrag_allocator: crate::util::alloc::ImmixAllocator::new(
+                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
+                Some(&self.immix),
+                self,
+                true,
+            )
+        };
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
@@ -128,7 +143,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, ImmixCopyContext<VM>>, ImmixCopyContext<VM>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -136,7 +151,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else if defrag {
             debug!("Full heap GC Defrag");
             self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }>, ImmixCopyContext<VM>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,
@@ -144,7 +159,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else {
             debug!("Full heap GC Fast");
             self.common()
-                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>, GenImmixCopyContext<VM>>(
+                .schedule_common::<Self, GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>, ImmixCopyContext<VM>>(
                     self,
                     &GENIMMIX_CONSTRAINTS,
                     scheduler,

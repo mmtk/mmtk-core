@@ -327,7 +327,7 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
     }
 
     fn prepare(&mut self) {
-        
+
     }
 
     fn release(&mut self) {

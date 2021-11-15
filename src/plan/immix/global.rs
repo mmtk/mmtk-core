@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
+use super::gc_work::{ImmixProcessEdges, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -20,6 +20,7 @@ use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use crate::policy::immix::ImmixCopyContext;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -58,11 +59,25 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext::new(mmtk);
+        let mut c = ImmixCopyContext {
+            plan_constraints: &IMMIX_CONSTRAINTS,
+            copy_allocator: crate::util::alloc::ImmixAllocator::new(
+                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
+                Some(&self.immix_space),
+                self,
+                false,
+            ),
+            defrag_allocator: crate::util::alloc::ImmixAllocator::new(
+                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
+                Some(&self.immix_space),
+                self,
+                true,
+            )
+        };
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

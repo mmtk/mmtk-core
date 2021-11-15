@@ -341,6 +341,29 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
+    #[inline(always)]
+    pub fn trace_object_new(
+        &self,
+        trace: &mut impl TransitiveClosure,
+        object: ObjectReference,
+        semantics: AllocationSemantics,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        let copy_context = unsafe { worker.local::<ImmixCopyContext<VM>>() };
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
+        if Block::containing::<VM>(object).is_defrag_source() {
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
+        } else {
+            self.trace_object_without_moving(trace, object)
+        }
+    }
+
     /// Trace and mark objects without evacuation.
     #[inline(always)]
     pub fn trace_object_without_moving(
@@ -585,5 +608,77 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
                 self.immix_space.mark_lines(*object);
             }
         }
+    }
+}
+
+use crate::util::alloc::ImmixAllocator;
+use crate::util::alloc::Allocator;
+use crate::plan::PlanConstraints;
+use crate::scheduler::GCWorkerLocal;
+use crate::util::object_forwarding;
+
+/// Immix copy allocator
+pub struct ImmixCopyContext<VM: VMBinding> {
+    pub plan_constraints: &'static PlanConstraints,
+    pub copy_allocator: ImmixAllocator<VM>,
+    pub defrag_allocator: ImmixAllocator<VM>,
+}
+
+impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
+    type VM = VM;
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        self.plan_constraints
+    }
+    fn init(&mut self, tls: VMWorkerThread) {
+        self.copy_allocator.tls = tls.0;
+        self.defrag_allocator.tls = tls.0;
+    }
+    fn prepare(&mut self) {
+        self.copy_allocator.reset();
+        self.defrag_allocator.reset();
+    }
+    fn release(&mut self) {
+        self.copy_allocator.reset();
+        self.defrag_allocator.reset();
+    }
+    #[inline(always)]
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        _semantics: crate::AllocationSemantics,
+    ) -> Address {
+        debug_assert!(
+            bytes <= self.plan_constraints.max_non_los_default_alloc_bytes,
+            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+            bytes, self.plan_constraints.max_non_los_default_alloc_bytes
+        );
+        if self.defrag_allocator.immix_space().in_defrag() {
+            self.defrag_allocator.alloc(bytes, align, offset)
+        } else {
+            self.copy_allocator.alloc(bytes, align, offset)
+        }
+    }
+    #[inline(always)]
+    fn post_copy(
+        &mut self,
+        obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _semantics: crate::AllocationSemantics,
+    ) {
+        object_forwarding::clear_forwarding_bits::<VM>(obj);
+        if self.plan_constraints.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+        }
+    }
+}
+
+impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
+    fn init(&mut self, tls: VMWorkerThread) {
+        CopyContext::init(self, tls);
     }
 }

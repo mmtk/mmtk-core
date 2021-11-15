@@ -16,97 +16,97 @@ use std::ops::{Deref, DerefMut};
 /// Copy context for generational immix. We include two copy allocators for the same immix space.
 /// We should use the defrag copy allocator for full heap GC with defrag, or the normal copy allocator
 /// for other GCs.
-pub struct GenImmixCopyContext<VM: VMBinding> {
-    plan: &'static GenImmix<VM>,
-    copy: ImmixAllocator<VM>,
-    defrag_copy: ImmixAllocator<VM>,
-}
+// pub struct GenImmixCopyContext<VM: VMBinding> {
+//     plan: &'static GenImmix<VM>,
+//     copy: ImmixAllocator<VM>,
+//     defrag_copy: ImmixAllocator<VM>,
+// }
 
-impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
-    type VM = VM;
+// impl<VM: VMBinding> CopyContext for GenImmixCopyContext<VM> {
+//     type VM = VM;
 
-    fn constraints(&self) -> &'static PlanConstraints {
-        &super::global::GENIMMIX_CONSTRAINTS
-    }
+//     fn constraints(&self) -> &'static PlanConstraints {
+//         &super::global::GENIMMIX_CONSTRAINTS
+//     }
 
-    fn init(&mut self, tls: VMWorkerThread) {
-        self.copy.tls = tls.0;
-        self.defrag_copy.tls = tls.0;
-    }
+//     fn init(&mut self, tls: VMWorkerThread) {
+//         self.copy.tls = tls.0;
+//         self.defrag_copy.tls = tls.0;
+//     }
 
-    fn prepare(&mut self) {
-        self.copy.reset();
-        if !self.plan.gen.is_current_gc_nursery() {
-            self.defrag_copy.reset();
-        }
-    }
+//     fn prepare(&mut self) {
+//         self.copy.reset();
+//         if !self.plan.gen.is_current_gc_nursery() {
+//             self.defrag_copy.reset();
+//         }
+//     }
 
-    fn release(&mut self) {
-        self.copy.reset();
-    }
+//     fn release(&mut self) {
+//         self.copy.reset();
+//     }
 
-    #[inline(always)]
-    fn alloc_copy(
-        &mut self,
-        _original: ObjectReference,
-        bytes: usize,
-        align: usize,
-        offset: isize,
-        _semantics: crate::AllocationSemantics,
-    ) -> Address {
-        debug_assert!(
-            bytes <= super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
-            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
-            bytes, super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
-        );
-        debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
-        if self.plan.immix.in_defrag() {
-            self.defrag_copy.alloc(bytes, align, offset)
-        } else {
-            self.copy.alloc(bytes, align, offset)
-        }
-    }
+//     #[inline(always)]
+//     fn alloc_copy(
+//         &mut self,
+//         _original: ObjectReference,
+//         bytes: usize,
+//         align: usize,
+//         offset: isize,
+//         _semantics: crate::AllocationSemantics,
+//     ) -> Address {
+//         debug_assert!(
+//             bytes <= super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+//             "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+//             bytes, super::GENIMMIX_CONSTRAINTS.max_non_los_default_alloc_bytes,
+//         );
+//         debug_assert!(VM::VMActivePlan::global().base().gc_in_progress_proper());
+//         if self.plan.immix.in_defrag() {
+//             self.defrag_copy.alloc(bytes, align, offset)
+//         } else {
+//             self.copy.alloc(bytes, align, offset)
+//         }
+//     }
 
-    #[inline(always)]
-    fn post_copy(
-        &mut self,
-        obj: ObjectReference,
-        tib: Address,
-        bytes: usize,
-        semantics: crate::AllocationSemantics,
-    ) {
-        // Missing ImmixSpace.post_copy()
-        crate::plan::generational::generational_post_copy::<VM>(obj, tib, bytes, semantics)
-    }
-}
+//     #[inline(always)]
+//     fn post_copy(
+//         &mut self,
+//         obj: ObjectReference,
+//         tib: Address,
+//         bytes: usize,
+//         semantics: crate::AllocationSemantics,
+//     ) {
+//         // Missing ImmixSpace.post_copy()
+//         crate::plan::generational::generational_post_copy::<VM>(obj, tib, bytes, semantics)
+//     }
+// }
 
-impl<VM: VMBinding> GenImmixCopyContext<VM> {
-    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
-        let plan = &mmtk.plan.downcast_ref::<GenImmix<VM>>().unwrap();
-        Self {
-            plan,
-            // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
-            copy: ImmixAllocator::new(
-                VMThread::UNINITIALIZED,
-                Some(&plan.immix),
-                &*mmtk.plan,
-                false,
-            ),
-            defrag_copy: ImmixAllocator::new(
-                VMThread::UNINITIALIZED,
-                Some(&plan.immix),
-                &*mmtk.plan,
-                true,
-            ),
-        }
-    }
-}
+// impl<VM: VMBinding> GenImmixCopyContext<VM> {
+//     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+//         let plan = &mmtk.plan.downcast_ref::<GenImmix<VM>>().unwrap();
+//         Self {
+//             plan,
+//             // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
+//             copy: ImmixAllocator::new(
+//                 VMThread::UNINITIALIZED,
+//                 Some(&plan.immix),
+//                 &*mmtk.plan,
+//                 false,
+//             ),
+//             defrag_copy: ImmixAllocator::new(
+//                 VMThread::UNINITIALIZED,
+//                 Some(&plan.immix),
+//                 &*mmtk.plan,
+//                 true,
+//             ),
+//         }
+//     }
+// }
 
-impl<VM: VMBinding> GCWorkerLocal for GenImmixCopyContext<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
+// impl<VM: VMBinding> GCWorkerLocal for GenImmixCopyContext<VM> {
+//     fn init(&mut self, tls: VMWorkerThread) {
+//         CopyContext::init(self, tls);
+//     }
+// }
 
 use crate::plan::immix::gc_work::TraceKind;
 
@@ -156,20 +156,18 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
             if KIND == TraceKind::Fast {
                 return self.plan.immix.fast_trace_object(self, object);
             } else {
-                return self.plan.immix.trace_object(
+                return self.plan.immix.trace_object_new(
                     self,
                     object,
                     AllocationSemantics::Default,
-                    unsafe { self.worker().local::<GenImmixCopyContext<VM>>() },
+                    self.worker(),
                 );
             }
         }
 
         self.plan
             .gen
-            .trace_object_full_heap::<Self, GenImmixCopyContext<VM>>(self, object, unsafe {
-                self.worker().local::<GenImmixCopyContext<VM>>()
-            })
+            .trace_object_full_heap_new::<Self>(self, object, self.worker())
     }
 }
 
