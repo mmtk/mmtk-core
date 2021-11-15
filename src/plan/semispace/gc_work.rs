@@ -51,7 +51,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         } else {
             self.ss()
                 .common
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+                .trace_object::<Self>(self, object)
         }
     }
 }

@@ -543,7 +543,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,
@@ -844,7 +844,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_pages_used()
     }
 
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -857,7 +857,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return self.los.trace_object(trace, object);
         }
-        self.base.trace_object::<T, C>(trace, object)
+        self.base.trace_object::<T>(trace, object)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

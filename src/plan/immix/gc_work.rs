@@ -71,7 +71,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
         } else {
             self.immix()
                 .common
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+                .trace_object::<Self>(self, object)
         }
     }
 

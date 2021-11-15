@@ -183,7 +183,7 @@ impl<VM: VMBinding> Gen<VM> {
                 worker,
             );
         }
-        self.common.trace_object::<T, NoCopy<VM>>(trace, object)
+        self.common.trace_object::<T>(trace, object)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.

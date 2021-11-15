@@ -42,7 +42,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
         } else {
             self.plan
                 .common()
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+                .trace_object::<Self>(self, object)
         }
     }
 }
