@@ -1017,6 +1017,34 @@
 <span id="1017">1017</span>
 <span id="1018">1018</span>
 <span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+<span id="1023">1023</span>
+<span id="1024">1024</span>
+<span id="1025">1025</span>
+<span id="1026">1026</span>
+<span id="1027">1027</span>
+<span id="1028">1028</span>
+<span id="1029">1029</span>
+<span id="1030">1030</span>
+<span id="1031">1031</span>
+<span id="1032">1032</span>
+<span id="1033">1033</span>
+<span id="1034">1034</span>
+<span id="1035">1035</span>
+<span id="1036">1036</span>
+<span id="1037">1037</span>
+<span id="1038">1038</span>
+<span id="1039">1039</span>
+<span id="1040">1040</span>
+<span id="1041">1041</span>
+<span id="1042">1042</span>
+<span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1401,7 +1429,6 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">trigger_gc_when_heap_is_full</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">gc_status</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">GcStatus</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">last_stress_pages</span>: <span class="ident">AtomicUsize</span>,
-    <span class="kw">pub</span> <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">emergency_collection</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">user_triggered_collection</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">internal_triggered_collection</span>: <span class="ident">AtomicBool</span>,
@@ -1420,8 +1447,10 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">inside_sanity</span>: <span class="ident">AtomicBool</span>,
-    <span class="comment">// A counter for per-mutator stack scanning</span>
-    <span class="kw">pub</span> <span class="ident">scanned_stacks</span>: <span class="ident">AtomicUsize</span>,
+    <span class="doccomment">/// A counter for per-mutator stack scanning</span>
+    <span class="ident">scanned_stacks</span>: <span class="ident">AtomicUsize</span>,
+    <span class="doccomment">/// Have we scanned all the stacks?</span>
+    <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">mutator_iterator_lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
     <span class="comment">// A counter that keeps tracks of the number of bytes allocated since last stress test</span>
     <span class="ident">allocation_bytes</span>: <span class="ident">AtomicUsize</span>,
@@ -1731,8 +1760,35 @@ BasePlan should contain all plan-related state and functions that are _fundament
         }
     }
 
+    <span class="doccomment">/// Are the stacks scanned?</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">stacks_prepared</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">stacks_prepared</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    }
+
+    <span class="doccomment">/// Prepare for stack scanning. This is usually used with `inform_stack_scanned()`.</span>
+    <span class="doccomment">/// This should be called before doing stack scanning.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare_for_stack_scanning</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">scanned_stacks</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">stacks_prepared</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+    }
+
+    <span class="doccomment">/// Inform that 1 stack has been scanned. The argument `n_mutators` indicates the</span>
+    <span class="doccomment">/// total stacks we should scan. This method returns true if the number of scanned</span>
+    <span class="doccomment">/// stacks equals the total mutator count. Otherwise it returns false. This method</span>
+    <span class="doccomment">/// is thread safe and we guarantee only one thread will return true.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">inform_stack_scanned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">n_mutators</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="ident">old</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scanned_stacks</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="macro">debug_assert!</span>(
+            <span class="ident">old</span> <span class="op">&lt;</span> <span class="ident">n_mutators</span>,
+            <span class="string">&quot;The number of scanned stacks ({}) is more than the number of mutators ({})&quot;</span>,
+            <span class="ident">old</span>,
+            <span class="ident">n_mutators</span>
+        );
+        <span class="kw">let</span> <span class="ident">scanning_done</span> <span class="op">=</span> <span class="ident">old</span> <span class="op">+</span> <span class="number">1</span> <span class="op">==</span> <span class="ident">n_mutators</span>;
+        <span class="kw">if</span> <span class="ident">scanning_done</span> {
+            <span class="self">self</span>.<span class="ident">stacks_prepared</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+        }
+        <span class="ident">scanning_done</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_in_progress</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
