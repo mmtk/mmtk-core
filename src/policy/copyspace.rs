@@ -16,6 +16,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::scheduler::GCWorker;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -224,6 +225,50 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
     }
 
+    #[inline]
+    pub fn trace_object_new<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        semantics: AllocationSemantics,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
+        debug_assert!(
+            self.from_space(),
+            "Trace object called for object ({:?}) in to-space",
+            object
+        );
+
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
+
+        trace!("attempting to forward");
+        let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
+
+        trace!("checking if object is being forwarded");
+        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
+            trace!("... yes it is");
+            let new_object =
+                object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+            trace!("Returning");
+            new_object
+        } else {
+            trace!("... no it isn't. Copying");
+            let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
+            let new_object =
+                object_forwarding::forward_object::<VM, _>(object, semantics, copy_context);
+            trace!("Forwarding pointer");
+            trace.process_node(new_object);
+            trace!("Copied [{:?} -> {:?}]", object, new_object);
+            new_object
+        }
+    }
+
     #[allow(dead_code)] // Only used with certain features (such as sanity)
     pub fn protect(&self) {
         if !self.common().contiguous {
@@ -256,5 +301,74 @@ impl<VM: VMBinding> CopySpace<VM> {
             );
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
+    }
+}
+
+use crate::plan::PlanConstraints;
+use crate::util::alloc::BumpAllocator;
+use crate::util::alloc::Allocator;
+use crate::util::opaque_pointer::VMWorkerThread;
+use crate::scheduler::GCWorkerLocal;
+
+pub struct CopySpaceCopyContext<VM: VMBinding> {
+    pub plan_constraints: &'static PlanConstraints,
+    pub copy_allocator: BumpAllocator<VM>,
+}
+
+impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
+    type VM = VM;
+
+    fn constraints(&self) -> &'static PlanConstraints {
+        self.plan_constraints
+    }
+
+    fn init(&mut self, tls: VMWorkerThread) {
+        self.copy_allocator.tls = tls.0;
+    }
+
+    fn prepare(&mut self) {
+        
+    }
+
+    fn release(&mut self) {
+
+    }
+
+    #[inline(always)]
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        _semantics: crate::AllocationSemantics,
+    ) -> Address {
+        self.copy_allocator.alloc(bytes, align, offset)
+    }
+
+    #[inline(always)]
+    fn post_copy(
+        &mut self,
+        obj: ObjectReference,
+        _tib: Address,
+        _bytes: usize,
+        _semantics: crate::AllocationSemantics,
+    ) {
+        object_forwarding::clear_forwarding_bits::<VM>(obj);
+        if self.plan_constraints.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+        }
+    }
+}
+
+impl<VM: VMBinding> GCWorkerLocal for CopySpaceCopyContext<VM> {
+    fn init(&mut self, tls: VMWorkerThread) {
+        CopyContext::init(self, tls);
+    }
+}
+
+impl<VM: VMBinding> CopySpaceCopyContext<VM> {
+    pub fn rebind(&mut self, space: &CopySpace<VM>) {
+        self.copy_allocator.rebind(unsafe { &*{space as *const _} });
     }
 }

@@ -186,6 +186,24 @@ impl<VM: VMBinding> Gen<VM> {
         self.common.trace_object::<T, C>(trace, object)
     }
 
+    /// Trace objects for spaces in generational and common plans for a full heap GC.
+    pub fn trace_object_full_heap_new<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if self.nursery.in_space(object) {
+            return self.nursery.trace_object_new::<T>(
+                trace,
+                object,
+                AllocationSemantics::Default,
+                worker,
+            );
+        }
+        self.common.trace_object::<T, crate::plan::global::NoCopy<VM>>(trace, object)
+    }
+
     /// Trace objects for spaces in generational and common plans for a nursery GC.
     pub fn trace_object_nursery<T: TransitiveClosure, C: CopyContext + GCWorkerLocal>(
         &self,

@@ -199,7 +199,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn constraints(&self) -> &'static PlanConstraints;
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
@@ -259,6 +259,7 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread);
+    fn prepare_collector(&self, worker: &mut GCWorker<Self::VM>) {}
     fn release(&mut self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {

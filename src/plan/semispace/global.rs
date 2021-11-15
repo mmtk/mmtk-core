@@ -1,4 +1,4 @@
-use super::gc_work::{SSCopyContext, SSProcessEdges};
+use super::gc_work::SSProcessEdges;
 use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -51,11 +51,17 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = SSCopyContext::new(mmtk);
+        use crate::policy::copyspace::CopySpaceCopyContext;
+        use crate::util::opaque_pointer::VMThread;
+        use crate::util::alloc::BumpAllocator;
+        let mut c = CopySpaceCopyContext {
+            plan_constraints: &SS_CONSTRAINTS,
+            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, &self.copyspace0, self),
+        };
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
@@ -73,10 +79,11 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        use crate::policy::copyspace::CopySpaceCopyContext;
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         self.common()
-            .schedule_common::<Self, SSProcessEdges<VM>, SSCopyContext<VM>>(
+            .schedule_common::<Self, SSProcessEdges<VM>, CopySpaceCopyContext<VM>>(
                 self,
                 &SS_CONSTRAINTS,
                 scheduler,
@@ -96,6 +103,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+    }
+
+    fn prepare_collector(&self, worker: &mut GCWorker<VM>) {
+        use crate::policy::copyspace::CopySpaceCopyContext;
+        let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
+        copy_context.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

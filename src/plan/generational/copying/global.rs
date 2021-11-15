@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges};
+use super::gc_work::GenCopyMatureProcessEdges;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
@@ -25,6 +25,7 @@ use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::policy::copyspace::CopySpaceCopyContext;
 
 pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
@@ -45,11 +46,16 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = GenCopyCopyContext::new(mmtk);
+        use crate::util::opaque_pointer::VMThread;
+        use crate::util::alloc::BumpAllocator;
+        let mut c = CopySpaceCopyContext {
+            plan_constraints: &GENCOPY_CONSTRAINTS,
+            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, self.tospace(), self),
+        };
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
@@ -87,7 +93,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if !is_full_heap {
             debug!("Nursery GC");
             self.common()
-                .schedule_common::<Self, GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>, GenCopyCopyContext<VM>>(
+                .schedule_common::<Self, GenNurseryProcessEdges<VM, CopySpaceCopyContext<VM>>, CopySpaceCopyContext<VM>>(
                     self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
@@ -95,7 +101,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         } else {
             debug!("Full heap GC");
             self.common()
-                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>, GenCopyCopyContext<VM>>(
+                .schedule_common::<Self, GenCopyMatureProcessEdges<VM>, CopySpaceCopyContext<VM>>(
                     self,
                     &GENCOPY_CONSTRAINTS,
                     scheduler,
@@ -117,6 +123,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+    }
+
+    fn prepare_collector(&self, worker: &mut GCWorker<Self::VM>) {
+        let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
+        copy_context.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

@@ -12,70 +12,70 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
-pub struct SSCopyContext<VM: VMBinding> {
-    plan: &'static SemiSpace<VM>,
-    ss: BumpAllocator<VM>,
-}
+// pub struct SSCopyContext<VM: VMBinding> {
+//     plan: &'static SemiSpace<VM>,
+//     ss: BumpAllocator<VM>,
+// }
 
-impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
-    type VM = VM;
+// impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
+//     type VM = VM;
 
-    fn constraints(&self) -> &'static PlanConstraints {
-        &super::global::SS_CONSTRAINTS
-    }
+//     fn constraints(&self) -> &'static PlanConstraints {
+//         &super::global::SS_CONSTRAINTS
+//     }
 
-    fn init(&mut self, tls: VMWorkerThread) {
-        self.ss.tls = tls.0;
-    }
+//     fn init(&mut self, tls: VMWorkerThread) {
+//         self.ss.tls = tls.0;
+//     }
 
-    fn prepare(&mut self) {
-        self.ss.rebind(self.plan.tospace());
-    }
+//     fn prepare(&mut self) {
+//         self.ss.rebind(self.plan.tospace());
+//     }
 
-    fn release(&mut self) {
-        // self.ss.rebind(Some(self.plan.tospace()));
-    }
+//     fn release(&mut self) {
+//         // self.ss.rebind(Some(self.plan.tospace()));
+//     }
 
-    #[inline(always)]
-    fn alloc_copy(
-        &mut self,
-        _original: ObjectReference,
-        bytes: usize,
-        align: usize,
-        offset: isize,
-        _semantics: crate::AllocationSemantics,
-    ) -> Address {
-        self.ss.alloc(bytes, align, offset)
-    }
+//     #[inline(always)]
+//     fn alloc_copy(
+//         &mut self,
+//         _original: ObjectReference,
+//         bytes: usize,
+//         align: usize,
+//         offset: isize,
+//         _semantics: crate::AllocationSemantics,
+//     ) -> Address {
+//         self.ss.alloc(bytes, align, offset)
+//     }
 
-    #[inline(always)]
-    fn post_copy(
-        &mut self,
-        obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        _semantics: crate::AllocationSemantics,
-    ) {
-        object_forwarding::clear_forwarding_bits::<VM>(obj);
-    }
-}
+//     #[inline(always)]
+//     fn post_copy(
+//         &mut self,
+//         obj: ObjectReference,
+//         _tib: Address,
+//         _bytes: usize,
+//         _semantics: crate::AllocationSemantics,
+//     ) {
+//         object_forwarding::clear_forwarding_bits::<VM>(obj);
+//     }
+// }
 
-impl<VM: VMBinding> SSCopyContext<VM> {
-    pub fn new(mmtk: &'static MMTK<VM>) -> Self {
-        let plan = &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap();
-        Self {
-            plan,
-            // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
-            ss: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
-        }
-    }
-}
+// impl<VM: VMBinding> SSCopyContext<VM> {
+//     pub fn new(mmtk: &'static MMTK<VM>) -> Self {
+//         let plan = &mmtk.plan.downcast_ref::<SemiSpace<VM>>().unwrap();
+//         Self {
+//             plan,
+//             // it doesn't matter which space we bind with the copy allocator. We will rebind to a proper space in prepare().
+//             ss: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &*mmtk.plan),
+//         }
+//     }
+// }
 
-impl<VM: VMBinding> GCWorkerLocal for SSCopyContext<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
+// impl<VM: VMBinding> GCWorkerLocal for SSCopyContext<VM> {
+//     fn init(&mut self, tls: VMWorkerThread) {
+//         CopyContext::init(self, tls);
+//     }
+// }
 
 pub struct SSProcessEdges<VM: VMBinding> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
@@ -111,16 +111,17 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
         } else if self.ss().fromspace().in_space(object) {
             self.ss()
                 .fromspace()
-                .trace_object::<Self, SSCopyContext<VM>>(
+                .trace_object_new::<Self>(
                     self,
                     object,
                     super::global::ALLOC_SS,
-                    unsafe { self.worker().local::<SSCopyContext<VM>>() },
+                    self.worker(),
                 )
         } else {
+            use crate::plan::global::NoCopy;
             self.ss()
                 .common
-                .trace_object::<Self, SSCopyContext<VM>>(self, object)
+                .trace_object::<Self, NoCopy<VM>>(self, object)
         }
     }
 }
