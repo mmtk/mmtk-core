@@ -256,7 +256,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             return self.alloc_slow(size, align, offset)
         }
         // eprintln!("a {}", addr);
-;        addr
+        addr
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
@@ -294,6 +294,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
+        // eprintln!("a {}", free_list);
 
         free_list
     }
@@ -760,7 +761,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
-        eprintln!("f {}", addr);
+        // eprintln!("f {}", addr);
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = self.space.load_block_tls(block);
@@ -802,11 +803,67 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "lazy_sweeping")]
     pub fn reset(&mut self) {
+        use crate::policy::marksweepspace::block::BlockState;
+
         trace!("reset");
         // consumed and available are now unswept
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
+            let mut prev = unsafe { Address::zero() };
             let unswept = &mut self.unswept_blocks[bin];
+            let mut unswept_b = unswept.first;
+            while !unswept_b.is_zero() {
+                let unswept_block = Block::from(unswept_b);
+                let next = FreeListAllocator::<VM>::load_next_block(unswept_b);
+                if unswept_block.get_state() == BlockState::Unmarked {
+                    unswept_block.set_state(BlockState::UnmarkedAcknowledged);
+                    // eprintln!("ua {}", unswept_b);
+                    if prev.is_zero() {
+                        unswept.first = next;
+                    } else {
+                        FreeListAllocator::<VM>::store_next_block(prev, next);
+                    }
+                }
+                unswept_b = next;
+            }
+
+            let mut prev = unsafe { Address::zero() };
+            let available = &mut self.available_blocks[bin];
+            let mut available_b = available.first;
+            while !available_b.is_zero() {
+                let available_block = Block::from(available_b);
+                let next = FreeListAllocator::<VM>::load_next_block(available_b);
+                if available_block.get_state() == BlockState::Unmarked {
+                    available_block.set_state(BlockState::UnmarkedAcknowledged);
+                    // eprintln!("ua {}", available_b);
+                    if prev.is_zero() {
+                        available.first = next;
+                    } else {
+                        FreeListAllocator::<VM>::store_next_block(prev, next);
+                    }
+                }
+                available_b = next;
+            }
+
+            
+            let mut prev = unsafe { Address::zero() };
+            let consumed = &mut self.consumed_blocks[bin];
+            let mut consumed_b = consumed.first;
+            while !consumed_b.is_zero() {
+                let consumed_block = Block::from(consumed_b);
+                let next = FreeListAllocator::<VM>::load_next_block(consumed_b);
+                if consumed_block.get_state() == BlockState::Unmarked {
+                    consumed_block.set_state(BlockState::UnmarkedAcknowledged);
+                    // eprintln!("ua {}", consumed_b);
+                    if prev.is_zero() {
+                        consumed.first = next;
+                    } else {
+                        FreeListAllocator::<VM>::store_next_block(prev, next);
+                    }
+                }
+                consumed_b = next;
+            }
+
             let available = self.available_blocks[bin];
             debug_assert!(available.size == unswept.size);
             if !available.is_empty() {
