@@ -68,7 +68,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkCont
     type VM = VM;
     type PlanType = GenCopy<VM>;
     type CopyContextType = CopySpaceCopyContext<VM>;
-    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
 }
 
 pub(super) struct GenCopyMatureGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);

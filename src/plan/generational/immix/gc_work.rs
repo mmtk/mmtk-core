@@ -92,7 +92,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkCon
     type VM = VM;
     type PlanType = GenImmix<VM>;
     type CopyContextType = ImmixCopyContext<VM>;
-    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
 }
 
 pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(

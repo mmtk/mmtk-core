@@ -4,7 +4,6 @@ use crate::plan::generational::immix::GenImmix;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
-use crate::policy::immix::ImmixCopyContext;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -60,11 +59,10 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier:
-            box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, ImmixCopyContext<VM>>>::new(
-                mmtk,
-                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-            ),
+        barrier: box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
+            mmtk,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        ),
         mutator_tls,
         config,
         plan: genimmix,
