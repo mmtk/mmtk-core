@@ -72,11 +72,8 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         &'static self,
         tls: VMWorkerThread,
     ) -> GCWorkerLocalPtr {
-        use crate::util::alloc::BumpAllocator;
-        let mut c = CopySpaceCopyContext {
-            plan_constraints: &MYGC_CONSTRAINTS,
-            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, &self.copyspace0, self),
-        };
+        // The tospace argument doesn't matter, we will rebind before a GC anyway.
+        let mut c = CopySpaceCopyContext::new(self, &self.copyspace0);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

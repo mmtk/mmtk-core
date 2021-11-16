@@ -591,6 +591,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
 }
 
 use crate::plan::PlanConstraints;
+use crate::plan::Plan;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
@@ -598,9 +599,9 @@ use crate::util::object_forwarding;
 
 /// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {
-    pub plan_constraints: &'static PlanConstraints,
-    pub copy_allocator: ImmixAllocator<VM>,
-    pub defrag_allocator: ImmixAllocator<VM>,
+    plan_constraints: &'static PlanConstraints,
+    copy_allocator: ImmixAllocator<VM>,
+    defrag_allocator: ImmixAllocator<VM>,
 }
 
 impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
@@ -652,6 +653,16 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
         if self.plan_constraints.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
+        }
+    }
+}
+
+impl<VM: VMBinding> ImmixCopyContext<VM> {
+    pub fn new(plan: &'static dyn Plan<VM=VM>, space: &'static ImmixSpace<VM>) -> Self {
+        ImmixCopyContext {
+            plan_constraints: plan.constraints(),
+            copy_allocator: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(space), plan, false),
+            defrag_allocator: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(space), plan, true),
         }
     }
 }

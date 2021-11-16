@@ -44,12 +44,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        use crate::util::alloc::BumpAllocator;
-        use crate::util::opaque_pointer::VMThread;
-        let mut c = CopySpaceCopyContext {
-            plan_constraints: &GENCOPY_CONSTRAINTS,
-            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, self.tospace(), self),
-        };
+        // The tospace argument doesn't matter, we will rebind before a GC anyway.
+        let mut c = CopySpaceCopyContext::new(self, self.tospace());
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

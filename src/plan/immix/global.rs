@@ -60,21 +60,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext {
-            plan_constraints: &IMMIX_CONSTRAINTS,
-            copy_allocator: crate::util::alloc::ImmixAllocator::new(
-                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
-                Some(&self.immix_space),
-                self,
-                false,
-            ),
-            defrag_allocator: crate::util::alloc::ImmixAllocator::new(
-                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
-                Some(&self.immix_space),
-                self,
-                true,
-            ),
-        };
+        let mut c = ImmixCopyContext::new(self, &self.immix_space);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

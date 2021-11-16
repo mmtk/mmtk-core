@@ -65,21 +65,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext {
-            plan_constraints: &GENIMMIX_CONSTRAINTS,
-            copy_allocator: crate::util::alloc::ImmixAllocator::new(
-                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
-                Some(&self.immix),
-                self,
-                false,
-            ),
-            defrag_allocator: crate::util::alloc::ImmixAllocator::new(
-                crate::util::opaque_pointer::VMThread::UNINITIALIZED,
-                Some(&self.immix),
-                self,
-                true,
-            ),
-        };
+        let mut c = ImmixCopyContext::new(self, &self.immix);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
