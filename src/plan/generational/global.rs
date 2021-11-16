@@ -171,7 +171,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
-    pub fn trace_object_full_heap_new<T: TransitiveClosure>(
+    pub fn trace_object_full_heap<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,

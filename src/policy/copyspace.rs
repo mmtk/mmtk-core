@@ -27,6 +27,7 @@ pub struct CopySpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
+    /// What policy we will copy objects to
     copy_to: CopyDestination,
 }
 
@@ -282,6 +283,7 @@ use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;
 
+/// Copy allocator for CopySpace
 pub struct CopySpaceCopyContext<VM: VMBinding> {
     plan_constraints: &'static PlanConstraints,
     copy_allocator: BumpAllocator<VM>,
@@ -331,7 +333,11 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
-    pub fn new(tls: VMWorkerThread, plan: &'static dyn Plan<VM = VM>, tospace: &'static CopySpace<VM>) -> Self {
+    pub fn new(
+        tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        tospace: &'static CopySpace<VM>,
+    ) -> Self {
         CopySpaceCopyContext {
             plan_constraints: plan.constraints(),
             copy_allocator: BumpAllocator::new(tls.0, tospace, plan),

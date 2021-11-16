@@ -660,7 +660,11 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 }
 
 impl<VM: VMBinding> ImmixCopyContext<VM> {
-    pub fn new(tls: VMWorkerThread, plan: &'static dyn Plan<VM = VM>, space: &'static ImmixSpace<VM>) -> Self {
+    pub fn new(
+        tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        space: &'static ImmixSpace<VM>,
+    ) -> Self {
         ImmixCopyContext {
             plan_constraints: plan.constraints(),
             copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),

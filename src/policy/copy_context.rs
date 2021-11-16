@@ -7,9 +7,13 @@ use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
-/// A GC worker's context for copying GCs.
-/// Each GC plan should provide their implementation of a CopyContext.
-/// For non-copying GC, NoCopy can be used.
+/// A GC worker's copy allocator for copying GCs.
+/// Each copying policy should provide their implementation of CopyContext.
+/// For non-copying policy, they do not need a copy context. For them, NoCopy will be used.
+/// If we copy objects from one policy to a different policy, the copy context of the destination
+/// policy should be used. For example, for generational immix, the nursery is CopySpace, and the
+/// mature space is ImmixSpace. When we copy from nursery to mature, ImmixCopyContext should be
+/// used.
 pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
@@ -52,6 +56,9 @@ pub trait CopyContext: 'static + Send {
     }
 }
 
+/// A stub implementation for CopyContext. This is used as per GC worker
+/// thread local type for non copying GCs (which won't be used). It does nothing for most of its
+/// methods, and will panic if alloc_copy() is ever called.
 pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
@@ -87,6 +94,9 @@ impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
     }
 }
 
+/// CopyDestination describes which policy we copy objects to.
+/// A policy can use this to determine which copy context it should
+/// use for copying.
 #[derive(Copy, Clone, Debug)]
 pub enum CopyDestination {
     CopySpace,

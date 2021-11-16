@@ -68,7 +68,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
 
         self.plan
             .gen
-            .trace_object_full_heap_new::<Self>(self, object, self.worker())
+            .trace_object_full_heap::<Self>(self, object, self.worker())
     }
 }
 

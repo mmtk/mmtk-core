@@ -172,8 +172,16 @@ pub trait Plan: 'static + Sync + Downcast {
             .load(Ordering::SeqCst)
     }
 
+    /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
+    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn prepare(&mut self, tls: VMWorkerThread);
-    fn prepare_collector(&self, _worker: &mut GCWorker<Self::VM>) {}
+
+    /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
+    /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
+    fn prepare_worker(&self, _worker: &mut GCWorker<Self::VM>) {}
+
+    /// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.
+    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {

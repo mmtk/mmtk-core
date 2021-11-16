@@ -91,7 +91,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn prepare_collector(&self, worker: &mut GCWorker<VM>) {
+    fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
         use crate::policy::copyspace::CopySpaceCopyContext;
         let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
         copy_context.rebind(self.tospace());

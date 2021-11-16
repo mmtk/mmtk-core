@@ -91,7 +91,7 @@ impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for PrepareCollec
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
         unsafe { worker.local::<W>() }.prepare();
-        mmtk.plan.prepare_collector(worker);
+        mmtk.plan.prepare_worker(worker);
     }
 }
 

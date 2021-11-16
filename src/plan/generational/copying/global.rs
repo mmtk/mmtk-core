@@ -106,7 +106,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.copyspace1.prepare(!hi);
     }
 
-    fn prepare_collector(&self, worker: &mut GCWorker<Self::VM>) {
+    fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
         let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
         copy_context.rebind(self.tospace());
     }

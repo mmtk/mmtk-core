@@ -46,7 +46,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
 
         self.gencopy()
             .gen
-            .trace_object_full_heap_new::<Self>(self, object, self.worker())
+            .trace_object_full_heap::<Self>(self, object, self.worker())
     }
 }
 
