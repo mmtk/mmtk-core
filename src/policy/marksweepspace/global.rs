@@ -223,6 +223,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn release_block(&self, block: Address) {
         // eprintln!("b < 0x{:0x}", block);
         self.block_clear_metadata(block);
+
         let block = Block::from(block);
         block.deinit();
         self.pr.release_pages(block.start());
@@ -238,6 +239,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 Some(Ordering::SeqCst),
             )
         }
+        bzero_alloc_bit(block, BYTES_IN_BLOCK);
     }
 
     pub fn load_block_tls(&self, block: Address) -> OpaquePointer {

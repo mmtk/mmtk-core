@@ -104,8 +104,9 @@ impl Block {
     pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
             BlockState::Unallocated => false,
-            BlockState::Unmarked => {
-                // Release the block if it is allocated but not marked by the current GC.
+            BlockState::Unmarked => false,
+            BlockState::UnmarkedAcknowledged => {
+                // Release the block if it is allocated but not marked by the current GC, and acknowledged by the allocator.
                 space.release_block(self.0);
                 true
             }
@@ -192,7 +193,7 @@ pub enum BlockState {
     /// the block is allocated and marked.
     Marked,
     /// the block is marked as reusable.
-    Reusable { unavailable_lines: u8 },
+    UnmarkedAcknowledged,
 }
 
 impl BlockState {
@@ -202,6 +203,8 @@ impl BlockState {
     const MARK_UNMARKED: u8 = u8::MAX;
     /// Private constant
     const MARK_MARKED: u8 = u8::MAX - 1;
+    // Private constant
+    const MARK_UNMARKED_ACKNOWLEDGED: u8 = u8::MAX - 2;
 }
 
 impl From<u8> for BlockState {
@@ -211,7 +214,8 @@ impl From<u8> for BlockState {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
-            unavailable_lines => BlockState::Reusable { unavailable_lines },
+            Self::MARK_UNMARKED_ACKNOWLEDGED => BlockState::UnmarkedAcknowledged,
+            _ => unreachable!()
         }
     }
 }
@@ -223,7 +227,7 @@ impl From<BlockState> for u8 {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
-            BlockState::Reusable { unavailable_lines } => unavailable_lines,
+            BlockState::UnmarkedAcknowledged => BlockState::MARK_UNMARKED_ACKNOWLEDGED,
         }
     }
 }
