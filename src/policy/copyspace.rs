@@ -280,7 +280,6 @@ use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
-use crate::util::opaque_pointer::VMThread;
 use crate::util::opaque_pointer::VMWorkerThread;
 
 pub struct CopySpaceCopyContext<VM: VMBinding> {
@@ -296,6 +295,7 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
     }
 
     fn init(&mut self, tls: VMWorkerThread) {
+        debug_assert_eq!(tls.0, self.copy_allocator.tls);
         self.copy_allocator.tls = tls.0;
     }
 
@@ -331,10 +331,10 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
 }
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
-    pub fn new(plan: &'static dyn Plan<VM = VM>, tospace: &'static CopySpace<VM>) -> Self {
+    pub fn new(tls: VMWorkerThread, plan: &'static dyn Plan<VM = VM>, tospace: &'static CopySpace<VM>) -> Self {
         CopySpaceCopyContext {
             plan_constraints: plan.constraints(),
-            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, tospace, plan),
+            copy_allocator: BumpAllocator::new(tls.0, tospace, plan),
         }
     }
 }

@@ -611,6 +611,8 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         self.plan_constraints
     }
     fn init(&mut self, tls: VMWorkerThread) {
+        debug_assert_eq!(tls.0, self.copy_allocator.tls);
+        debug_assert_eq!(tls.0, self.defrag_allocator.tls);
         self.copy_allocator.tls = tls.0;
         self.defrag_allocator.tls = tls.0;
     }
@@ -658,11 +660,11 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 }
 
 impl<VM: VMBinding> ImmixCopyContext<VM> {
-    pub fn new(plan: &'static dyn Plan<VM = VM>, space: &'static ImmixSpace<VM>) -> Self {
+    pub fn new(tls: VMWorkerThread, plan: &'static dyn Plan<VM = VM>, space: &'static ImmixSpace<VM>) -> Self {
         ImmixCopyContext {
             plan_constraints: plan.constraints(),
-            copy_allocator: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(space), plan, false),
-            defrag_allocator: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(space), plan, true),
+            copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
+            defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
         }
     }
 }

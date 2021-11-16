@@ -46,7 +46,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        let mut c = CopySpaceCopyContext::new(self, self.tospace());
+        let mut c = CopySpaceCopyContext::new(tls, self, self.tospace());
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

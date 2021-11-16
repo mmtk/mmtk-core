@@ -74,7 +74,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         tls: VMWorkerThread,
     ) -> GCWorkerLocalPtr {
         // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        let mut c = CopySpaceCopyContext::new(self, &self.copyspace0);
+        let mut c = CopySpaceCopyContext::new(tls, self, &self.copyspace0);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }

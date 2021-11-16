@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext::new(self, &self.immix_space);
+        let mut c = ImmixCopyContext::new(tls, self, &self.immix_space);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
