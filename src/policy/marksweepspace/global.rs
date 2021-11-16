@@ -4,7 +4,7 @@ use std::{
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunks::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, alloc_bit::ALLOC_SIDE_METADATA_SPEC, constants::LOG_BYTES_IN_PAGE, heap::{
+use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunks::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, constants::LOG_BYTES_IN_PAGE, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
         }, metadata::{self, MetadataSpec, load_metadata, side_metadata::{self, SideMetadataContext, SideMetadataSpec, address_to_meta_address}, store_metadata}}, vm::VMBinding};
@@ -205,6 +205,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn release_block(&self, block: Address) {
         // eprintln!("b < 0x{:0x}", block);
         self.block_clear_metadata(block);
+
         let block = Block::from(block);
         block.deinit();
         self.pr.release_pages(block.start());
@@ -220,6 +221,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 Some(Ordering::SeqCst),
             )
         }
+        bzero_alloc_bit(block, BYTES_IN_BLOCK);
     }
 
     pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
