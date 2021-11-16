@@ -3,6 +3,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
+use crate::policy::copy_context::CopyDestination;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -37,6 +38,7 @@ pub struct Gen<VM: VMBinding> {
 
 impl<VM: VMBinding> Gen<VM> {
     pub fn new(
+        mature_policy: CopyDestination,
         mut heap: HeapMeta,
         global_metadata_specs: Vec<SideMetadataSpec>,
         constraints: &'static PlanConstraints,
@@ -48,6 +50,7 @@ impl<VM: VMBinding> Gen<VM> {
             nursery: CopySpace::new(
                 "nursery",
                 false,
+                mature_policy,
                 true,
                 VMRequest::fixed_extent(crate::util::options::NURSERY_SIZE, false),
                 global_metadata_specs.clone(),

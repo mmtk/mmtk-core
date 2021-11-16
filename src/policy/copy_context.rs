@@ -86,3 +86,9 @@ impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
         CopyContext::init(self, tls);
     }
 }
+
+#[derive(Copy, Clone, Debug)]
+pub enum CopyDestination {
+    CopySpace,
+    ImmixSpace,
+}

@@ -1,6 +1,7 @@
 use crate::plan::AllocationSemantics;
 use crate::plan::TransitiveClosure;
 use crate::policy::copy_context::CopyContext;
+use crate::policy::copy_context::CopyDestination;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
@@ -26,6 +27,7 @@ pub struct CopySpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
+    copy_to: CopyDestination,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
@@ -96,6 +98,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     pub fn new(
         name: &'static str,
         from_space: bool,
+        copy_to: CopyDestination,
         zeroed: bool,
         vmrequest: VMRequest,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
@@ -137,6 +140,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             },
             common,
             from_space: AtomicBool::new(from_space),
+            copy_to,
         }
     }
 
@@ -217,9 +221,18 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
-            let new_object =
-                object_forwarding::forward_object::<VM, _>(object, semantics, copy_context);
+            let new_object = match self.copy_to {
+                CopyDestination::CopySpace => {
+                    object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
+                        worker.local::<CopySpaceCopyContext<VM>>()
+                    })
+                }
+                CopyDestination::ImmixSpace => {
+                    object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
+                        worker.local::<super::immix::immixspace::ImmixCopyContext<VM>>()
+                    })
+                }
+            };
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);

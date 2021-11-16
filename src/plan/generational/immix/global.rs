@@ -213,6 +213,7 @@ impl<VM: VMBinding> GenImmix<VM> {
 
         let genimmix = GenImmix {
             gen: Gen::new(
+                crate::policy::copy_context::CopyDestination::ImmixSpace,
                 heap,
                 global_metadata_specs,
                 &GENIMMIX_CONSTRAINTS,
