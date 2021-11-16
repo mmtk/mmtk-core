@@ -1,6 +1,6 @@
 // ANCHOR: imports
 use super::global::MyGC;
-use crate::plan::CopyContext;
+use crate::policy::copy_context::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::alloc::{Allocator, BumpAllocator};
@@ -114,21 +114,21 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
             return object;
         }
         if self.mygc().tospace().in_space(object) {
-            self.mygc().tospace().trace_object::<Self, MyGCCopyContext<VM>>(
+            self.mygc().tospace().trace_object::<Self>(
                 self,
                 object,
                 super::global::ALLOC_MyGC,
-                unsafe { self.worker().local::<MyGCCopyContext<VM>>() },
+                self.worker(),
             )
         } else if self.mygc().fromspace().in_space(object) {
-            self.mygc().fromspace().trace_object::<Self, MyGCCopyContext<VM>>(
+            self.mygc().fromspace().trace_object::<Self>(
                 self,
                 object,
                 super::global::ALLOC_MyGC,
-                unsafe { self.worker().local::<MyGCCopyContext<VM>>() },
+                self.worker(),
             )
         } else {
-            self.mygc().common.trace_object::<Self, MyGCCopyContext<VM>>(self, object)
+            self.mygc().common.trace_object::<Self>(self, object)
         }
     }
     // ANCHOR_END: trace_object

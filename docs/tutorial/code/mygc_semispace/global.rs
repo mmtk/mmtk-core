@@ -8,6 +8,7 @@ use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::copyspace::CopySpaceCopyContext; // Add
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
@@ -68,11 +69,14 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // ANCHOR: create_worker_local
     fn create_worker_local(
-        &self,
+        &'static self,
         tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr {
-        let mut c = MyGCCopyContext::new(mmtk);
+        use crate::util::alloc::BumpAllocator;
+        let mut c = CopySpaceCopyContext {
+            plan_constraints: &MYGC_CONSTRAINTS,
+            copy_allocator: BumpAllocator::new(VMThread::UNINITIALIZED, &self.copyspace0, self),
+        };
         c.init(tls);
         GCWorkerLocalPtr::new(c)
     }
