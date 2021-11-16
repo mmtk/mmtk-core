@@ -10,6 +10,7 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpaceCopyContext; // Add
 use crate::policy::copyspace::CopySpace; // Add
+use crate::policy::copy_context::CopyDestination; // Add
 use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::scheduler::gc_work::*; // Add
@@ -182,6 +183,7 @@ impl<VM: VMBinding> MyGC<VM> {
             copyspace0: CopySpace::new(
                 "copyspace0",
                 false,
+                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),
@@ -193,6 +195,7 @@ impl<VM: VMBinding> MyGC<VM> {
             copyspace1: CopySpace::new(
                 "copyspace1",
                 true,
+                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),
