@@ -590,8 +590,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
     }
 }
 
-use crate::plan::PlanConstraints;
 use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
@@ -658,7 +658,7 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
 }
 
 impl<VM: VMBinding> ImmixCopyContext<VM> {
-    pub fn new(plan: &'static dyn Plan<VM=VM>, space: &'static ImmixSpace<VM>) -> Self {
+    pub fn new(plan: &'static dyn Plan<VM = VM>, space: &'static ImmixSpace<VM>) -> Self {
         ImmixCopyContext {
             plan_constraints: plan.constraints(),
             copy_allocator: ImmixAllocator::new(VMThread::UNINITIALIZED, Some(space), plan, false),
