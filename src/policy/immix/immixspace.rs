@@ -610,12 +610,6 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         self.plan_constraints
     }
-    fn init(&mut self, tls: VMWorkerThread) {
-        debug_assert_eq!(tls.0, self.copy_allocator.tls);
-        debug_assert_eq!(tls.0, self.defrag_allocator.tls);
-        self.copy_allocator.tls = tls.0;
-        self.defrag_allocator.tls = tls.0;
-    }
     fn prepare(&mut self) {
         self.copy_allocator.reset();
         self.defrag_allocator.reset();
@@ -673,8 +667,4 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
+impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {}

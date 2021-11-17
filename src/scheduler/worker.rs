@@ -12,9 +12,7 @@ use std::sync::{Arc, Weak};
 /// Thread-local data for each worker thread.
 ///
 /// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
-pub trait GCWorkerLocal {
-    fn init(&mut self, _tls: VMWorkerThread) {}
-}
+pub trait GCWorkerLocal {}
 
 /// This struct will be accessed during trace_object(), which is performance critical.
 /// However, we do not know its concrete type as the plan and its copy context is dynamically selected.

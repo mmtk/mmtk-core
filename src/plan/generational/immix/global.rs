@@ -13,7 +13,6 @@ use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocalPtr;
-use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -65,9 +64,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext::new(tls, self, &self.immix);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+        GCWorkerLocalPtr::new(ImmixCopyContext::new(tls, self, &self.immix))
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {

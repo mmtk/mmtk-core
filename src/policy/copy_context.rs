@@ -3,7 +3,6 @@ use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
@@ -14,10 +13,12 @@ use std::marker::PhantomData;
 /// policy should be used. For example, for generational immix, the nursery is CopySpace, and the
 /// mature space is ImmixSpace. When we copy from nursery to mature, ImmixCopyContext should be
 /// used.
+/// Currently we are assuming one plan will only use one copy context, which is true for our current GCs.
+/// However, that might not be true in the future if we have more than 2 generations in a plan. We
+/// may need to reconsider this design. Possibly we can do something similar to Mutator.
 pub trait CopyContext: 'static + Send {
     type VM: VMBinding;
     fn constraints(&self) -> &'static PlanConstraints;
-    fn init(&mut self, tls: VMWorkerThread);
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(
@@ -64,7 +65,6 @@ pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> CopyContext for NoCopy<VM> {
     type VM = VM;
 
-    fn init(&mut self, _tls: VMWorkerThread) {}
     fn constraints(&self) -> &'static PlanConstraints {
         unreachable!()
     }
@@ -88,11 +88,7 @@ impl<VM: VMBinding> NoCopy<VM> {
     }
 }
 
-impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
+impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {}
 
 /// CopyDestination describes which policy we copy objects to.
 /// A policy can use this to determine which copy context it should

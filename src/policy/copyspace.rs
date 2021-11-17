@@ -296,11 +296,6 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
         self.plan_constraints
     }
 
-    fn init(&mut self, tls: VMWorkerThread) {
-        debug_assert_eq!(tls.0, self.copy_allocator.tls);
-        self.copy_allocator.tls = tls.0;
-    }
-
     fn prepare(&mut self) {}
 
     fn release(&mut self) {}
@@ -345,11 +340,7 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> GCWorkerLocal for CopySpaceCopyContext<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
+impl<VM: VMBinding> GCWorkerLocal for CopySpaceCopyContext<VM> {}
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub fn rebind(&mut self, space: &CopySpace<VM>) {

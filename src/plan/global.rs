@@ -116,7 +116,12 @@ pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr;
+
+    /// Create thread local GC worker. For copying plan, they will have to override this method,
+    /// and use the correct copy context as GC workers.
+    fn create_worker_local(&'static self, _tls: VMWorkerThread) -> GCWorkerLocalPtr {
+        GCWorkerLocalPtr::new(crate::policy::copy_context::NoCopy::<Self::VM>::new())
+    }
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {

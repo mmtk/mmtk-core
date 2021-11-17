@@ -53,9 +53,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
         use crate::policy::copyspace::CopySpaceCopyContext;
         // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        let mut c = CopySpaceCopyContext::new(tls, self, &self.copyspace0);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+        GCWorkerLocalPtr::new(CopySpaceCopyContext::new(tls, self, &self.copyspace0))
     }
 
     fn gc_init(
