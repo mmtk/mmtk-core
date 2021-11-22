@@ -7,6 +7,8 @@ use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 
+use crate::util::copy::*;
+
 /// VM-specific methods for object model.
 ///
 /// This trait includes 3 parts:
@@ -191,6 +193,12 @@ pub trait ObjectModel<VM: VMBinding> {
         from: ObjectReference,
         semantics: AllocationSemantics,
         copy_context: &mut impl CopyContext,
+    ) -> ObjectReference;
+
+    fn copy_new(
+        from: ObjectReference,
+        semantics: CopySemantics,
+        copy_context: &mut GCWorkerCopyContext<VM>,
     ) -> ObjectReference;
 
     /// Copy an object. This is required

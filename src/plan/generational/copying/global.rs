@@ -45,8 +45,20 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        GCWorkerLocalPtr::new(CopySpaceCopyContext::new(tls, self, self.tospace()))
+        use enum_map::enum_map;
+        use crate::util::copy::*;
+
+        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                CopySemantics::PromoteMature => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
+            },
+            constraints: &GENCOPY_CONSTRAINTS,
+        }, &[
+            // The tospace argument doesn't matter, we will rebind before a GC anyway.
+            (CopySelector::CopySpace(0), self.tospace()),
+        ]))
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool

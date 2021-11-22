@@ -60,7 +60,18 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        GCWorkerLocalPtr::new(ImmixCopyContext::new(tls, self, &self.immix_space))
+        use enum_map::enum_map;
+        use crate::util::copy::*;
+
+        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::Compact => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
+            },
+            constraints: &IMMIX_CONSTRAINTS,
+        }, &[
+            (CopySelector::Immix(0), &self.immix_space),
+        ]))
     }
 
     fn gc_init(

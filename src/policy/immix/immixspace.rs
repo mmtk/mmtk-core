@@ -32,6 +32,7 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
+use crate::util::copy::*;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -326,10 +327,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
-        semantics: AllocationSemantics,
+        semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        let copy_context = unsafe { worker.local::<ImmixCopyContext<VM>>() };
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced(object),
@@ -337,7 +337,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object
         );
         if Block::containing::<VM>(object).is_defrag_source() {
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker)
         } else {
             self.trace_object_without_moving(trace, object)
         }
@@ -372,9 +372,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
+        semantics: CopySemantics,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        let copy_context = unsafe { worker.local::<GCWorkerCopyContext<VM>>() };
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -391,7 +392,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 #[cfg(feature = "global_alloc_bit")]
                 crate::util::alloc_bit::unset_alloc_bit(object);
-                ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
+                ForwardingWord::forward_object_new::<VM>(object, semantics, copy_context)
             };
             if !super::MARK_LINE_AT_SCAN_TIME {
                 self.mark_lines(new_object);
@@ -625,17 +626,24 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         bytes: usize,
         align: usize,
         offset: isize,
-        _semantics: crate::AllocationSemantics,
+        semantics: CopySemantics,
     ) -> Address {
         debug_assert!(
             bytes <= self.plan_constraints.max_non_los_default_alloc_bytes,
             "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
             bytes, self.plan_constraints.max_non_los_default_alloc_bytes
         );
-        if self.defrag_allocator.immix_space().in_defrag() {
-            self.defrag_allocator.alloc(bytes, align, offset)
-        } else {
-            self.copy_allocator.alloc(bytes, align, offset)
+        // if self.defrag_allocator.immix_space().in_defrag() {
+        //     self.defrag_allocator.alloc(bytes, align, offset)
+        // } else {
+        //     self.copy_allocator.alloc(bytes, align, offset)
+        // }
+        match semantics {
+            CopySemantics::Compact => {
+                debug_assert!(self.defrag_allocator.immix_space().in_defrag());
+                self.defrag_allocator.alloc(bytes, align, offset)
+            }
+            _ => self.copy_allocator.alloc(bytes, align, offset),
         }
     }
     #[inline(always)]
@@ -644,7 +652,7 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _semantics: crate::AllocationSemantics,
+        semantics: CopySemantics,
     ) {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
         if self.plan_constraints.needs_log_bit {

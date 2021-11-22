@@ -6,6 +6,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
+use crate::util::copy::*;
 
 pub struct SSProcessEdges<VM: VMBinding> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
@@ -42,7 +43,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             self.ss().fromspace().trace_object::<Self>(
                 self,
                 object,
-                super::global::ALLOC_SS,
+                CopySemantics::DefaultCopy,
                 self.worker(),
             )
         } else {

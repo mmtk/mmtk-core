@@ -90,7 +90,11 @@ impl<W: CopyContext + GCWorkerLocal> PrepareCollector<W> {
 impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for PrepareCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
-        unsafe { worker.local::<W>() }.prepare();
+        // unsafe { worker.local::<W>() }.prepare();
+        {
+            use crate::util::copy::*;
+            unsafe { worker.local::<GCWorkerCopyContext<VM>>().prepare();}
+        }
         mmtk.plan.prepare_worker(worker);
     }
 }
@@ -167,7 +171,11 @@ impl<W: CopyContext + GCWorkerLocal> ReleaseCollector<W> {
 impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for ReleaseCollector<W> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
-        unsafe { worker.local::<W>() }.release();
+        // unsafe { worker.local::<W>() }.release();
+        {
+            use crate::util::copy::*;
+            unsafe { worker.local::<GCWorkerCopyContext<VM>>().release();}
+        }
     }
 }
 

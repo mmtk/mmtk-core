@@ -5,6 +5,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
+use crate::util::copy::*;
 
 /// A GC worker's copy allocator for copying GCs.
 /// Each copying policy should provide their implementation of CopyContext.
@@ -27,33 +28,15 @@ pub trait CopyContext: 'static + Send {
         bytes: usize,
         align: usize,
         offset: isize,
-        semantics: AllocationSemantics,
+        semantics: CopySemantics,
     ) -> Address;
     fn post_copy(
         &mut self,
         _obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _semantics: AllocationSemantics,
+        semantics: CopySemantics,
     ) {
-    }
-    fn copy_check_allocator(
-        &self,
-        _from: ObjectReference,
-        bytes: usize,
-        align: usize,
-        semantics: AllocationSemantics,
-    ) -> AllocationSemantics {
-        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
-            bytes,
-            align,
-            Self::VM::MIN_ALIGNMENT,
-        ) > self.constraints().max_non_los_copy_bytes;
-        if large {
-            AllocationSemantics::Los
-        } else {
-            semantics
-        }
     }
 }
 
@@ -76,7 +59,7 @@ impl<VM: VMBinding> CopyContext for NoCopy<VM> {
         _bytes: usize,
         _align: usize,
         _offset: isize,
-        _semantics: AllocationSemantics,
+        _semantics: CopySemantics,
     ) -> Address {
         unreachable!()
     }

@@ -19,6 +19,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::util::copy::*;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -193,7 +194,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
-        semantics: AllocationSemantics,
+        semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
@@ -222,17 +223,22 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = match self.copy_to {
-                CopyDestination::CopySpace => {
-                    object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
-                        worker.local::<CopySpaceCopyContext<VM>>()
-                    })
-                }
-                CopyDestination::ImmixSpace => {
-                    object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
-                        worker.local::<super::immix::immixspace::ImmixCopyContext<VM>>()
-                    })
-                }
+            // let new_object = match self.copy_to {
+            //     CopyDestination::CopySpace => {
+            //         object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
+            //             worker.local::<CopySpaceCopyContext<VM>>()
+            //         })
+            //     }
+            //     CopyDestination::ImmixSpace => {
+            //         object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
+            //             worker.local::<super::immix::immixspace::ImmixCopyContext<VM>>()
+            //         })
+            //     }
+            // };
+            let new_object = {
+                object_forwarding::forward_object_new::<VM>(object, semantics, unsafe {
+                    worker.local::<GCWorkerCopyContext<VM>>()
+                })
             };
             trace!("Forwarding pointer");
             trace.process_node(new_object);
@@ -307,7 +313,7 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
         bytes: usize,
         align: usize,
         offset: isize,
-        _semantics: crate::AllocationSemantics,
+        _semantics: CopySemantics,
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
     }
@@ -318,7 +324,7 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
         obj: ObjectReference,
         _tib: Address,
         _bytes: usize,
-        _semantics: crate::AllocationSemantics,
+        _semantics: CopySemantics,
     ) {
         object_forwarding::clear_forwarding_bits::<VM>(obj);
         if self.plan_constraints.needs_log_bit {

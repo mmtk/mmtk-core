@@ -18,7 +18,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
-
+use crate::util::copy::CopySemantics;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -181,7 +181,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                AllocationSemantics::Default,
+                CopySemantics::PromoteMature,
                 worker,
             );
         }
@@ -200,7 +200,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                crate::plan::global::AllocationSemantics::Default,
+                CopySemantics::PromoteMature,
                 worker,
             );
         }

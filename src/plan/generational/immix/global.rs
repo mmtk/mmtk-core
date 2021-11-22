@@ -64,7 +64,19 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        GCWorkerLocalPtr::new(ImmixCopyContext::new(tls, self, &self.immix))
+        use enum_map::enum_map;
+        use crate::util::copy::*;
+
+        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::Unused,
+                CopySemantics::PromoteMature => CopySelector::Immix(0),
+                CopySemantics::Compact => CopySelector::Immix(0),
+            },
+            constraints: &GENIMMIX_CONSTRAINTS,
+        }, &[
+            (CopySelector::Immix(0), &self.immix),
+        ]))
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
@@ -107,6 +119,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         let defrag = if is_full_heap {
+            info!("full heap GC");
             self.immix.decide_whether_to_defrag(
                 self.is_emergency_collection(),
                 true,

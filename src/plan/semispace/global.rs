@@ -51,9 +51,21 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        use crate::policy::copyspace::CopySpaceCopyContext;
-        // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        GCWorkerLocalPtr::new(CopySpaceCopyContext::new(tls, self, &self.copyspace0))
+        // use crate::policy::copyspace::CopySpaceCopyContext;
+        // // The tospace argument doesn't matter, we will rebind before a GC anyway.
+        // GCWorkerLocalPtr::new(CopySpaceCopyContext::new(tls, self, &self.copyspace0))
+        use enum_map::enum_map;
+        use crate::util::copy::*;
+
+        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
+            },
+            constraints: &SS_CONSTRAINTS,
+        }, &[
+            (CopySelector::CopySpace(0), &self.copyspace0)
+        ]))
     }
 
     fn gc_init(
@@ -90,9 +102,13 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
-        use crate::policy::copyspace::CopySpaceCopyContext;
-        let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
-        copy_context.rebind(self.tospace());
+        // use crate::policy::copyspace::CopySpaceCopyContext;
+        // let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
+        // copy_context.rebind(self.tospace());
+        use crate::util::copy::*;
+
+        let copy_context = unsafe { worker.local::<GCWorkerCopyContext<VM>>() };
+        unsafe { copy_context.copy[0].assume_init_mut() }.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

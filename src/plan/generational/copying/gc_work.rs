@@ -7,6 +7,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
+use crate::util::copy::*;
 
 pub struct GenCopyMatureProcessEdges<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
@@ -39,7 +40,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             return self.gencopy().fromspace().trace_object::<Self>(
                 self,
                 object,
-                super::global::ALLOC_SS,
+                CopySemantics::DefaultCopy,
                 self.worker(),
             );
         }

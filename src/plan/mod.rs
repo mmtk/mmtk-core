@@ -32,6 +32,7 @@ pub use mutator_context::MutatorContext;
 
 mod plan_constraints;
 pub use plan_constraints::PlanConstraints;
+pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
 mod tracelocal;
 pub use tracelocal::TraceLocal;

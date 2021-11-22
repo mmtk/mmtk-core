@@ -6,6 +6,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
+use crate::util::copy::CopySemantics;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(in crate::plan) enum TraceKind {
@@ -63,7 +64,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
                 self.immix().immix_space.trace_object(
                     self,
                     object,
-                    super::global::ALLOC_IMMIX,
+                    CopySemantics::Compact,
                     self.worker(),
                 )
             }
