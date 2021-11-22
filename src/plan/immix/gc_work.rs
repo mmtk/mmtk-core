@@ -64,7 +64,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
                 self.immix().immix_space.trace_object(
                     self,
                     object,
-                    CopySemantics::Compact,
+                    CopySemantics::DefaultCompact,
                     self.worker(),
                 )
             }

@@ -69,9 +69,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
         GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
             copy_mapping: enum_map! {
-                CopySemantics::DefaultCopy => CopySelector::Unused,
                 CopySemantics::PromoteMature => CopySelector::Immix(0),
-                CopySemantics::Compact => CopySelector::Immix(0),
+                CopySemantics::MatureCompact => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
             },
             constraints: &GENIMMIX_CONSTRAINTS,
         }, &[

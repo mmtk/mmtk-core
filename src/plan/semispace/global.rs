@@ -51,9 +51,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        // use crate::policy::copyspace::CopySpaceCopyContext;
-        // // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        // GCWorkerLocalPtr::new(CopySpaceCopyContext::new(tls, self, &self.copyspace0))
         use enum_map::enum_map;
         use crate::util::copy::*;
 
@@ -64,6 +61,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
             },
             constraints: &SS_CONSTRAINTS,
         }, &[
+            // // The tospace argument doesn't matter, we will rebind before a GC anyway.
             (CopySelector::CopySpace(0), &self.copyspace0)
         ]))
     }

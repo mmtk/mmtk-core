@@ -47,14 +47,12 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
 
     pub fn post_copy(&mut self, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
         object_forwarding::clear_forwarding_bits::<VM>(object);
-        match semantics {
-            CopySemantics::PromoteMature => {
-                if self.config.constraints.needs_log_bit {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-                }
+        if semantics.is_mature() {
+            if self.config.constraints.needs_log_bit {
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            } else {
+                unimplemented!("Mature copy is used but the plan does not use unlogged bit");
             }
-            CopySemantics::DefaultCopy => {}
-            _ => unimplemented!(),
         }
     }
 
@@ -105,11 +103,16 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             config: CopyConfig {
-                copy_mapping: enum_map! {
-                    CopySemantics::DefaultCopy => CopySelector::Unused,
-                    CopySemantics::PromoteMature => CopySelector::Unused,
-                    CopySemantics::Compact => CopySelector::Unused,
-                },
+                copy_mapping: EnumMap::default(),
+                // enum_map! {
+                //     CopySemantics::DefaultCopy => CopySelector::Unused,
+                //     CopySemantics::DefaultCompact => CopySelector::Unused,
+                //     CopySemantics::PromoteMature => CopySelector::Unused,
+                //     CopySemantics::NurseryCopy => CopySelector::Unused,
+                //     CopySemantics::NurseryCompact => CopySelector::Unused,
+                //     CopySemantics::MatureCopy => CopySelector::Unused,
+                //     CopySemantics::MatureCompact => CopySelector::Unused,
+                // },
                 constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
             }
         }
@@ -121,8 +124,28 @@ impl<VM: VMBinding> GCWorkerLocal for GCWorkerCopyContext<VM> {}
 #[derive(Clone, Copy, Enum, Debug)]
 pub enum CopySemantics {
     DefaultCopy,
+    DefaultCompact,
+    NurseryCopy,
+    NurseryCompact,
     PromoteMature,
-    Compact,
+    MatureCopy,
+    MatureCompact,
+}
+
+impl CopySemantics {
+    pub fn is_mature(&self) -> bool {
+        match self {
+            CopySemantics::PromoteMature | CopySemantics::MatureCompact | CopySemantics::MatureCopy => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_compact(&self) -> bool {
+        match self {
+            CopySemantics::DefaultCompact | CopySemantics::NurseryCompact | CopySemantics::MatureCompact => true,
+            _ => false,
+        }
+    }
 }
 
 #[repr(C, u8)]
@@ -131,4 +154,10 @@ pub enum CopySelector {
     CopySpace(u8),
     Immix(u8),
     Unused,
+}
+
+impl std::default::Default for CopySelector {
+    fn default() -> Self {
+        CopySelector::Unused
+    }
 }

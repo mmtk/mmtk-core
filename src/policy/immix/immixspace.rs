@@ -392,7 +392,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 #[cfg(feature = "global_alloc_bit")]
                 crate::util::alloc_bit::unset_alloc_bit(object);
-                ForwardingWord::forward_object_new::<VM>(object, semantics, copy_context)
+                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             if !super::MARK_LINE_AT_SCAN_TIME {
                 self.mark_lines(new_object);
@@ -638,12 +638,11 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
         // } else {
         //     self.copy_allocator.alloc(bytes, align, offset)
         // }
-        match semantics {
-            CopySemantics::Compact => {
-                debug_assert!(self.defrag_allocator.immix_space().in_defrag());
-                self.defrag_allocator.alloc(bytes, align, offset)
-            }
-            _ => self.copy_allocator.alloc(bytes, align, offset),
+        if semantics.is_compact() {
+            debug_assert!(self.defrag_allocator.immix_space().in_defrag());
+            self.defrag_allocator.alloc(bytes, align, offset)
+        } else {
+            self.copy_allocator.alloc(bytes, align, offset)
         }
     }
     #[inline(always)]

@@ -5,7 +5,7 @@ use crate::util::metadata::{
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
 use std::sync::atomic::Ordering;
-
+use crate::util::copy::*;
 use crate::plan::AllocationSemantics;
 use crate::policy::copy_context::CopyContext;
 use crate::vm::VMBinding;
@@ -74,43 +74,12 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-/// Copy the object, mark it as forwarded and return a reference to the new object (copy).
-pub fn forward_object<VM: VMBinding, CC: CopyContext>(
-    object: ObjectReference,
-    semantics: AllocationSemantics,
-    copy_context: &mut CC,
-) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
-    #[cfg(feature = "global_alloc_bit")]
-    crate::util::alloc_bit::set_alloc_bit(new_object);
-    if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
-        store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-            object,
-            new_object.to_address().as_usize() | (FORWARDED << shift),
-            None,
-            Some(Ordering::SeqCst),
-        )
-    } else {
-        write_forwarding_pointer::<VM>(object, new_object);
-        store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            object,
-            FORWARDED,
-            None,
-            Some(Ordering::SeqCst),
-        );
-    }
-    new_object
-}
-
-use crate::util::copy::*;
-pub fn forward_object_new<VM: VMBinding>(
+pub fn forward_object<VM: VMBinding>(
     object: ObjectReference,
     semantics: CopySemantics,
     copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy_new(object, semantics, copy_context);
+    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     #[cfg(feature = "global_alloc_bit")]
     crate::util::alloc_bit::set_alloc_bit(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {

@@ -60,7 +60,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
                 return self.plan.immix.trace_object(
                     self,
                     object,
-                    crate::util::copy::CopySemantics::Compact,
+                    crate::util::copy::CopySemantics::MatureCompact,
                     self.worker(),
                 );
             }

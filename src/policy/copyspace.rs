@@ -236,7 +236,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             //     }
             // };
             let new_object = {
-                object_forwarding::forward_object_new::<VM>(object, semantics, unsafe {
+                object_forwarding::forward_object::<VM>(object, semantics, unsafe {
                     worker.local::<GCWorkerCopyContext<VM>>()
                 })
             };

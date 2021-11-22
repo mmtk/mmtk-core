@@ -50,7 +50,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
         GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
             copy_mapping: enum_map! {
-                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                CopySemantics::MatureCopy => CopySelector::CopySpace(0),
                 CopySemantics::PromoteMature => CopySelector::CopySpace(0),
                 _ => CopySelector::Unused,
             },

@@ -183,19 +183,14 @@ pub trait ObjectModel<VM: VMBinding> {
     ) -> usize;
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
-    /// `alloc_copy()` and `post_copy()` from a plan's [`CopyContext`](../trait.CopyContext.html) are used for copying.
+    /// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)
+    /// are used for copying.
     ///
     /// Arguments:
     /// * `from`: The address of the object to be copied.
-    /// * `semantics`: The allocation semantic to use.
-    /// * `copy_context`: The `CopyContext` for the GC thread.
+    /// * `semantics`: The copy semantic to use.
+    /// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.
     fn copy(
-        from: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
-    ) -> ObjectReference;
-
-    fn copy_new(
         from: ObjectReference,
         semantics: CopySemantics,
         copy_context: &mut GCWorkerCopyContext<VM>,
