@@ -98,10 +98,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             metadata::extract_side_metadata(
             &vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
+                MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::SIZE_TABLE),
                 MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+                MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
@@ -203,7 +205,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Address) {
-        // eprintln!("b < 0x{:0x}", block);
+        eprintln!("b < 0x{:0x}", block);
         self.block_clear_metadata(block);
 
         let block = Block::from(block);
