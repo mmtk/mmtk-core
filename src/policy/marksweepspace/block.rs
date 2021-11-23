@@ -4,19 +4,12 @@ use std::iter::Step;
 
 use atomic::Ordering;
 
-use crate::{
-    util::{
-        alloc::free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK},
-        metadata::{
+use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, FreeListAllocator, LOG_BYTES_IN_BLOCK}, metadata::{
             side_metadata::{
                 self, SideMetadataOffset, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_OFFSET,
             },
             store_metadata, MetadataSpec,
-        },
-        Address, OpaquePointer,
-    },
-    vm::VMBinding,
-};
+        }}, vm::VMBinding};
 
 use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
 use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK}}, metadata::side_metadata::{self, LOCAL_SIDE_METADATA_BASE_OFFSET, SideMetadataOffset, SideMetadataSpec}}, vm::VMBinding};
@@ -47,9 +40,16 @@ impl Block {
         log_min_obj_size: 16,
     };
 
-    pub const FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
+    pub const PREV_BLOCK_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Block::NEXT_BLOCK_TABLE),
+        log_num_of_bits: 6,
+        log_min_obj_size: 16,
+    };
+
+    pub const FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
+        is_global: false,
+        offset: SideMetadataOffset::layout_after(&Block::PREV_BLOCK_TABLE),
         log_num_of_bits: 6,
         log_min_obj_size: 16,
     };
@@ -71,9 +71,17 @@ impl Block {
         log_num_of_bits: 6,
         log_min_obj_size: 16,
     };
-    pub const TLS_TABLE: SideMetadataSpec = SideMetadataSpec {
+
+    pub const BLOCK_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
         is_global: false,
         offset: SideMetadataOffset::layout_after(&Block::THREAD_FREE_LIST_TABLE),
+        log_num_of_bits: 6,
+        log_min_obj_size: 16,
+    };
+
+    pub const TLS_TABLE: SideMetadataSpec = SideMetadataSpec {
+        is_global: false,
+        offset: SideMetadataOffset::layout_after(&Block::BLOCK_LIST_TABLE),
         log_num_of_bits: 6,
         log_min_obj_size: 16,
     };
@@ -104,9 +112,21 @@ impl Block {
     pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
             BlockState::Unallocated => false,
-            BlockState::Unmarked => false,
-            BlockState::UnmarkedAcknowledged => {
-                // Release the block if it is allocated but not marked by the current GC, and acknowledged by the allocator.
+            BlockState::Unmarked => {
+                let prev = FreeListAllocator::<VM>::load_prev_block(self.0);
+                let next = FreeListAllocator::<VM>::load_next_block(self.0);
+                if next.is_zero() {
+                    let mut block_list = FreeListAllocator::<VM>::load_block_list(self.0);
+                    block_list.last = prev;
+                } else {
+                    FreeListAllocator::<VM>::store_prev_block(next, prev);
+                }
+                if prev.is_zero() {
+                    let mut block_list = FreeListAllocator::<VM>::load_block_list(self.0);
+                    block_list.first = next;
+                } else {
+                    FreeListAllocator::<VM>::store_next_block(prev, next);
+                }
                 space.release_block(self.0);
                 true
             }
@@ -127,7 +147,6 @@ impl Block {
     /// Initialize a clean block after acquired from page-resource.
     #[inline]
     pub fn init(&self) {
-        // eprintln!("i {}", self.0);
         self.set_state( BlockState::Unmarked);
     }
 
