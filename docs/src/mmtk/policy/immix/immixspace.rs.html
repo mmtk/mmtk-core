@@ -587,6 +587,15 @@
 <span id="587">587</span>
 <span id="588">588</span>
 <span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -1087,6 +1096,15 @@
         <span class="macro">debug_assert!</span>((<span class="ident">start</span>..<span class="ident">end</span>)
             .<span class="ident">all</span>(<span class="op">|</span><span class="ident">line</span><span class="op">|</span> <span class="op">!</span><span class="ident">line</span>.<span class="ident">is_marked</span>(<span class="ident">unavail_state</span>) <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">line</span>.<span class="ident">is_marked</span>(<span class="ident">current_state</span>)));
         <span class="prelude-val">Some</span>(<span class="ident">start</span>..<span class="ident">end</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_last_gc_exhaustive</span>(<span class="ident">did_defrag_for_last_gc</span>: <span class="ident">bool</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::DEFRAG</span> {
+            <span class="ident">did_defrag_for_last_gc</span>
+        } <span class="kw">else</span> {
+            <span class="comment">// If defrag is disabled, every GC is exhaustive.</span>
+            <span class="bool-val">true</span>
+        }
     }
 }
 
