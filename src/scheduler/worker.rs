@@ -9,11 +9,6 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
 use crate::util::copy::GCWorkerCopyContext;
 
-/// Thread-local data for each worker thread.
-///
-/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
-pub trait GCWorkerLocal {}
-
 const LOCALLY_CACHED_WORKS: usize = 1;
 
 pub struct GCWorker<VM: VMBinding> {

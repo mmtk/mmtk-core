@@ -262,7 +262,6 @@ impl<VM: VMBinding> CopySpace<VM> {
 
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::VMWorkerThread;
@@ -309,8 +308,6 @@ impl<VM: VMBinding> CopySpaceCopyContext<VM> {
         }
     }
 }
-
-impl<VM: VMBinding> GCWorkerLocal for CopySpaceCopyContext<VM> {}
 
 impl<VM: VMBinding> CopySpaceCopyContext<VM> {
     pub fn rebind(&mut self, space: &CopySpace<VM>) {

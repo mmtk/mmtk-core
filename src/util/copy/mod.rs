@@ -8,7 +8,6 @@ use crate::util::{Address, ObjectReference};
 use crate::plan::PlanConstraints;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::policy::space::Space;
-use crate::scheduler::GCWorkerLocal;
 use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::immix::ImmixSpace;
@@ -120,8 +119,6 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         }
     }
 }
-
-impl<VM: VMBinding> GCWorkerLocal for GCWorkerCopyContext<VM> {}
 
 #[derive(Clone, Copy, Enum, Debug)]
 pub enum CopySemantics {

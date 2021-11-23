@@ -592,7 +592,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
 
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
 use crate::policy::copy_context::PolicyCopyContext;
@@ -654,5 +653,3 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
         }
     }
 }
-
-impl<VM: VMBinding> GCWorkerLocal for ImmixCopyContext<VM> {}
