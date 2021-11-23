@@ -6,13 +6,14 @@ use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
-use crate::util::alloc::{Allocator, BumpAllocator};
+use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
 pub const MAX_BUMP_ALLOCATORS: usize = 5;
 pub const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 pub const MAX_MALLOC_ALLOCATORS: usize = 1;
+pub const MAX_IMMIX_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -23,6 +24,7 @@ pub struct Allocators<VM: VMBinding> {
     pub bump_pointer: [MaybeUninit<BumpAllocator<VM>>; MAX_BUMP_ALLOCATORS],
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
     pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
+    pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -37,7 +39,8 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_ref()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
-            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
+            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
+            _ => unreachable!(),
         }
     }
 
@@ -55,7 +58,8 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.large_object[index as usize].assume_init_mut()
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
-            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
+            AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
+            _ => unreachable!(),
         }
     }
 
@@ -68,6 +72,7 @@ impl<VM: VMBinding> Allocators<VM> {
             bump_pointer: unsafe { MaybeUninit::uninit().assume_init() },
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
             malloc: unsafe { MaybeUninit::uninit().assume_init() },
+            immix: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
         for &(selector, space) in space_mapping.iter() {
@@ -93,7 +98,15 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
-                AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
+                AllocatorSelector::Immix(index) => {
+                    ret.immix[index as usize].write(ImmixAllocator::new(
+                        mutator_tls.0,
+                        Some(space),
+                        plan,
+                        false,
+                    ));
+                }
+                _ => unreachable!(),
             }
         }
 
@@ -119,11 +132,12 @@ pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
     Malloc(u8),
+    Immix(u8),
     None,
 }
 
 impl Default for AllocatorSelector {
     fn default() -> Self {
-        AllocatorSelector::None
+        Self::None
     }
 }

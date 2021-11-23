@@ -14,7 +14,7 @@ use std::sync::Mutex;
 pub const MAX_PHASES: usize = 1 << 12;
 pub const MAX_COUNTERS: usize = 100;
 
-// Shared with each counter
+/// GC stats shared among counters
 pub struct SharedStats {
     phase: AtomicUsize,
     gathering_stats: AtomicBool,
@@ -38,6 +38,10 @@ impl SharedStats {
     }
 }
 
+/// GC statistics
+///
+/// The struct holds basic GC statistics, like the GC count,
+/// and an array of counters.
 pub struct Stats {
     gc_count: AtomicUsize,
     total_time: Arc<Mutex<Timer>>,
@@ -54,6 +58,8 @@ pub struct Stats {
 impl Stats {
     #[allow(unused)]
     pub fn new(options: &Options) -> Self {
+        // Create a perfmon instance and initialize it
+        // we use perfmon to parse perf event names
         #[cfg(feature = "perf_counter")]
         let perfmon = {
             let mut perfmon: Perfmon = Default::default();
@@ -65,6 +71,7 @@ impl Stats {
             gathering_stats: AtomicBool::new(false),
         });
         let mut counters: Vec<Arc<Mutex<dyn Counter + Send>>> = vec![];
+        // We always have a time counter enabled
         let t = Arc::new(Mutex::new(LongCounter::new(
             "time".to_string(),
             shared.clone(),
@@ -73,6 +80,8 @@ impl Stats {
             MonotoneNanoTime {},
         )));
         counters.push(t.clone());
+        // Read from the MMTK option for a list of perf events we want to
+        // measure, and create corresponding counters
         #[cfg(feature = "perf_counter")]
         for e in &options.phase_perf_events.events {
             counters.push(Arc::new(Mutex::new(LongCounter::new(
@@ -211,7 +220,7 @@ impl Stats {
             if c.merge_phases() {
                 print!("{}\t", c.name());
             } else {
-                print!("{}.mu\t{}.gc\t", c.name(), c.name());
+                print!("{}.other\t{}.stw\t", c.name(), c.name());
             }
         }
         for name in scheduler_stat.keys() {

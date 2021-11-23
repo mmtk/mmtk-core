@@ -10,7 +10,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use crate::plan::PlanConstraints;
-use crate::scheduler::WorkerLocal;
+use crate::scheduler::GCWorkerLocal;
 use std::ops::{Deref, DerefMut};
 // ANCHOR_END: imports
 
@@ -77,7 +77,7 @@ impl<VM: VMBinding> MyGCCopyContext<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for MyGCCopyContext<VM> {
+impl<VM: VMBinding> GCWorkerLocal for MyGCCopyContext<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
@@ -100,8 +100,8 @@ impl<VM: VMBinding> MyGCProcessEdges<VM> {
 impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type VM = VM;
     // ANCHOR: mygc_process_edges_new
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
         Self { base, plan }
     }
@@ -150,3 +150,13 @@ impl<VM: VMBinding> DerefMut for MyGCProcessEdges<VM> {
     }
 }
 // ANCHOR_END: deref
+
+// ANCHOR: workcontext
+pub struct MyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MyGC<VM>;
+    type CopyContextType = MyGCCopyContext<VM>;
+    type ProcessEdgesWorkType = MyGCProcessEdges<VM>;
+}
+// ANCHOR_END: workcontext

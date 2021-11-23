@@ -70,32 +70,10 @@ pub trait ObjectModel<VM: VMBinding> {
     // Any side metadata offset calculation must consider these to prevent overlaps. A binding should start their
     // side metadata from GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS or LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.
 
-    // --------------------------------------------------
-    //
-    // Global Metadata
-    //
-    // MMTk reserved Global side metadata offsets:
-    //
-    //  1 - MarkSweep Active Chunk byte:
-    //      - Offset `GLOBAL_SIDE_METADATA_BASE_ADDRESS`
-    //
-    // --------------------------------------------------
-
     /// The metadata specification of the global log bit. 1 bit.
+    /// Note that for this bit, 0 represents logged (default), and 1 represents unlogged.
+    /// This bit is also referred to as unlogged bit in Java MMTk for this reason.
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec;
-
-    // --------------------------------------------------
-    // PolicySpecific Metadata
-    //
-    // MMTk reserved PolicySpecific side metadata offsets:
-    //
-    //  1 - MarkSweep Alloc bit:
-    //      - Offset `0x0` on 32-bits
-    //      - Offset `LOCAL_SIDE_METADATA_BASE_ADDRESS` on 64-bits
-    //  2 - MarkSweep Active Page byte:
-    //      - Offset `Alloc bit`.offset + `Alloc bit`.metadata_address_range_size()
-    //
-    // --------------------------------------------------
 
     /// The metadata specification for the forwarding pointer, used by copying plans. Word size.
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec;
@@ -301,17 +279,19 @@ pub mod specs {
                 pub const fn side_first() -> Self {
                     if Self::IS_GLOBAL {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: GLOBAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     } else {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: LOCAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     }
                 }
@@ -320,10 +300,11 @@ pub mod specs {
                     let side_spec = spec.extract_side_spec();
                     debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
                         offset: SideMetadataOffset::layout_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size: $side_min_obj_size as usize,
+                        log_bytes_in_region: $side_min_obj_size as usize,
                     }))
                 }
                 #[inline(always)]

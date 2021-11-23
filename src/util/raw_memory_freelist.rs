@@ -194,9 +194,8 @@ impl RawMemoryFreeList {
     }
 
     fn mmap(&self, start: Address, bytes: usize) {
-        if super::memory::dzmmap_noreplace(start, bytes).is_err() {
-            panic!("Can't get more space with mmap()");
-        }
+        let res = super::memory::dzmmap_noreplace(start, bytes);
+        assert!(res.is_ok(), "Can't get more space with mmap()");
     }
     pub fn get_limit(&self) -> Address {
         self.limit

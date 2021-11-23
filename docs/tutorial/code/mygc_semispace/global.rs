@@ -1,17 +1,17 @@
-// ANCHOR: imports
-use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+// ANCHOR: imports_no_gc_work
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*; // Add
 use crate::scheduler::*; // Modify
+use crate::scheduler::gc_work::*; // Add
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -25,9 +25,15 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
 use std::sync::Arc;
+// ANCHOR_END: imports_no_gc_work
+
+// ANCHOR: imports_gc_work
+use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+//ANCHOR_END: imports_gc_work
+
 // Remove #[allow(unused_imports)].
-// Remove handle_user_collection_request.
-// ANCHOR_END: imports
+// Remove handle_user_collection_request().
+
 
 pub type SelectedPlan<VM> = MyGC<VM>;
 
@@ -78,7 +84,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
         self.copyspace0.init(&vm_map);
@@ -88,16 +94,10 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: schedule_collection
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
-        self.base().set_collection_kind();
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MyGCProcessEdges<VM>>::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
 
@@ -169,7 +169,7 @@ impl<VM: VMBinding> MyGC<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static MMTkScheduler<VM>,
+        _scheduler: &'static GCWorkScheduler<VM>,
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
@@ -202,6 +202,8 @@ impl<VM: VMBinding> MyGC<VM> {
             common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.common.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.copyspace0.verify_side_metadata_sanity(&mut side_metadata_sanity_checker);

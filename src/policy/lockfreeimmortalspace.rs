@@ -1,7 +1,6 @@
 use crate::mmtk::SFT_MAP;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
-use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
 
 use crate::util::ObjectReference;
@@ -11,6 +10,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
     AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
 };
+use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
@@ -55,7 +55,8 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         unimplemented!()
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        unimplemented!()
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(_object);
     }
 }
 
@@ -102,11 +103,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft(),
-            AVAILABLE_START,
-            bytes_to_chunks_up(total_bytes),
-        );
+        SFT_MAP.update(self.as_sft(), AVAILABLE_START, total_bytes);
     }
 
     fn reserved_pages(&self) -> usize {
@@ -126,6 +123,21 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             crate::util::memory::zero(start, bytes);
         }
         start
+    }
+
+    /// Get the name of the space
+    ///
+    /// We have to override the default implementation because
+    /// LockFreeImmortalSpace doesn't have a common space
+    fn get_name(&self) -> &'static str {
+        "LockFreeImmortalSpace"
+    }
+
+    /// We have to override the default implementation because
+    /// LockFreeImmortalSpace doesn't put metadata in a common space
+    fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
+        side_metadata_sanity_checker
+            .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
     }
 }
 

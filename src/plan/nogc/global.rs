@@ -7,9 +7,9 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
+use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
 use crate::scheduler::GCWorkerLocalPtr;
-use crate::scheduler::MMTkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -60,7 +60,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         #[cfg(feature = "nogc_common_plan")]
         self.common.gc_init(heap_size, vm_map, scheduler);
@@ -68,7 +68,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base.gc_init(heap_size, vm_map, scheduler);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.nogc_space.init(vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -102,7 +102,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &*ALLOCATOR_MAPPING
     }
 
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<VM>) {
+    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<VM>) {
         unreachable!("GC triggered in nogc")
     }
 
@@ -168,6 +168,8 @@ impl<VM: VMBinding> NoGC<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
         res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);

@@ -23,7 +23,8 @@ pub mod opaque_pointer;
 pub mod reference_processor;
 
 // The following modules are only public in the mmtk crate. They should only be used in MMTk core.
-
+/// Alloc bit
+pub(crate) mod alloc_bit;
 /// An analysis framework for collecting data and profiling in GC.
 #[cfg(feature = "analysis")]
 pub(crate) mod analysis;
@@ -37,13 +38,15 @@ pub(crate) mod heap;
 /// Logger initialization
 pub(crate) mod logger;
 /// Various malloc implementations (conditionally compiled by features)
-pub(crate) mod malloc;
+pub mod malloc;
 /// Metadata (OnSide or InHeader) implementation.
 pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
 /// MMTk command line options.
 pub mod options;
+/// Utilities funcitons for Rust
+pub(crate) mod rust_util;
 /// Sanity checker for GC.
 #[cfg(feature = "sanity")]
 pub(crate) mod sanity;

@@ -12,7 +12,6 @@ use super::constants::{
 };
 #[cfg(test)]
 use super::ensure_munmap_metadata;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::layout::Mmapper;
 use crate::MMAPPER;
 
@@ -22,13 +21,13 @@ pub(super) fn address_to_chunked_meta_address(
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
-    let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region as usize;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     let meta_chunk_addr = address_to_meta_chunk_addr(data_addr);
     let internal_addr = data_addr & CHUNK_MASK;
-    let effective_addr = internal_addr >> log_min_obj_size;
+    let effective_addr = internal_addr >> log_bytes_in_region;
     let second_offset = if rshift >= 0 {
         effective_addr >> rshift
     } else {
@@ -75,7 +74,7 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
         let mut next_data_chunk = second_data_chunk;
         // unmap all chunks in the middle
         while next_data_chunk != last_data_chunk {
-            let to_unmap = metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+            let to_unmap = metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
             ensure_munmap_metadata(address_to_meta_address(spec, next_data_chunk), to_unmap);
             total_unmapped += to_unmap;
             next_data_chunk += BYTES_IN_CHUNK;
@@ -86,16 +85,16 @@ pub(crate) fn ensure_munmap_chunked_metadata_space(
 }
 
 #[inline(always)]
-pub(crate) fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
+pub(crate) const fn address_to_meta_chunk_addr(data_addr: Address) -> Address {
     LOCAL_SIDE_METADATA_BASE_ADDRESS
-        + ((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
+        .add((data_addr.as_usize() & !CHUNK_MASK) >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
 }
 
 #[inline(always)]
-pub const fn metadata_bytes_per_chunk(log_min_obj_size: usize, log_num_of_bits: usize) -> usize {
+pub const fn metadata_bytes_per_chunk(log_bytes_in_region: usize, log_num_of_bits: usize) -> usize {
     1usize
-        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) - log_min_obj_size
-            + log_num_of_bits)
+        << (LOG_BYTES_IN_CHUNK - (constants::LOG_BITS_IN_BYTE as usize) + log_num_of_bits
+            - log_bytes_in_region)
 }
 
 /// Unmaps the metadata for a single chunk starting at `start`
@@ -177,10 +176,11 @@ pub fn try_mmap_metadata_chunk(
     debug_assert!(start.is_aligned_to(BYTES_IN_CHUNK));
 
     let policy_meta_start = address_to_meta_chunk_addr(start);
+    let pages = crate::util::conversions::bytes_to_pages_up(local_per_chunk);
     if !no_reserve {
         // We have reserved the memory
-        MMAPPER.ensure_mapped(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        MMAPPER.ensure_mapped(policy_meta_start, pages)
     } else {
-        MMAPPER.quarantine_address_range(policy_meta_start, local_per_chunk >> LOG_BYTES_IN_PAGE)
+        MMAPPER.quarantine_address_range(policy_meta_start, pages)
     }
 }

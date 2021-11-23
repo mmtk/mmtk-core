@@ -8,7 +8,7 @@ in case you are stuck on the exercise.
 First, rename all instances of `mygc` to `triplespace`, and add it as a
 module by following the instructions in [Create MyGC](./create.md).
 
-In `global.rs`:
+In `triplespace/global.rs`:
 
  1. Add a `youngspace` field to `pub struct TripleSpace`:
 

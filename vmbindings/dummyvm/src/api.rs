@@ -39,13 +39,19 @@ pub extern "C" fn destroy_mutator(mutator: *mut Mutator<DummyVM>) {
 
 #[no_mangle]
 pub extern "C" fn alloc(mutator: *mut Mutator<DummyVM>, size: usize,
-                    align: usize, offset: isize, semantics: AllocationSemantics) -> Address {
+                    align: usize, offset: isize, mut semantics: AllocationSemantics) -> Address {
+    if size >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
+        semantics = AllocationSemantics::Los;
+    }
     memory_manager::alloc::<DummyVM>(unsafe { &mut *mutator }, size, align, offset, semantics)
 }
 
 #[no_mangle]
 pub extern "C" fn post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectReference,
-                                        bytes: usize, semantics: AllocationSemantics) {
+                                        bytes: usize, mut semantics: AllocationSemantics) {
+    if bytes >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
+        semantics = AllocationSemantics::Los;
+    }
     memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, bytes, semantics)
 }
 
@@ -60,8 +66,18 @@ pub extern "C" fn start_worker(tls: VMWorkerThread, worker: &'static mut GCWorke
 }
 
 #[no_mangle]
-pub extern "C" fn enable_collection(tls: VMThread) {
-    memory_manager::enable_collection(&SINGLETON, tls)
+pub extern "C" fn initialize_collection(tls: VMThread) {
+    memory_manager::initialize_collection(&SINGLETON, tls)
+}
+
+#[no_mangle]
+pub extern "C" fn disable_collection() {
+    memory_manager::disable_collection(&SINGLETON)
+}
+
+#[no_mangle]
+pub extern "C" fn enable_collection() {
+    memory_manager::enable_collection(&SINGLETON)
 }
 
 #[no_mangle]

@@ -1,4 +1,4 @@
-use super::gc_work::{SSCopyContext, SSProcessEdges};
+use super::gc_work::{SSCopyContext, SSGCWorkContext};
 use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
@@ -8,11 +8,8 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -21,8 +18,6 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -69,39 +64,18 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.common.gc_init(heap_size, vm_map, scheduler);
 
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+        self.copyspace0.init(vm_map);
+        self.copyspace1.init(vm_map);
     }
 
-    fn schedule_collection(&'static self, scheduler: &MMTkScheduler<VM>) {
-        self.base().set_collection_kind();
+    fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.common()
-            .schedule_common::<SSProcessEdges<VM>>(&SS_CONSTRAINTS, scheduler);
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<SSProcessEdges<VM>>::new());
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, SSCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<SSProcessEdges<VM>>::new());
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, SSCopyContext<VM>>::new(self));
-        // Scheduling all the gc hooks of analysis routines. It is generally recommended
-        // to take advantage of the scheduling system we have in place for more performance
-        #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, SSCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        scheduler.schedule_common_work::<SSGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -187,6 +161,8 @@ impl<VM: VMBinding> SemiSpace<VM> {
             ),
         };
 
+        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
+        // side metadata in extreme_assertions.
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();
             res.common

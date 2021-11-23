@@ -3,12 +3,12 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
+use crate::plan::generational::global::Gen;
 use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
@@ -107,7 +107,7 @@ impl<VM: VMBinding> NoCopy<VM> {
     }
 }
 
-impl<VM: VMBinding> WorkerLocal for NoCopy<VM> {
+impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
     fn init(&mut self, tls: VMWorkerThread) {
         CopyContext::init(self, tls);
     }
@@ -122,10 +122,16 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::SemiSpace => {
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::GenCopy => crate::plan::gencopy::mutator::create_gencopy_mutator(tls, mmtk),
+        PlanSelector::GenCopy => {
+            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
+        }
+        PlanSelector::GenImmix => {
+            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
+        }
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }
@@ -137,17 +143,24 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::GenCopy => {
-            Box::new(crate::plan::gencopy::GenCopy::new(vm_map, mmapper, options))
-        }
+        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
+            vm_map, mmapper, options,
+        )),
+        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
+            vm_map, mmapper, options, scheduler,
+        )),
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
+        )),
+        PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
+            vm_map, mmapper, options, scheduler,
         )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
@@ -160,6 +173,26 @@ pub fn create_plan<VM: VMBinding>(
 ///
 /// The global instance defines and manages static resources
 /// (such as memory and virtual memory resources).
+///
+/// Constructor:
+///
+/// For the constructor of a new plan, there are a few things the constructor _must_ do
+/// (please check existing plans and see what they do in the constructor):
+/// 1. Create a HeapMeta, and use this HeapMeta to initialize all the spaces.
+/// 2. Create a vector of all the side metadata specs with `SideMetadataContext::new_global_specs()`,
+///    the parameter is a vector of global side metadata specs that are specific to the plan.
+/// 3. Initialize all the spaces the plan uses with the heap meta, and the global metadata specs vector.
+/// 4. Create a `SideMetadataSanity` object, and invoke verify_side_metadata_sanity() for each space (or
+///    invoke verify_side_metadata_sanity() in `CommonPlan`/`BasePlan` for the spaces in the common/base plan).
+///
+/// Methods in this trait:
+///
+/// Only methods that will be overridden by each specific plan should be included in this trait. The trait may
+/// provide a default implementation, and each plan can override the implementation. For methods that won't be
+/// overridden, we should implement those methods in BasePlan (or CommonPlan) and call them from there instead.
+/// We should avoid having methods with the same name in both Plan and BasePlan, as this may confuse people, and
+/// they may call a wrong method by mistake.
+// TODO: Some methods that are not overriden can be moved from the trait to BasePlan.
 pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
@@ -170,9 +203,12 @@ pub trait Plan: 'static + Sync + Downcast {
         mmtk: &'static MMTK<Self::VM>,
     ) -> GCWorkerLocalPtr;
     fn base(&self) -> &BasePlan<Self::VM>;
-    fn schedule_collection(&'static self, _scheduler: &MMTkScheduler<Self::VM>);
+    fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
+    }
+    fn generational(&self) -> &Gen<Self::VM> {
+        panic!("This is not a generational plan.")
     }
     fn mmapper(&self) -> &'static Mmapper {
         self.base().mmapper
@@ -186,7 +222,7 @@ pub trait Plan: 'static + Sync + Downcast {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<Self::VM>>,
+        scheduler: &Arc<GCWorkScheduler<Self::VM>>,
     );
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
@@ -213,6 +249,12 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn is_initialized(&self) -> bool {
         self.base().initialized.load(Ordering::SeqCst)
+    }
+
+    fn should_trigger_gc_when_heap_is_full(&self) -> bool {
+        self.base()
+            .trigger_gc_when_heap_is_full
+            .load(Ordering::SeqCst)
     }
 
     fn prepare(&mut self, tls: VMWorkerThread);
@@ -291,30 +333,31 @@ pub trait Plan: 'static + Sync + Downcast {
         self.get_total_pages() - self.get_pages_used()
     }
 
+    /// The application code has requested a collection.
     fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
-        if force || !self.options().ignore_system_g_c {
-            info!("User triggering collection");
-            self.base()
-                .user_triggered_collection
-                .store(true, Ordering::Relaxed);
-            self.base().control_collector_context.request();
-            <Self::VM as VMBinding>::VMCollection::block_for_gc(tls);
-        }
+        self.base().handle_user_collection_request(tls, force)
     }
 
-    fn reset_collection_trigger(&self) {
-        self.base()
-            .user_triggered_collection
-            .store(false, Ordering::Relaxed)
+    /// Return whether last GC was an exhaustive attempt to collect the heap.
+    /// For many collectors this is the same as asking whether the last GC was a full heap collection.
+    fn last_collection_was_exhaustive(&self) -> bool {
+        self.last_collection_full_heap()
     }
+
+    /// Return whether last GC is a full GC.
+    fn last_collection_full_heap(&self) -> bool {
+        true
+    }
+
+    /// Force the next collection to be full heap.
+    fn force_full_heap_collection(&self) {}
 
     fn modify_check(&self, object: ObjectReference) {
-        if self.base().gc_in_progress_proper() && object.is_movable() {
-            panic!(
-                "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
-                object
-            );
-        }
+        assert!(
+            !(self.base().gc_in_progress_proper() && object.is_movable()),
+            "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
+            object
+        );
     }
 }
 
@@ -331,13 +374,17 @@ pub enum GcStatus {
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
 pub struct BasePlan<VM: VMBinding> {
-    // Whether MMTk is now ready for collection. This is set to true when enable_collection() is called.
+    /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
+    /// Should we trigger a GC when the heap is full? It seems this should always be true. However, we allow
+    /// bindings to temporarily disable GC, at which point, we do not trigger GC even if the heap is full.
+    pub trigger_gc_when_heap_is_full: AtomicBool,
     pub gc_status: Mutex<GcStatus>,
     pub last_stress_pages: AtomicUsize,
-    pub stacks_prepared: AtomicBool,
     pub emergency_collection: AtomicBool,
     pub user_triggered_collection: AtomicBool,
+    pub internal_triggered_collection: AtomicBool,
+    pub last_internal_triggered_collection: AtomicBool,
     // Has an allocation succeeded since the emergency collection?
     pub allocation_success: AtomicBool,
     // Maximum number of failed attempts by a single thread
@@ -352,11 +399,13 @@ pub struct BasePlan<VM: VMBinding> {
     pub heap: HeapMeta,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
-    // A counter for per-mutator stack scanning
-    pub scanned_stacks: AtomicUsize,
+    /// A counter for per-mutator stack scanning
+    scanned_stacks: AtomicUsize,
+    /// Have we scanned all the stacks?
+    stacks_prepared: AtomicBool,
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
-    pub allocation_bytes: AtomicUsize,
+    allocation_bytes: AtomicUsize,
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -462,11 +511,14 @@ impl<VM: VMBinding> BasePlan<VM> {
             ),
 
             initialized: AtomicBool::new(false),
+            trigger_gc_when_heap_is_full: AtomicBool::new(true),
             gc_status: Mutex::new(GcStatus::NotInGC),
             last_stress_pages: AtomicUsize::new(0),
             stacks_prepared: AtomicBool::new(false),
             emergency_collection: AtomicBool::new(false),
             user_triggered_collection: AtomicBool::new(false),
+            internal_triggered_collection: AtomicBool::new(false),
+            last_internal_triggered_collection: AtomicBool::new(false),
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
@@ -490,7 +542,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
@@ -513,6 +565,40 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.vm_space.init(vm_map);
             self.vm_space.ensure_mapped();
         }
+    }
+
+    /// The application code has requested a collection.
+    pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
+        if force || !self.options.ignore_system_g_c {
+            info!("User triggering collection");
+            self.user_triggered_collection
+                .store(true, Ordering::Relaxed);
+            self.control_collector_context.request();
+            VM::VMCollection::block_for_gc(tls);
+        }
+    }
+
+    /// MMTK has requested stop-the-world activity (e.g., stw within a concurrent gc).
+    // This is not used, as we do not have a concurrent plan.
+    #[allow(unused)]
+    pub fn trigger_internal_collection_request(&self) {
+        self.last_internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.internal_triggered_collection
+            .store(true, Ordering::Relaxed);
+        self.control_collector_context.request();
+    }
+
+    /// Reset collection state information.
+    pub fn reset_collection_trigger(&self) {
+        self.last_internal_triggered_collection.store(
+            self.internal_triggered_collection.load(Ordering::SeqCst),
+            Ordering::Relaxed,
+        );
+        self.internal_triggered_collection
+            .store(false, Ordering::SeqCst);
+        self.user_triggered_collection
+            .store(false, Ordering::Relaxed);
     }
 
     // Depends on what base spaces we use, unsync may be unused.
@@ -567,7 +653,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         panic!("No special case for space in trace_object({:?})", _object);
     }
 
-    pub fn prepare(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.prepare();
         #[cfg(feature = "code_space")]
@@ -578,7 +664,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.prepare();
     }
 
-    pub fn release(&mut self, _tls: VMWorkerThread, _primary: bool) {
+    pub fn release(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
         #[cfg(feature = "code_space")]
         self.code_space.release();
         #[cfg(feature = "code_space")]
@@ -589,7 +675,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.vm_space.release();
     }
 
-    pub fn set_collection_kind(&self) {
+    pub fn set_collection_kind<P: Plan>(&self, plan: &P) {
         self.cur_collection_attempts.store(
             if self.is_user_triggered_collection() {
                 1
@@ -600,13 +686,13 @@ impl<VM: VMBinding> BasePlan<VM> {
         );
 
         let emergency_collection = !self.is_internal_triggered_collection()
-            && self.last_collection_was_exhaustive()
+            && plan.last_collection_was_exhaustive()
             && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
         self.emergency_collection
             .store(emergency_collection, Ordering::Relaxed);
 
         if emergency_collection {
-            self.force_full_heap_collection();
+            plan.force_full_heap_collection();
         }
     }
 
@@ -626,8 +712,35 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
     }
 
+    /// Are the stacks scanned?
     pub fn stacks_prepared(&self) -> bool {
         self.stacks_prepared.load(Ordering::SeqCst)
+    }
+
+    /// Prepare for stack scanning. This is usually used with `inform_stack_scanned()`.
+    /// This should be called before doing stack scanning.
+    pub fn prepare_for_stack_scanning(&self) {
+        self.scanned_stacks.store(0, Ordering::SeqCst);
+        self.stacks_prepared.store(false, Ordering::SeqCst);
+    }
+
+    /// Inform that 1 stack has been scanned. The argument `n_mutators` indicates the
+    /// total stacks we should scan. This method returns true if the number of scanned
+    /// stacks equals the total mutator count. Otherwise it returns false. This method
+    /// is thread safe and we guarantee only one thread will return true.
+    pub fn inform_stack_scanned(&self, n_mutators: usize) -> bool {
+        let old = self.scanned_stacks.fetch_add(1, Ordering::SeqCst);
+        debug_assert!(
+            old < n_mutators,
+            "The number of scanned stacks ({}) is more than the number of mutators ({})",
+            old,
+            n_mutators
+        );
+        let scanning_done = old + 1 == n_mutators;
+        if scanning_done {
+            self.stacks_prepared.store(true, Ordering::SeqCst);
+        }
+        scanning_done
     }
 
     pub fn gc_in_progress(&self) -> bool {
@@ -636,10 +749,6 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub fn gc_in_progress_proper(&self) -> bool {
         *self.gc_status.lock().unwrap() == GcStatus::GcProper
-    }
-
-    fn is_user_triggered_collection(&self) -> bool {
-        self.user_triggered_collection.load(Ordering::Relaxed)
     }
 
     fn determine_collection_attempts(&self) -> usize {
@@ -653,18 +762,26 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.max_collection_attempts.load(Ordering::Relaxed)
     }
 
-    fn is_internal_triggered_collection(&self) -> bool {
-        // FIXME
-        false
+    /// Return true if this collection was triggered by application code.
+    pub fn is_user_triggered_collection(&self) -> bool {
+        self.user_triggered_collection.load(Ordering::Relaxed)
     }
 
-    fn last_collection_was_exhaustive(&self) -> bool {
-        true
+    /// Return true if this collection was triggered internally.
+    pub fn is_internal_triggered_collection(&self) -> bool {
+        let is_internal_triggered = self
+            .last_internal_triggered_collection
+            .load(Ordering::SeqCst);
+        // Remove this assertion when we have concurrent GC.
+        assert!(
+            !is_internal_triggered,
+            "We have no concurrent GC implemented. We should not have internally triggered GC"
+        );
+        is_internal_triggered
     }
 
-    fn force_full_heap_collection(&self) {}
-
-    pub fn increase_allocation_bytes_by(&self, size: usize) {
+    /// Increase the allocation bytes and return the current allocation bytes after increasing
+    pub fn increase_allocation_bytes_by(&self, size: usize) -> usize {
         let old_allocation_bytes = self.allocation_bytes.fetch_add(size, Ordering::SeqCst);
         trace!(
             "Stress GC: old_allocation_bytes = {}, size = {}, allocation_bytes = {}",
@@ -672,25 +789,28 @@ impl<VM: VMBinding> BasePlan<VM> {
             size,
             self.allocation_bytes.load(Ordering::Relaxed),
         );
+        old_allocation_bytes + size
     }
 
-    #[inline]
-    pub(super) fn stress_test_gc_required(&self) -> bool {
-        let stress_factor = self.options.stress_factor;
-        if self.initialized.load(Ordering::SeqCst)
-            && (self.allocation_bytes.load(Ordering::SeqCst) > stress_factor)
-        {
-            trace!(
-                "Stress GC: allocation_bytes = {}, stress_factor = {}",
-                self.allocation_bytes.load(Ordering::Relaxed),
-                stress_factor
-            );
-            trace!("Doing stress GC");
-            self.allocation_bytes.store(0, Ordering::SeqCst);
-            true
-        } else {
-            false
-        }
+    /// Check if the options are set for stress GC. If either stress_factor or analysis_factor is set,
+    /// we should do stress GC.
+    pub fn is_stress_test_gc_enabled(&self) -> bool {
+        use crate::util::constants::DEFAULT_STRESS_FACTOR;
+        self.options.stress_factor != DEFAULT_STRESS_FACTOR
+            || self.options.analysis_factor != DEFAULT_STRESS_FACTOR
+    }
+
+    /// Check if we should do precise stress test. If so, we need to check for stress GCs for every allocation.
+    /// Otherwise, we only check in the allocation slow path.
+    pub fn is_precise_stress(&self) -> bool {
+        self.options.precise_stress
+    }
+
+    /// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds
+    /// the stress factor, we should do a stress GC.
+    pub fn should_do_stress_gc(&self) -> bool {
+        self.initialized.load(Ordering::SeqCst)
+            && (self.allocation_bytes.load(Ordering::SeqCst) > self.options.stress_factor)
     }
 
     pub(super) fn collection_required<P: Plan>(
@@ -699,7 +819,17 @@ impl<VM: VMBinding> BasePlan<VM> {
         space_full: bool,
         _space: &dyn Space<VM>,
     ) -> bool {
-        let stress_force_gc = self.stress_test_gc_required();
+        let stress_force_gc = self.should_do_stress_gc();
+        if stress_force_gc {
+            debug!(
+                "Stress GC: allocation_bytes = {}, stress_factor = {}",
+                self.allocation_bytes.load(Ordering::Relaxed),
+                self.options.stress_factor
+            );
+            debug!("Doing stress GC");
+            self.allocation_bytes.store(0, Ordering::SeqCst);
+        }
+
         debug!(
             "self.get_pages_reserved()={}, self.get_total_pages()={}",
             plan.get_pages_reserved(),
@@ -782,7 +912,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<MMTkScheduler<VM>>,
+        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
         self.base.gc_init(heap_size, vm_map, scheduler);
         self.immortal.init(vm_map);
@@ -809,34 +939,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<T, C>(trace, object)
     }
 
-    pub fn prepare(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
-        self.los.prepare(primary);
-        self.base.prepare(tls, primary)
+        self.los.prepare(full_heap);
+        self.base.prepare(tls, full_heap)
     }
 
-    pub fn release(&mut self, tls: VMWorkerThread, primary: bool) {
+    pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
-        self.los.release(primary);
-        self.base.release(tls, primary)
-    }
-
-    pub fn schedule_common<E: ProcessEdgesWork<VM = VM>>(
-        &self,
-        constraints: &'static PlanConstraints,
-        scheduler: &MMTkScheduler<VM>,
-    ) {
-        // Schedule finalization
-        if !self.base.options.no_finalizer {
-            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
-            // finalization
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(Finalization::<E>::new());
-            // forward refs
-            if constraints.needs_forward_after_liveness {
-                scheduler.work_buckets[WorkBucketStage::RefForwarding]
-                    .add(ForwardFinalization::<E>::new());
-            }
-        }
+        self.los.release(full_heap);
+        self.base.release(tls, full_heap)
     }
 
     pub fn stacks_prepared(&self) -> bool {

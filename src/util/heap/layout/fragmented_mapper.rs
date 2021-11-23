@@ -137,10 +137,7 @@ impl Mmapper for FragmentedMapper {
 
                 let mmap_start = Self::chunk_index_to_address(base, chunk);
                 let _guard = self.lock.lock().unwrap();
-                let res = MapState::transition_to_mapped(entry, mmap_start);
-                if res.is_err() {
-                    return res;
-                }
+                MapState::transition_to_mapped(entry, mmap_start)?;
             }
             start = high;
         }
@@ -274,7 +271,7 @@ impl FragmentedMapper {
 
     fn slab_table_for(&self, _addr: Address, index: usize) -> Option<&Slab> {
         debug_assert!(self.slab_table[index].is_some());
-        self.slab_table[index].as_ref().map(|x| &x as &Slab)
+        self.slab_table[index].as_ref().map(|x| x as &Slab)
     }
 
     /**

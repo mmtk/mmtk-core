@@ -4,7 +4,7 @@ use crate::plan::barriers::{Barrier, WriteTarget};
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators, *};
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -21,7 +21,7 @@ pub struct MutatorConfig<VM: VMBinding> {
     pub allocator_mapping: &'static EnumMap<AllocationSemantics, AllocatorSelector>,
     /// Mapping between allocator selector and spaces. Each pair represents a mapping.
     /// Put this behind a box, so it is a pointer-sized field.
-    #[allow(clippy::box_vec)]
+    #[allow(clippy::box_collection)]
     pub space_mapping: Box<SpaceMapping<VM>>,
     /// Plan-specific code for mutator prepare. The VMWorkerThread is the worker thread that executes this prepare function.
     pub prepare_func: &'static (dyn Fn(&mut Mutator<VM>, VMWorkerThread) + Send + Sync),

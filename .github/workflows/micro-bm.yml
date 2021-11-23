@@ -1,10 +1,17 @@
-name: Post Code Review Checks (Micro Benchmarks)
+name: Binding Perf Tests (Micro Benchmarks)
 
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened, labeled]
+#     branches:
+#       - master
+
+# Ignore micro benchmarks - micro benchmarking does not seem to be very helpful.
+# We should rethink if we really need it or make it more useful.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    branches:
-      - master
+  push:
+    branches-ignore:
+      - '**'
 
 jobs:
   openjdk-microbm:
@@ -54,7 +61,7 @@ jobs:
         with:
           repository: mmtk/ci-perf-kit
           token: ${{ secrets.GITHUB_TOKEN }}
-          ref: "0.6.4"
+          ref: "0.6.5"
           path: ci-perf-kit
           submodules: true
       # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
@@ -82,7 +89,7 @@ jobs:
       # report
       - name: Result
         if: always()
-        uses: thollander/actions-comment-pull-request@master
+        uses: thollander/actions-comment-pull-request@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           message: ${{ steps.cat.outputs.text }}

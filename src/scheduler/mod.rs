@@ -1,18 +1,9 @@
 //! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
-mod context;
-pub(self) use context::Context;
-pub(crate) use context::WorkerLocal;
-
-mod mmtk_context;
-pub(crate) use mmtk_context::GCWorkerLocal;
-pub(crate) use mmtk_context::GCWorkerLocalPtr;
-
 #[allow(clippy::module_inception)]
 mod scheduler;
 pub(crate) use scheduler::CoordinatorMessage;
-pub(crate) use scheduler::MMTkScheduler;
-pub(self) use scheduler::Scheduler;
+pub(crate) use scheduler::GCWorkScheduler;
 
 mod stat;
 pub(self) mod work_counter;
@@ -20,15 +11,14 @@ pub(self) mod work_counter;
 mod work;
 pub use work::CoordinatorWork;
 pub use work::GCWork;
-pub(crate) use work::Work;
+pub(crate) use work::GCWorkContext;
 
 mod work_bucket;
 pub use work_bucket::WorkBucketStage;
 
 mod worker;
 pub use worker::GCWorker;
-pub(crate) use worker::Worker;
-pub(crate) use worker::WorkerLocalPtr;
+pub(crate) use worker::{GCWorkerLocal, GCWorkerLocalPtr};
 
 pub(crate) mod gc_work;
 pub use gc_work::ProcessEdgesWork;

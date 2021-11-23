@@ -12,7 +12,10 @@ use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
 pub struct SanityChecker {
+    /// Visited objects
     refs: HashSet<ObjectReference>,
+    /// Cached root edges for sanity root scanning
+    roots: Vec<Vec<Address>>,
 }
 
 impl Default for SanityChecker {
@@ -25,16 +28,27 @@ impl SanityChecker {
     pub fn new() -> Self {
         Self {
             refs: HashSet::new(),
+            roots: vec![],
         }
+    }
+
+    /// Cache a list of root edges to the sanity checker.
+    pub fn add_roots(&mut self, roots: Vec<Address>) {
+        self.roots.push(roots)
+    }
+
+    /// Reset roots cache at the end of the sanity gc.
+    fn clear_roots_cache(&mut self) {
+        self.roots.clear();
     }
 }
 
-pub struct ScheduleSanityGC<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct ScheduleSanityGC<P: Plan, W: CopyContext + GCWorkerLocal> {
     _plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> ScheduleSanityGC<P, W> {
     pub fn new(plan: &'static P) -> Self {
         ScheduleSanityGC {
             _plan: plan,
@@ -43,7 +57,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> ScheduleSanityGC<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
@@ -52,9 +66,22 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P
 
         plan.base().inside_sanity.store(true, Ordering::SeqCst);
         // Stop & scan mutators (mutator scanning can happen before STW)
-        for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            scheduler.work_buckets[WorkBucketStage::Prepare]
-                .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
+
+        // We use the cached roots for sanity gc, based on the assumption that
+        // the stack scanning triggered by the selected plan is correct and precise.
+        // FIXME(Wenyu,Tianle): When working on eager stack scanning on OpenJDK,
+        // the stack scanning may be broken. Uncomment the following lines to
+        // collect the roots again.
+        // Also, remember to call `DerivedPointerTable::update_pointers(); DerivedPointerTable::clear();`
+        // in openjdk binding before the second round of roots scanning.
+        // for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
+        //     scheduler.work_buckets[WorkBucketStage::Prepare]
+        //         .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
+        // }
+        for roots in &mmtk.sanity_checker.lock().unwrap().roots {
+            scheduler.work_buckets[WorkBucketStage::Closure].add(
+                SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk),
+            );
         }
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<P::VM>>::new());
@@ -69,12 +96,12 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P
     }
 }
 
-pub struct SanityPrepare<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct SanityPrepare<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityPrepare<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -83,7 +110,7 @@ impl<P: Plan, W: CopyContext + WorkerLocal> SanityPrepare<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.enter_sanity();
         {
@@ -100,12 +127,12 @@ impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityPrepare<P, W
     }
 }
 
-pub struct SanityRelease<P: Plan, W: CopyContext + WorkerLocal> {
+pub struct SanityRelease<P: Plan, W: CopyContext + GCWorkerLocal> {
     pub plan: &'static P,
     _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityRelease<P, W> {
     pub fn new(plan: &'static P) -> Self {
         Self {
             plan,
@@ -114,9 +141,10 @@ impl<P: Plan, W: CopyContext + WorkerLocal> SanityRelease<P, W> {
     }
 }
 
-impl<P: Plan, W: CopyContext + WorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
+impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
+        mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
@@ -148,10 +176,11 @@ impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type VM = VM;
+
     const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         Self {
-            base: ProcessEdgesBase::new(edges, mmtk),
+            base: ProcessEdgesBase::new(edges, roots, mmtk),
             // ..Default::default()
         }
     }
@@ -164,9 +193,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
-            if !object.is_sane() {
-                panic!("Invalid reference {:?}", object);
-            }
+            assert!(object.is_sane(), "Invalid reference {:?}", object);
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
             ProcessEdgesWork::process_node(self, object);
