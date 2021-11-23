@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
+use super::gc_work::{ImmixCopyContext, ImmixGCWorkContext, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -7,11 +7,8 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -19,14 +16,9 @@ use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::vm::VMBinding;
-use crate::{
-    mmtk::MMTK,
-    policy::immix::{block::Block, ImmixSpace},
-    util::opaque_pointer::VMWorkerThread,
-};
+use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use atomic::Ordering;
@@ -37,6 +29,7 @@ pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
 pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     pub common: CommonPlan<VM>,
+    last_gc_was_defrag: AtomicBool,
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -45,7 +38,7 @@ pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 0,
     num_specialized_scans: 1,
     /// Max immix object size is half of a block.
-    max_non_los_default_alloc_bytes: Block::BYTES >> 1,
+    max_non_los_default_alloc_bytes: crate::policy::immix::MAX_IMMIX_OBJECT_SIZE,
     ..PlanConstraints::default()
 };
 
@@ -54,6 +47,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
         self.base().collection_required(self, space_full, space)
+    }
+
+    fn last_collection_was_exhaustive(&self) -> bool {
+        ImmixSpace::<VM>::is_last_gc_exhaustive(self.last_gc_was_defrag.load(Ordering::Relaxed))
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -81,7 +78,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         let in_defrag = self.immix_space.decide_whether_to_defrag(
             self.is_emergency_collection(),
@@ -90,45 +87,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self.base().is_user_triggered_collection(),
             self.base().options.full_heap_system_gc,
         );
-        // Stop & scan mutators (mutator scanning can happen before STW)
+
         // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
         #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        #[allow(clippy::branches_sharing_code)]
         if in_defrag {
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Defrag }>>::new());
+            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(self);
         } else {
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
+            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, ImmixCopyContext<VM>>::new(self));
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        #[allow(clippy::if_same_then_else)]
-        // The two StopMutators have different types parameters, thus we cannot extract the common code before add().
-        #[allow(clippy::branches_sharing_code)]
-        if in_defrag {
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                ImmixProcessEdges<VM, { TraceKind::Defrag }>,
-            >::new());
-        } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<ImmixProcessEdges<VM, { TraceKind::Fast }>>::new());
-        }
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, ImmixCopyContext<VM>>::new(self));
-        // Analysis routine that is ran. It is generally recommended to take advantage
-        // of the scheduling system we have in place for more performance
-        #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, ImmixCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -137,13 +103,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        self.immix_space.prepare();
+        self.immix_space.prepare(true);
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
         // release the collected region
-        self.immix_space.release();
+        self.last_gc_was_defrag
+            .store(self.immix_space.release(true), Ordering::Relaxed);
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -189,6 +156,7 @@ impl<VM: VMBinding> Immix<VM> {
                 &IMMIX_CONSTRAINTS,
                 global_metadata_specs,
             ),
+            last_gc_was_defrag: AtomicBool::new(false),
         };
 
         {

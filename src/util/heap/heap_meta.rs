@@ -27,14 +27,13 @@ impl HeapMeta {
             start
         };
 
-        if self.heap_cursor > self.heap_limit {
-            panic!(
-                "Out of virtual address space at {} ({} > {})",
-                self.heap_cursor - extent,
-                self.heap_cursor,
-                self.heap_limit
-            );
-        }
+        assert!(
+            self.heap_cursor <= self.heap_limit,
+            "Out of virtual address space at {} ({} > {})",
+            self.heap_cursor - extent,
+            self.heap_cursor,
+            self.heap_limit
+        );
 
         ret
     }

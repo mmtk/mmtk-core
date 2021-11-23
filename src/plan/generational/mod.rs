@@ -14,6 +14,8 @@ use std::sync::atomic::Ordering;
 
 /// Generational copying (GenCopy)
 pub mod copying;
+/// Generational immix (GenImmix)
+pub mod immix;
 
 // Common generational code
 

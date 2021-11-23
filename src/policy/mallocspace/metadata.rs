@@ -1,16 +1,13 @@
 use crate::util::alloc_bit;
-use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+use crate::util::conversions;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
-use crate::util::metadata::side_metadata::LOG_MAX_GLOBAL_SIDE_METADATA_SIZE;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{constants, conversions};
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -24,8 +21,7 @@ lazy_static! {
     /// Lock to synchronize the mapping of side metadata for a newly allocated chunk by malloc
     static ref CHUNK_MAP_LOCK: Mutex<()> = Mutex::new(());
     /// Maximum metadata address for the ACTIVE_CHUNK_METADATA_SPEC which is used to check bounds
-    static ref MAX_METADATA_ADDRESS: Address =
-        ACTIVE_CHUNK_METADATA_SPEC.get_absolute_offset() + (1_usize << LOG_MAX_GLOBAL_SIDE_METADATA_SIZE);
+    pub static ref MAX_METADATA_ADDRESS: Address = ACTIVE_CHUNK_METADATA_SPEC.upper_bound_address_for_contiguous();
 }
 
 /// Metadata spec for the active chunk byte
@@ -40,12 +36,8 @@ lazy_static! {
 /// This is a global side metadata spec even though it is used only by MallocSpace as
 /// we require its space to be contiguous and mapped only once. Otherwise we risk
 /// overwriting the previous mapping.
-pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: true,
-    offset: SideMetadataOffset::layout_after(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC),
-    log_num_of_bits: 3,
-    log_min_obj_size: LOG_BYTES_IN_CHUNK as usize,
-};
+pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_CHUNK;
 
 /// Metadata spec for the active page byte
 ///
@@ -57,12 +49,11 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec
 /// the same time
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
-pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec = SideMetadataSpec {
-    is_global: false,
-    offset: LOCAL_SIDE_METADATA_BASE_OFFSET,
-    log_num_of_bits: 3,
-    log_min_obj_size: constants::LOG_BYTES_IN_PAGE as usize,
-};
+pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
+
+pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
+    crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
 
 /// Check if metadata is mapped for a range [addr, addr + size). Metadata is mapped per chunk,
 /// we will go through all the chunks for [address, address + size), and check if they are mapped.
@@ -110,9 +101,10 @@ fn map_active_chunk_metadata(chunk_start: Address) {
         chunk_start + (size / 2)
     );
 
-    if CHUNK_METADATA.try_map_metadata_space(start, size).is_err() {
-        panic!("failed to mmap meta memory");
-    }
+    assert!(
+        CHUNK_METADATA.try_map_metadata_space(start, size).is_ok(),
+        "failed to mmap meta memory"
+    );
 }
 
 /// We map the active chunk metadata (if not previously mapped), as well as the alloc bit metadata
@@ -249,6 +241,18 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
         1,
         Ordering::SeqCst,
     );
+}
+
+pub(super) fn is_offset_malloc(address: Address) -> bool {
+    unsafe { side_metadata::load(&OFFSET_MALLOC_METADATA_SPEC, address) == 1 }
+}
+
+pub(super) fn set_offset_malloc_bit(address: Address) {
+    side_metadata::store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address, 1, Ordering::SeqCst);
+}
+
+pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
+    side_metadata::store(&OFFSET_MALLOC_METADATA_SPEC, address, 0);
 }
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {

@@ -23,15 +23,19 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &super::global::SS_CONSTRAINTS
     }
+
     fn init(&mut self, tls: VMWorkerThread) {
         self.ss.tls = tls.0;
     }
+
     fn prepare(&mut self) {
         self.ss.rebind(self.plan.tospace());
     }
+
     fn release(&mut self) {
         // self.ss.rebind(Some(self.plan.tospace()));
     }
+
     #[inline(always)]
     fn alloc_copy(
         &mut self,
@@ -43,6 +47,7 @@ impl<VM: VMBinding> CopyContext for SSCopyContext<VM> {
     ) -> Address {
         self.ss.alloc(bytes, align, offset)
     }
+
     #[inline(always)]
     fn post_copy(
         &mut self,
@@ -87,23 +92,22 @@ impl<VM: VMBinding> SSProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<SemiSpace<VM>>().unwrap();
         Self { plan, base }
     }
+
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
         }
+
+        // We don't need to trace the object if it is already in the to-space
         if self.ss().tospace().in_space(object) {
-            self.ss().tospace().trace_object::<Self, SSCopyContext<VM>>(
-                self,
-                object,
-                super::global::ALLOC_SS,
-                unsafe { self.worker().local::<SSCopyContext<VM>>() },
-            )
+            object
         } else if self.ss().fromspace().in_space(object) {
             self.ss()
                 .fromspace()
@@ -134,4 +138,12 @@ impl<VM: VMBinding> DerefMut for SSProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct SSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for SSGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = SemiSpace<VM>;
+    type CopyContextType = SSCopyContext<VM>;
+    type ProcessEdgesWorkType = SSProcessEdges<VM>;
 }

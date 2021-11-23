@@ -1,6 +1,3 @@
-use crate::util::constants::DEFAULT_STRESS_FACTOR;
-use std::sync::atomic::Ordering;
-
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
 use crate::util::Address;
 
@@ -10,7 +7,7 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::conversions::bytes_to_pages;
 use crate::util::opaque_pointer::*;
-use crate::vm::{ActivePlan, VMBinding};
+use crate::vm::VMBinding;
 
 const BYTES_IN_PAGE: usize = 1 << 12;
 const BLOCK_SIZE: usize = 8 * BYTES_IN_PAGE;
@@ -49,6 +46,12 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
+    fn does_thread_local_allocation(&self) -> bool {
+        true
+    }
+    fn get_thread_local_buffer_granularity(&self) -> usize {
+        BLOCK_SIZE
+    }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc");
@@ -74,15 +77,46 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc_slow");
-        // TODO: internalLimit etc.
-        let base = &self.plan.base();
+        self.acquire_block(size, align, offset, false)
+    }
 
-        if base.options.stress_factor == DEFAULT_STRESS_FACTOR
-            && base.options.analysis_factor == DEFAULT_STRESS_FACTOR
-        {
-            self.acquire_block(size, align, offset, false)
+    // Slow path for allocation if the precise stress test has been enabled.
+    // It works by manipulating the limit to be below the cursor always.
+    // Performs three kinds of allocations: (i) if the hard limit has been met;
+    // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
+    // factor has been crossed.
+    fn alloc_slow_once_precise_stress(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
+        if need_poll {
+            return self.acquire_block(size, align, offset, true);
+        }
+
+        trace!("alloc_slow stress_test");
+        let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
+        let new_cursor = result + size;
+
+        // For stress test, limit is [0, block_size) to artificially make the
+        // check in the fastpath (alloc()) fail. The real limit is recovered by
+        // adding it to the current cursor.
+        if new_cursor > self.cursor + self.limit.as_usize() {
+            self.acquire_block(size, align, offset, true)
         } else {
-            self.alloc_slow_once_stress_test(size, align, offset)
+            fill_alignment_gap::<VM>(self.cursor, result);
+            self.limit -= new_cursor - self.cursor;
+            self.cursor = new_cursor;
+            trace!(
+                "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
+                size,
+                result,
+                self.cursor,
+                self.limit
+            );
+            result
         }
     }
 
@@ -103,65 +137,6 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             limit: unsafe { Address::zero() },
             space,
             plan,
-        }
-    }
-
-    // Slow path for allocation if the stress test flag has been enabled. It works
-    // by manipulating the limit to be below the cursor always.
-    // Performs three kinds of allocations: (i) if the hard limit has been met;
-    // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
-    // factor has been crossed.
-    fn alloc_slow_once_stress_test(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        trace!("alloc_slow stress_test");
-        let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
-        let new_cursor = result + size;
-
-        // For stress test, limit is [0, block_size) to artificially make the
-        // check in the fastpath (alloc()) fail. The real limit is recovered by
-        // adding it to the current cursor.
-        if new_cursor > self.cursor + self.limit.as_usize() {
-            self.acquire_block(size, align, offset, true)
-        } else {
-            let base = &self.plan.base();
-            let is_mutator = VM::VMActivePlan::is_mutator(self.tls) && self.plan.is_initialized();
-
-            if is_mutator
-                && base.allocation_bytes.load(Ordering::SeqCst) > base.options.stress_factor
-            {
-                trace!(
-                    "Stress GC: allocation_bytes = {} more than stress_factor = {}",
-                    base.allocation_bytes.load(Ordering::Relaxed),
-                    base.options.stress_factor
-                );
-                return self.acquire_block(size, align, offset, true);
-            }
-
-            // This is the allocation hook for the analysis trait. If you want to call
-            // an analysis counter specific allocation hook, then here is the place to do so
-            #[cfg(feature = "analysis")]
-            if is_mutator
-                && base.allocation_bytes.load(Ordering::SeqCst) > base.options.analysis_factor
-            {
-                trace!(
-                    "Analysis: allocation_bytes = {} more than analysis_factor = {}",
-                    base.allocation_bytes.load(Ordering::Relaxed),
-                    base.options.analysis_factor
-                );
-
-                base.analysis_manager.alloc_hook(size, align, offset);
-            }
-
-            fill_alignment_gap::<VM>(self.cursor, result);
-            self.limit -= new_cursor - self.cursor;
-            self.cursor = new_cursor;
-            trace!(
-                "alloc_slow: Bump allocation size: {}, result: {}, new_cursor: {}, limit: {}",
-                size,
-                result,
-                self.cursor,
-                self.limit
-            );
-            result
         }
     }
 

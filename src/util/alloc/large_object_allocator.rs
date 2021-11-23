@@ -26,6 +26,10 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
         self.space as &'static dyn Space<VM>
     }
 
+    fn does_thread_local_allocation(&self) -> bool {
+        false
+    }
+
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let cell: Address = self.alloc_slow(size, align, offset);
         allocator::align_allocation::<VM>(cell, align, offset, VM::MIN_ALIGNMENT, true)

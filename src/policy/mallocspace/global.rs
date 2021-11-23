@@ -71,6 +71,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         true
     }
 
+    // For malloc space, we need to further check the alloc bit.
+    fn is_mmtk_object(&self, object: ObjectReference) -> bool {
+        is_alloced_by_malloc(object)
+    }
+
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
         let page_addr = conversions::page_align_down(object.to_address());
@@ -173,6 +178,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 global: global_side_metadata_specs,
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
+                    MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
@@ -187,7 +193,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    pub fn alloc(&self, tls: VMThread, size: usize) -> Address {
+    pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, self) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
@@ -195,17 +201,22 @@ impl<VM: VMBinding> MallocSpace<VM> {
             return unsafe { Address::zero() };
         }
 
-        let raw = unsafe { calloc(1, size) };
-        let address = Address::from_mut_ptr(raw);
-
+        let (address, is_offset_malloc) = alloc::<VM>(size, align, offset);
         if !address.is_zero() {
-            let actual_size = unsafe { malloc_usable_size(raw) };
+            let actual_size = get_malloc_usable_size(address, is_offset_malloc);
+
             // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
             if !is_meta_space_mapped(address, actual_size) {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
+                // Update SFT
+                crate::mmtk::SFT_MAP.update(self, address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
+
+            if is_offset_malloc {
+                set_offset_malloc_bit(address);
+            }
 
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
@@ -219,12 +230,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     // XXX optimize: We pass the bytes in to free as otherwise there were multiple
     // indirect call instructions in the generated assembly
-    pub fn free(&self, addr: Address, bytes: usize) {
-        let ptr = addr.to_mut_ptr();
-        trace!("Free memory {:?}", ptr);
-        unsafe {
-            free(ptr);
+    pub fn free(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
+        if offset_malloc_bit {
+            trace!("Free memory {:x}", addr);
+            offset_free(addr);
+            unsafe { unset_offset_malloc_bit_unsafe(addr) };
+        } else {
+            let ptr = addr.to_mut_ptr();
+            trace!("Free memory {:?}", ptr);
+            unsafe {
+                free(ptr);
+            }
         }
+
         self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
 
         #[cfg(debug_assertions)]
@@ -316,6 +334,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
+    /// Clean up for an empty chunk
+    fn clean_up_empty_chunk(&self, chunk_start: Address) {
+        // Since the chunk mark metadata is a byte, we don't need synchronization
+        unsafe { unset_chunk_mark_unsafe(chunk_start) };
+        // Clear the SFT entry
+        crate::mmtk::SFT_MAP.clear(chunk_start);
+    }
+
     /// This function is called when the mark bits sit on the side metadata.
     /// This has been optimized with the use of bulk loading and bulk zeroing of
     /// metadata.
@@ -336,15 +362,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut last_on_page_boundary = false;
 
         debug_assert!(
-            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size
-                == mark_bit_spec.log_min_obj_size,
+            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                == mark_bit_spec.log_bytes_in_region,
             "Alloc-bit and mark-bit metadata have different minimum object sizes!"
         );
 
         // For bulk xor'ing 128-bit vectors on architectures with vector instructions
         // Each bit represents an object of LOG_MIN_OBJ_SIZE size
         let bulk_load_size: usize =
-            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_min_obj_size);
+            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
 
         while address < chunk_end {
             // We extensively tested the performance of the following if-statement and were
@@ -390,14 +416,16 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     if unsafe { is_alloced_object_unsafe(address) } {
                         let object = unsafe { address.to_object_reference() };
                         let obj_start = VM::VMObjectModel::object_start_ref(object);
-                        let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                        let offset_malloc_bit = is_offset_malloc(obj_start);
+                        let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
                         if !is_marked::<VM>(object, None) {
                             // Dead object
                             trace!("Object {} has been allocated but not marked", object);
 
                             // Free object
-                            self.free(obj_start, bytes);
+                            self.free(obj_start, bytes, offset_malloc_bit);
                             trace!("free object {}", object);
                             unsafe { unset_alloc_bit_unsafe(object) };
                         } else {
@@ -443,7 +471,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 if unsafe { is_alloced_object_unsafe(address) } {
                     let object = unsafe { address.to_object_reference() };
                     let obj_start = VM::VMObjectModel::object_start_ref(object);
-                    let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                    let bytes = get_malloc_usable_size(obj_start, is_offset_malloc(obj_start));
 
                     #[cfg(debug_assertions)]
                     if ASSERT_ALLOCATION {
@@ -481,8 +510,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
         if chunk_is_empty {
-            // Since the chunk mark metadata is a byte, we don't need synchronization
-            unsafe { unset_chunk_mark_unsafe(chunk_start) };
+            self.clean_up_empty_chunk(chunk_start);
         }
 
         debug!(
@@ -545,7 +573,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if unsafe { is_alloced_object_unsafe(address) } {
                 let object = unsafe { address.to_object_reference() };
                 let obj_start = VM::VMObjectModel::object_start_ref(object);
-                let bytes = unsafe { malloc_usable_size(obj_start.to_mut_ptr()) };
+
+                let offset_malloc_bit = is_offset_malloc(obj_start);
+
+                let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
                 #[cfg(debug_assertions)]
                 if ASSERT_ALLOCATION {
@@ -567,7 +598,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     trace!("Object {} has been allocated but not marked", object);
 
                     // Free object
-                    self.free(obj_start, bytes);
+                    self.free(obj_start, bytes, offset_malloc_bit);
                     trace!("free object {}", object);
                     unsafe { unset_alloc_bit_unsafe(object) };
                 } else {
@@ -597,8 +628,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         if chunk_is_empty {
-            // Since the chunk mark metadata is a byte, we don't need synchronization
-            unsafe { unset_chunk_mark_unsafe(chunk_start) };
+            self.clean_up_empty_chunk(chunk_start);
         }
 
         debug!(

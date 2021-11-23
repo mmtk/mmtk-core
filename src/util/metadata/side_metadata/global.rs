@@ -17,12 +17,13 @@ use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
 /// For performance reasons, objects of this struct should be constants.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SideMetadataSpec {
+    pub name: &'static str,
     pub is_global: bool,
     pub offset: SideMetadataOffset,
     /// Number of bits needed per region. E.g. 0 = 1 bit, 1 = 2 bit.
     pub log_num_of_bits: usize,
     /// Number of bytes of the region. E.g. 3 = 8 bytes, 12 = 4096 bytes (page).
-    pub log_min_obj_size: usize,
+    pub log_bytes_in_region: usize,
 }
 
 impl SideMetadataSpec {
@@ -48,17 +49,66 @@ impl SideMetadataSpec {
         debug_assert!(self.is_rel_offset());
         unsafe { self.offset.rel_offset }
     }
+
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
+    #[cfg(target_pointer_width = "64")]
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+        debug_assert!(self.is_absolute_offset());
+        SideMetadataOffset {
+            addr: unsafe { self.offset.addr }
+                .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+        }
+    }
+
+    /// Return the upperbound offset for the side metadata. The next side metadata should be laid out at this offset.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound_offset(&self) -> SideMetadataOffset {
+        if self.is_absolute_offset() {
+            SideMetadataOffset {
+                addr: unsafe { self.offset.addr }
+                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(self)),
+            }
+        } else {
+            SideMetadataOffset {
+                rel_offset: unsafe { self.offset.rel_offset }
+                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
+                        self.log_bytes_in_region,
+                        self.log_num_of_bits,
+                    ),
+            }
+        }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a contiguous side metadata spec (which uses address
+    /// as offset).
+    pub const fn upper_bound_address_for_contiguous(&self) -> Address {
+        debug_assert!(self.is_absolute_offset());
+        unsafe { self.upper_bound_offset().addr }
+    }
+
+    /// The upper bound address for metadata address computed for this global spec. The computed metadata address
+    /// should never be larger than this address. Otherwise, we are accessing the metadata that is laid out
+    /// after this spec. This spec must be a chunked side metadata spec (which uses relative offset). Only 32 bit local
+    /// side metadata uses chunked metadata.
+    #[cfg(target_pointer_width = "32")]
+    pub const fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
+        debug_assert!(self.is_rel_offset());
+        address_to_meta_chunk_addr(data_addr).add(unsafe { self.upper_bound_offset().rel_offset })
+    }
 }
 
 impl fmt::Debug for SideMetadataSpec {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
-            "SideMetadataSpec {{ \
+            "SideMetadataSpec {} {{ \
             **is_global: {:?} \
             **offset: {} \
             **log_num_of_bits: 0x{:x} \
-            **log_min_obj_size: 0x{:x} \
+            **log_bytes_in_region: 0x{:x} \
             }}",
+            self.name,
             self.is_global,
             unsafe {
                 if self.is_absolute_offset() {
@@ -68,7 +118,7 @@ impl fmt::Debug for SideMetadataSpec {
                 }
             },
             self.log_num_of_bits,
-            self.log_min_obj_size
+            self.log_bytes_in_region
         ))
     }
 }
@@ -94,31 +144,8 @@ impl SideMetadataOffset {
     }
 
     /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "64")]
     pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        debug_assert!(spec.is_absolute_offset());
-        SideMetadataOffset {
-            addr: unsafe { spec.offset.addr }
-                .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-        }
-    }
-    /// Get an offset after a spec. This is used to layout another spec immediately after this one.
-    #[cfg(target_pointer_width = "32")]
-    pub const fn layout_after(spec: &SideMetadataSpec) -> SideMetadataOffset {
-        if spec.is_absolute_offset() {
-            SideMetadataOffset {
-                addr: unsafe { spec.offset.addr }
-                    .add(crate::util::metadata::side_metadata::metadata_address_range_size(spec)),
-            }
-        } else {
-            SideMetadataOffset {
-                rel_offset: unsafe { spec.offset.rel_offset }
-                    + crate::util::metadata::side_metadata::metadata_bytes_per_chunk(
-                        spec.log_min_obj_size,
-                        spec.log_num_of_bits,
-                    ),
-            }
-        }
+        spec.upper_bound_offset()
     }
 }
 
@@ -260,7 +287,7 @@ impl SideMetadataContext {
             }
             #[cfg(target_pointer_width = "32")]
             {
-                lsize += metadata_bytes_per_chunk(spec.log_min_obj_size, spec.log_num_of_bits);
+                lsize += metadata_bytes_per_chunk(spec.log_bytes_in_region, spec.log_num_of_bits);
             }
         }
 
@@ -751,7 +778,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
             "Each heap entry should map to a byte in side-metadata"
         );
         debug_assert_eq!(
-            bytes >> metadata_spec.log_min_obj_size,
+            bytes >> metadata_spec.log_bytes_in_region,
             ENTRIES,
             "Heap range size and MetadataByteArray size does not match"
         );
@@ -781,7 +808,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
         let value = self.data[index];
         #[cfg(feature = "extreme_assertions")]
         {
-            let data_addr = self.heap_range_start + (index << self.spec.log_min_obj_size);
+            let data_addr = self.heap_range_start + (index << self.spec.log_bytes_in_region);
             sanity::verify_load(&self.spec, data_addr, value as _);
         }
         value
@@ -847,7 +874,7 @@ pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: us
                 memory::zero(
                     address_to_meta_address(metadata_spec, next_data_chunk),
                     metadata_bytes_per_chunk(
-                        metadata_spec.log_min_obj_size,
+                        metadata_spec.log_bytes_in_region,
                         metadata_spec.log_num_of_bits,
                     ),
                 );
@@ -869,10 +896,11 @@ mod tests {
     fn calculate_reserved_pages_one_spec() {
         // 1 bit per 8 bytes - 1:64
         let spec = SideMetadataSpec {
+            name: "test_spec",
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
-            log_min_obj_size: 3,
+            log_bytes_in_region: 3,
         };
         let side_metadata = SideMetadataContext {
             global: vec![spec],
@@ -889,17 +917,19 @@ mod tests {
     fn calculate_reserved_pages_multi_specs() {
         // 1 bit per 8 bytes - 1:64
         let gspec = SideMetadataSpec {
+            name: "gspec",
             is_global: true,
             offset: ZERO_OFFSET,
             log_num_of_bits: 0,
-            log_min_obj_size: 3,
+            log_bytes_in_region: 3,
         };
         // 2 bits per page - 2 / (4k * 8) = 1:16k
         let lspec = SideMetadataSpec {
+            name: "lspec",
             is_global: false,
             offset: ZERO_OFFSET,
             log_num_of_bits: 1,
-            log_min_obj_size: 12,
+            log_bytes_in_region: 12,
         };
         let side_metadata = SideMetadataContext {
             global: vec![gspec],

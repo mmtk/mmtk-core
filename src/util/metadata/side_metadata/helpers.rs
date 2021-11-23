@@ -18,14 +18,14 @@ pub(crate) fn address_to_contiguous_meta_address(
     data_addr: Address,
 ) -> Address {
     let log_bits_num = metadata_spec.log_num_of_bits as i32;
-    let log_min_obj_size = metadata_spec.log_min_obj_size as usize;
+    let log_bytes_in_region = metadata_spec.log_bytes_in_region as usize;
 
     let rshift = (LOG_BITS_IN_BYTE as i32) - log_bits_num;
 
     if rshift >= 0 {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) >> rshift)
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) >> rshift)
     } else {
-        metadata_spec.get_absolute_offset() + ((data_addr >> log_min_obj_size) << (-rshift))
+        metadata_spec.get_absolute_offset() + ((data_addr >> log_bytes_in_region) << (-rshift))
     }
 }
 
@@ -114,8 +114,8 @@ pub(crate) fn address_to_meta_address(
 }
 
 pub(crate) const fn addr_rshift(metadata_spec: &SideMetadataSpec) -> i32 {
-    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_min_obj_size - (metadata_spec.log_num_of_bits))
-        as i32
+    ((LOG_BITS_IN_BYTE as usize) + metadata_spec.log_bytes_in_region
+        - (metadata_spec.log_num_of_bits)) as i32
 }
 
 #[allow(dead_code)]
@@ -131,7 +131,7 @@ pub(crate) fn meta_byte_lshift(metadata_spec: &SideMetadataSpec, data_addr: Addr
         return 0;
     }
     let rem_shift = BITS_IN_WORD as i32 - ((LOG_BITS_IN_BYTE as i32) - bits_num_log);
-    ((((data_addr >> metadata_spec.log_min_obj_size) << rem_shift) >> rem_shift) << bits_num_log)
+    ((((data_addr >> metadata_spec.log_bytes_in_region) << rem_shift) >> rem_shift) << bits_num_log)
         as u8
 }
 

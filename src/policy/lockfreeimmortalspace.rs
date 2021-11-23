@@ -1,7 +1,6 @@
 use crate::mmtk::SFT_MAP;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
-use crate::util::conversions::bytes_to_chunks_up;
 use crate::util::heap::PageResource;
 
 use crate::util::ObjectReference;
@@ -104,11 +103,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft(),
-            AVAILABLE_START,
-            bytes_to_chunks_up(total_bytes),
-        );
+        SFT_MAP.update(self.as_sft(), AVAILABLE_START, total_bytes);
     }
 
     fn reserved_pages(&self) -> usize {

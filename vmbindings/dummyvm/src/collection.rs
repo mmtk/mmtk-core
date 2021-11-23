@@ -16,11 +16,11 @@ impl Collection<DummyVM> for VMCollection {
     }
 
     fn block_for_gc(_tls: VMMutatorThread) {
-        unimplemented!();
+        panic!("block_for_gc is not implemented")
     }
 
     fn spawn_worker_thread(_tls: VMThread, _ctx: Option<&GCWorker<DummyVM>>) {
-        unimplemented!();
+
     }
 
     fn prepare_mutator<T: MutatorContext<DummyVM>>(_tls_w: VMWorkerThread, _tls_m: VMMutatorThread, _mutator: &T) {
