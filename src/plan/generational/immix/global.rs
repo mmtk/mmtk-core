@@ -8,7 +8,6 @@ use crate::plan::immix::gc_work::TraceKind;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::immix::ImmixCopyContext;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -223,7 +222,6 @@ impl<VM: VMBinding> GenImmix<VM> {
 
         let genimmix = GenImmix {
             gen: Gen::new(
-                crate::policy::copy_context::CopyDestination::ImmixSpace,
                 heap,
                 global_metadata_specs,
                 &GENIMMIX_CONSTRAINTS,

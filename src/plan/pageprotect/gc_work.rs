@@ -1,5 +1,4 @@
 use super::global::PageProtect;
-use crate::policy::copy_context::NoCopy;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
@@ -60,6 +59,5 @@ pub struct PPGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for PPGCWorkContext<VM> {
     type VM = VM;
     type PlanType = PageProtect<VM>;
-    type CopyContextType = NoCopy<VM>;
     type ProcessEdgesWorkType = PPProcessEdges<VM>;
 }

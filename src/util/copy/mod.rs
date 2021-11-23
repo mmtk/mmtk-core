@@ -1,12 +1,10 @@
 use std::mem::MaybeUninit;
 
 use crate::vm::VMBinding;
-use crate::util::alloc::*;
-use crate::policy::copy_context::CopyContext;
+use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixCopyContext;
 use crate::util::{Address, ObjectReference};
-use crate::plan::AllocationSemantics;
 use crate::plan::PlanConstraints;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::policy::space::Space;
@@ -20,7 +18,6 @@ use crate::vm::ObjectModel;
 
 use enum_map::Enum;
 use enum_map::EnumMap;
-use enum_map::enum_map;
 
 const MAX_COPYSPACE_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_COPY_ALLOCATORS: usize = 2;
@@ -53,6 +50,11 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
             } else {
                 unimplemented!("Mature copy is used but the plan does not use unlogged bit");
             }
+        }
+        match self.config.copy_mapping[semantics] {
+            CopySelector::CopySpace(index) => unsafe { self.copy[index as usize].assume_init_mut() }.post_copy(object, bytes, semantics),
+            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }.post_copy(object, bytes, semantics),
+            CopySelector::Unused => unreachable!()
         }
     }
 

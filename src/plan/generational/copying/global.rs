@@ -7,7 +7,6 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::copy_context::CopyDestination;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::space::Space;
@@ -25,8 +24,6 @@ use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct GenCopy<VM: VMBinding> {
     pub gen: Gen<VM>,
@@ -177,7 +174,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         let copyspace0 = CopySpace::new(
             "copyspace0",
             false,
-            CopyDestination::CopySpace,
             true,
             VMRequest::discontiguous(),
             global_metadata_specs.clone(),
@@ -188,7 +184,6 @@ impl<VM: VMBinding> GenCopy<VM> {
         let copyspace1 = CopySpace::new(
             "copyspace1",
             true,
-            CopyDestination::CopySpace,
             true,
             VMRequest::discontiguous(),
             global_metadata_specs.clone(),
@@ -199,7 +194,6 @@ impl<VM: VMBinding> GenCopy<VM> {
 
         let res = GenCopy {
             gen: Gen::new(
-                CopyDestination::CopySpace,
                 heap,
                 global_metadata_specs,
                 &GENCOPY_CONSTRAINTS,

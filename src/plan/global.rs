@@ -120,7 +120,7 @@ pub trait Plan: 'static + Sync + Downcast {
     /// Create thread local GC worker. For copying plan, they will have to override this method,
     /// and use the correct copy context as GC workers.
     fn create_worker_local(&'static self, _tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        GCWorkerLocalPtr::new(crate::policy::copy_context::NoCopy::<Self::VM>::new())
+        GCWorkerLocalPtr::new(crate::util::copy::GCWorkerCopyContext::<Self::VM>::new_non_copy())
     }
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);

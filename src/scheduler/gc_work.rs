@@ -1,7 +1,6 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
-use crate::policy::copy_context::CopyContext;
 use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
@@ -10,6 +9,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
+use crate::util::copy::*;
 
 pub struct ScheduleCollection;
 
@@ -52,7 +52,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
         }
         for w in &mmtk.scheduler.worker_group().workers {
             w.local_work_bucket
-                .add(PrepareCollector::<C::CopyContextType>::new());
+                .add(PrepareCollector);
         }
     }
 }
@@ -79,22 +79,12 @@ impl<VM: VMBinding> GCWork<VM> for PrepareMutator<VM> {
 
 /// The collector GC Preparation Work
 #[derive(Default)]
-pub struct PrepareCollector<W: CopyContext + GCWorkerLocal>(PhantomData<W>);
+pub struct PrepareCollector;
 
-impl<W: CopyContext + GCWorkerLocal> PrepareCollector<W> {
-    pub fn new() -> Self {
-        PrepareCollector(PhantomData)
-    }
-}
-
-impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for PrepareCollector<W> {
+impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
-        // unsafe { worker.local::<W>() }.prepare();
-        {
-            use crate::util::copy::*;
-            unsafe { worker.local::<GCWorkerCopyContext<VM>>().prepare();}
-        }
+        unsafe { worker.local::<GCWorkerCopyContext<VM>>().prepare(); }
         mmtk.plan.prepare_worker(worker);
     }
 }
@@ -131,7 +121,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         }
         for w in &mmtk.scheduler.worker_group().workers {
             w.local_work_bucket
-                .add(ReleaseCollector::<C::CopyContextType>::new());
+                .add(ReleaseCollector);
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();
@@ -160,22 +150,12 @@ impl<VM: VMBinding> GCWork<VM> for ReleaseMutator<VM> {
 
 /// The collector release Work
 #[derive(Default)]
-pub struct ReleaseCollector<W: CopyContext + GCWorkerLocal>(PhantomData<W>);
+pub struct ReleaseCollector;
 
-impl<W: CopyContext + GCWorkerLocal> ReleaseCollector<W> {
-    pub fn new() -> Self {
-        ReleaseCollector(PhantomData)
-    }
-}
-
-impl<VM: VMBinding, W: CopyContext + GCWorkerLocal> GCWork<VM> for ReleaseCollector<W> {
+impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
-        // unsafe { worker.local::<W>() }.release();
-        {
-            use crate::util::copy::*;
-            unsafe { worker.local::<GCWorkerCopyContext<VM>>().release();}
-        }
+        unsafe { worker.local::<GCWorkerCopyContext<VM>>().release();}
     }
 }
 

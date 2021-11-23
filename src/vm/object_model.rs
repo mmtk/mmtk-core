@@ -1,8 +1,6 @@
 use atomic::Ordering;
 
 use self::specs::*;
-use crate::plan::AllocationSemantics;
-use crate::policy::copy_context::CopyContext;
 use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;

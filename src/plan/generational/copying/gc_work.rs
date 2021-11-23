@@ -1,6 +1,5 @@
 use super::global::GenCopy;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
@@ -68,7 +67,6 @@ pub struct GenCopyNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<V
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenCopy<VM>;
-    type CopyContextType = CopySpaceCopyContext<VM>;
     type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
 }
 
@@ -76,6 +74,5 @@ pub(super) struct GenCopyMatureGCWorkContext<VM: VMBinding>(std::marker::Phantom
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyMatureGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenCopy<VM>;
-    type CopyContextType = CopySpaceCopyContext<VM>;
     type ProcessEdgesWorkType = GenCopyMatureProcessEdges<VM>;
 }

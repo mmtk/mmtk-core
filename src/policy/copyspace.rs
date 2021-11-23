@@ -1,7 +1,5 @@
-use crate::plan::AllocationSemantics;
 use crate::plan::TransitiveClosure;
-use crate::policy::copy_context::CopyContext;
-use crate::policy::copy_context::CopyDestination;
+use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
@@ -28,8 +26,6 @@ pub struct CopySpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
     from_space: AtomicBool,
-    /// What policy we will copy objects to
-    copy_to: CopyDestination,
 }
 
 impl<VM: VMBinding> SFT for CopySpace<VM> {
@@ -100,7 +96,6 @@ impl<VM: VMBinding> CopySpace<VM> {
     pub fn new(
         name: &'static str,
         from_space: bool,
-        copy_to: CopyDestination,
         zeroed: bool,
         vmrequest: VMRequest,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
@@ -142,7 +137,6 @@ impl<VM: VMBinding> CopySpace<VM> {
             },
             common,
             from_space: AtomicBool::new(from_space),
-            copy_to,
         }
     }
 
@@ -295,7 +289,7 @@ pub struct CopySpaceCopyContext<VM: VMBinding> {
     copy_allocator: BumpAllocator<VM>,
 }
 
-impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
+impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -316,20 +310,6 @@ impl<VM: VMBinding> CopyContext for CopySpaceCopyContext<VM> {
         _semantics: CopySemantics,
     ) -> Address {
         self.copy_allocator.alloc(bytes, align, offset)
-    }
-
-    #[inline(always)]
-    fn post_copy(
-        &mut self,
-        obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        _semantics: CopySemantics,
-    ) {
-        object_forwarding::clear_forwarding_bits::<VM>(obj);
-        if self.plan_constraints.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
-        }
     }
 }
 

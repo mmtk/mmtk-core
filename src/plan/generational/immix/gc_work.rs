@@ -1,11 +1,9 @@
 use super::global::GenImmix;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::policy::immix::ImmixCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::AllocationSemantics;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
@@ -91,7 +89,6 @@ pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type CopyContextType = ImmixCopyContext<VM>;
     type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
 }
 
@@ -103,6 +100,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type CopyContextType = ImmixCopyContext<VM>;
     type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;
 }

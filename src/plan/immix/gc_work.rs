@@ -1,5 +1,4 @@
 use super::global::Immix;
-use crate::policy::immix::ImmixCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
@@ -106,6 +105,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type CopyContextType = ImmixCopyContext<VM>;
     type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
 }

@@ -7,7 +7,6 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::immix::ImmixCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -25,8 +24,6 @@ use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
-
-pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,

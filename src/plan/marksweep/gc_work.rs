@@ -1,5 +1,4 @@
 use crate::plan::global::Plan;
-use crate::policy::copy_context::NoCopy;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
 use crate::policy::mallocspace::MallocSpace;
@@ -122,6 +121,5 @@ pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
-    type CopyContextType = NoCopy<VM>;
     type ProcessEdgesWorkType = MSProcessEdges<VM>;
 }

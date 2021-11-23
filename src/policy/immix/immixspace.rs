@@ -5,7 +5,6 @@ use super::{
     defrag::Defrag,
 };
 use crate::plan::ObjectsClosure;
-use crate::policy::copy_context::CopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -24,7 +23,7 @@ use crate::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
-    AllocationSemantics, MMTK,
+    MMTK,
 };
 use atomic::Ordering;
 use std::{
@@ -596,7 +595,7 @@ use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkerLocal;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
-use crate::util::object_forwarding;
+use crate::policy::copy_context::PolicyCopyContext;
 
 /// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {
@@ -605,7 +604,7 @@ pub struct ImmixCopyContext<VM: VMBinding> {
     defrag_allocator: ImmixAllocator<VM>,
 }
 
-impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
+impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     type VM = VM;
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -633,29 +632,11 @@ impl<VM: VMBinding> CopyContext for ImmixCopyContext<VM> {
             "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
             bytes, self.plan_constraints.max_non_los_default_alloc_bytes
         );
-        // if self.defrag_allocator.immix_space().in_defrag() {
-        //     self.defrag_allocator.alloc(bytes, align, offset)
-        // } else {
-        //     self.copy_allocator.alloc(bytes, align, offset)
-        // }
         if semantics.is_compact() {
             debug_assert!(self.defrag_allocator.immix_space().in_defrag());
             self.defrag_allocator.alloc(bytes, align, offset)
         } else {
             self.copy_allocator.alloc(bytes, align, offset)
-        }
-    }
-    #[inline(always)]
-    fn post_copy(
-        &mut self,
-        obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        semantics: CopySemantics,
-    ) {
-        object_forwarding::clear_forwarding_bits::<VM>(obj);
-        if self.plan_constraints.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
         }
     }
 }

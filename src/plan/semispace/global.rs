@@ -5,7 +5,6 @@ use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::copy_context::CopyDestination;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -23,8 +22,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use enum_map::EnumMap;
-
-pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
@@ -150,7 +147,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
             copyspace0: CopySpace::new(
                 "copyspace0",
                 false,
-                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),
@@ -161,7 +157,6 @@ impl<VM: VMBinding> SemiSpace<VM> {
             copyspace1: CopySpace::new(
                 "copyspace1",
                 true,
-                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),

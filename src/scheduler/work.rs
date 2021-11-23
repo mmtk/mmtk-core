@@ -25,7 +25,6 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
 
 use super::gc_work::ProcessEdgesWork;
 use crate::plan::Plan;
-use crate::policy::copy_context::CopyContext;
 
 /// This trait provides a group of associated types that are needed to
 /// create GC work packets for a certain plan. For example, `GCWorkScheduler.schedule_common_work()`
@@ -35,6 +34,5 @@ use crate::policy::copy_context::CopyContext;
 pub trait GCWorkContext {
     type VM: VMBinding;
     type PlanType: Plan<VM = Self::VM>;
-    type CopyContextType: CopyContext<VM = Self::VM> + GCWorkerLocal;
     type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
 }
