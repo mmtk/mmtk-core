@@ -9,8 +9,7 @@
 //!   also included here.
 //! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines
 //!   plan-specific constants.
-//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan
-//!   implements a copying GC, a [`CopyContext`](crate::plan::CopyContext) also needs to be provided.
+//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.
 //!
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
