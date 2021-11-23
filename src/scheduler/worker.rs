@@ -2,12 +2,12 @@ use super::stat::WorkerLocalStat;
 use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
-use crate::util::copy::GCWorkerCopyContext;
 
 const LOCALLY_CACHED_WORKS: usize = 1;
 

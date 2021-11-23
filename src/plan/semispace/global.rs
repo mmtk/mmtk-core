@@ -9,6 +9,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -18,7 +19,6 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::{plan::global::BasePlan, vm::VMBinding};
-use crate::util::copy::GCWorkerCopyContext;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -49,19 +49,24 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use enum_map::enum_map;
         use crate::util::copy::*;
+        use enum_map::enum_map;
 
-        GCWorkerCopyContext::new(tls, self, CopyConfig {
-            copy_mapping: enum_map! {
-                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
-                _ => CopySelector::Unused,
+        GCWorkerCopyContext::new(
+            tls,
+            self,
+            CopyConfig {
+                copy_mapping: enum_map! {
+                    CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                    _ => CopySelector::Unused,
+                },
+                constraints: &SS_CONSTRAINTS,
             },
-            constraints: &SS_CONSTRAINTS,
-        }, &[
-            // // The tospace argument doesn't matter, we will rebind before a GC anyway.
-            (CopySelector::CopySpace(0), &self.copyspace0)
-        ])
+            &[
+                // // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &self.copyspace0),
+            ],
+        )
     }
 
     fn gc_init(

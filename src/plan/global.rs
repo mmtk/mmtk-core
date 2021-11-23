@@ -14,6 +14,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -27,7 +28,6 @@ use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
-use crate::util::copy::GCWorkerCopyContext;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};

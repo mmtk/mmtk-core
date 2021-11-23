@@ -1,8 +1,8 @@
 use crate::plan::PlanConstraints;
+use crate::util::copy::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::util::copy::*;
 
 /// A GC worker's copy allocator for copying GCs.
 /// Each copying policy should provide their implementation of PolicyCopyContext.
@@ -27,11 +27,5 @@ pub trait PolicyCopyContext: 'static + Send {
         semantics: CopySemantics,
     ) -> Address;
     #[inline(always)]
-    fn post_copy(
-        &mut self,
-        _obj: ObjectReference,
-        _bytes: usize,
-        _semantics: CopySemantics,
-    ) {
-    }
+    fn post_copy(&mut self, _obj: ObjectReference, _bytes: usize, _semantics: CopySemantics) {}
 }

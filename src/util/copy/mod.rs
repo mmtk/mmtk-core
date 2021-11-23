@@ -1,19 +1,19 @@
 use std::mem::MaybeUninit;
 
-use crate::vm::VMBinding;
+use crate::plan::Plan;
+use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
+use crate::policy::copyspace::CopySpace;
 use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::immix::ImmixCopyContext;
-use crate::util::{Address, ObjectReference};
-use crate::plan::PlanConstraints;
-use crate::util::opaque_pointer::VMWorkerThread;
-use crate::policy::space::Space;
-use crate::plan::Plan;
-use crate::policy::copyspace::CopySpace;
 use crate::policy::immix::ImmixSpace;
-use std::sync::atomic::Ordering;
+use crate::policy::space::Space;
 use crate::util::object_forwarding;
+use crate::util::opaque_pointer::VMWorkerThread;
+use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 
 use enum_map::Enum;
 use enum_map::EnumMap;
@@ -33,11 +33,22 @@ pub struct GCWorkerCopyContext<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> GCWorkerCopyContext<VM> {
-    pub fn alloc_copy(&mut self, original: ObjectReference, bytes: usize, align: usize, offset: isize, semantics: CopySemantics) -> Address {
+    pub fn alloc_copy(
+        &mut self,
+        original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+        semantics: CopySemantics,
+    ) -> Address {
         match self.config.copy_mapping[semantics] {
-            CopySelector::CopySpace(index) => unsafe { self.copy[index as usize].assume_init_mut() }.alloc_copy(original, bytes, align, offset, semantics),
-            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }.alloc_copy(original, bytes, align, offset, semantics),
-            CopySelector::Unused => unreachable!()
+            CopySelector::CopySpace(index) => {
+                unsafe { self.copy[index as usize].assume_init_mut() }
+                    .alloc_copy(original, bytes, align, offset, semantics)
+            }
+            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }
+                .alloc_copy(original, bytes, align, offset, semantics),
+            CopySelector::Unused => unreachable!(),
         }
     }
 
@@ -45,23 +56,32 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         object_forwarding::clear_forwarding_bits::<VM>(object);
         if semantics.is_mature() {
             if self.config.constraints.needs_log_bit {
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
+                    .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
             } else {
                 unimplemented!("Mature copy is used but the plan does not use unlogged bit");
             }
         }
         match self.config.copy_mapping[semantics] {
-            CopySelector::CopySpace(index) => unsafe { self.copy[index as usize].assume_init_mut() }.post_copy(object, bytes, semantics),
-            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }.post_copy(object, bytes, semantics),
-            CopySelector::Unused => unreachable!()
+            CopySelector::CopySpace(index) => {
+                unsafe { self.copy[index as usize].assume_init_mut() }
+                    .post_copy(object, bytes, semantics)
+            }
+            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }
+                .post_copy(object, bytes, semantics),
+            CopySelector::Unused => unreachable!(),
         }
     }
 
     pub fn prepare(&mut self) {
         for (_, selector) in self.config.copy_mapping.iter() {
             match selector {
-                CopySelector::CopySpace(index) => unsafe { self.copy[*index as usize].assume_init_mut() }.prepare(),
-                CopySelector::Immix(index) => unsafe { self.immix[*index as usize].assume_init_mut() }.prepare(),
+                CopySelector::CopySpace(index) => {
+                    unsafe { self.copy[*index as usize].assume_init_mut() }.prepare()
+                }
+                CopySelector::Immix(index) => {
+                    unsafe { self.immix[*index as usize].assume_init_mut() }.prepare()
+                }
                 CopySelector::Unused => {}
             }
         }
@@ -70,27 +90,44 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
     pub fn release(&mut self) {
         for (_, selector) in self.config.copy_mapping.iter() {
             match selector {
-                CopySelector::CopySpace(index) => unsafe { self.copy[*index as usize].assume_init_mut() }.release(),
-                CopySelector::Immix(index) => unsafe { self.immix[*index as usize].assume_init_mut() }.release(),
+                CopySelector::CopySpace(index) => {
+                    unsafe { self.copy[*index as usize].assume_init_mut() }.release()
+                }
+                CopySelector::Immix(index) => {
+                    unsafe { self.immix[*index as usize].assume_init_mut() }.release()
+                }
                 CopySelector::Unused => {}
             }
         }
     }
 
-    pub fn new(worker_tls: VMWorkerThread, plan: &'static dyn Plan<VM = VM>, config: CopyConfig, space_mapping: &[(CopySelector, &'static dyn Space<VM>)]) -> Self {
+    pub fn new(
+        worker_tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        config: CopyConfig,
+        space_mapping: &[(CopySelector, &'static dyn Space<VM>)],
+    ) -> Self {
         let mut ret = GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
-            config
+            config,
         };
 
         for &(selector, space) in space_mapping.iter() {
             match selector {
                 CopySelector::CopySpace(index) => {
-                    ret.copy[index as usize].write(CopySpaceCopyContext::new(worker_tls, plan, space.downcast_ref::<CopySpace<VM>>().unwrap()));
-                },
+                    ret.copy[index as usize].write(CopySpaceCopyContext::new(
+                        worker_tls,
+                        plan,
+                        space.downcast_ref::<CopySpace<VM>>().unwrap(),
+                    ));
+                }
                 CopySelector::Immix(index) => {
-                    ret.immix[index as usize].write(ImmixCopyContext::new(worker_tls, plan, space.downcast_ref::<ImmixSpace<VM>>().unwrap()));
+                    ret.immix[index as usize].write(ImmixCopyContext::new(
+                        worker_tls,
+                        plan,
+                        space.downcast_ref::<ImmixSpace<VM>>().unwrap(),
+                    ));
                 }
                 CopySelector::Unused => unreachable!(),
             }
@@ -115,7 +152,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
                 //     CopySemantics::MatureCompact => CopySelector::Unused,
                 // },
                 constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
-            }
+            },
         }
     }
 }
@@ -133,17 +170,19 @@ pub enum CopySemantics {
 
 impl CopySemantics {
     pub fn is_mature(&self) -> bool {
-        match self {
-            CopySemantics::PromoteMature | CopySemantics::MatureCompact | CopySemantics::MatureCopy => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            CopySemantics::PromoteMature | CopySemantics::MatureCompact | CopySemantics::MatureCopy
+        )
     }
 
     pub fn is_compact(&self) -> bool {
-        match self {
-            CopySemantics::DefaultCompact | CopySemantics::NurseryCompact | CopySemantics::MatureCompact => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            CopySemantics::DefaultCompact
+                | CopySemantics::NurseryCompact
+                | CopySemantics::MatureCompact
+        )
     }
 }
 

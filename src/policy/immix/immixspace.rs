@@ -7,6 +7,7 @@ use super::{
 use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -31,7 +32,6 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
-use crate::util::copy::*;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -592,9 +592,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
 
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
-use crate::policy::copy_context::PolicyCopyContext;
 
 /// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {

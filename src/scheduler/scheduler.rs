@@ -178,9 +178,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
             self.work_buckets[WorkBucketStage::Final]
-                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(
-                    plan,
-                ));
+                .add(ScheduleSanityGC::<C::PlanType>::new(plan));
         }
 
         // Finalization

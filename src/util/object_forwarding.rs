@@ -1,12 +1,12 @@
+use crate::util::copy::*;
 use crate::util::metadata::{
     compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
 };
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
-use std::sync::atomic::Ordering;
-use crate::util::copy::*;
 use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 
 const FORWARDING_NOT_TRIGGERED_YET: usize = 0b00;
 const BEING_FORWARDED: usize = 0b10;

@@ -12,6 +12,7 @@ use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -19,7 +20,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
-use crate::util::copy::GCWorkerCopyContext;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -63,19 +63,22 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use enum_map::enum_map;
         use crate::util::copy::*;
+        use enum_map::enum_map;
 
-        GCWorkerCopyContext::new(tls, self, CopyConfig {
-            copy_mapping: enum_map! {
-                CopySemantics::PromoteMature => CopySelector::Immix(0),
-                CopySemantics::MatureCompact => CopySelector::Immix(0),
-                _ => CopySelector::Unused,
+        GCWorkerCopyContext::new(
+            tls,
+            self,
+            CopyConfig {
+                copy_mapping: enum_map! {
+                    CopySemantics::PromoteMature => CopySelector::Immix(0),
+                    CopySemantics::MatureCompact => CopySelector::Immix(0),
+                    _ => CopySelector::Unused,
+                },
+                constraints: &GENIMMIX_CONSTRAINTS,
             },
-            constraints: &GENIMMIX_CONSTRAINTS,
-        }, &[
-            (CopySelector::Immix(0), &self.immix),
-        ])
+            &[(CopySelector::Immix(0), &self.immix)],
+        )
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {

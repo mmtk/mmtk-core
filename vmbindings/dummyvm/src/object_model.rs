@@ -1,8 +1,7 @@
+use mmtk::util::copy::{CopySemantics, GCWorkerCopyContext};
 use mmtk::util::metadata::header_metadata::HeaderMetadataSpec;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::*;
-use mmtk::AllocationSemantics;
-use mmtk::CopyContext;
 use std::sync::atomic::Ordering;
 use DummyVM;
 
@@ -66,8 +65,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
 
     fn copy(
         _from: ObjectReference,
-        _semantics: AllocationSemantics,
-        _copy_context: &mut impl CopyContext,
+        _semantics: CopySemantics,
+        _copy_context: &mut GCWorkerCopyContext<DummyVM>,
     ) -> ObjectReference {
         unimplemented!()
     }

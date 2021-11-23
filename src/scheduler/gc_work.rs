@@ -50,8 +50,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket
-                .add(PrepareCollector);
+            w.local_work_bucket.add(PrepareCollector);
         }
     }
 }
@@ -119,8 +118,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket
-                .add(ReleaseCollector);
+            w.local_work_bucket.add(ReleaseCollector);
         }
         // TODO: Process weak references properly
         mmtk.reference_processors.clear();

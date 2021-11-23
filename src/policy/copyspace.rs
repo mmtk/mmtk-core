@@ -4,6 +4,7 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -17,7 +18,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::util::copy::*;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -217,7 +217,11 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            let new_object = object_forwarding::forward_object::<VM>(object, semantics, worker.get_copy_context_mut());
+            let new_object = object_forwarding::forward_object::<VM>(
+                object,
+                semantics,
+                worker.get_copy_context_mut(),
+            );
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);

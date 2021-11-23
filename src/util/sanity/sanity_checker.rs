@@ -1,12 +1,10 @@
 use crate::plan::Plan;
-use crate::policy::copy_context::CopyContext;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
 use std::collections::HashSet;
-use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
@@ -43,21 +41,17 @@ impl SanityChecker {
     }
 }
 
-pub struct ScheduleSanityGC<P: Plan, W: CopyContext + GCWorkerLocal> {
+pub struct ScheduleSanityGC<P: Plan> {
     _plan: &'static P,
-    _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> ScheduleSanityGC<P, W> {
+impl<P: Plan> ScheduleSanityGC<P> {
     pub fn new(plan: &'static P) -> Self {
-        ScheduleSanityGC {
-            _plan: plan,
-            _p: PhantomData,
-        }
+        ScheduleSanityGC { _plan: plan }
     }
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for ScheduleSanityGC<P, W> {
+impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
         let plan = &mmtk.plan;
@@ -86,31 +80,25 @@ impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for ScheduleSanityGC
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(ScanVMSpecificRoots::<SanityGCProcessEdges<P::VM>>::new());
         // Prepare global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Prepare].add(SanityPrepare::<P, W>::new(
-            plan.downcast_ref::<P>().unwrap(),
-        ));
+        worker.scheduler().work_buckets[WorkBucketStage::Prepare]
+            .add(SanityPrepare::<P>::new(plan.downcast_ref::<P>().unwrap()));
         // Release global/collectors/mutators
-        worker.scheduler().work_buckets[WorkBucketStage::Release].add(SanityRelease::<P, W>::new(
-            plan.downcast_ref::<P>().unwrap(),
-        ));
+        worker.scheduler().work_buckets[WorkBucketStage::Release]
+            .add(SanityRelease::<P>::new(plan.downcast_ref::<P>().unwrap()));
     }
 }
 
-pub struct SanityPrepare<P: Plan, W: CopyContext + GCWorkerLocal> {
+pub struct SanityPrepare<P: Plan> {
     pub plan: &'static P,
-    _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityPrepare<P, W> {
+impl<P: Plan> SanityPrepare<P> {
     pub fn new(plan: &'static P) -> Self {
-        Self {
-            plan,
-            _p: PhantomData,
-        }
+        Self { plan }
     }
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityPrepare<P, W> {
+impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.enter_sanity();
         {
@@ -122,26 +110,22 @@ impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityPrepare<P,
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(PrepareCollector::<W>::new());
+            w.local_work_bucket.add(PrepareCollector);
         }
     }
 }
 
-pub struct SanityRelease<P: Plan, W: CopyContext + GCWorkerLocal> {
+pub struct SanityRelease<P: Plan> {
     pub plan: &'static P,
-    _p: PhantomData<W>,
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> SanityRelease<P, W> {
+impl<P: Plan> SanityRelease<P> {
     pub fn new(plan: &'static P) -> Self {
-        Self {
-            plan,
-            _p: PhantomData,
-        }
+        Self { plan }
     }
 }
 
-impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityRelease<P, W> {
+impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.plan.leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
@@ -150,7 +134,7 @@ impl<P: Plan, W: CopyContext + GCWorkerLocal> GCWork<P::VM> for SanityRelease<P,
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group().workers {
-            w.local_work_bucket.add(ReleaseCollector::<W>::new());
+            w.local_work_bucket.add(ReleaseCollector);
         }
     }
 }

@@ -1,11 +1,11 @@
 use super::global::SemiSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
+use crate::util::copy::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
-use crate::util::copy::*;
 
 pub struct SSProcessEdges<VM: VMBinding> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
