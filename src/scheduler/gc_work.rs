@@ -9,7 +9,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
-use crate::util::copy::*;
 
 pub struct ScheduleCollection;
 
@@ -84,7 +83,7 @@ pub struct PrepareCollector;
 impl<VM: VMBinding> GCWork<VM> for PrepareCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         trace!("Prepare Collector");
-        unsafe { worker.local::<GCWorkerCopyContext<VM>>().prepare(); }
+        worker.get_copy_context_mut().prepare();
         mmtk.plan.prepare_worker(worker);
     }
 }
@@ -155,7 +154,7 @@ pub struct ReleaseCollector;
 impl<VM: VMBinding> GCWork<VM> for ReleaseCollector {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         trace!("Release Collector");
-        unsafe { worker.local::<GCWorkerCopyContext<VM>>().release();}
+        worker.get_copy_context_mut().release();
     }
 }
 

@@ -374,7 +374,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        let copy_context = unsafe { worker.local::<GCWorkerCopyContext<VM>>() };
+        let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {

@@ -217,23 +217,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            // let new_object = match self.copy_to {
-            //     CopyDestination::CopySpace => {
-            //         object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
-            //             worker.local::<CopySpaceCopyContext<VM>>()
-            //         })
-            //     }
-            //     CopyDestination::ImmixSpace => {
-            //         object_forwarding::forward_object::<VM, _>(object, semantics, unsafe {
-            //             worker.local::<super::immix::immixspace::ImmixCopyContext<VM>>()
-            //         })
-            //     }
-            // };
-            let new_object = {
-                object_forwarding::forward_object::<VM>(object, semantics, unsafe {
-                    worker.local::<GCWorkerCopyContext<VM>>()
-                })
-            };
+            let new_object = object_forwarding::forward_object::<VM>(object, semantics, worker.get_copy_context_mut());
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);

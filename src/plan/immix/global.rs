@@ -19,6 +19,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::util::copy::GCWorkerCopyContext;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -56,11 +57,11 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &IMMIX_CONSTRAINTS
     }
 
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
         use enum_map::enum_map;
         use crate::util::copy::*;
 
-        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+        GCWorkerCopyContext::new(tls, self, CopyConfig {
             copy_mapping: enum_map! {
                 CopySemantics::DefaultCompact => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
@@ -68,7 +69,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             constraints: &IMMIX_CONSTRAINTS,
         }, &[
             (CopySelector::Immix(0), &self.immix_space),
-        ]))
+        ])
     }
 
     fn gc_init(

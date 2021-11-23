@@ -8,7 +8,6 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
-use crate::policy::copyspace::CopySpaceCopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -21,6 +20,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::util::copy::GCWorkerCopyContext;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -41,11 +41,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &GENCOPY_CONSTRAINTS
     }
 
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerLocalPtr {
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
         use enum_map::enum_map;
         use crate::util::copy::*;
 
-        GCWorkerLocalPtr::new(GCWorkerCopyContext::new(tls, self, CopyConfig {
+        GCWorkerCopyContext::new(tls, self, CopyConfig {
             copy_mapping: enum_map! {
                 CopySemantics::MatureCopy => CopySelector::CopySpace(0),
                 CopySemantics::PromoteMature => CopySelector::CopySpace(0),
@@ -55,7 +55,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }, &[
             // The tospace argument doesn't matter, we will rebind before a GC anyway.
             (CopySelector::CopySpace(0), self.tospace()),
-        ]))
+        ])
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
@@ -114,8 +114,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
-        let copy_context = unsafe { worker.local::<CopySpaceCopyContext<VM>>() };
-        copy_context.rebind(self.tospace());
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

@@ -27,6 +27,7 @@ use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
+use crate::util::copy::GCWorkerCopyContext;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -119,8 +120,8 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// Create thread local GC worker. For copying plan, they will have to override this method,
     /// and use the correct copy context as GC workers.
-    fn create_worker_local(&'static self, _tls: VMWorkerThread) -> GCWorkerLocalPtr {
-        GCWorkerLocalPtr::new(crate::util::copy::GCWorkerCopyContext::<Self::VM>::new_non_copy())
+    fn create_worker_local(&'static self, _tls: VMWorkerThread) -> GCWorkerCopyContext<Self::VM> {
+        GCWorkerCopyContext::<Self::VM>::new_non_copy()
     }
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
