@@ -1,5 +1,4 @@
 // ANCHOR: imports_no_gc_work
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
@@ -8,13 +7,11 @@ use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::copyspace::CopySpaceCopyContext; // Add
 use crate::policy::copyspace::CopySpace; // Add
-use crate::policy::copy_context::CopyDestination; // Add
 use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
-use crate::scheduler::gc_work::*; // Add
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -29,17 +26,8 @@ use std::sync::atomic::{AtomicBool, Ordering}; // Add
 use std::sync::Arc;
 // ANCHOR_END: imports_no_gc_work
 
-// ANCHOR: imports_gc_work
-use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
-//ANCHOR_END: imports_gc_work
-
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
-
-
-pub type SelectedPlan<VM> = MyGC<VM>;
-
-pub const ALLOC_MyGC: AllocationSemantics = AllocationSemantics::Default; // Add
 
 // Modify
 // ANCHOR: plan_def
@@ -69,14 +57,25 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
 
     // ANCHOR: create_worker_local
-    fn create_worker_local(
-        &'static self,
-        tls: VMWorkerThread,
-    ) -> GCWorkerLocalPtr {
-        // The tospace argument doesn't matter, we will rebind before a GC anyway.
-        let mut c = CopySpaceCopyContext::new(tls, self, &self.copyspace0);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
+        use crate::util::copy::*;
+        use enum_map::enum_map;
+
+        GCWorkerCopyContext::new(
+            tls,
+            self,
+            CopyConfig {
+                copy_mapping: enum_map! {
+                    CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                    _ => CopySelector::Unused,
+                },
+                constraints: &MYGC_CONSTRAINTS,
+            },
+            &[
+                // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &self.copyspace0),
+            ],
+        )
     }
     // ANCHOR_END: create_worker_local
 
@@ -126,6 +125,13 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         self.copyspace1.prepare(!hi);
     }
     // ANCHOR_END: prepare
+
+    // Add
+    // ANCHOR: prepare_worker
+    fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+    }
+    // ANCHOR_END: prepare_worker
 
     // Modify
     // ANCHOR: release
@@ -183,7 +189,6 @@ impl<VM: VMBinding> MyGC<VM> {
             copyspace0: CopySpace::new(
                 "copyspace0",
                 false,
-                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),
@@ -195,7 +200,6 @@ impl<VM: VMBinding> MyGC<VM> {
             copyspace1: CopySpace::new(
                 "copyspace1",
                 true,
-                CopyDestination::CopySpace,
                 true,
                 VMRequest::discontiguous(),
                 global_metadata_specs.clone(),

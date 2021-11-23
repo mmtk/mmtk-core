@@ -1,14 +1,39 @@
 # Collection: Implement garbage collection
 
 We need to add a few more things to get garbage collection working. 
-Specifically, we need to add a `CopyContext`, which a GC worker uses for 
+Specifically, we need to config the `GCWorkerCopyContext`, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.
 
-## CopyContext
+## GCWorkerCopyContext
 
-At the moment, none of the files in the plan are suited for garbage collection 
-operations. So, we need to add a new file to hold the `CopyContext` and other 
-structures and functions that will give the collector proper functionality.
+`GCWorkerCopyContext` is a thread local struct for GC worker threads that is used to copy objects.
+Similar to the `Mutator` struct, you would need to config `GCWorkerCopyContext` for your plan.
+
+In `impl<VM: VMBinding> Plan for MyGC<VM>`, override the method `create_worker_local()`.
+The default implementation provides a stub `GCWorkerCopyContext` for non-copying plans.
+For copying plans, you would have to provide an implementation, in which you will create a proper
+`GCWorkerCopyContext`.
+
+In a semispace GC, objects will be copied between the two copy spaces. We will use one
+`CopySpaceCopyContext` for the copying, and will rebind the copy context to the proper tospace
+in the preparation step of a GC (which will be discussed later when we talk about preparing for collections).
+
+We provide a `CopyConfig` for our semispace GC. We use `CopySemantics::DefaultCopy` for our copy
+operation, and bind it with the first `CopySpaceCopyContext` (`CopySemantics::DefaultCopy => CopySelector::CopySpace(0)`).
+And for the rest copy semantics, they are unused for this plan. We also provide an initial space
+binding for `CopySpaceCopyContext`. However, we will flip tospace in every GC, and rebind the
+copy context to the new tospace in each GC, so it does not matter which space we use as the initial
+space here.
+
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:create_worker_local}}
+```
+
+## MyGCProcessEdges
+
+We will create the tracing work packet for our GC.
+At the moment, none of the files in the plan are suited for implementing this
+GC packet. So, we need to add a new file to hold the `MyGCProcessEdges`.
 
 Make a new file under `mygc`, called `gc_work.rs`. 
 In `mod.rs`, import `gc_work` as a module by adding the line `mod gc_work`.
@@ -17,75 +42,6 @@ In `gc_work.rs`, add the following import statements:
 {{#include ../../../code/mygc_semispace/gc_work.rs:imports}}
 ```
 
-Add a new structure, `MyGCCopyContext`, with the type parameter 
-`VM: VMBinding`. It should have the fields `plan: &'static MyGC<VM>`
-and `mygc: BumpAllocator`.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_copy_context}}
-```
-   
-Create an implementation block - 
-`impl<VM: VMBinding> CopyContext for MyGCCopyContext<VM>`.
-Define the associate type `VM` for `CopyContext` as the VMBinding type 
-given to the class as `VM`: `type VM = VM`. 
-
-Add the following skeleton functions (taken from `plan/global.rs`):
-
-```rust
-fn constraints(&self) -> &'static PlanConstraints {
-    unimplemented!()
-}
-fn init(&mut self, tls: OpaquePointer) {
-    unimplemented!()
-}
-fn prepare(&mut self) {
-    unimplemented!()
-}
-fn release(&mut self) {
-    unimplemented!()
-}
-fn alloc_copy(
-    &mut self,
-    original: ObjectReference,
-    bytes: usize,
-    align: usize,
-    offset: isize,
-    semantics: AllocationSemantics,
-) -> Address {
-    unimplemented!()
-}
-fn post_copy(
-    &mut self,
-    _obj: ObjectReference,
-    _tib: Address,
-    _bytes: usize,
-    _semantics: AllocationSemantics,
-) {
-    unimplemented!()
-}
-```
-
-In `init()`, set the `tls` variable in the held instance of `mygc` to the one 
-passed to the function. In `constraints()`, return a reference of 
-`MYGC_CONSTRAINTS`.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_constraints_init}}
-```
-
-We just leave the rest of the functions empty for now and will implement them 
-later.
-
-Add a constructor to `MyGCCopyContext` and implement the `WorkerLocal` trait 
-for `MyGCCopyContext`.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:constructor_and_workerlocal}}
-```
-
-## MyGCProcessEdges
-    
 Add a new public structure, `MyGCProcessEdges`, with the type parameter 
 `<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and 
 `MyGC`. This is the core part for tracing objects in the `MyGC` plan.
@@ -169,15 +125,16 @@ This function is called at the start of a collection. It prepares the two
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.
 
-### Prepare CopyContext
+### Prepare worker
 
-First, fill in some more of the skeleton functions we added to the 
-`CopyContext` (in `gc_work.rs`) earlier.
-In `prepare()`, rebind the allocator to the tospace using the function
-   `self.mygc.rebind(Some(self.plan.tospace()))`.
+As we flip tospac for the plan, we also need to rebind the copy context
+to the new tospace. We will override `prepare_worker()` in our `Plan` implementation.
+`Plan.prepare_worker()` is executed by each GC worker in the preparation phase of a GC. The code
+is straightforward -- we get the first `CopySpaceCopyContext`, and call `rebind()` on it with
+the new `tospace`.
 
 ```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_prepare}}
+{{#include ../../../code/mygc_semispace/global.rs:prepare_worker}}
 ```
 
 ### Prepare mutator

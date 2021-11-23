@@ -142,15 +142,6 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             config: CopyConfig {
                 copy_mapping: EnumMap::default(),
-                // enum_map! {
-                //     CopySemantics::DefaultCopy => CopySelector::Unused,
-                //     CopySemantics::DefaultCompact => CopySelector::Unused,
-                //     CopySemantics::PromoteMature => CopySelector::Unused,
-                //     CopySemantics::NurseryCopy => CopySelector::Unused,
-                //     CopySemantics::NurseryCompact => CopySelector::Unused,
-                //     CopySemantics::MatureCopy => CopySelector::Unused,
-                //     CopySemantics::MatureCompact => CopySelector::Unused,
-                // },
                 constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
             },
         }
