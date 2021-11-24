@@ -69,12 +69,12 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
                     CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
                     _ => CopySelector::Unused,
                 },
+                space_mapping: vec![
+                    // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                    (CopySelector::CopySpace(0), &self.copyspace0)
+                ],
                 constraints: &MYGC_CONSTRAINTS,
             },
-            &[
-                // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), &self.copyspace0),
-            ],
         )
     }
     // ANCHOR_END: create_worker_local
