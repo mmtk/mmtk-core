@@ -69,9 +69,11 @@ impl<VM: VMBinding> Plan for Immix<VM> {
                     CopySemantics::DefaultCompact => CopySelector::Immix(0),
                     _ => CopySelector::Unused,
                 },
+                space_mapping: vec![
+                    (CopySelector::Immix(0), &self.immix_space)
+                ],
                 constraints: &IMMIX_CONSTRAINTS,
             },
-            &[(CopySelector::Immix(0), &self.immix_space)],
         )
     }
 

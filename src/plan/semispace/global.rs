@@ -60,12 +60,12 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                     CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
                     _ => CopySelector::Unused,
                 },
+                space_mapping: vec![
+                    // // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                    (CopySelector::CopySpace(0), &self.copyspace0),
+                ],
                 constraints: &SS_CONSTRAINTS,
             },
-            &[
-                // // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), &self.copyspace0),
-            ],
         )
     }
 

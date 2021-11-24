@@ -1,4 +1,3 @@
-use crate::plan::PlanConstraints;
 use crate::util::copy::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
@@ -15,7 +14,6 @@ use crate::vm::VMBinding;
 /// behaviors for copying.
 pub trait PolicyCopyContext: 'static + Send {
     type VM: VMBinding;
-    fn constraints(&self) -> &'static PlanConstraints;
     fn prepare(&mut self);
     fn release(&mut self);
     fn alloc_copy(

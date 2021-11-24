@@ -21,18 +21,42 @@ use enum_map::EnumMap;
 const MAX_COPYSPACE_COPY_ALLOCATORS: usize = 1;
 const MAX_IMMIX_COPY_ALLOCATORS: usize = 2;
 
-pub struct CopyConfig {
+type CopySpaceMapping<VM> = Vec<(CopySelector, &'static dyn Space<VM>)>;
+
+/// A configuration for GCWorkerCopyContext.
+/// Similar to [MutatorConfig](plan/mutator_context/struct.MutatorConfig.html),
+/// We expect each copying plan to provide a CopyConfig.
+pub struct CopyConfig<VM: VMBinding> {
+    /// Mapping CopySemantics to the actual copying allocators (CopySelector)
     pub copy_mapping: EnumMap<CopySemantics, CopySelector>,
+    /// Mapping copying allocators with space
+    pub space_mapping: CopySpaceMapping<VM>,
+    /// A reference to the plan constraints.
+    /// GCWorkerCopyContext may have plan-specific behaviors dependson the plan constraints.
     pub constraints: &'static PlanConstraints,
 }
 
+/// The thread local struct for each GC worker for copying. Each GC worker should include
+/// one instance of this struct for copying operations.
 pub struct GCWorkerCopyContext<VM: VMBinding> {
+    /// Copy allocators for CopySpace
     pub copy: [MaybeUninit<CopySpaceCopyContext<VM>>; MAX_COPYSPACE_COPY_ALLOCATORS],
+    /// Copy allocators for ImmixSpace
     pub immix: [MaybeUninit<ImmixCopyContext<VM>>; MAX_IMMIX_COPY_ALLOCATORS],
-    config: CopyConfig,
+    /// The config for the plan
+    config: CopyConfig<VM>,
 }
 
 impl<VM: VMBinding> GCWorkerCopyContext<VM> {
+    /// Allocate for the object for GC copying.
+    ///
+    /// Arguments:
+    /// * `original`: The original object that will be copied.
+    /// * `bytes`: The size in bytes for the allocation.
+    /// * `align`: The alignment in bytes for the allocation.
+    /// * `offset`: The offset in bytes for the allocation.
+    /// * `semantics`: The copy semantic for this coying allocation.
+    ///   It determins which copy allocator will be used for the copying.
     pub fn alloc_copy(
         &mut self,
         original: ObjectReference,
@@ -41,6 +65,11 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         offset: isize,
         semantics: CopySemantics,
     ) -> Address {
+        debug_assert!(
+            bytes <= self.config.constraints.max_non_los_default_alloc_bytes,
+            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+            bytes, self.config.constraints.max_non_los_default_alloc_bytes
+        );
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
                 unsafe { self.copy[index as usize].assume_init_mut() }
@@ -52,16 +81,26 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         }
     }
 
+    /// Post allocation after allocating an object.
+    ///
+    /// Arguments:
+    /// * `object`: The newly allocated object (the new object after copying).
+    /// * `bytes`: The size of the object in bytes.
+    /// * `semantics`: The copy semantic used for the copying.
     pub fn post_copy(&mut self, object: ObjectReference, bytes: usize, semantics: CopySemantics) {
+        // Clear forwarding bits.
         object_forwarding::clear_forwarding_bits::<VM>(object);
+        // If we are copying objects in mature space, we would need to mark the object as mature.
         if semantics.is_mature() {
             if self.config.constraints.needs_log_bit {
+                // If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
                 VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                     .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
             } else {
                 unimplemented!("Mature copy is used but the plan does not use unlogged bit");
             }
         }
+        // Policy specific post copy.
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
                 unsafe { self.copy[index as usize].assume_init_mut() }
@@ -73,7 +112,9 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         }
     }
 
+    /// Prepare the copying allocators.
     pub fn prepare(&mut self) {
+        // Delegate to prepare() for each policy copy context
         for (_, selector) in self.config.copy_mapping.iter() {
             match selector {
                 CopySelector::CopySpace(index) => {
@@ -87,7 +128,9 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         }
     }
 
+    /// Release the copying allocators.
     pub fn release(&mut self) {
+        // Delegate to release() for each policy copy context
         for (_, selector) in self.config.copy_mapping.iter() {
             match selector {
                 CopySelector::CopySpace(index) => {
@@ -101,11 +144,16 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         }
     }
 
+    /// Create a GCWorkerCopyContext based on the configuration for a copying plan.
+    ///
+    /// Arguments:
+    /// * `worker_tls`: The worker thread for this copy context.
+    /// * `plan`: A reference to the current plan.
+    /// * `config`: The configuration for the copy context.
     pub fn new(
         worker_tls: VMWorkerThread,
         plan: &'static dyn Plan<VM = VM>,
-        config: CopyConfig,
-        space_mapping: &[(CopySelector, &'static dyn Space<VM>)],
+        config: CopyConfig<VM>,
     ) -> Self {
         let mut ret = GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
@@ -113,7 +161,8 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
             config,
         };
 
-        for &(selector, space) in space_mapping.iter() {
+        // Initiate the copy context for each policy based on the space mapping.
+        for &(selector, space) in ret.config.space_mapping.iter() {
             match selector {
                 CopySelector::CopySpace(index) => {
                     ret.copy[index as usize].write(CopySpaceCopyContext::new(
@@ -136,26 +185,40 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         ret
     }
 
+    /// Create a stub GCWorkerCopyContext for non copying plans.
     pub fn new_non_copy() -> Self {
         GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             config: CopyConfig {
                 copy_mapping: EnumMap::default(),
+                space_mapping: vec![],
                 constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
             },
         }
     }
 }
 
+/// CopySemantics describes the copying operation. It depends on
+/// the kinds of GC, and the space. For example, in a mature/major GC in
+/// a generational plan, the nursery should have `PromoteMature` while
+/// the mature space should have `MatureCopy/Compact`.
+/// This enum may be expanded in the future to describe more semantics.
 #[derive(Clone, Copy, Enum, Debug)]
 pub enum CopySemantics {
+    /// Copy an object across spaces for non generational plans.
     DefaultCopy,
+    /// Compact/defragment (copy an object to the same space) for non generational plans.
     DefaultCompact,
+    /// Copy in nursery generation.
     NurseryCopy,
+    /// Compact semantic for nursery generation.
     NurseryCompact,
+    /// Promote an object from nursery to mature spaces.
     PromoteMature,
+    /// Copy in mature generation.
     MatureCopy,
+    /// Compact in mature generation.
     MatureCompact,
 }
 

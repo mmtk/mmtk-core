@@ -54,12 +54,12 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
                     CopySemantics::PromoteMature => CopySelector::CopySpace(0),
                     _ => CopySelector::Unused,
                 },
+                space_mapping: vec![
+                    // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                    (CopySelector::CopySpace(0), self.tospace()),
+                ],
                 constraints: &GENCOPY_CONSTRAINTS,
             },
-            &[
-                // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                (CopySelector::CopySpace(0), self.tospace()),
-            ],
         )
     }
 

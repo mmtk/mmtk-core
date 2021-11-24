@@ -591,14 +591,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
 }
 
 use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
 
 /// Immix copy allocator
 pub struct ImmixCopyContext<VM: VMBinding> {
-    plan_constraints: &'static PlanConstraints,
     copy_allocator: ImmixAllocator<VM>,
     defrag_allocator: ImmixAllocator<VM>,
 }
@@ -606,9 +604,6 @@ pub struct ImmixCopyContext<VM: VMBinding> {
 impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     type VM = VM;
 
-    fn constraints(&self) -> &'static PlanConstraints {
-        self.plan_constraints
-    }
     fn prepare(&mut self) {
         self.copy_allocator.reset();
         self.defrag_allocator.reset();
@@ -626,11 +621,6 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         offset: isize,
         semantics: CopySemantics,
     ) -> Address {
-        debug_assert!(
-            bytes <= self.plan_constraints.max_non_los_default_alloc_bytes,
-            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
-            bytes, self.plan_constraints.max_non_los_default_alloc_bytes
-        );
         if semantics.is_compact() {
             debug_assert!(self.defrag_allocator.immix_space().in_defrag());
             self.defrag_allocator.alloc(bytes, align, offset)
@@ -647,7 +637,6 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
         space: &'static ImmixSpace<VM>,
     ) -> Self {
         ImmixCopyContext {
-            plan_constraints: plan.constraints(),
             copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
             defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
         }

@@ -75,9 +75,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                     CopySemantics::MatureCompact => CopySelector::Immix(0),
                     _ => CopySelector::Unused,
                 },
+                space_mapping: vec![
+                    (CopySelector::Immix(0), &self.immix)
+                ],
                 constraints: &GENIMMIX_CONSTRAINTS,
             },
-            &[(CopySelector::Immix(0), &self.immix)],
         )
     }
 
@@ -121,7 +123,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         let defrag = if is_full_heap {
-            info!("full heap GC");
             self.immix.decide_whether_to_defrag(
                 self.is_emergency_collection(),
                 true,
