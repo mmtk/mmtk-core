@@ -75,9 +75,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                     CopySemantics::MatureCompact => CopySelector::Immix(0),
                     _ => CopySelector::Unused,
                 },
-                space_mapping: vec![
-                    (CopySelector::Immix(0), &self.immix)
-                ],
+                space_mapping: vec![(CopySelector::Immix(0), &self.immix)],
                 constraints: &GENIMMIX_CONSTRAINTS,
             },
         )
