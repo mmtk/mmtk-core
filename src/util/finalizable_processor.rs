@@ -84,13 +84,6 @@ impl FinalizableProcessor {
         <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
     }
 
-    // pub fn forward<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
-    //     self.candidates
-    //         .iter_mut()
-    //         .for_each(|reff| *reff = FinalizableProcessor::get_forwarded_finalizable(e, *reff));
-    //     e.flush();
-    // }
-
     pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
