@@ -4,6 +4,7 @@ use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -96,13 +97,7 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MyGCProcessEdges<VM>>::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
 

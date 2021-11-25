@@ -139,3 +139,11 @@ impl<VM: VMBinding> DerefMut for SSProcessEdges<VM> {
         &mut self.base
     }
 }
+
+pub struct SSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for SSGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = SemiSpace<VM>;
+    type CopyContextType = SSCopyContext<VM>;
+    type ProcessEdgesWorkType = SSProcessEdges<VM>;
+}

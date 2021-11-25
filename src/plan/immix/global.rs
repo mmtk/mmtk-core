@@ -1,4 +1,4 @@
-use super::gc_work::{ImmixCopyContext, ImmixProcessEdges, TraceKind};
+use super::gc_work::{ImmixCopyContext, ImmixGCWorkContext, TraceKind};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -50,7 +50,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
-        self.last_gc_was_defrag.load(Ordering::Relaxed)
+        ImmixSpace::<VM>::is_last_gc_exhaustive(self.last_gc_was_defrag.load(Ordering::Relaxed))
     }
 
     fn constraints(&self) -> &'static PlanConstraints {
@@ -91,11 +91,9 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
         #[allow(clippy::if_same_then_else)]
         if in_defrag {
-            self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Defrag }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
+            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Defrag }>>(self);
         } else {
-            self.common()
-                .schedule_common::<Self, ImmixProcessEdges<VM, { TraceKind::Fast }>, ImmixCopyContext<VM>>(self, &IMMIX_CONSTRAINTS, scheduler);
+            scheduler.schedule_common_work::<ImmixGCWorkContext<VM, { TraceKind::Fast }>>(self);
         }
     }
 

@@ -1,4 +1,5 @@
 use super::global::GenCopy;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
@@ -85,6 +86,7 @@ impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
     type VM = VM;
+
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<GenCopy<VM>>().unwrap();
@@ -129,4 +131,20 @@ impl<VM: VMBinding> DerefMut for GenCopyMatureProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct GenCopyNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = GenCopy<VM>;
+    type CopyContextType = GenCopyCopyContext<VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+}
+
+pub(super) struct GenCopyMatureGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyMatureGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = GenCopy<VM>;
+    type CopyContextType = GenCopyCopyContext<VM>;
+    type ProcessEdgesWorkType = GenCopyMatureProcessEdges<VM>;
 }

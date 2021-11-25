@@ -23,6 +23,7 @@ pub struct MSProcessEdges<VM: VMBinding> {
 
 impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     type VM = VM;
+
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
@@ -117,4 +118,12 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
 
         mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
+}
+
+pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MarkSweep<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = MSProcessEdges<VM>;
 }

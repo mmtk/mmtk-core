@@ -58,7 +58,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        if !super::DEFRAG {
+            // If defrag is disabled, we won't forward objects.
+            self.is_marked(object, self.mark_state)
+        } else {
+            self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        }
     }
     fn is_movable(&self) -> bool {
         super::DEFRAG
@@ -493,6 +498,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!((start..end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some(start..end)
+    }
+
+    pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
+        if super::DEFRAG {
+            did_defrag_for_last_gc
+        } else {
+            // If defrag is disabled, every GC is exhaustive.
+            true
+        }
     }
 }
 

@@ -3,7 +3,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::gc_work::{MSProcessEdges, MSSweepChunks};
+use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -56,12 +56,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        self.common()
-            .schedule_common::<Self, MSProcessEdges<VM>, NoCopy<VM>>(
-                self,
-                &MS_CONSTRAINTS,
-                scheduler,
-            );
+        scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 

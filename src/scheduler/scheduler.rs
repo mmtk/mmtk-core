@@ -149,6 +149,61 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
     }
 
+    /// Schedule all the common work packets
+    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static>(
+        &self,
+        plan: &'static C::PlanType,
+    ) {
+        use crate::plan::Plan;
+        use crate::scheduler::gc_work::*;
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        self.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<C::ProcessEdgesWorkType>::new());
+
+        // Prepare global/collectors/mutators
+        self.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
+
+        // VM-specific weak ref processing
+        self.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
+
+        // Release global/collectors/mutators
+        self.work_buckets[WorkBucketStage::Release].add(Release::<C>::new(plan));
+
+        // Analysis GC work
+        #[cfg(feature = "analysis")]
+        {
+            use crate::util::analysis::GcHookWork;
+            self.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        }
+
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            self.work_buckets[WorkBucketStage::Final]
+                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(
+                    plan,
+                ));
+        }
+
+        // Finalization
+        if !plan.base().options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            self.work_buckets[WorkBucketStage::RefClosure]
+                .add(Finalization::<C::ProcessEdgesWorkType>::new());
+            // forward refs
+            if plan.constraints().needs_forward_after_liveness {
+                self.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
+            }
+        }
+
+        // Set EndOfGC to run at the end
+        self.set_finalizer(Some(EndOfGC));
+    }
+
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
