@@ -4,7 +4,7 @@ use crate::plan::barriers::{Barrier, WriteTarget};
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
-use crate::util::alloc::allocators::{AllocatorSelector, Allocators, *};
+use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
