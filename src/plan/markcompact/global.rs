@@ -40,7 +40,7 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 1,
     num_specialized_scans: 2,
-    // needs_forward_after_liveness: true, // enable this once finalizable_processor can work with markcompact
+    needs_forward_after_liveness: true,
     ..PlanConstraints::default()
 };
 
