@@ -10,7 +10,7 @@ use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
-pub(crate) const MAX_BUMP_ALLOCATORS: usize = 5;
+pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
 pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 1;
