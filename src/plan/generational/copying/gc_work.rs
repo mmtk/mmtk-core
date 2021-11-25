@@ -39,7 +39,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
             return self.gencopy().fromspace().trace_object::<Self>(
                 self,
                 object,
-                CopySemantics::DefaultCopy,
+                CopySemantics::MatureCopy,
                 self.worker(),
             );
         }
