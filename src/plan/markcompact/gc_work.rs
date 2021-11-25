@@ -187,3 +187,11 @@ impl<VM: VMBinding> DerefMut for ForwardingProcessEdges<VM> {
         &mut self.base
     }
 }
+
+pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MarkCompact<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
+}

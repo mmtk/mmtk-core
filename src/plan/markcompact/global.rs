@@ -1,3 +1,4 @@
+use super::gc_work::MarkCompactGCWorkContext;
 use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
@@ -106,10 +107,16 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         //         &MARKCOMPACT_CONSTRAINTS,
         //         scheduler,
         //     );
+
+        // Stop & scan mutators (mutator scanning can happen before STW)
         scheduler.work_buckets[WorkBucketStage::Unconstrained]
             .add(StopMutators::<MarkingProcessEdges<VM>>::new());
+
+        // Prepare global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, NoCopy<VM>>::new(self));
+            .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
+
+        // VM-specific weak ref processing
         scheduler.work_buckets[WorkBucketStage::RefClosure]
             .add(ProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
 
@@ -118,8 +125,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         // do another trace to update references
         scheduler.work_buckets[WorkBucketStage::RefForwarding].add(UpdateReferences::<VM>::new());
         scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
+
+        // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, NoCopy<VM>>::new(self));
+            .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
 
         // Finalization
         if !self.base().options.no_finalizer {
