@@ -73,10 +73,10 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
                 unsafe { self.copy[index as usize].assume_init_mut() }
-                    .alloc_copy(original, bytes, align, offset, semantics)
+                    .alloc_copy(original, bytes, align, offset)
             }
             CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }
-                .alloc_copy(original, bytes, align, offset, semantics),
+                .alloc_copy(original, bytes, align, offset),
             CopySelector::Unused => unreachable!(),
         }
     }
@@ -103,11 +103,11 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         // Policy specific post copy.
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
-                unsafe { self.copy[index as usize].assume_init_mut() }
-                    .post_copy(object, bytes, semantics)
+                unsafe { self.copy[index as usize].assume_init_mut() }.post_copy(object, bytes)
             }
-            CopySelector::Immix(index) => unsafe { self.immix[index as usize].assume_init_mut() }
-                .post_copy(object, bytes, semantics),
+            CopySelector::Immix(index) => {
+                unsafe { self.immix[index as usize].assume_init_mut() }.post_copy(object, bytes)
+            }
             CopySelector::Unused => unreachable!(),
         }
     }
@@ -202,41 +202,23 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
 /// CopySemantics describes the copying operation. It depends on
 /// the kinds of GC, and the space. For example, in a mature/major GC in
 /// a generational plan, the nursery should have `PromoteMature` while
-/// the mature space should have `MatureCopy/Compact`.
+/// the mature space should have `Mature`.
 /// This enum may be expanded in the future to describe more semantics.
 #[derive(Clone, Copy, Enum, Debug)]
 pub enum CopySemantics {
-    /// Copy an object across spaces for non generational plans.
+    /// Copy for non generational plans.
     DefaultCopy,
-    /// Compact/defragment (copy an object to the same space) for non generational plans.
-    DefaultCompact,
     /// Copy in nursery generation.
-    NurseryCopy,
-    /// Compact semantic for nursery generation.
-    NurseryCompact,
+    Nursery,
     /// Promote an object from nursery to mature spaces.
     PromoteMature,
     /// Copy in mature generation.
-    MatureCopy,
-    /// Compact in mature generation.
-    MatureCompact,
+    Mature,
 }
 
 impl CopySemantics {
     pub fn is_mature(&self) -> bool {
-        matches!(
-            self,
-            CopySemantics::PromoteMature | CopySemantics::MatureCompact | CopySemantics::MatureCopy
-        )
-    }
-
-    pub fn is_compact(&self) -> bool {
-        matches!(
-            self,
-            CopySemantics::DefaultCompact
-                | CopySemantics::NurseryCompact
-                | CopySemantics::MatureCompact
-        )
+        matches!(self, CopySemantics::PromoteMature | CopySemantics::Mature)
     }
 }
 

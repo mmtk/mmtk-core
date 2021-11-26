@@ -619,10 +619,8 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         bytes: usize,
         align: usize,
         offset: isize,
-        semantics: CopySemantics,
     ) -> Address {
-        if semantics.is_compact() {
-            debug_assert!(self.defrag_allocator.immix_space().in_defrag());
+        if self.defrag_allocator.immix_space().in_defrag() {
             self.defrag_allocator.alloc(bytes, align, offset)
         } else {
             self.copy_allocator.alloc(bytes, align, offset)

@@ -66,7 +66,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             self,
             CopyConfig {
                 copy_mapping: enum_map! {
-                    CopySemantics::DefaultCompact => CopySelector::Immix(0),
+                    CopySemantics::DefaultCopy => CopySelector::Immix(0),
                     _ => CopySelector::Unused,
                 },
                 space_mapping: vec![(CopySelector::Immix(0), &self.immix_space)],
