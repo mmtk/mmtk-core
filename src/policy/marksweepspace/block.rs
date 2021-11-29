@@ -113,20 +113,25 @@ impl Block {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
+                // eprintln!("block {} is unmarked", self.0);
                 let prev = FreeListAllocator::<VM>::load_prev_block(self.0);
                 let next = FreeListAllocator::<VM>::load_next_block(self.0);
-                if next.is_zero() {
-                    let mut block_list = FreeListAllocator::<VM>::load_block_list(self.0);
-                    block_list.last = prev;
+                if next.is_zero() || prev.is_zero() {
+                    unsafe { 
+                        let mut block_list = FreeListAllocator::<VM>::load_block_list(self.0);
+                        // eprintln!("delete {} from list {:?}", self.0, block_list);
+                        // // eprintln!("delete {} from list {} -> .. -> {}", self.0, (*block_list).first, (*block_list).last);
+                        (*block_list).remove::<VM>(self.0);
+                        // // eprintln!("done deletion, list is {} -> .. -> {}", (*block_list).first, (*block_list).last);
+                        let mut block_list2 = FreeListAllocator::<VM>::load_block_list(self.0);
+                    }
                 } else {
+                    // eprintln!("block: store {} -> {}", prev, next); 
                     FreeListAllocator::<VM>::store_prev_block(next, prev);
-                }
-                if prev.is_zero() {
-                    let mut block_list = FreeListAllocator::<VM>::load_block_list(self.0);
-                    block_list.first = next;
-                } else {
                     FreeListAllocator::<VM>::store_next_block(prev, next);
                 }
+                // check what list
+                // try to remove copy
                 space.release_block(self.0);
                 true
             }
