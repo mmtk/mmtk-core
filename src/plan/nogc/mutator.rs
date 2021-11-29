@@ -10,7 +10,7 @@ use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
-use enum_map::EnumMap;
+use enum_map::{EnumMap, enum_map};
 
 const NOGC_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 3,
@@ -19,12 +19,20 @@ const NOGC_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
 };
 
 lazy_static! {
+    static ref ALLOCATOR_MAPPING_SINGLE_SPACE: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default | AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly | AllocationType::Los => AllocatorSelector::BumpPointer(0),
+    };
+
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = create_allocator_mapping(NOGC_RESERVED_ALLOCATOR, false);
-        map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
-        map[AllocationType::Immortal] = AllocatorSelector::BumpPointer(1);
-        map[AllocationType::Los] = AllocatorSelector::BumpPointer(2);
-        map
+        if cfg!(feature = "nogc_multi_space") {
+            let mut map = create_allocator_mapping(NOGC_RESERVED_ALLOCATOR, false);
+            map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
+            map[AllocationType::Immortal] = AllocatorSelector::BumpPointer(1);
+            map[AllocationType::Los] = AllocatorSelector::BumpPointer(2);
+            map
+        } else {
+            ALLOCATOR_MAPPING_SINGLE_SPACE.clone()
+        }
     };
 }
 
