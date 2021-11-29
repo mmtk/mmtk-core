@@ -476,6 +476,42 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
+pub struct MMTkProcessEdges<VM: VMBinding> {
+    base: ProcessEdgesBase<MMTkProcessEdges<VM>>,
+}
+
+impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
+    type VM = VM;
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+        Self { base }
+    }
+
+    #[inline]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+
+        unimplemented!()
+    }
+}
+
+impl<VM: VMBinding> Deref for MMTkProcessEdges<VM> {
+    type Target = ProcessEdgesBase<Self>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<VM: VMBinding> DerefMut for MMTkProcessEdges<VM> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
 /// Scan & update a list of object slots
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
