@@ -29,6 +29,7 @@ use std::sync::Mutex;
 use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::util::copy::CopySemantics;
 use crate::scheduler::GCWorker;
+use crate::policy::space::*;
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
@@ -84,6 +85,12 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         let page_addr = conversions::page_align_down(object.to_address());
         set_page_mark(page_addr);
         set_alloc_bit(object);
+    }
+
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+        let trace = trace.as_mut::<VM>();
+        let worker = worker.as_mut::<VM>();
+        self.general_trace_object(trace, object, semantics, worker)
     }
 }
 

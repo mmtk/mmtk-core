@@ -82,6 +82,28 @@ pub trait SFT {
     }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
+
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference;
+}
+
+pub struct MMTkProcessEdgesMutRef(usize);
+impl MMTkProcessEdgesMutRef {
+    pub fn new<VM: VMBinding>(r: &mut MMTkProcessEdges<VM>) -> Self {
+        Self ( unsafe { std::mem::transmute(r) })
+    }
+    pub fn as_mut<'a, VM: VMBinding>(self) -> &'a mut MMTkProcessEdges<VM> {
+        unsafe { std::mem::transmute(self.0) }
+    }
+}
+
+pub struct GCWorkerMutRef(usize);
+impl GCWorkerMutRef {
+    pub fn new<VM: VMBinding>(r: &mut GCWorker<VM>) -> Self {
+        Self ( unsafe { std::mem::transmute(r) })
+    }
+    pub fn as_mut<'a, VM: VMBinding>(self) -> &'a mut GCWorker<VM> {
+        unsafe { std::mem::transmute(self.0) }
+    }
 }
 
 /// Print debug info for SFT. Should be false when committed.
@@ -126,6 +148,13 @@ impl SFT for EmptySpaceSFT {
         panic!(
             "Called initialize_object_metadata() on {:x}, which maps to an empty space",
             object
+        )
+    }
+
+    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _semantics: CopySemantics, _worker: GCWorkerMutRef) -> ObjectReference {
+        panic!(
+            "Call sft_trace_object() on {:x}, which maps to an empty space",
+            _object
         )
     }
 }

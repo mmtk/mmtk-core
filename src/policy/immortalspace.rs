@@ -19,6 +19,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
+use crate::policy::space::*;
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the
@@ -78,6 +79,11 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         }
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(object);
+    }
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+        let trace = trace.as_mut::<VM>();
+        let worker = worker.as_mut::<VM>();
+        self.general_trace_object(trace, object, semantics, worker)
     }
 }
 

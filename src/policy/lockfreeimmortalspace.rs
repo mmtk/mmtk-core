@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::util::copy::CopySemantics;
 use crate::scheduler::GCWorker;
+use crate::policy::space::*;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -60,6 +61,9 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
+    }
+    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _semantics: CopySemantics, _worker: GCWorkerMutRef) -> ObjectReference {
+        unreachable!()
     }
 }
 

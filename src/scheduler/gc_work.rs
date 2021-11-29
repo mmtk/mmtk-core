@@ -489,11 +489,17 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        use crate::policy::space::*;
+        use crate::util::copy::*;
         if object.is_null() {
             return object;
         }
 
-        unimplemented!()
+        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+
+        let trace = MMTkProcessEdgesMutRef::new(self);
+        let worker = GCWorkerMutRef::new(self.worker());
+        sft.sft_trace_object(trace, object, CopySemantics::DefaultCopy, worker)
     }
 }
 

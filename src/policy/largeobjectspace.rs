@@ -22,6 +22,7 @@ use crate::vm::VMBinding;
 use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::util::copy::CopySemantics;
 use crate::scheduler::GCWorker;
+use crate::policy::space::*;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -81,6 +82,11 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
+    }
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+        let trace = trace.as_mut::<VM>();
+        let worker = worker.as_mut::<VM>();
+        self.general_trace_object(trace, object, semantics, worker)
     }
 }
 
