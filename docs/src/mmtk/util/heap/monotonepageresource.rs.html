@@ -321,6 +321,25 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::required_chunks</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
@@ -597,6 +616,25 @@
      }
      }
      }*/</span>
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset_cursor</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">contiguous</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">let</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">_start</span>.<span class="ident">align_up</span>(<span class="ident"><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE</span>);
+            <span class="kw">let</span> <span class="ident">chunk</span> <span class="op">=</span> <span class="ident">chunk_align_down</span>(<span class="ident">_start</span>);
+            <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">guard</span>.<span class="ident">conditional</span> {
+                <span class="ident">MonotonePageResourceConditional::Contiguous</span> { <span class="ident">start</span>: <span class="ident">_start</span>, .. } =&gt; <span class="ident">_start</span>,
+                <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+            };
+            <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">bytes_to_pages</span>(<span class="ident">_start</span> <span class="op">-</span> <span class="ident">start</span>);
+            <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">reset</span>();
+            <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">reserve_and_commit</span>(<span class="ident">pages</span>);
+            <span class="ident">guard</span>.<span class="ident">current_chunk</span> <span class="op">=</span> <span class="ident">chunk</span>;
+            <span class="ident">guard</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cursor</span>;
+        } <span class="kw">else</span> {
+            <span class="macro">unimplemented!</span>();
+        }
+    }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">release_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">guard</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">MonotonePageResourceSync</span><span class="op">&gt;</span>) {

@@ -56,6 +56,8 @@
 <span id="56">56</span>
 <span id="57">57</span>
 <span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
 </pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides various GC plans, each of which implements a GC algorithm.</span>
@@ -100,6 +102,7 @@
 
 <span class="kw">mod</span> <span class="ident">generational</span>;
 <span class="kw">mod</span> <span class="ident">immix</span>;
+<span class="kw">mod</span> <span class="ident">markcompact</span>;
 <span class="kw">mod</span> <span class="ident">marksweep</span>;
 <span class="kw">mod</span> <span class="ident">nogc</span>;
 <span class="kw">mod</span> <span class="ident">pageprotect</span>;
@@ -110,6 +113,7 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">generational::copying::GENCOPY_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">immix::IMMIX_CONSTRAINTS</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">markcompact::MARKCOMPACT_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">marksweep::MS_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">nogc::NOGC_CONSTRAINTS</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">pageprotect::PP_CONSTRAINTS</span>;

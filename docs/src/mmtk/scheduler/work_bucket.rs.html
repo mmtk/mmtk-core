@@ -158,6 +158,8 @@
 <span id="158">158</span>
 <span id="159">159</span>
 <span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">enum_map::Enum</span>;
@@ -314,7 +316,9 @@
     <span class="comment">// TODO: We only support final reference at the moment. If we have references of multiple strengths,</span>
     <span class="comment">// we may need more than one buckets for each reference strength.</span>
     <span class="ident">RefClosure</span>,
+    <span class="ident">CalculateForwarding</span>,
     <span class="ident">RefForwarding</span>,
+    <span class="ident">Compact</span>,
     <span class="ident">Release</span>,
     <span class="ident">Final</span>,
 }

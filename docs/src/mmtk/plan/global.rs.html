@@ -989,6 +989,12 @@
 <span id="989">989</span>
 <span id="990">990</span>
 <span id="991">991</span>
+<span id="992">992</span>
+<span id="993">993</span>
+<span id="994">994</span>
+<span id="995">995</span>
+<span id="996">996</span>
+<span id="997">997</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1126,6 +1132,9 @@
         <span class="ident">PlanSelector::PageProtect</span> =&gt; {
             <span class="ident"><span class="kw">crate</span>::plan::pageprotect::mutator::create_pp_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
         }
+        <span class="ident">PlanSelector::MarkCompact</span> =&gt; {
+            <span class="ident"><span class="kw">crate</span>::plan::markcompact::mutator::create_markcompact_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
+        }
     })
 }
 
@@ -1154,6 +1163,9 @@
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )),
         <span class="ident">PlanSelector::PageProtect</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::pageprotect::PageProtect::new</span>(
+            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
+        )),
+        <span class="ident">PlanSelector::MarkCompact</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::markcompact::MarkCompact::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
         )),
     }

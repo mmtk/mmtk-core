@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["MarkCompactAllocator","A thin wrapper(specific implementation) of bump allocator reserve extra bytes when allocating"]]});
