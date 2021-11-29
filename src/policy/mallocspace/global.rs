@@ -26,6 +26,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
@@ -164,6 +167,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: CopySemantics, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object)
     }
 }
 

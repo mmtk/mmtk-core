@@ -9,6 +9,9 @@ use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_meta
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::TransitiveClosure;
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
@@ -97,6 +100,10 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immortalspace only releases pages enmasse")
+    }
+
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: CopySemantics, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object)
     }
 }
 

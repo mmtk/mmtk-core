@@ -17,6 +17,9 @@ use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -138,6 +141,10 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+
+    fn general_trace_object(&self, _trace: &mut MMTkProcessEdges<VM>, _object: ObjectReference, _semantics: CopySemantics, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        unreachable!()
     }
 }
 

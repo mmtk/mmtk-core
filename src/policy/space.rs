@@ -13,6 +13,9 @@ use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::scheduler::GCWorker;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -420,6 +423,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn common(&self) -> &CommonSpace<VM>;
 
     fn release_multiple_pages(&mut self, start: Address);
+
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference;
 
     fn print_vm_map(&self) {
         let common = self.common();

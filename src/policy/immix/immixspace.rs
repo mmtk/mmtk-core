@@ -32,6 +32,7 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
+use crate::scheduler::gc_work::MMTkProcessEdges;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -98,6 +99,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
+    }
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object, semantics, worker)
     }
 }
 

@@ -19,6 +19,9 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -101,6 +104,10 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
+    }
+
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: CopySemantics, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object)
     }
 }
 
