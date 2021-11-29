@@ -172,8 +172,8 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             }
 
             // eprintln!("check sanity {}", object.to_address());
-            if !( crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
-            
+            // if !( crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
+            if object.to_address().as_usize() > 0x400000000000 {
                 eprintln!("sanity {}", object.to_address());
             }
 
