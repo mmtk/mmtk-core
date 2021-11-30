@@ -83,6 +83,10 @@ pub trait SFT {
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 
+    fn copy_semantics(&self) -> Option<CopySemantics> {
+        None
+    }
+
     fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference;
 }
 
@@ -455,6 +459,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference;
 
+    fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
+        panic!("A copying space should override this method")
+    }
+
     fn print_vm_map(&self) {
         let common = self.common();
         print!("{} ", common.name);
@@ -522,6 +530,9 @@ pub struct CommonSpace<VM: VMBinding> {
     pub descriptor: SpaceDescriptor,
     pub vmrequest: VMRequest,
 
+    /// For a copying space, this should be set before each GC, and it is only used in GC.
+    pub copy: Option<CopySemantics>,
+
     immortal: bool,
     movable: bool,
     pub contiguous: bool,
@@ -567,6 +578,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             name: opt.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
             vmrequest: opt.vmrequest,
+            copy: None,
             immortal: opt.immortal,
             movable: opt.movable,
             contiguous: true,

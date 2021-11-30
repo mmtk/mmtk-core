@@ -31,23 +31,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-
-        // We don't need to trace the object if it is already in the to-space
-        if self.ss().tospace().in_space(object) {
-            object
-        } else if self.ss().fromspace().in_space(object) {
-            self.ss().fromspace().trace_object::<Self>(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                self.worker(),
-            )
-        } else {
-            self.ss().common.trace_object::<Self>(self, object)
-        }
+        unreachable!();
     }
 }
 
@@ -66,9 +50,10 @@ impl<VM: VMBinding> DerefMut for SSProcessEdges<VM> {
     }
 }
 
+use crate::scheduler::gc_work::MMTkProcessEdges;
 pub struct SSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for SSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = SemiSpace<VM>;
-    type ProcessEdgesWorkType = SSProcessEdges<VM>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }

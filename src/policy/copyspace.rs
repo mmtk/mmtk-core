@@ -71,6 +71,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         let worker = worker.as_mut::<VM>();
         self.general_trace_object(trace, object, semantics, worker)
     }
+
+    fn copy_semantics(&self) -> Option<CopySemantics> {
+        self.common.copy
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
@@ -100,6 +104,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference {
         self.trace_object(trace, object, semantics, worker)
+    }
+
+    fn set_copy_semantics(&mut self, semantics: Option<CopySemantics>) {
+        self.common.copy = semantics;
     }
 }
 

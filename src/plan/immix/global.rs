@@ -22,6 +22,7 @@ use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use crate::util::copy::*;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -58,7 +59,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use crate::util::copy::*;
         use enum_map::enum_map;
 
         GCWorkerCopyContext::new(
@@ -112,6 +112,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.immix_space.prepare(true);
+        self.immix_space.set_copy_semantics(Some(CopySemantics::DefaultCopy));
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

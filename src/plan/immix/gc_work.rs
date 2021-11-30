@@ -53,23 +53,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     /// Trace  and evacuate objects.
     #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.immix().immix_space.in_space(object) {
-            if KIND == TraceKind::Fast {
-                self.immix().immix_space.fast_trace_object(self, object)
-            } else {
-                self.immix().immix_space.trace_object(
-                    self,
-                    object,
-                    CopySemantics::DefaultCopy,
-                    self.worker(),
-                )
-            }
-        } else {
-            self.immix().common.trace_object::<Self>(self, object)
-        }
+        unreachable!()
     }
 
     #[inline]
@@ -97,6 +81,7 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KI
     }
 }
 
+use crate::scheduler::gc_work::MMTkProcessEdges;
 pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
     std::marker::PhantomData<VM>,
 );
@@ -105,5 +90,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }

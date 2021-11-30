@@ -480,6 +480,7 @@ pub struct MMTkProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<MMTkProcessEdges<VM>>,
 }
 
+// FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
 impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -499,7 +500,12 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
 
         let trace = MMTkProcessEdgesMutRef::new(self);
         let worker = GCWorkerMutRef::new(self.worker());
-        sft.sft_trace_object(trace, object, CopySemantics::DefaultCopy, worker)
+        let semantics = match sft.copy_semantics() {
+            Some(s) => s,
+            // I need to rethink on this. Should we always use Option<CopySemantics> or add CopySemantics::NoCopy
+            None => CopySemantics::DefaultCopy,
+        };
+        sft.sft_trace_object(trace, object, semantics, worker)
     }
 }
 

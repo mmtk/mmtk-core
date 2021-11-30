@@ -21,6 +21,7 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use crate::util::copy::*;
 
 use enum_map::EnumMap;
 
@@ -49,7 +50,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
     }
 
     fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use crate::util::copy::*;
         use enum_map::enum_map;
 
         GCWorkerCopyContext::new(
@@ -99,7 +99,9 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
                                                                        // prepare each of the collected regions
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
+        self.copyspace0.set_copy_semantics(Some(CopySemantics::DefaultCopy));
         self.copyspace1.prepare(!hi);
+        self.copyspace0.set_copy_semantics(None);
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
