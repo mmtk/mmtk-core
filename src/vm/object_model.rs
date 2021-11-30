@@ -221,6 +221,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn get_current_size(object: ObjectReference) -> usize;
 
+    /// Return the size when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_size_when_copied(object: ObjectReference) -> usize;
+
+    /// Return the alignment when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_align_when_copied(object: ObjectReference) -> usize;
+
+    /// Return the alignment offset when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_align_offset_when_copied(object: ObjectReference) -> isize;
+
     /// Get the type descriptor for an object.
     ///
     /// FIXME: Do we need this? If so, determine lifetime, return byte[]
