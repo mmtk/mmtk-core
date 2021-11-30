@@ -9,7 +9,9 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use enum_map::enum_map;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use enum_map::EnumMap;
 // Remove crate::plan::mygc::MyGC
 // Remove mygc_mutator_noop
