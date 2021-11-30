@@ -5,7 +5,7 @@ use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
     create_allocator_mapping, create_space_mapping, ReservedAllocators,
 };
-use crate::plan::AllocationSemantics as AllocationType;
+use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
@@ -22,7 +22,7 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     let bump_allocator = unsafe {
         mutator
             .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
@@ -35,16 +35,15 @@ pub fn ss_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     );
 }
 
-const SS_RESERVED_ALLOCATOR: ReservedAllocators = ReservedAllocators {
+const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 1,
-    n_large_object: 0,
-    n_malloc: 0,
+    ..ReservedAllocators::DEFAULT
 };
 
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = {
-        let mut map = create_allocator_mapping(SS_RESERVED_ALLOCATOR, true);
-        map[AllocationType::Default] = AllocatorSelector::BumpPointer(0);
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
+        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
         map
     };
 }
@@ -57,7 +56,7 @@ pub fn create_ss_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = create_space_mapping(SS_RESERVED_ALLOCATOR, true, plan);
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::BumpPointer(0), ss.tospace()));
             vec
         },

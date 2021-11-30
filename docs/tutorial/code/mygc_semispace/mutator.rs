@@ -4,7 +4,7 @@ use crate::Plan;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::AllocationSemantics as AllocationType;
+use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::*;
@@ -33,7 +33,7 @@ pub fn mygc_mutator_release<VM: VMBinding>(
     let bump_allocator = unsafe {
         mutator
             .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
     .downcast_mut::<BumpAllocator<VM>>()
     .unwrap();
@@ -49,11 +49,16 @@ pub fn mygc_mutator_release<VM: VMBinding>(
 
 // Modify
 // ANCHOR: allocator_mapping
+const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 1,
+    ..ReservedAllocators::DEFAULT
+};
+
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default => AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly => AllocatorSelector::BumpPointer(1),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
+        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
+        map
     };
 }
 // ANCHOR_END: allocator_mapping
@@ -69,14 +74,11 @@ pub fn create_mygc_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         // Modify
         // ANCHOR: space_mapping
-        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), mygc.tospace()),
-            (
-                AllocatorSelector::BumpPointer(1),
-                mygc.common.get_immortal(),
-            ),
-            (AllocatorSelector::LargeObject(0), mygc.common.get_los()),
-        ],
+        space_mapping: box {
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
+            vec
+        },
         // ANCHOR_END: space_mapping
         prepare_func: &mygc_mutator_prepare, // Modify
         release_func: &mygc_mutator_release, // Modify

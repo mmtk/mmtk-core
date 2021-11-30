@@ -147,14 +147,24 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
 /// it means the first bump pointer allocator will be reserved for the plan (and the plan should
 /// initialize its mapping itself), and the spaces in common/base plan will use the following bump
 /// pointer allocators.
+#[allow(dead_code)]
 #[derive(Default)]
 pub(crate) struct ReservedAllocators {
     pub n_bump_pointer: u8,
     pub n_large_object: u8,
     pub n_malloc: u8,
+    pub n_immix: u8,
+    pub n_mark_compact: u8,
 }
 
 impl ReservedAllocators {
+    pub const DEFAULT: Self = ReservedAllocators {
+        n_bump_pointer: 0,
+        n_large_object: 0,
+        n_malloc: 0,
+        n_immix: 0,
+        n_mark_compact: 0,
+    };
     /// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
     fn validate(&self) {
         use crate::util::alloc::allocators::*;
