@@ -29,7 +29,7 @@ lazy_static! {
             map[AllocationSemantics::Los] = AllocatorSelector::BumpPointer(2);
             map
         } else {
-            ALLOCATOR_MAPPING_SINGLE_SPACE.clone()
+            *ALLOCATOR_MAPPING_SINGLE_SPACE
         }
     };
 }
