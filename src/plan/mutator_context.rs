@@ -180,6 +180,14 @@ impl ReservedAllocators {
             self.n_malloc as usize <= MAX_MALLOC_ALLOCATORS,
             "Allocator mapping declared more malloc allocators than the max allowed."
         );
+        assert!(
+            self.n_immix as usize <= MAX_IMMIX_ALLOCATORS,
+            "Allocator mapping declared more immix allocators than the max allowed."
+        );
+        assert!(
+            self.n_mark_compact as usize <= MAX_MARK_COMPACT_ALLOCATORS,
+            "Allocator mapping declared more mark compact allocators than the max allowed."
+        );
     }
 }
 
