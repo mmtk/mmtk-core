@@ -549,8 +549,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "lazy_sweeping")]
     pub fn reset(&mut self) {
-        // use crate::policy::marksweepspace::block::BlockState;
-
         trace!("reset");
         // consumed and available are now unswept
         let mut bin = 0;
@@ -560,67 +558,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let consumed = self.consumed_blocks.get_mut(bin).unwrap();
             unswept.append::<VM>(available);
             unswept.append::<VM>(consumed);
-            // debug_assert!(available.size == unswept.size);
-            // if !available.is_empty() {
-            //     if unswept.is_empty() {
-            //         unswept.first = available.first;
-            //         unswept.first.store_block_list::<VM>(unswept);
-            //     } else {
-            //         // eprintln!("reset available: store {} -> {}", unswept.last.start(), available.first.start());
-            //         unswept.last.store_next_block::<VM>(available.first);
-            //         available.first.store_prev_block::<VM>(unswept.last);
-            //         let mut next = available.first;
-            //         // eprintln!("moving to list {:?} (sweep available), available.first = {}", unswept as *mut _, next.start());
-            //         while !next.is_zero() {
-            //             // if !next.load_prev_block::<VM>().is_zero() {
-            //             //     assert!(next == next.load_prev_block::<VM>().load_next_block::<VM>());
-            //             // }
-            //             // if !next.load_next_block::<VM>().is_zero() {
-            //             //     assert!(next == next.load_next_block::<VM>().load_prev_block::<VM>());
-            //             // }
-            //             // eprintln!("{} is moved to list {:?} (sweep available)", next.start(), unswept as *mut _);
-            //             next = next.load_next_block::<VM>();
-            //             assert!(next != available.first);
-            //         }
-            //     }
-            //     unswept.last = available.last;
-            //     unswept.last.store_block_list::<VM>(unswept);
-            //     debug_assert!(!unswept.first.is_zero());
-            //     debug_assert!(unswept.last.load_next_block::<VM>().is_zero());
-            // }
-            // let consumed = &mut self.consumed_blocks[bin];
-            // if !consumed.is_empty() {
-            //     if unswept.is_empty() {
-            //         unswept.first = consumed.first;
-            //         unswept.first.store_block_list::<VM>(unswept);
-            //     } else {
-            //         // eprintln!("reset consumed: store {} -> {}", unswept.last.start(), consumed.first.start()); 
-            //         unswept.last.store_next_block::<VM>(consumed.first);
-            //         consumed.first.store_prev_block::<VM>(unswept.last);
-            //         let mut next = consumed.first;
-            //         // eprintln!("moving to list {:?} (sweep consumed), consumed.first = {}", unswept as *mut _, next.start());
-            //         while !next.is_zero() {
-            //             // if !next.load_prev_block::<VM>().is_zero() {
-            //             //     assert!(next == next.load_prev_block::<VM>().load_next_block::<VM>());
-            //             // }
-            //             // if !next.load_next_block::<VM>().is_zero() {
-            //             //     assert!(next == next.load_next_block::<VM>().load_prev_block::<VM>());
-            //             // }
-            //             // eprintln!("{} is moved to list {:?} (sweep consumed)", next.start(), unswept as *mut _);
-            //             next = next.load_next_block::<VM>();
-            //             assert!(next != consumed.first, next.start());
-            //         }
-            //     }
-            //     unswept.last = consumed.last;
-            //     unswept.last.store_block_list::<VM>(unswept);
-            // }
-            // available.reset();
-            // consumed.reset();
             bin += 1;
         }
-
-        // self.available_blocks = BLOCK_LISTS_EMPTY.to_vec();
-        // self.consumed_blocks = BLOCK_LISTS_EMPTY.to_vec();
     }
 
     #[cfg(not(feature = "lazy_sweeping"))]
@@ -629,32 +568,24 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
-            let available = self.available_blocks[bin];
-            let consumed = self.consumed_blocks[bin];
-            if !available.first.is_zero() {
-                let mut block = available.first;
+            let available = self.available_blocks.get_mut(bin).unwrap();
+
+            let mut block = available.first;
+            while !block.is_zero() {
                 self.sweep_block(block);
-                let mut next = block.load_next_block::<VM>();
-                while !next.is_zero() {
-                    block = next;
-                    self.sweep_block(block);
-                    next = block.load_next_block::<VM>();
-                }
-                block.store_next_block(block, consumed.first);
-            } else {
-                self.available_blocks[bin].first = consumed.first;
-                FreeListAllocator::<VM>::store_block_list(self.available_blocks[bin].first, self.available_blocks[bin]);
+                block = block.load_next_block::<VM>();
             }
-            if !consumed.first.is_zero() {
-                let mut block = consumed.first;
-                while !block.is_zero() {
-                    self.sweep_block(block);
-                    block = block.load_next_block::<VM>();
-                }
+
+            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
+            let mut block = consumed.first;
+            while !block.is_zero() {
+                self.sweep_block(block);
+                block = block.load_next_block::<VM>();
             }
+
+            self.available_blocks.get_mut(bin).unwrap().append::<VM>(self.consumed_blocks.get_mut(bin).unwrap());
             bin += 1;
         }
-        self.consumed_blocks = BLOCK_LISTS_EMPTY.to_vec();
     }
 
     pub fn rebind(&mut self, space: &'static MarkSweepSpace<VM>) {
