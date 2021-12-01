@@ -6,7 +6,7 @@ use atomic::Ordering;
 
 use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, BlockList, FreeListAllocator, LOG_BYTES_IN_BLOCK}, metadata::{MetadataSpec, load_metadata, side_metadata::{
                 self, SideMetadataOffset, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_OFFSET,
-            }, store_metadata}, VMThread}, vm::VMBinding};
+            }, store_metadata}, VMThread, alloc_bit::is_alloced}, vm::VMBinding, policy::marksweepspace::metadata::is_marked};
 
 use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
 use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK}}, metadata::side_metadata::{self, LOCAL_SIDE_METADATA_BASE_OFFSET, SideMetadataOffset, SideMetadataSpec}}, vm::VMBinding};
@@ -349,7 +349,7 @@ impl Block {
             _ => unreachable!(),
         }
     }
-
+ 
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
