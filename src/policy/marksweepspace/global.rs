@@ -30,7 +30,7 @@ use crate::{
 use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunks::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, alloc_bit::ALLOC_SIDE_METADATA_SPEC, constants::LOG_BYTES_IN_PAGE, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, load_metadata, side_metadata::{self, SideMetadataContext, SideMetadataSpec, address_to_meta_address}, store_metadata}}, vm::VMBinding};
+        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
 use super::{super::space::{CommonSpace, Space, SFT}, chunks::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
@@ -179,7 +179,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             // eprintln!("m {} meta: {}", object.to_address(), address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), object.to_address()));
-            let block = Block::from(FreeListAllocator::<VM>::get_block(address));
+            let block = FreeListAllocator::<VM>::get_block(address);
             block.set_state(BlockState::Marked);
             trace.process_node(object);
         }
@@ -197,13 +197,10 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
-    pub fn record_new_block(&self, block: Address) {
-        let block = Block::from(block);
+    pub fn record_new_block(&self, block: Block) {
         block.init();
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
     }
-
-
 
     #[inline]
     pub fn get_next_metadata_spec(&self) -> SideMetadataSpec {
@@ -217,40 +214,32 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn block_level_sweep(&self) {
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_sweep_tasks(space);
-        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        for chunk in self.chunk_map.all_chunks() {
+            chunk.sweep(space);
+        }
+        // let work_packets = self.chunk_map.generate_sweep_tasks(space);
+        // self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 
     /// Release a block.
-    pub fn release_block(&self, block: Address) {
-        // eprintln!("b < 0x{:0x}", block);
+    pub fn release_block(&self, block: Block) {
+        // eprintln!("b < {}", block.start());
         self.block_clear_metadata(block);
 
-        let block = Block::from(block);
         block.deinit();
         self.pr.release_pages(block.start());
     }
 
-    pub fn block_clear_metadata(&self, block: Address) {
+    pub fn block_clear_metadata(&self, block: Block) {
         for metadata_spec in &self.common.metadata.local {
             store_metadata::<VM>(
                 &MetadataSpec::OnSide(*metadata_spec),
-                unsafe { block.to_object_reference() },
+                unsafe { block.start().to_object_reference() },
                 0,
                 None,
                 Some(Ordering::SeqCst),
             )
         }
-        bzero_alloc_bit(block, BYTES_IN_BLOCK);
-    }
-
-    pub fn load_block_tls(&self, block: Address) -> OpaquePointer {
-        let tls = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::TLS_TABLE),
-            unsafe { block.to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        );
-        unsafe { std::mem::transmute::<usize, OpaquePointer>(tls) }
+        bzero_alloc_bit(block.start(), BYTES_IN_BLOCK);
     }
 }
