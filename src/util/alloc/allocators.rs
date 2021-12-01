@@ -12,11 +12,11 @@ use crate::vm::VMBinding;
 
 use super::MarkCompactAllocator;
 
-const MAX_BUMP_ALLOCATORS: usize = 5;
-const MAX_LARGE_OBJECT_ALLOCATORS: usize = 1;
-const MAX_MALLOC_ALLOCATORS: usize = 1;
-const MAX_IMMIX_ALLOCATORS: usize = 1;
-const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
+pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
+pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
+pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
+pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 1;
+pub(crate) const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -47,6 +47,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_ref()
             }
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -68,6 +69,7 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_mut()
             }
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -122,6 +124,7 @@ impl<VM: VMBinding> Allocators<VM> {
                         plan,
                     ));
                 }
+                AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             }
         }
 
@@ -142,11 +145,18 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
     Malloc(u8),
     Immix(u8),
     MarkCompact(u8),
+    None,
+}
+
+impl Default for AllocatorSelector {
+    fn default() -> Self {
+        AllocatorSelector::None
+    }
 }

@@ -1,14 +1,24 @@
+use enum_map::EnumMap;
+
 ///! Generational plans
 use crate::plan::barriers::BarrierSelector;
+use crate::plan::mutator_context::create_allocator_mapping;
 use crate::plan::AllocationSemantics;
 use crate::plan::PlanConstraints;
+use crate::policy::copyspace::CopySpace;
+use crate::policy::space::Space;
+use crate::util::alloc::AllocatorSelector;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::Plan;
 
 use std::sync::atomic::Ordering;
+
+use super::mutator_context::create_space_mapping;
+use super::mutator_context::ReservedAllocators;
 
 // Generational plans:
 
@@ -74,4 +84,26 @@ pub fn generational_post_copy<VM: VMBinding>(
     if !NO_SLOW && ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
         VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
     }
+}
+
+const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 1,
+    ..ReservedAllocators::DEFAULT
+};
+
+lazy_static! {
+    static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
+        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
+        map
+    };
+}
+
+fn create_gen_space_mapping<VM: VMBinding>(
+    plan: &'static dyn Plan<VM = VM>,
+    nursery: &'static CopySpace<VM>,
+) -> Vec<(AllocatorSelector, &'static dyn Space<VM>)> {
+    let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+    vec.push((AllocatorSelector::BumpPointer(0), nursery));
+    vec
 }

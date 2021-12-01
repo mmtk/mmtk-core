@@ -4,6 +4,7 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorkerLocal;
@@ -30,6 +31,8 @@ use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalS
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
+    pub immortal: ImmortalSpace<VM>,
+    pub los: ImmortalSpace<VM>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -64,7 +67,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base.collection_required(self, space_full, space)
+        self.base().collection_required(self, space_full, space)
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -89,6 +92,9 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn get_pages_used(&self) -> usize {
         self.nogc_space.reserved_pages()
+            + self.immortal.reserved_pages()
+            + self.los.reserved_pages()
+            + self.base.get_pages_used()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
@@ -105,7 +111,7 @@ impl<VM: VMBinding> NoGC<VM> {
         #[cfg(not(feature = "nogc_lock_free"))]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         #[cfg(feature = "nogc_lock_free")]
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
@@ -129,6 +135,26 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let res = NoGC {
             nogc_space,
+            immortal: ImmortalSpace::new(
+                "immortal",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                &NOGC_CONSTRAINTS,
+            ),
+            los: ImmortalSpace::new(
+                "los",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                &NOGC_CONSTRAINTS,
+            ),
             base: BasePlan::new(
                 vm_map,
                 mmapper,
@@ -142,7 +168,7 @@ impl<VM: VMBinding> NoGC<VM> {
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
         // side metadata in extreme_assertions.
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-        res.base
+        res.base()
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res.nogc_space
             .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
