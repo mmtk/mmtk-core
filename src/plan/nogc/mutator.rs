@@ -12,18 +12,20 @@ use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use enum_map::{enum_map, EnumMap};
 
-const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+/// We use three bump allocators when enabling nogc_multi_space.
+const MULTI_SPACE_RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 3,
     ..ReservedAllocators::DEFAULT
 };
 
 lazy_static! {
+    /// When nogc_multi_space is disabled, force all the allocation go to the default allocator and space.
     static ref ALLOCATOR_MAPPING_SINGLE_SPACE: EnumMap<AllocationSemantics, AllocatorSelector> = enum_map! {
         _ => AllocatorSelector::BumpPointer(0),
     };
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
         if cfg!(feature = "nogc_multi_space") {
-            let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, false);
+            let mut map = create_allocator_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false);
             map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
             map[AllocationSemantics::Immortal] = AllocatorSelector::BumpPointer(1);
             map[AllocationSemantics::Los] = AllocatorSelector::BumpPointer(2);
