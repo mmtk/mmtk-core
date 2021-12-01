@@ -539,7 +539,7 @@ will then go to the new tospace.</p>
     let bump_allocator = unsafe {
         mutator
             .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
     .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
     .unwrap();

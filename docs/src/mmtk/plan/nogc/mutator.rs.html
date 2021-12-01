@@ -42,21 +42,73 @@
 <span id="42">42</span>
 <span id="43">43</span>
 <span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::NoBarrier</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context::MutatorConfig</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::mutator_context</span>::{
+    <span class="ident">create_allocator_mapping</span>, <span class="ident">create_space_mapping</span>, <span class="ident">ReservedAllocators</span>,
+};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::nogc::NoGC</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span> <span class="kw">as</span> <span class="ident">AllocationType</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators</span>::{<span class="ident">AllocatorSelector</span>, <span class="ident">Allocators</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-<span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use</span> <span class="ident">enum_map</span>::{<span class="ident">enum_map</span>, <span class="ident">EnumMap</span>};
+
+<span class="doccomment">/// We use three bump allocators when enabling nogc_multi_space.</span>
+<span class="kw">const</span> <span class="ident">MULTI_SPACE_RESERVED_ALLOCATORS</span>: <span class="ident">ReservedAllocators</span> <span class="op">=</span> <span class="ident">ReservedAllocators</span> {
+    <span class="ident">n_bump_pointer</span>: <span class="number">3</span>,
+    ..<span class="ident">ReservedAllocators::DEFAULT</span>
+};
 
 <span class="macro">lazy_static!</span> {
-    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationType</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">enum_map!</span> {
-        <span class="ident">AllocationType::Default</span> <span class="op">|</span> <span class="ident">AllocationType::Immortal</span> <span class="op">|</span> <span class="ident">AllocationType::Code</span> <span class="op">|</span> <span class="ident">AllocationType::LargeCode</span> <span class="op">|</span> <span class="ident">AllocationType::ReadOnly</span> <span class="op">|</span> <span class="ident">AllocationType::Los</span> =&gt; <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
+    <span class="doccomment">/// When nogc_multi_space is disabled, force all the allocation go to the default allocator and space.</span>
+    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING_SINGLE_SPACE</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> <span class="macro">enum_map!</span> {
+        <span class="kw">_</span> =&gt; <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
+    };
+    <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">ALLOCATOR_MAPPING</span>: <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> <span class="op">=</span> {
+        <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nogc_multi_space&quot;</span>) {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">map</span> <span class="op">=</span> <span class="ident">create_allocator_mapping</span>(<span class="ident">MULTI_SPACE_RESERVED_ALLOCATORS</span>, <span class="bool-val">false</span>);
+            <span class="ident">map</span>[<span class="ident">AllocationSemantics::Default</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>);
+            <span class="ident">map</span>[<span class="ident">AllocationSemantics::Immortal</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>);
+            <span class="ident">map</span>[<span class="ident">AllocationSemantics::Los</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">2</span>);
+            <span class="ident">map</span>
+        } <span class="kw">else</span> {
+            <span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING_SINGLE_SPACE</span>
+        }
     };
 }
 
@@ -70,10 +122,22 @@
 ) -&gt; <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">config</span> <span class="op">=</span> <span class="ident">MutatorConfig</span> {
         <span class="ident">allocator_mapping</span>: <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">ALLOCATOR_MAPPING</span>,
-        <span class="ident">space_mapping</span>: <span class="kw">box</span> <span class="macro">vec!</span>[(
-            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
-            <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">NoGC</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>().<span class="ident">nogc_space</span>,
-        )],
+        <span class="ident">space_mapping</span>: <span class="kw">box</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">vec</span> <span class="op">=</span> <span class="ident">create_space_mapping</span>(<span class="ident">MULTI_SPACE_RESERVED_ALLOCATORS</span>, <span class="bool-val">false</span>, <span class="ident">plan</span>);
+            <span class="ident">vec</span>.<span class="ident">push</span>((
+                <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">0</span>),
+                <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">NoGC</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>().<span class="ident">nogc_space</span>,
+            ));
+            <span class="ident">vec</span>.<span class="ident">push</span>((
+                <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">1</span>),
+                <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">NoGC</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>().<span class="ident">immortal</span>,
+            ));
+            <span class="ident">vec</span>.<span class="ident">push</span>((
+                <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="number">2</span>),
+                <span class="kw-2">&amp;</span><span class="ident">plan</span>.<span class="ident">downcast_ref</span>::<span class="op">&lt;</span><span class="ident">NoGC</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">unwrap</span>().<span class="ident">los</span>,
+            ));
+            <span class="ident">vec</span>
+        },
         <span class="ident">prepare_func</span>: <span class="kw-2">&amp;</span><span class="ident">nogc_mutator_noop</span>,
         <span class="ident">release_func</span>: <span class="kw-2">&amp;</span><span class="ident">nogc_mutator_noop</span>,
     };

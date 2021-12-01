@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["create_genimmix_mutator",""],["genimmix_mutator_prepare",""],["genimmix_mutator_release",""]],"struct":[["ALLOCATOR_MAPPING",""]]});
+initSidebarItems({"fn":[["create_genimmix_mutator",""],["genimmix_mutator_prepare",""],["genimmix_mutator_release",""]]});

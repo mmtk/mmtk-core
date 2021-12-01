@@ -843,12 +843,14 @@ use crate::Plan;
 use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
-use crate::plan::AllocationSemantics as AllocationType;
+use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::alloc::BumpAllocator;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
-use enum_map::enum_map;
+use crate::plan::mutator_context::{
+    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+};
 use enum_map::EnumMap;
 // Remove crate::plan::mygc::MyGC
 // Remove mygc_mutator_noop
@@ -860,18 +862,23 @@ which maps the required allocation semantics to the corresponding allocators.
 For example, for <code>Default</code>, we allocate using the first bump pointer allocator 
 (<code>BumpPointer(0)</code>):</p>
 <ol>
+<li>Define a <code>ReservedAllocators</code> instance to declare that we need one bump allocator.</li>
+<li>Map the common plan allocators using <code>create_allocator_mapping</code>.</li>
 <li>Map <code>Default</code> to <code>BumpPointer(0)</code>.</li>
-<li>Map <code>ReadOnly</code> to <code>BumpPointer(1)</code>.</li>
-<li>Map <code>Los</code> to <code>LargeObject(0)</code>. </li>
 </ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationType, AllocatorSelector&gt; = enum_map! {
-        AllocationType::Default =&gt; AllocatorSelector::BumpPointer(0),
-        AllocationType::Immortal | AllocationType::Code | AllocationType::LargeCode | AllocationType::ReadOnly =&gt; AllocatorSelector::BumpPointer(1),
-        AllocationType::Los =&gt; AllocatorSelector::LargeObject(0),
+</span>const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_bump_pointer: 1,
+    ..ReservedAllocators::DEFAULT
+};
+
+lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap&lt;AllocationSemantics, AllocatorSelector&gt; = {
+        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
+        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
+        map
     };
 }
 <span class="boring">}
@@ -892,27 +899,24 @@ bound with <code>tospace</code>.</p>
 <p>Then, use <code>mygc</code> to access the spaces in <code>MyGC</code>.</p>
 <ol>
 <li><code>BumpPointer(0)</code> should map to the tospace.</li>
-<li><code>BumpPointer(1)</code> should map to <code>mygc.common.get_immortal()</code>.</li>
-<li><code>LargeObject(0)</code> should map to <code>mygc.common.get_los()</code>.</li>
-<li>None of the above should be dereferenced (ie, they should not have 
+<li>Other common plan allocators should be mapped using <code>create_space_mapping</code>.</li>
+<li>None of the above should be dereferenced (ie, they should not have
 the <code>&amp;</code> prefix).</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>        space_mapping: box vec![
-            (AllocatorSelector::BumpPointer(0), mygc.tospace()),
-            (
-                AllocatorSelector::BumpPointer(1),
-                mygc.common.get_immortal(),
-            ),
-            (AllocatorSelector::LargeObject(0), mygc.common.get_los()),
-        ],
+</span>        space_mapping: box {
+            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
+            vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
+            vec
+        },
 <span class="boring">}
 </span></code></pre></pre>
-<p>There may seem to be 2 extraneous spaces and allocators that have appeared all 
-of a sudden in these past 2 steps. These are parts of the MMTk common plan 
-itself.</p>
+<p>The <code>create_space_mapping</code> and <code>create_allocator_mapping</code> call that have appeared all
+of a sudden in these past 2 steps, are parts of the MMTk common plan
+itself. They are used to construct allocator-space mappings for the spaces defined
+by the common plan:</p>
 <ol>
 <li>The immortal space is used for objects that the virtual machine or a 
 library never expects to die.</li>
@@ -920,6 +924,8 @@ library never expects to die.</li>
 objects differently to normal objects, as the space overhead of copying 
 large objects is very high. Instead, this space is used by a free list 
 allocator in the common plan to avoid having to copy them. </li>
+<li>The read-only space is used to store all the immutable objects.</li>
+<li>The code spaces are used for VM generated code objects.</li>
 </ol>
 <p>With this, you should have the allocation working, but not garbage collection. 
 Try building again. If you run HelloWorld or Fannkunchredux, they should
@@ -1321,7 +1327,7 @@ will then go to the new tospace.</p>
     let bump_allocator = unsafe {
         mutator
             .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
+            .get_allocator_mut(mutator.config.allocator_mapping[AllocationSemantics::Default])
     }
     .downcast_mut::&lt;BumpAllocator&lt;VM&gt;&gt;()
     .unwrap();
