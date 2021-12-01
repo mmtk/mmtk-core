@@ -27,6 +27,7 @@ pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
+const ZERO_BLOCK: Block = Block::from(unsafe { Address::zero() });
 
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
@@ -118,16 +119,16 @@ pub struct FreeListAllocator<VM: VMBinding> {
 
 #[derive(Clone, Debug)]
 pub struct BlockList {
-    pub first: Address,
-    pub last: Address,
+    pub first: Block,
+    pub last: Block,
     size: usize,
 }
 
 impl BlockList {
     const fn new(size: usize) -> BlockList {
         BlockList {
-            first: unsafe { Address::zero() },
-            last: unsafe { Address::zero() },
+            first: ZERO_BLOCK,
+            last: ZERO_BLOCK,
             size,
         }
     }
@@ -136,71 +137,93 @@ impl BlockList {
         self.first.is_zero()
     }
 
-    pub fn remove<VM: VMBinding>(&mut self, block: Address) {
-        let prev = FreeListAllocator::<VM>::load_prev_block(block);
-        let next = FreeListAllocator::<VM>::load_next_block(block);
-        // eprintln!("BlockList.remove {} from {:?}", block, self as *const _);
+    pub fn remove<VM: VMBinding>(&mut self, block: Block) {
+        let prev = block.load_prev_block::<VM>();
+        let next = block.load_next_block::<VM>();
+        // eprintln!("BlockList.remove {} from {:?}", block.start(), self as *const _);
         if prev.is_zero() {
             if next.is_zero() {
-                self.first = unsafe { Address::zero() };
-                self.last = unsafe { Address::zero() };
+                self.first = ZERO_BLOCK;
+                self.last = ZERO_BLOCK;
             } else {
-                FreeListAllocator::<VM>::store_prev_block(next, unsafe { Address::zero() });
+                next.store_prev_block::<VM>(ZERO_BLOCK);
                 self.first = next;
-                FreeListAllocator::<VM>::store_block_list(next, self);
+                next.store_block_list::<VM>(self);
             }
         } else {
             if next.is_zero() {
-                FreeListAllocator::<VM>::store_next_block(prev, unsafe { Address::zero() });
+                prev.store_next_block::<VM>(next);
+                prev.store_next_block::<VM>(ZERO_BLOCK);
                 self.last = prev;
-                FreeListAllocator::<VM>::store_block_list(prev, self);
+                prev.store_block_list::<VM>(self);
             } else {
-                unreachable!();
-                FreeListAllocator::<VM>::store_next_block(prev, next);
-                FreeListAllocator::<VM>::store_prev_block(next, prev);
+                unreachable!("remove: {} -> {} -> {}", prev.start(), block.start(), next.start());
+                prev.store_next_block::<VM>(next);
+                next.store_prev_block::<VM>(prev);
             }
         }
     }
 
-    fn pop<VM: VMBinding>(&mut self) -> Address {
+    fn pop<VM: VMBinding>(&mut self) -> Block {
+        // eprintln!("start to pop from list {:?}", self as *mut _);
         let rtn = self.first;
         if rtn.is_zero() {
+            // eprintln!("list {:?} is empty", self as *mut _);
             return rtn;
         }
-        let next = FreeListAllocator::<VM>::load_next_block(rtn);
+        let next = rtn.load_next_block::<VM>();
         if next.is_zero() {
-            self.first = unsafe { Address::zero() };
-            self.last = unsafe { Address::zero() };
+            self.first = ZERO_BLOCK;
+            self.last = ZERO_BLOCK;
         } else {
             self.first = next;
-            FreeListAllocator::<VM>::store_prev_block(next, unsafe {Address::zero()});
-            FreeListAllocator::<VM>::store_block_list(self.first, self);
+            next.store_prev_block::<VM>(ZERO_BLOCK);
+            self.first.store_block_list::<VM>(self);
         }
-        FreeListAllocator::<VM>::store_next_block(rtn, unsafe {Address::zero()});
-        FreeListAllocator::<VM>::store_prev_block(rtn, unsafe {Address::zero()});
-        // eprintln!("pop {} from list {:?}", rtn, self as *mut _);
+        rtn.store_next_block::<VM>(ZERO_BLOCK);
+        rtn.store_prev_block::<VM>(ZERO_BLOCK);
+        // eprintln!("popped {} from list {:?}", rtn.start(), self as *mut _);
         rtn
     }
 
-    fn push<VM: VMBinding>(&mut self, block: Address) {
-        // eprintln!("push: store {} -> {}", block, self.first);
+    fn push<VM: VMBinding>(&mut self, block: Block) {
+        // eprintln!("push {} to list {:?}", block.start(), self as *const _);
         if self.is_empty() {
-            FreeListAllocator::<VM>::store_next_block(block, unsafe { Address::zero() });
-            FreeListAllocator::<VM>::store_prev_block(block, unsafe { Address::zero() });
+            block.store_next_block::<VM>(ZERO_BLOCK);
+            block.store_prev_block::<VM>(ZERO_BLOCK);
             self.first = block;
             self.last = block;
         } else {
-            FreeListAllocator::<VM>::store_next_block(block, self.first);
-            FreeListAllocator::<VM>::store_prev_block(self.first, block);
+            block.store_next_block::<VM>(self.first);
+            self.first.store_prev_block::<VM>(block);
+            block.store_prev_block::<VM>(ZERO_BLOCK);
             self.first = block;
         }
-        FreeListAllocator::<VM>::store_block_list(block, self);
-        // eprintln!("store {} in list {:?}", block, self as *const BlockList);
+        block.store_block_list::<VM>(self);
+        // eprintln!("store {} in list {:?}", block.start(), self as *const BlockList);
+    }
+    
+    fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
+        if !list.is_empty() {
+            assert!(list.first.load_prev_block::<VM>().is_zero(), "{} -> {}", list.first.load_prev_block::<VM>().start(), list.first.start());
+            if self.is_empty() {
+                self.first = list.first;
+                self.last = list.last;
+            } else {
+                assert!(self.first.load_prev_block::<VM>().is_zero(), "{} -> {}", self.first.load_prev_block::<VM>().start(), self.first.start());
+                self.last.store_next_block::<VM>(list.first);
+                list.first.store_prev_block::<VM>(self.last);
+                self.last = list.last;
+            }
+            self.first.store_block_list::<VM>(self);
+            self.last.store_block_list::<VM>(self);
+            list.reset();
+        }
     }
 
     fn reset(&mut self) {
-        self.first = unsafe { Address::zero() };
-        self.last = unsafe { Address::zero() };
+        self.first = ZERO_BLOCK;
+        self.last = ZERO_BLOCK;
     }
 }
 
@@ -232,15 +255,16 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
         let addr = self.alloc_from_available(size);
         if addr.is_zero() {
-            debug_assert!(self.available_blocks[FreeListAllocator::<VM>::mi_bin(size) as usize].is_empty());
+            debug_assert!(self.available_blocks[mi_bin(size) as usize].is_empty());
             return self.alloc_slow(size, align, offset)
         }
         addr
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        // eprintln!("alloc slow once");
         // try to find an existing block with free cells
-        let bin = FreeListAllocator::<VM>::mi_bin(size);
+        let bin = mi_bin(size);
         if !self.available_blocks[bin as usize].is_empty() {
             // we've just had GC, which has made some blocks available
             return self.alloc_from_available(size);
@@ -249,24 +273,25 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let block = self.acquire_block_for_size(size);
         if block.is_zero() {
             // gc
-            return block;
+            return unsafe {Address::zero()};
         }
 
         debug_assert!(!block.is_zero());
 
         // _mi_page_malloc
-        let free_list = FreeListAllocator::<VM>::load_free_list(block);
+        let free_list = block.load_free_list::<VM>();
         debug_assert!(!free_list.is_zero());
 
         // update free list
         let next_cell = unsafe { free_list.load::<Address>() };
-        FreeListAllocator::<VM>::store_free_list(block, next_cell);
-        debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
+        block.store_free_list::<VM>(next_cell);
+        debug_assert!(block.load_free_list::<VM>() == next_cell);
 
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
         // // eprintln!("a {}", free_list);
+        // eprintln!("end alloc slow once");
 
         free_list
     }
@@ -290,7 +315,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     fn alloc_from_available(&mut self, size: usize) -> Address {
-        let bin = FreeListAllocator::<VM>::mi_bin(size);
+        let bin = mi_bin(size);
         debug_assert!(bin <= MI_BIN_HUGE as u8);
 
         let available_blocks = &mut self.available_blocks[bin as usize];
@@ -299,25 +324,20 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut block = available_blocks.first;
 
         while !block.is_zero() {
-            let free_list = FreeListAllocator::<VM>::load_free_list(block);
+            let free_list = block.load_free_list::<VM>();
             if !free_list.is_zero() {
                 // update free list
                 let next_cell = unsafe { free_list.load::<Address>() };
-                FreeListAllocator::<VM>::store_free_list(block, next_cell);
-                debug_assert!(FreeListAllocator::<VM>::load_free_list(block) == next_cell);
+                block.store_free_list::<VM>(next_cell);
+                debug_assert!(block.load_free_list::<VM>() == next_cell);
                 // set allocation bit
                 set_alloc_bit(unsafe { free_list.to_object_reference() });
                 debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
 
                 return free_list;
             }
-            // eprintln!("block {} is consumed", block);
-            available_blocks.first = FreeListAllocator::<VM>::load_next_block(block);
-            if !available_blocks.first.is_zero() {
-                FreeListAllocator::<VM>::store_block_list(available_blocks.first, available_blocks);
-            } else {
-                available_blocks.last = unsafe { Address::zero() };
-            }
+            // eprintln!("block {} is consumed", block.start());
+            available_blocks.pop::<VM>();
             self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
 
             block = available_blocks.first;
@@ -326,193 +346,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         unsafe { Address::zero() }
     }
 
-    #[inline]
-    pub fn load_free_list(block: Address) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
-                block.to_object_reference(),
-                None,
-                None,
-            ))
-        }
-    }
-
-    #[inline]
-    pub fn store_free_list(block: Address, free_list: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            free_list.as_usize(),
-            None,
-            None,
-        );
-    }
-
-    #[inline]
-    pub fn load_local_free_list(block: Address) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-                block.to_object_reference(),
-                None,
-                None,
-            ))
-        }
-    }
-
-    #[inline]
-    pub fn store_local_free_list(block: Address, local_free: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            local_free.as_usize(),
-            None,
-            None,
-        );
-    }
-
-    #[inline]
-    pub fn load_thread_free_list(block: Address) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-                block.to_object_reference(),
-                None,
-                Some(Ordering::SeqCst),
-            ))
-        }
-    }
-
-    #[inline]
-    pub fn store_thread_free_list(block: Address, thread_free: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            thread_free.as_usize(),
-            None,
-            None,
-        );
-    }
-
-    // #[inline]
-    // pub fn cas_thread_free_list(
-    //     &self,
-    //     block: Address,
-    //     old_thread_free: Address,
-    //     new_thread_free: Address,
-    // ) -> bool {
-    //     compare_exchange_metadata::<VM>(
-    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-    //         unsafe { block.to_object_reference() },
-    //         old_thread_free.as_usize(),
-    //         new_thread_free.as_usize(),
-    //         None,
-    //         Ordering::SeqCst,
-    //         Ordering::SeqCst,
-    //     )
-    // }
-
-    pub fn load_prev_block(block: Address) -> Address {
-        assert!(!block.is_zero());
-        let prev = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
-            unsafe { block.to_object_reference() },
-            None,
-            None,
-        );
-        unsafe { Address::from_usize(prev) }
-    }
-
-    pub fn load_next_block(block: Address) -> Address {
-        assert!(!block.is_zero());
-        let next = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-            unsafe { block.to_object_reference() },
-            None,
-            None,
-        );
-        unsafe { Address::from_usize(next) }
-    }
-
-    pub fn store_next_block(block: Address, next: Address) {
-        assert!(!block.is_zero());
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-            unsafe { block.to_object_reference() },
-            next.as_usize(),
-            None,
-            None,
-        );
-        // eprintln!("store {} -> {}", block, next);
-    }
-
-    pub fn store_prev_block(block: Address, prev: Address) {
-        assert!(!block.is_zero());
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
-            unsafe { block.to_object_reference() },
-            prev.as_usize(),
-            None,
-            None,
-        );
-        // eprintln!("store {} -> {}", prev, block);
-    }
-
-    pub fn store_block_list(block: Address, block_list: &BlockList) {
-        assert!(!block.is_zero());
-        assert!(FreeListAllocator::<VM>::load_prev_block(block).is_zero() || FreeListAllocator::<VM>::load_next_block(block).is_zero());
-        assert!(block_list.first == block || block_list.last == block);
-        // let ptr: *mut BlockList = &mut block_list;
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            unsafe { std::mem::transmute::<&BlockList, usize>(block_list) },
-            None,
-            None,
-        );
-        // eprintln!("store that {} is in list {:?}", block, block_list as *const BlockList);
-        let loaded =FreeListAllocator::<VM>::load_block_list(block);
-        unsafe{assert!((*loaded).first == block_list.first);}
-    }
-
-    pub fn load_block_list(block: Address) -> *mut BlockList {
-        assert!(!block.is_zero());
-        let block_list = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
-            unsafe { block.to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        );
-        let ptr = unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) };
-        ptr
-    }
-
-    pub fn load_block_cell_size(block: Address) -> usize {
-        load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::SIZE_TABLE),
-            unsafe { block.to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        )
-    }
-    
-    pub fn store_block_cell_size(block: Address, size: usize) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::SIZE_TABLE),
-            unsafe { block.to_object_reference() },
-            size,
-            None,
-            None,
-        );
-    }
-
-
-
-
 
     // pub fn block_thread_free_collect(&self, block: Address) {
-    //     let free_list = FreeListAllocator::<VM>::load_free_list(block);
+    //     let free_list = block.load_free_list();
 
     //     let mut success = false;
     //     let mut thread_free = unsafe { Address::zero() };
@@ -539,19 +375,19 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     //             tail.store(free_list);
     //         }
     //     }
-    //     FreeListAllocator::<VM>::store_free_list(block, thread_free);
+    //     block.store_free_list(thread_free);
     // }
 
-    pub fn block_free_collect(&self, block: Address) {
-        let free_list = FreeListAllocator::<VM>::load_free_list(block);
+    pub fn block_free_collect(&self, block: Block) {
+        let free_list = block.load_free_list::<VM>();
 
         // first, other threads
         // self.block_thread_free_collect(block);
 
         // same thread
-        let local_free = FreeListAllocator::<VM>::load_local_free_list(block);
-        FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
-        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
+        let local_free = block.load_local_free_list::<VM>();
+        block.store_local_free_list::<VM>(unsafe{Address::zero()});
+        debug_assert!(block.load_local_free_list::<VM>().is_zero());
 
         if !local_free.is_zero() {
             if !free_list.is_zero() {
@@ -565,21 +401,17 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     tail.store(free_list);
                 }
             }
-            FreeListAllocator::<VM>::store_free_list(block, local_free);
+            block.store_free_list::<VM>(local_free);
         }
 
-        debug_assert!(FreeListAllocator::<VM>::load_local_free_list(block).is_zero());
+        debug_assert!(block.load_local_free_list::<VM>().is_zero());
     }
 
-    pub fn block_has_free_cells(block: Address) -> bool {
-        debug_assert!(!block.is_zero());
-        !FreeListAllocator::<VM>::load_free_list(block).is_zero()
 
-    }
 
-    pub fn acquire_block_for_size(&mut self, size: usize) -> Address {
+    pub fn acquire_block_for_size(&mut self, size: usize) -> Block {
 
-        let bin = FreeListAllocator::<VM>::mi_bin(size) as usize;
+        let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
         // attempt to sweep
@@ -591,34 +423,34 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 break
             }
             self.sweep_block(block);
-            if FreeListAllocator::<VM>::block_has_free_cells(block) {
+            if block.has_free_cells::<VM>() {
                 // recyclable block
-                // eprintln!("{} unswept -> available", block);
+                // eprintln!("{} unswept -> available", block.start());
                 self.available_blocks.get_mut(bin).unwrap().push::<VM>(block);
                 return block;
             } else {
                 // nothing was freed from this block
-                // eprintln!("{} unswept -> consumed", block);
+                // eprintln!("{} unswept -> consumed", block.start());
                 self.consumed_blocks.get_mut(bin).unwrap().push::<VM>(block);
             }
         }
 
         // fresh block
 
-        let block = self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE);
+        let block = Block::from(self.space.acquire(self.tls, BYTES_IN_BLOCK >> LOG_BYTES_IN_PAGE));
 
         if block.is_zero() {
             // GC
             return block;
         }
         self.space.record_new_block(block);
-        // eprintln!("b > 0x{:0x} {}", block, self.available_blocks[bin as usize].size);
+        // eprintln!("b > 0x{:0x} {}", block.start(), self.available_blocks[bin as usize].size);
 
         // construct free list
-        let block_end = block + BYTES_IN_BLOCK;
+        let block_end = block.start() + BYTES_IN_BLOCK;
         let mut old_cell = unsafe { Address::zero() };
-        let mut new_cell = block;
-        let block_list = self.available_blocks.get_mut(FreeListAllocator::<VM>::mi_bin(size) as usize).unwrap();
+        let mut new_cell = block.start();
+        let block_list = self.available_blocks.get_mut(mi_bin(size) as usize).unwrap();
         trace!(
             "Asked for size {}, construct free list with cells of size {}",
             size,
@@ -637,25 +469,26 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             };
         };
         
-        FreeListAllocator::<VM>::store_free_list(block, final_cell);
-        FreeListAllocator::<VM>::store_local_free_list(block, unsafe { Address::zero() });
-        FreeListAllocator::<VM>::store_thread_free_list(block, unsafe { Address::zero() });
-        FreeListAllocator::<VM>::store_block_cell_size(block, block_list.size);
+        block.store_free_list::<VM>(final_cell);
+        block.store_local_free_list::<VM>(unsafe { Address::zero() });
+        block.store_thread_free_list::<VM>(unsafe { Address::zero() });
+        block.store_block_cell_size::<VM>(block_list.size);
         block_list.push::<VM>(block);
+        
         self.store_block_tls(block);
-        trace!("Constructed free list for block starting at {}", block);
+        trace!("Constructed free list for block starting at {}", block.start());
         block
     }
 
-    pub fn get_block(addr: Address) -> Address {
-        unsafe { Address::from_usize(addr.bitand(!0xFFFF as usize)) }
+    pub fn get_block(addr: Address) -> Block {
+        Block::from(unsafe { Address::from_usize(addr.bitand(!0xFFFF as usize)) })
     }
 
-    pub fn sweep_block(&self, block: Address) {
-        let cell_size = FreeListAllocator::<VM>::load_block_cell_size(block);
-        assert!(cell_size != 0, "b = {}", block);
-        let mut cell = block;
-        while cell < block + BYTES_IN_BLOCK {
+    pub fn sweep_block(&self, block: Block) {
+        let cell_size = block.load_block_cell_size::<VM>();
+        assert!(cell_size != 0, "b = {}", block.start());
+        let mut cell = block.start();
+        while cell < block.start() + BYTES_IN_BLOCK {
             let alloced = is_alloced(unsafe { cell.to_object_reference() });
             if alloced {
                 let marked = is_marked::<VM>(
@@ -675,15 +508,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // // eprintln!("f {}", addr);
 
         let block = FreeListAllocator::<VM>::get_block(addr);
-        let block_tls = self.space.load_block_tls(block);
+        let block_tls = block.load_tls::<VM>();
 
         if self.tls.0 == block_tls {
             // same thread that allocated
-            let local_free = FreeListAllocator::<VM>::load_local_free_list(block);
+            let local_free = block.load_local_free_list::<VM>();
             unsafe {
                 addr.store(local_free);
             }
-            FreeListAllocator::<VM>::store_local_free_list(block, addr);
+            block.store_local_free_list::<VM>(addr);
         } else {
             // different thread to allocator
             unreachable!();
@@ -701,15 +534,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         unsafe { unset_alloc_bit_unsafe(addr.to_object_reference()) };
     }
 
-    pub fn store_block_tls(&self, block: Address) {
-        let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(self.tls.0) };
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::TLS_TABLE),
-            unsafe { block.to_object_reference() },
-            tls,
-            None,
-            None,
-        );
+    pub fn store_block_tls(&self, block: Block) {
+        block.store_tls::<VM>(self.tls);
     }
 
     #[cfg(feature = "lazy_sweeping")]
@@ -721,63 +547,66 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
-            let available = &mut self.available_blocks[bin];
-            debug_assert!(available.size == unswept.size);
-            if !available.is_empty() {
-                if unswept.is_empty() {
-                    unswept.first = available.first;
-                    FreeListAllocator::<VM>::store_block_list(unswept.first, unswept);
-                } else {
-                    // eprintln!("reset available: store {} -> {}", unswept.last, available.first);
-                    FreeListAllocator::<VM>::store_next_block(unswept.last, available.first);
-                    FreeListAllocator::<VM>::store_prev_block(available.first, unswept.last);
-                    let mut next = available.first;
-                    // eprintln!("moving to list {:?} (sweep available), available.first = {}", unswept as *mut _, next);
-                    while !next.is_zero() {
-                        if !FreeListAllocator::<VM>::load_prev_block(next).is_zero() {
-                            assert!(next == FreeListAllocator::<VM>::load_next_block(FreeListAllocator::<VM>::load_prev_block(next)));
-                        }
-                        if !FreeListAllocator::<VM>::load_next_block(next).is_zero() {
-                            assert!(next == FreeListAllocator::<VM>::load_prev_block(FreeListAllocator::<VM>::load_next_block(next)));
-                        }
-                        // eprintln!("{} is moved to list {:?} (sweep available)", next, unswept as *mut _);
-                        next = FreeListAllocator::<VM>::load_next_block(next);
-                        assert!(next != available.first);
-                    }
-                }
-                unswept.last = available.last;
-                FreeListAllocator::<VM>::store_block_list(unswept.last, unswept);
-                debug_assert!(!unswept.first.is_zero());
-                debug_assert!(FreeListAllocator::<VM>::load_next_block(unswept.last).is_zero());
-            }
-            let consumed = &mut self.consumed_blocks[bin];
-            if !consumed.is_empty() {
-                if unswept.is_empty() {
-                    unswept.first = consumed.first;
-                    FreeListAllocator::<VM>::store_block_list(unswept.first, unswept);
-                } else {
-                    // eprintln!("reset consumed: store {} -> {}", unswept.last, consumed.first); 
-                    FreeListAllocator::<VM>::store_next_block(unswept.last, consumed.first);
-                    FreeListAllocator::<VM>::store_prev_block(consumed.first, unswept.last);
-                    let mut next = consumed.first;
-                    // eprintln!("moving to list {:?} (sweep consumed), consumed.first = {}", unswept as *mut _, next);
-                    while !next.is_zero() {
-                        if !FreeListAllocator::<VM>::load_prev_block(next).is_zero() {
-                            assert!(next == FreeListAllocator::<VM>::load_next_block(FreeListAllocator::<VM>::load_prev_block(next)));
-                        }
-                        if !FreeListAllocator::<VM>::load_next_block(next).is_zero() {
-                            assert!(next == FreeListAllocator::<VM>::load_prev_block(FreeListAllocator::<VM>::load_next_block(next)));
-                        }
-                        // eprintln!("{} is moved to list {:?} (sweep consumed)", next, unswept as *mut _);
-                        next = FreeListAllocator::<VM>::load_next_block(next);
-                        assert!(next != consumed.first);
-                    }
-                }
-                unswept.last = consumed.last;
-                FreeListAllocator::<VM>::store_block_list(unswept.last, unswept);
-            }
-            available.reset();
-            consumed.reset();
+            let available = self.available_blocks.get_mut(bin).unwrap();
+            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
+            unswept.append::<VM>(available);
+            unswept.append::<VM>(consumed);
+            // debug_assert!(available.size == unswept.size);
+            // if !available.is_empty() {
+            //     if unswept.is_empty() {
+            //         unswept.first = available.first;
+            //         unswept.first.store_block_list::<VM>(unswept);
+            //     } else {
+            //         // eprintln!("reset available: store {} -> {}", unswept.last.start(), available.first.start());
+            //         unswept.last.store_next_block::<VM>(available.first);
+            //         available.first.store_prev_block::<VM>(unswept.last);
+            //         let mut next = available.first;
+            //         // eprintln!("moving to list {:?} (sweep available), available.first = {}", unswept as *mut _, next.start());
+            //         while !next.is_zero() {
+            //             // if !next.load_prev_block::<VM>().is_zero() {
+            //             //     assert!(next == next.load_prev_block::<VM>().load_next_block::<VM>());
+            //             // }
+            //             // if !next.load_next_block::<VM>().is_zero() {
+            //             //     assert!(next == next.load_next_block::<VM>().load_prev_block::<VM>());
+            //             // }
+            //             // eprintln!("{} is moved to list {:?} (sweep available)", next.start(), unswept as *mut _);
+            //             next = next.load_next_block::<VM>();
+            //             assert!(next != available.first);
+            //         }
+            //     }
+            //     unswept.last = available.last;
+            //     unswept.last.store_block_list::<VM>(unswept);
+            //     debug_assert!(!unswept.first.is_zero());
+            //     debug_assert!(unswept.last.load_next_block::<VM>().is_zero());
+            // }
+            // let consumed = &mut self.consumed_blocks[bin];
+            // if !consumed.is_empty() {
+            //     if unswept.is_empty() {
+            //         unswept.first = consumed.first;
+            //         unswept.first.store_block_list::<VM>(unswept);
+            //     } else {
+            //         // eprintln!("reset consumed: store {} -> {}", unswept.last.start(), consumed.first.start()); 
+            //         unswept.last.store_next_block::<VM>(consumed.first);
+            //         consumed.first.store_prev_block::<VM>(unswept.last);
+            //         let mut next = consumed.first;
+            //         // eprintln!("moving to list {:?} (sweep consumed), consumed.first = {}", unswept as *mut _, next.start());
+            //         while !next.is_zero() {
+            //             // if !next.load_prev_block::<VM>().is_zero() {
+            //             //     assert!(next == next.load_prev_block::<VM>().load_next_block::<VM>());
+            //             // }
+            //             // if !next.load_next_block::<VM>().is_zero() {
+            //             //     assert!(next == next.load_next_block::<VM>().load_prev_block::<VM>());
+            //             // }
+            //             // eprintln!("{} is moved to list {:?} (sweep consumed)", next.start(), unswept as *mut _);
+            //             next = next.load_next_block::<VM>();
+            //             assert!(next != consumed.first, next.start());
+            //         }
+            //     }
+            //     unswept.last = consumed.last;
+            //     unswept.last.store_block_list::<VM>(unswept);
+            // }
+            // available.reset();
+            // consumed.reset();
             bin += 1;
         }
 
@@ -796,16 +625,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if !available.first.is_zero() {
                 let mut block = available.first;
                 self.sweep_block(block);
-                let mut next = FreeListAllocator::<VM>::load_next_block(block);
+                let mut next = block.load_next_block::<VM>();
                 while !next.is_zero() {
                     block = next;
                     self.sweep_block(block);
-                    next = FreeListAllocator::<VM>::load_next_block(block);
+                    next = block.load_next_block::<VM>();
                 }
-                FreeListAllocator::<VM>::store_next_block(
-                    block,
-                    consumed.first,
-                );
+                block.store_next_block(block, consumed.first);
             } else {
                 self.available_blocks[bin].first = consumed.first;
                 FreeListAllocator::<VM>::store_block_list(self.available_blocks[bin].first, self.available_blocks[bin]);
@@ -814,7 +640,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 let mut block = consumed.first;
                 while !block.is_zero() {
                     self.sweep_block(block);
-                    block = FreeListAllocator::<VM>::load_next_block(block);
+                    block = block.load_next_block::<VM>();
                 }
             }
             bin += 1;
@@ -828,30 +654,32 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         self.space = space;
     }
 
-    fn mi_wsize_from_size(size: usize) -> usize {
-        // Align a byte size to a size in machine words
-        // i.e. byte size == `wsize*sizeof(void*)`
-        // adapted from _mi_wsize_from_size in mimalloc
-        (size + size_of::<u32>() - 1) / size_of::<u32>()
-    }
 
-    pub fn mi_bin(size: usize) -> u8 {
-        // adapted from _mi_bin in mimalloc
-        let mut wsize: usize = FreeListAllocator::<VM>::mi_wsize_from_size(size);
-        let bin: u8;
-        if wsize <= 1 {
-            bin = 1;
-        } else if wsize <= 8 {
-            bin = wsize as u8;
-            // bin = ((wsize + 1) & !1) as u8; // round to double word sizes
-        } else if wsize > MI_LARGE_OBJ_WSIZE_MAX {
-            // bin = MI_BIN_HUGE;
-            panic!(); // this should not be reached, because I'm sending objects bigger than this to the immortal space
-        } else {
-            wsize -= 1;
-            let b = (MI_INTPTR_BITS - 1 - (u64::leading_zeros(wsize as u64)) as usize) as u8; // note: wsize != 0
-            bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
-        }
-        bin
+}
+
+fn mi_wsize_from_size(size: usize) -> usize {
+    // Align a byte size to a size in machine words
+    // i.e. byte size == `wsize*sizeof(void*)`
+    // adapted from _mi_wsize_from_size in mimalloc
+    (size + size_of::<u32>() - 1) / size_of::<u32>()
+}
+
+pub fn mi_bin(size: usize) -> u8 {
+    // adapted from _mi_bin in mimalloc
+    let mut wsize: usize = mi_wsize_from_size(size);
+    let bin: u8;
+    if wsize <= 1 {
+        bin = 1;
+    } else if wsize <= 8 {
+        bin = wsize as u8;
+        // bin = ((wsize + 1) & !1) as u8; // round to double word sizes
+    } else if wsize > MI_LARGE_OBJ_WSIZE_MAX {
+        // bin = MI_BIN_HUGE;
+        panic!(); // this should not be reached, because I'm sending objects bigger than this to the immortal space
+    } else {
+        wsize -= 1;
+        let b = (MI_INTPTR_BITS - 1 - (u64::leading_zeros(wsize as u64)) as usize) as u8; // note: wsize != 0
+        bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
     }
+    bin
 }
