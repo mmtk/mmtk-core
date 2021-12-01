@@ -47,7 +47,7 @@ pub fn create_nogc_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: box {
-            let mut vec = create_space_mapping(RESERVED_ALLOCATORS, false, plan);
+            let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
             vec.push((
                 AllocatorSelector::BumpPointer(0),
                 &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
