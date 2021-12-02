@@ -55,9 +55,12 @@ pub trait Counter {
     fn print_last(&self);
     /// Whether the counter merges other and stw phases.
     fn merge_phases(&self) -> bool;
-    /// Whether the counter starts implicitly after creation
-    ///
-    /// FIXME currently unused
+    /// Whether the counter implicitly starts at harness_begin, and stops at harness_end.
+    /// This makes sure the counter captures all the events during the measuring period.
+    /// If you are using a counter that is 'implicitly_start' and you would still like to
+    /// manually control its start/end, please take the implicit start/end into consideration.
+    /// If a counter has 'implicitly_start' as false, the counter needs to be manually started
+    /// and stopped.
     fn implicitly_start(&self) -> bool;
     /// Get the name of the counter
     fn name(&self) -> &String;

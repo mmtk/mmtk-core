@@ -288,7 +288,11 @@ impl Stats {
         self.shared.set_gathering_stats(true);
 
         for c in &(*counters) {
-            c.lock().unwrap().start();
+            let mut counter = c.lock().unwrap();
+            // Only start counters that should 'implicitly start'.
+            if counter.implicitly_start() {
+                counter.start();
+            }
         }
     }
 
@@ -300,7 +304,11 @@ impl Stats {
     fn stop_all_counters(&self) {
         let counters = self.counters.lock().unwrap();
         for c in &(*counters) {
-            c.lock().unwrap().stop();
+            let mut counter = c.lock().unwrap();
+            // Only stop counters that should 'implicitly start'.
+            if counter.implicitly_start() {
+                counter.stop();
+            }
         }
         self.shared.set_gathering_stats(false);
     }
