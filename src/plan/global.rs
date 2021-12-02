@@ -92,9 +92,6 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
             vm_map, mmapper, options,
         )),
-        PlanSelector::FreeListMarkSweep => Box::new(crate::plan::freelistmarksweep::FreeListMarkSweep::new(
-            vm_map, mmapper, options,
-        )),
     }
 }
 

@@ -43,10 +43,10 @@ pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
 
 #[cfg(feature="malloc")]
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
-        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
-        map[AllocationSemantics::Default] = AllocatorSelector::Malloc(0);
-        map
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::FreeList(0),
+        AllocationType::Immortal | AllocationType::LargeCode => AllocatorSelector::BumpPointer(0),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
 

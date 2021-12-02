@@ -42,7 +42,7 @@ crossbeam = "0.7.3"
 rand = "0.7.3"
 
 [features]
-default = ["sanity"]
+default = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
@@ -80,14 +80,6 @@ single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
-
-# Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
-nogc_multi_space = []
-
-# To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
-work_packet_stats = []
-# lazy sweeping in mark sweep policy
-lazy_sweeping = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
