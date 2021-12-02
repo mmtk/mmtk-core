@@ -135,6 +135,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::MarkCompact => {
+            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
+        }
     })
 }
 
@@ -166,6 +169,9 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options, scheduler, stats,
         )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
+            vm_map, mmapper, options, stats,
+        )),
+        PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
             vm_map, mmapper, options, stats,
         )),
     }

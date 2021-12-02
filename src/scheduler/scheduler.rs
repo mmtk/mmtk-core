@@ -63,7 +63,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_prepare", false, true))),
                 WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_closure", false, true))),
                 WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_ref_closure", false, true))),
+                WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_calculate_forwarding", false, true))),
                 WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_ref_forwarding", false, true))),
+                WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_compact", false, true))),
                 WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_release", false, true))),
                 WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_final", false, true))),
             },
@@ -140,7 +142,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             open_next(Closure);
             open_next(RefClosure);
+            open_next(CalculateForwarding);
             open_next(RefForwarding);
+            open_next(Compact);
             open_next(Release);
             open_next(Final);
         }
@@ -291,7 +295,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::CalculateForwarding].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Compact].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
     }
@@ -300,7 +306,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
+        self.work_buckets[WorkBucketStage::Compact].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
@@ -309,7 +317,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
+        self.work_buckets[WorkBucketStage::Compact].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
