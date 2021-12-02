@@ -20,6 +20,7 @@ use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use crate::util::statistics::stats::Stats;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -136,10 +137,11 @@ impl<VM: VMBinding> Immix<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         scheduler: Arc<GCWorkScheduler<VM>>,
+        stats: Stats,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        let immix = Immix {
+        let mut immix = Immix {
             immix_space: ImmixSpace::new(
                 "immix",
                 vm_map,
@@ -158,6 +160,7 @@ impl<VM: VMBinding> Immix<VM> {
             ),
             last_gc_was_defrag: AtomicBool::new(false),
         };
+        immix.common.base.stats = stats;
 
         {
             let mut side_metadata_sanity_checker = SideMetadataSanity::new();

@@ -144,6 +144,7 @@ pub fn create_plan<VM: VMBinding>(
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
     scheduler: Arc<GCWorkScheduler<VM>>,
+    stats: Stats,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -160,7 +161,7 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )),
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options, scheduler, stats,
         )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,

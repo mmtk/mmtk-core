@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
+use crate::util::statistics::stats::Stats;
 
 pub enum CoordinatorMessage<VM: VMBinding> {
     Work(Box<dyn CoordinatorWork<VM>>),
@@ -54,19 +55,19 @@ pub struct GCWorkScheduler<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new() -> Arc<Self> {
+    pub fn new(stats: &Stats) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         Arc::new(Self {
             work_buckets: enum_map! {
-                WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-                WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone(), None),
+                WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_prepare", false, true))),
+                WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_closure", false, true))),
+                WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_ref_closure", false, true))),
+                WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_ref_forwarding", false, true))),
+                WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_release", false, true))),
+                WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), Some(stats.new_timer("bucket_wait_final", false, true))),
             },
-            coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
+            coordinator_work: WorkBucket::new(true, worker_monitor.clone(), None),
             worker_group: None,
             worker_monitor,
             mmtk: None,
@@ -400,6 +401,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().control_collector_context.clear_request();
+
+        for bucket in self.work_buckets.values() {
+            bucket.inform_stop_the_world();
+        }
+
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();

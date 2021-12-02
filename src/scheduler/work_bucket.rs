@@ -6,6 +6,7 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use crate::util::statistics::counter::*;
 
 /// A unique work-packet id for each instance of work-packet
 #[derive(Eq, PartialEq, Clone, Copy)]
@@ -55,6 +56,9 @@ impl<VM: VMBinding> PartialOrd for PrioritizedWork<VM> {
 }
 
 pub struct WorkBucket<VM: VMBinding> {
+    /// How long this bucket is waited for (this gives us an idea how long each 'phase' takes).
+    /// This is initialized for buckets that are used for the phases of GC works (excluding coordinator bucket, and worker local bucket)
+    wait_timer: Option<Arc<Mutex<Timer>>>,
     active: AtomicBool,
     /// A priority queue
     queue: RwLock<BinaryHeap<PrioritizedWork<VM>>>,
@@ -64,8 +68,9 @@ pub struct WorkBucket<VM: VMBinding> {
 
 impl<VM: VMBinding> WorkBucket<VM> {
     pub const DEFAULT_PRIORITY: usize = 1000;
-    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>, timer: Option<Arc<Mutex<Timer>>>) -> Self {
         Self {
+            wait_timer: timer,
             active: AtomicBool::new(active),
             queue: Default::default(),
             monitor,
@@ -83,9 +88,22 @@ impl<VM: VMBinding> WorkBucket<VM> {
     pub fn is_activated(&self) -> bool {
         self.active.load(Ordering::SeqCst)
     }
+    /// Inform the work bucket that we have stopped the world and from now the bucket is waiting to be activated.
+    pub fn inform_stop_the_world(&self) {
+        // If we have the wait timer, start it now.
+        if let Some(ref t) = self.wait_timer {
+            let mut timer = t.lock().unwrap();
+            timer.start();
+        }
+    }
     /// Enable the bucket
     pub fn activate(&self) {
         self.active.store(true, Ordering::SeqCst);
+        // If we have the wait timer, stop it as the bucket is open now.
+        if let Some(ref t) = self.wait_timer {
+            let mut timer = t.lock().unwrap();
+            timer.stop();
+        }
     }
     /// Test if the bucket is drained
     pub fn is_empty(&self) -> bool {

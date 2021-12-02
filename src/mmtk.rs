@@ -16,6 +16,7 @@ use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use crate::util::statistics::stats::Stats;
 
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
@@ -51,14 +52,16 @@ pub struct MMTK<VM: VMBinding> {
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
-        let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
+        let stats = Stats::new(&options);
+        let scheduler = GCWorkScheduler::new(&stats);
         let plan = crate::plan::create_plan(
             options.plan,
             &VM_MAP,
             &MMAPPER,
             options.clone(),
             scheduler.clone(),
+            stats,
         );
         MMTK {
             plan,
