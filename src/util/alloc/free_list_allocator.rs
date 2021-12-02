@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::{mem::size_of, ops::BitAnd};
 
 use atomic::Ordering;
@@ -7,13 +8,8 @@ use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::util::alloc_bit::{is_alloced, set_alloc_bit, unset_alloc_bit_unsafe};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::heap::layout::FragmentedMapper;
-use crate::util::metadata::load_metadata;
-use crate::util::metadata::store_metadata;
-use crate::util::metadata::MetadataSpec;
 use crate::util::alloc::Allocator;
 use crate::util::Address;
-use crate::util::OpaquePointer;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 use crate::Plan;
@@ -107,109 +103,24 @@ pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
     BlockList::new(MI_LARGE_OBJ_WSIZE_MAX + 1 /* 655360, Huge queue */),
 ];
 
-pub(crate) const BYTES_IN_BLOCK: usize = 1 << LOG_BYTES_IN_BLOCK;
-pub(crate) const LOG_BYTES_IN_BLOCK: usize = 16;
-const MI_BIN_HUGE: usize = 73;
-const MI_INTPTR_SHIFT: usize = 3;
-const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
-pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
-const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
-const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
-const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
-
-// mimalloc init.c:46
-pub(crate) const BLOCK_LISTS_EMPTY: [BlockList; MI_BIN_HUGE + 1] = [
-    BlockList::new(1 * 4),
-    BlockList::new(1 * 4),
-    BlockList::new(2 * 4),
-    BlockList::new(3 * 4),
-    BlockList::new(4 * 4),
-    BlockList::new(5 * 4),
-    BlockList::new(6 * 4),
-    BlockList::new(7 * 4),
-    BlockList::new(8 * 4), /* 8 */
-    BlockList::new(10 * 4),
-    BlockList::new(12 * 4),
-    BlockList::new(14 * 4),
-    BlockList::new(16 * 4),
-    BlockList::new(20 * 4),
-    BlockList::new(24 * 4),
-    BlockList::new(28 * 4),
-    BlockList::new(32 * 4), /* 16 */
-    BlockList::new(40 * 4),
-    BlockList::new(48 * 4),
-    BlockList::new(56 * 4),
-    BlockList::new(64 * 4),
-    BlockList::new(80 * 4),
-    BlockList::new(96 * 4),
-    BlockList::new(112 * 4),
-    BlockList::new(128 * 4), /* 24 */
-    BlockList::new(160 * 4),
-    BlockList::new(192 * 4),
-    BlockList::new(224 * 4),
-    BlockList::new(256 * 4),
-    BlockList::new(320 * 4),
-    BlockList::new(384 * 4),
-    BlockList::new(448 * 4),
-    BlockList::new(512 * 4), /* 32 */
-    BlockList::new(640 * 4),
-    BlockList::new(768 * 4),
-    BlockList::new(896 * 4),
-    BlockList::new(1024 * 4),
-    BlockList::new(1280 * 4),
-    BlockList::new(1536 * 4),
-    BlockList::new(1792 * 4),
-    BlockList::new(2048 * 4), /* 40 */
-    BlockList::new(2560 * 4),
-    BlockList::new(3072 * 4),
-    BlockList::new(3584 * 4),
-    BlockList::new(4096 * 4),
-    BlockList::new(5120 * 4),
-    BlockList::new(6144 * 4),
-    BlockList::new(7168 * 4),
-    BlockList::new(8192 * 4), /* 48 */
-    BlockList::new(10240 * 4),
-    BlockList::new(12288 * 4),
-    BlockList::new(14336 * 4),
-    BlockList::new(16384 * 4),
-    BlockList::new(20480 * 4),
-    BlockList::new(24576 * 4),
-    BlockList::new(28672 * 4),
-    BlockList::new(32768 * 4), /* 56 */
-    BlockList::new(40960 * 4),
-    BlockList::new(49152 * 4),
-    BlockList::new(57344 * 4),
-    BlockList::new(65536 * 4),
-    BlockList::new(81920 * 4),
-    BlockList::new(98304 * 4),
-    BlockList::new(114688 * 4),
-    BlockList::new(131072 * 4), /* 64 */
-    BlockList::new(163840 * 4),
-    BlockList::new(196608 * 4),
-    BlockList::new(229376 * 4),
-    BlockList::new(262144 * 4),
-    BlockList::new(327680 * 4),
-    BlockList::new(393216 * 4),
-    BlockList::new(458752 * 4),
-    BlockList::new(524288 * 4), /* 72 */
-    BlockList::new(MI_LARGE_OBJ_WSIZE_MAX + 1 /* 655360, Huge queue */),
-];
+type BlockLists = [BlockList; MI_BIN_HUGE + 1];
 
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
-    available_blocks: Vec<BlockList>, // = pages in mimalloc
+    available_blocks: BlockLists, // = pages in mimalloc
     #[cfg(feature = "lazy_sweeping")]
-    unswept_blocks: Vec<BlockList>,
-    consumed_blocks: Vec<BlockList>,
+    unswept_blocks: BlockLists,
+    consumed_blocks: BlockLists,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockList {
     pub first: Block,
     pub last: Block,
     size: usize,
+    lock: AtomicBool,
 }
 
 impl BlockList {
@@ -218,6 +129,7 @@ impl BlockList {
             first: ZERO_BLOCK,
             last: ZERO_BLOCK,
             size,
+            lock: AtomicBool::new(false),
         }
     }
 
@@ -228,7 +140,6 @@ impl BlockList {
     pub fn remove<VM: VMBinding>(&mut self, block: Block) {
         let prev = block.load_prev_block::<VM>();
         let next = block.load_next_block::<VM>();
-        // eprintln!("BlockList.remove {} from {:?}", block.start(), self as *const _);
         if prev.is_zero() {
             if next.is_zero() {
                 self.first = ZERO_BLOCK;
@@ -253,10 +164,8 @@ impl BlockList {
     }
 
     fn pop<VM: VMBinding>(&mut self) -> Block {
-        // eprintln!("start to pop from list {:?}", self as *mut _);
         let rtn = self.first;
         if rtn.is_zero() {
-            // eprintln!("list {:?} is empty", self as *mut _);
             return rtn;
         }
         let next = rtn.load_next_block::<VM>();
@@ -270,12 +179,10 @@ impl BlockList {
         }
         rtn.store_next_block::<VM>(ZERO_BLOCK);
         rtn.store_prev_block::<VM>(ZERO_BLOCK);
-        // eprintln!("popped {} from list {:?}", rtn.start(), self as *mut _);
         rtn
     }
 
     fn push<VM: VMBinding>(&mut self, block: Block) {
-        // eprintln!("push {} to list {:?}", block.start(), self as *const _);
         if self.is_empty() {
             block.store_next_block::<VM>(ZERO_BLOCK);
             block.store_prev_block::<VM>(ZERO_BLOCK);
@@ -288,7 +195,6 @@ impl BlockList {
             self.first = block;
         }
         block.store_block_list::<VM>(self);
-        // eprintln!("store {} in list {:?}", block.start(), self as *const BlockList);
     }
     
     fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
@@ -303,8 +209,11 @@ impl BlockList {
                 list.first.store_prev_block::<VM>(self.last);
                 self.last = list.last;
             }
-            self.first.store_block_list::<VM>(self);
-            self.last.store_block_list::<VM>(self);
+            let mut block = list.first;
+            while !block.is_zero() {
+                block.store_block_list::<VM>(self);
+                block = block.load_next_block::<VM>();
+            }
             list.reset();
         }
     }
@@ -312,6 +221,17 @@ impl BlockList {
     fn reset(&mut self) {
         self.first = ZERO_BLOCK;
         self.last = ZERO_BLOCK;
+    }
+
+    pub fn lock(&mut self) {
+        let mut success = false;
+        while !success {
+            success = self.lock.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok();
+        }
+    }
+
+    pub fn release_lock(&mut self) {
+        self.lock.store(false, Ordering::SeqCst);
     }
 }
 
@@ -350,7 +270,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // eprintln!("alloc slow once");
         // try to find an existing block with free cells
         let bin = mi_bin(size);
         if !self.available_blocks[bin as usize].is_empty() {
@@ -385,8 +304,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
-        // // eprintln!("a {}", free_list);
-        // eprintln!("end alloc slow once");
 
         free_list
     }
@@ -402,10 +319,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             plan,
-            available_blocks: BLOCK_LISTS_EMPTY.to_vec(),
+            available_blocks: BLOCK_LISTS_EMPTY,
             #[cfg(feature = "lazy_sweeping")]
-            unswept_blocks: BLOCK_LISTS_EMPTY.to_vec(),
-            consumed_blocks: BLOCK_LISTS_EMPTY.to_vec(),
+            unswept_blocks: BLOCK_LISTS_EMPTY,
+            consumed_blocks: BLOCK_LISTS_EMPTY,
         }
     }
 
@@ -434,7 +351,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
                 return free_list;
             }
-            // eprintln!("block {} is consumed", block.start());
             available_blocks.pop::<VM>();
             self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
 
@@ -549,12 +465,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             self.sweep_block(block);
             if block.has_free_cells::<VM>() {
                 // recyclable block
-                // eprintln!("{} unswept -> available", block.start());
                 self.available_blocks.get_mut(bin).unwrap().push::<VM>(block);
                 return block;
             } else {
                 // nothing was freed from this block
-                // eprintln!("{} unswept -> consumed", block.start());
                 self.consumed_blocks.get_mut(bin).unwrap().push::<VM>(block);
             }
         }
@@ -568,7 +482,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             return block;
         }
         self.space.record_new_block(block);
-        // eprintln!("b > 0x{:0x} {}", block.start(), self.available_blocks[bin as usize].size);
 
         // construct free list
         let block_end = block.start() + BYTES_IN_BLOCK;
@@ -635,7 +548,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
-        // // eprintln!("f {}", addr);
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = block.load_tls::<VM>();
@@ -649,7 +561,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             block.store_local_free_list::<VM>(addr);
         } else {
             // different thread to allocator
-            unreachable!();
+            unreachable!("{:?}, {:?}", self.tls.0, block_tls);
             // let mut success = false;
             // while !success {
             //     let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
