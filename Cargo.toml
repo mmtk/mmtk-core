@@ -42,7 +42,7 @@ crossbeam = "0.7.3"
 rand = "0.7.3"
 
 [features]
-default = ["sanity"]
+default = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
@@ -102,4 +102,10 @@ malloc_jemalloc = ["jemalloc-sys"]
 malloc_hoard = ["hoard-sys"]
 
 # If there are more groups, they should be inserted above this line
+# Group:end
+
+# Group:marksweepallocation
+# default is native allocator with lazy sweeping
+eager_sweeping = []
+malloc = []
 # Group:end
