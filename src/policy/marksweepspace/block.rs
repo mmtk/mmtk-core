@@ -201,7 +201,6 @@ impl Block {
             None,
             None,
         );
-        // eprintln!("store {} -> {}", self.start(), next.start());
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
@@ -213,13 +212,10 @@ impl Block {
             None,
             None,
         );
-        // eprintln!("store {} -> {}", prev.start(), self.start());
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
         assert!(!self.0.is_zero());
-        assert!(self.load_prev_block::<VM>().is_zero() || self.load_next_block::<VM>().is_zero());
-        assert!(block_list.first == *self || block_list.last == *self);
         // let ptr: *mut BlockList = &mut block_list;
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
@@ -322,23 +318,20 @@ impl Block {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
-                // // eprintln!("block {} is unmarked", self.0);
+                let mut block_list = self.load_block_list::<VM>();
+                unsafe { (*block_list).lock(); }
                 let prev = self.load_prev_block::<VM>();
                 let next = self.load_next_block::<VM>();
-                // eprintln!("sweep: {} -> {} -> {}", prev.0, self.0, next.0);
                 if next.is_zero() || prev.is_zero() {
                     unsafe { 
                         let mut block_list = self.load_block_list::<VM>();
-                        // eprintln!("sweep: {} -> {} -> {}, {:?}, first = {}, last = {}", prev.0, self.0, next.0, block_list, (*block_list).first.start(), (*block_list).last.start());
                         (*block_list).remove::<VM>(self);
                     }
                 } else {
-                    // // eprintln!("block: store {} -> {}", prev, next); 
                     next.store_prev_block::<VM>(prev);
                     prev.store_next_block::<VM>(next);
                 }
-                // check what list
-                // try to remove copy
+                unsafe { (*block_list).release_lock(); }
                 space.release_block(self);
                 true
             }

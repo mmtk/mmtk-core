@@ -175,10 +175,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        // eprintln!("check mark {}", object.to_address());
         if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            // eprintln!("m {} meta: {}", object.to_address(), address_to_meta_address(&VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.extract_side_spec(), object.to_address()));
             let block = FreeListAllocator::<VM>::get_block(address);
             block.set_state(BlockState::Marked);
             trace.process_node(object);
@@ -187,10 +185,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
         
     pub fn zero_mark_bits(&self) {
-        // eprintln!("b zero all {} {}", self.chunk_map.all_chunks().start.start(), self.chunk_map.all_chunks().end.start());
+        // todo: concurrent zeroing
         use crate::vm::*;
         for chunk in self.chunk_map.all_chunks() {
-            // eprintln!("b zero {}", chunk.start());
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
             }
@@ -214,16 +211,15 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn block_level_sweep(&self) {
         let space = unsafe { &*(self as *const Self) };
-        for chunk in self.chunk_map.all_chunks() {
-            chunk.sweep(space);
-        }
-        // let work_packets = self.chunk_map.generate_sweep_tasks(space);
-        // self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        // for chunk in self.chunk_map.all_chunks() {
+        //     chunk.sweep(space);
+        // }
+        let work_packets = self.chunk_map.generate_sweep_tasks(space);
+        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 
     /// Release a block.
     pub fn release_block(&self, block: Block) {
-        // eprintln!("b < {}", block.start());
         self.block_clear_metadata(block);
 
         block.deinit();
