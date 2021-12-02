@@ -43,7 +43,7 @@ impl SchedulerStat {
     }
 
     /// Used during statistics printing at [`crate::memory_manager::harness_end`]
-    pub fn harness_stat(&self) -> HashMap<String, String> {
+    pub fn harness_stat(&self) -> HashMap<String, f64> {
         let mut stat = HashMap::new();
         // Work counts
         let mut total_count = 0;
@@ -52,10 +52,10 @@ impl SchedulerStat {
             let n = self.work_id_name_map[t];
             stat.insert(
                 format!("work.{}.count", self.work_name(n)),
-                format!("{}", c),
+                *c as f64,
             );
         }
-        stat.insert("total-work.count".to_owned(), format!("{}", total_count));
+        stat.insert("total-work.count".to_owned(), total_count as f64);
         // Work execution times
         let mut duration_overall: WorkCounterBase = Default::default();
         for (t, vs) in &self.work_counters {
@@ -75,30 +75,30 @@ impl SchedulerStat {
                 let name = v.first().unwrap().name();
                 stat.insert(
                     format!("work.{}.{}.total", self.work_name(n), name),
-                    format!("{:.2}", fold.total),
+                    fold.total,
                 );
                 stat.insert(
                     format!("work.{}.{}.min", self.work_name(n), name),
-                    format!("{:.2}", fold.min),
+                    fold.min,
                 );
                 stat.insert(
                     format!("work.{}.{}.max", self.work_name(n), name),
-                    format!("{:.2}", fold.max),
+                    fold.max,
                 );
             }
         }
         // Print out overall execution time
         stat.insert(
             "total-work.time.total".to_owned(),
-            format!("{:.2}", duration_overall.total),
+            duration_overall.total,
         );
         stat.insert(
             "total-work.time.min".to_owned(),
-            format!("{:.2}", duration_overall.min),
+            duration_overall.min,
         );
         stat.insert(
             "total-work.time.max".to_owned(),
-            format!("{:.2}", duration_overall.max),
+            duration_overall.max,
         );
 
         stat

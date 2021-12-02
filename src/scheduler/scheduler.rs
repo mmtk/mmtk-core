@@ -388,7 +388,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         coordinator_worker.stat.enable();
     }
 
-    pub fn statistics(&self) -> HashMap<String, String> {
+    pub fn statistics(&self) -> HashMap<String, f64> {
         let mut summary = SchedulerStat::default();
         for worker in &self.worker_group().workers {
             summary.merge(&worker.stat);

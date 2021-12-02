@@ -28,6 +28,49 @@ custom_derive! {
     }
 }
 
+custom_derive! {
+    #[derive(Copy, Clone, EnumFromStr, Debug)]
+    pub enum StatisticsOutputFormat {
+        /// Tab separated values. The first line is the keys and the second line is the values. This is the default output format.
+        /// key1\t key2\t key3\t
+        /// val1\t val2\t val3\t
+        /// Total time: 123
+        TabSeparatedValuesWithTotalTime,
+        /// Key value pairs.
+        /// key1=val1
+        /// key2=val2
+        /// key3=val3
+        KeyValuePairs,
+    }
+}
+
+/// Filtering statistics by strings. If the stat key includes any of the strings,
+/// the stat will be included in the output. Otherwise, the stats will be omitted.
+/// By default, Vec<Strign> is an empty vec and all stats will be included.
+#[derive(Clone, Debug)]
+pub struct StatisticsOutputFilter(Vec<String>);
+impl StatisticsOutputFilter {
+    pub fn matches(&self, key: &str) -> bool {
+        if self.0.is_empty() {
+            true
+        } else {
+            self.0.iter().find(|f| key.contains(*f)).is_some()
+        }
+    }
+}
+impl std::default::Default for StatisticsOutputFilter {
+    fn default() -> Self {
+        StatisticsOutputFilter(vec![])
+    }
+}
+impl FromStr for StatisticsOutputFilter {
+    type Err = String;
+    fn from_str(filter_str: &str) -> Result<Self, Self::Err> {
+        let ret = StatisticsOutputFilter(filter_str.split(',').map(|s| s.to_owned()).collect());
+        Ok(ret)
+    }
+}
+
 /// MMTk option for perf events
 ///
 /// The format is
@@ -211,7 +254,11 @@ options! {
     // Measuring perf events for work packets
     work_perf_events:       PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
-    phase_perf_events:      PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
+    phase_perf_events:      PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
+    // The output format for MMTk statistics
+    statistics_output_format: StatisticsOutputFormat [always_valid] = StatisticsOutputFormat::TabSeparatedValuesWithTotalTime,
+    // The output filter for MMTk statistics
+    statistics_output_filter: StatisticsOutputFilter [always_valid] = StatisticsOutputFilter::default()
 }
 
 impl Options {

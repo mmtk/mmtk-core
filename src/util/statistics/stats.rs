@@ -184,32 +184,81 @@ impl Stats {
     }
 
     pub fn print_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) {
-        println!(
-            "============================ MMTk Statistics Totals ============================"
-        );
-        let scheduler_stat = mmtk.scheduler.statistics();
-        self.print_column_names(&scheduler_stat);
-        print!("{}\t", self.get_phase() / 2);
-        let counter = self.counters.lock().unwrap();
-        for iter in &(*counter) {
-            let c = iter.lock().unwrap();
-            if c.merge_phases() {
-                c.print_total(None);
-            } else {
-                c.print_total(Some(true));
-                print!("\t");
-                c.print_total(Some(false));
+        let output = self.format_stats(mmtk);
+        print!("{}", output);
+    }
+
+    fn format_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) -> String {
+        use crate::util::options::StatisticsOutputFormat;
+
+        // Output string
+        let mut output = String::new();
+        // push header
+        output.push_str("============================ MMTk Statistics Totals ============================\n");
+
+        // Get all stats from counters and scheduler stats
+        let stats = self.get_all_stats(mmtk);
+        // Get keys to print (the keys will be filtered by options and sorted)
+        let keys_to_print = {
+            let mut keys = stats.keys().filter(|k| {
+                mmtk.options.statistics_output_filter.matches(k)
+            }).collect::<Vec<&String>>();
+            keys.sort();
+            keys
+        };
+
+        match mmtk.options.statistics_output_format {
+            StatisticsOutputFormat::TabSeparatedValuesWithTotalTime => {
+                // push values, separated by tab
+                let mut key_line = String::new();
+                let mut val_line = String::new();
+                for key in keys_to_print {
+                    let val = stats.get(key).unwrap();
+                    key_line.push_str(key);
+                    key_line.push_str("\t");
+                    val_line.push_str(&format!("{:.2}", val));
+                    val_line.push_str("\t");
+                }
+                output.push_str(&key_line);
+                output.push_str("\n");
+                output.push_str(&val_line);
+                output.push_str("\n");
+                // push total
+                output.push_str(&format!("Total time: {} ms\n", self.total_time.lock().unwrap().get_total(None)));
             }
-            print!("\t");
+            StatisticsOutputFormat::KeyValuePairs => {
+                for key in keys_to_print {
+                    let val = stats.get(key).unwrap();
+                    output.push_str(&format!("{}={:.2}\n", key, val));
+                }
+            }
         }
-        for value in scheduler_stat.values() {
-            print!("{}\t", value);
+
+        // push end
+        output.push_str("------------------------------ End MMTk Statistics -----------------------------\n");
+
+        output
+    }
+
+    /// Get stats from both scheduler stat and counters
+    fn get_all_stats<VM: VMBinding>(&self, mmtk: &'static MMTK<VM>) -> HashMap<String, f64> {
+        let mut stats = mmtk.scheduler.statistics();
+
+        // Insert GC times (determined by phases)
+        stats.insert("GC".to_string(), (self.get_phase() / 2) as f64);
+        // Insert counter values
+        let counters = self.counters.lock().unwrap();
+        for counter_lock in counters.iter() {
+            let c = counter_lock.lock().unwrap();
+            if c.merge_phases() {
+                stats.insert(c.name().to_string(), c.get_total(None) as f64);
+            } else {
+                stats.insert(format!("{}.other", c.name()), c.get_total(Some(true)) as f64);
+                stats.insert(format!("{}.stw", c.name()), c.get_total(Some(false)) as f64);
+            }
         }
-        println!();
-        print!("Total time: ");
-        self.total_time.lock().unwrap().print_total(None);
-        println!(" ms");
-        println!("------------------------------ End MMTk Statistics -----------------------------")
+
+        stats
     }
 
     pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
