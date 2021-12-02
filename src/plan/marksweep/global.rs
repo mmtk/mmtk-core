@@ -21,6 +21,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -114,6 +115,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        stats: Stats,
     ) -> Self {
         let heap = HeapMeta::new(HEAP_START, HEAP_END);
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
@@ -138,6 +140,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
                 heap,
                 &MS_CONSTRAINTS,
                 global_metadata_specs,
+                stats,
             ),
         };
 

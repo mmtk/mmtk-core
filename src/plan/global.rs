@@ -147,24 +147,26 @@ pub fn create_plan<VM: VMBinding>(
     stats: Stats,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(
+            vm_map, mmapper, options, stats,
+        )),
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, stats,
         )),
         PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, stats,
         )),
         PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options, scheduler, stats,
         )),
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, stats,
         )),
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
             vm_map, mmapper, options, scheduler, stats,
         )),
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, stats,
         )),
     }
 }
@@ -462,8 +464,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
+        stats: Stats,
     ) -> BasePlan<VM> {
-        let stats = Stats::new(&options);
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
@@ -875,6 +877,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
+        stats: Stats,
     ) -> CommonPlan<VM> {
         CommonPlan {
             immortal: ImmortalSpace::new(
@@ -905,6 +908,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 heap,
                 constraints,
                 global_side_metadata_specs,
+                stats,
             ),
         }
     }

@@ -18,6 +18,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -125,6 +126,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        stats: Stats,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
@@ -158,6 +160,7 @@ impl<VM: VMBinding> SemiSpace<VM> {
                 heap,
                 &SS_CONSTRAINTS,
                 global_metadata_specs,
+                stats,
             ),
         };
 

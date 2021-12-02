@@ -19,6 +19,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
@@ -155,6 +156,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        stats: Stats,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         // We have no specific side metadata for copying. So just use the ones from generational.
@@ -190,6 +192,7 @@ impl<VM: VMBinding> GenCopy<VM> {
                 vm_map,
                 mmapper,
                 options,
+                stats,
             ),
             hi: AtomicBool::new(false),
             copyspace0,

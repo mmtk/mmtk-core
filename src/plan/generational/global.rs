@@ -15,6 +15,7 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
@@ -44,6 +45,7 @@ impl<VM: VMBinding> Gen<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
+        stats: Stats,
     ) -> Self {
         Gen {
             nursery: CopySpace::new(
@@ -63,6 +65,7 @@ impl<VM: VMBinding> Gen<VM> {
                 heap,
                 constraints,
                 global_metadata_specs,
+                stats,
             ),
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),

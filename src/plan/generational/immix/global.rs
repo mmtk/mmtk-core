@@ -20,6 +20,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::MMTK;
@@ -202,6 +203,7 @@ impl<VM: VMBinding> GenImmix<VM> {
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
         scheduler: Arc<GCWorkScheduler<VM>>,
+        stats: Stats,
     ) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         // We have no specific side metadata for copying. So just use the ones from generational.
@@ -224,6 +226,7 @@ impl<VM: VMBinding> GenImmix<VM> {
                 vm_map,
                 mmapper,
                 options,
+                stats,
             ),
             immix: immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
