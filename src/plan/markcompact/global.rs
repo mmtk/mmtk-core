@@ -27,8 +27,8 @@ use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
-use crate::vm::VMBinding;
 use crate::util::statistics::stats::Stats;
+use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
