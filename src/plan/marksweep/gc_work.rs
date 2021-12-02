@@ -1,18 +1,21 @@
+use atomic::Ordering;
+
 use crate::plan::global::NoCopy;
 use crate::plan::global::Plan;
+use crate::policy::mallocspace::MallocSpace;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
-use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
+use crate::scheduler::GCWork;
+use crate::scheduler::GCWorker;
+use crate::scheduler::WorkBucketStage;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
-use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 use super::MarkSweep;
 
@@ -61,13 +64,19 @@ impl<VM: VMBinding> DerefMut for MSProcessEdges<VM> {
     }
 }
 
+
+
+
+
 /// Simple work packet that just sweeps a single chunk
+#[cfg(feature="malloc")]
 pub struct MSSweepChunk<VM: VMBinding> {
     ms: &'static MallocSpace<VM>,
     // starting address of a chunk
     chunk: Address,
 }
 
+#[cfg(feature="malloc")]
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
@@ -76,16 +85,19 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
 }
 
 /// Work packet that generates sweep jobs for gc workers. Each chunk is given its own work packet
+#[cfg(feature="malloc")]
 pub struct MSSweepChunks<VM: VMBinding> {
     plan: &'static MarkSweep<VM>,
 }
 
+#[cfg(feature="malloc")]
 impl<VM: VMBinding> MSSweepChunks<VM> {
     pub fn new(plan: &'static MarkSweep<VM>) -> Self {
         Self { plan }
     }
 }
 
+#[cfg(feature="malloc")]
 impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
