@@ -11,12 +11,12 @@ use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+use crate::util::statistics::stats::Stats;
 use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
-use crate::util::statistics::stats::Stats;
 
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.

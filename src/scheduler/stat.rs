@@ -50,10 +50,7 @@ impl SchedulerStat {
         for (t, c) in &self.work_counts {
             total_count += c;
             let n = self.work_id_name_map[t];
-            stat.insert(
-                format!("work.{}.count", self.work_name(n)),
-                *c as f64,
-            );
+            stat.insert(format!("work.{}.count", self.work_name(n)), *c as f64);
         }
         stat.insert("total-work.count".to_owned(), total_count as f64);
         // Work execution times
@@ -77,29 +74,14 @@ impl SchedulerStat {
                     format!("work.{}.{}.total", self.work_name(n), name),
                     fold.total,
                 );
-                stat.insert(
-                    format!("work.{}.{}.min", self.work_name(n), name),
-                    fold.min,
-                );
-                stat.insert(
-                    format!("work.{}.{}.max", self.work_name(n), name),
-                    fold.max,
-                );
+                stat.insert(format!("work.{}.{}.min", self.work_name(n), name), fold.min);
+                stat.insert(format!("work.{}.{}.max", self.work_name(n), name), fold.max);
             }
         }
         // Print out overall execution time
-        stat.insert(
-            "total-work.time.total".to_owned(),
-            duration_overall.total,
-        );
-        stat.insert(
-            "total-work.time.min".to_owned(),
-            duration_overall.min,
-        );
-        stat.insert(
-            "total-work.time.max".to_owned(),
-            duration_overall.max,
-        );
+        stat.insert("total-work.time.total".to_owned(), duration_overall.total);
+        stat.insert("total-work.time.min".to_owned(), duration_overall.min);
+        stat.insert("total-work.time.max".to_owned(), duration_overall.max);
 
         stat
     }

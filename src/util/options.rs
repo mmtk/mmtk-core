@@ -47,20 +47,15 @@ custom_derive! {
 /// Filtering statistics by strings. If the stat key includes any of the strings,
 /// the stat will be included in the output. Otherwise, the stats will be omitted.
 /// By default, Vec<Strign> is an empty vec and all stats will be included.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct StatisticsOutputFilter(Vec<String>);
 impl StatisticsOutputFilter {
     pub fn matches(&self, key: &str) -> bool {
         if self.0.is_empty() {
             true
         } else {
-            self.0.iter().find(|f| key.contains(*f)).is_some()
+            self.0.iter().any(|f| key.contains(&*f))
         }
-    }
-}
-impl std::default::Default for StatisticsOutputFilter {
-    fn default() -> Self {
-        StatisticsOutputFilter(vec![])
     }
 }
 impl FromStr for StatisticsOutputFilter {

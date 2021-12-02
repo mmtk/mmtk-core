@@ -4,13 +4,13 @@ use super::worker::{GCWorker, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
+use crate::util::statistics::stats::Stats;
 use crate::vm::VMBinding;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
-use crate::util::statistics::stats::Stats;
 
 pub enum CoordinatorMessage<VM: VMBinding> {
     Work(Box<dyn CoordinatorWork<VM>>),

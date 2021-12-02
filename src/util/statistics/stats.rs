@@ -194,15 +194,18 @@ impl Stats {
         // Output string
         let mut output = String::new();
         // push header
-        output.push_str("============================ MMTk Statistics Totals ============================\n");
+        output.push_str(
+            "============================ MMTk Statistics Totals ============================\n",
+        );
 
         // Get all stats from counters and scheduler stats
         let stats = self.get_all_stats(mmtk);
         // Get keys to print (the keys will be filtered by options and sorted)
         let keys_to_print = {
-            let mut keys = stats.keys().filter(|k| {
-                mmtk.options.statistics_output_filter.matches(k)
-            }).collect::<Vec<&String>>();
+            let mut keys = stats
+                .keys()
+                .filter(|k| mmtk.options.statistics_output_filter.matches(k))
+                .collect::<Vec<&String>>();
             keys.sort();
             keys
         };
@@ -215,16 +218,19 @@ impl Stats {
                 for key in keys_to_print {
                     let val = stats.get(key).unwrap();
                     key_line.push_str(key);
-                    key_line.push_str("\t");
+                    key_line.push('\t');
                     val_line.push_str(&format!("{:.2}", val));
-                    val_line.push_str("\t");
+                    val_line.push('\t');
                 }
                 output.push_str(&key_line);
-                output.push_str("\n");
+                output.push('\n');
                 output.push_str(&val_line);
-                output.push_str("\n");
+                output.push('\n');
                 // push total
-                output.push_str(&format!("Total time: {} ms\n", self.total_time.lock().unwrap().get_total(None)));
+                output.push_str(&format!(
+                    "Total time: {} ms\n",
+                    self.total_time.lock().unwrap().get_total(None)
+                ));
             }
             StatisticsOutputFormat::KeyValuePairs => {
                 for key in keys_to_print {
@@ -235,7 +241,9 @@ impl Stats {
         }
 
         // push end
-        output.push_str("------------------------------ End MMTk Statistics -----------------------------\n");
+        output.push_str(
+            "------------------------------ End MMTk Statistics -----------------------------\n",
+        );
 
         output
     }
@@ -253,29 +261,15 @@ impl Stats {
             if c.merge_phases() {
                 stats.insert(c.name().to_string(), c.get_total(None) as f64);
             } else {
-                stats.insert(format!("{}.other", c.name()), c.get_total(Some(true)) as f64);
+                stats.insert(
+                    format!("{}.other", c.name()),
+                    c.get_total(Some(true)) as f64,
+                );
                 stats.insert(format!("{}.stw", c.name()), c.get_total(Some(false)) as f64);
             }
         }
 
         stats
-    }
-
-    pub fn print_column_names(&self, scheduler_stat: &HashMap<String, String>) {
-        print!("GC\t");
-        let counter = self.counters.lock().unwrap();
-        for iter in &(*counter) {
-            let c = iter.lock().unwrap();
-            if c.merge_phases() {
-                print!("{}\t", c.name());
-            } else {
-                print!("{}.other\t{}.stw\t", c.name(), c.name());
-            }
-        }
-        for name in scheduler_stat.keys() {
-            print!("{}\t", name);
-        }
-        println!();
     }
 
     pub fn start_all(&self) {

@@ -16,11 +16,11 @@ use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::statistics::stats::Stats;
 use crate::vm::VMBinding;
 use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use crate::util::statistics::stats::Stats;
 
 use atomic::Ordering;
 use enum_map::EnumMap;

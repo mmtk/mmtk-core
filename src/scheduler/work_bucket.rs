@@ -1,4 +1,5 @@
 use super::*;
+use crate::util::statistics::counter::*;
 use crate::vm::VMBinding;
 use enum_map::Enum;
 use spin::RwLock;
@@ -6,7 +7,6 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use crate::util::statistics::counter::*;
 
 /// A unique work-packet id for each instance of work-packet
 #[derive(Eq, PartialEq, Clone, Copy)]
@@ -68,7 +68,11 @@ pub struct WorkBucket<VM: VMBinding> {
 
 impl<VM: VMBinding> WorkBucket<VM> {
     pub const DEFAULT_PRIORITY: usize = 1000;
-    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>, timer: Option<Arc<Mutex<Timer>>>) -> Self {
+    pub fn new(
+        active: bool,
+        monitor: Arc<(Mutex<()>, Condvar)>,
+        timer: Option<Arc<Mutex<Timer>>>,
+    ) -> Self {
         Self {
             wait_timer: timer,
             active: AtomicBool::new(active),
