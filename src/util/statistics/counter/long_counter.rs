@@ -28,6 +28,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
         }
         debug_assert!(!self.running);
         self.running = true;
+        self.diffable.start();
         self.start_value = Some(self.diffable.current_value());
     }
 
@@ -37,6 +38,7 @@ impl<T: Diffable> Counter for LongCounter<T> {
         }
         debug_assert!(self.running);
         self.running = false;
+        self.diffable.stop();
         let current_value = self.diffable.current_value();
         let delta = T::diff(&current_value, self.start_value.as_ref().unwrap());
         self.count[self.stats.get_phase()] += delta;
@@ -62,9 +64,9 @@ impl<T: Diffable> Counter for LongCounter<T> {
         }
     }
 
-    fn print_total(&self, mutator: Option<bool>) {
-        match mutator {
-            None => self.print_value(self.total_count),
+    fn get_total(&self, other: Option<bool>) -> u64 {
+        match other {
+            None => self.total_count,
             Some(m) => {
                 let mut total = 0;
                 let mut p = if m { 0 } else { 1 };
@@ -72,13 +74,17 @@ impl<T: Diffable> Counter for LongCounter<T> {
                     total += self.count[p];
                     p += 2;
                 }
-                self.print_value(total);
+                total
             }
-        };
+        }
     }
 
-    fn print_min(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_total(&self, other: Option<bool>) {
+        self.print_value(self.get_total(other));
+    }
+
+    fn print_min(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut min = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] < min {
@@ -89,8 +95,8 @@ impl<T: Diffable> Counter for LongCounter<T> {
         self.print_value(min);
     }
 
-    fn print_max(&self, mutator: bool) {
-        let mut p = if mutator { 0 } else { 1 };
+    fn print_max(&self, other: bool) {
+        let mut p = if other { 0 } else { 1 };
         let mut max = self.count[p];
         while p < self.stats.get_phase() {
             if self.count[p] > max {

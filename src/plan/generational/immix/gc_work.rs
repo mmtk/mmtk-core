@@ -1,4 +1,5 @@
 use super::global::GenImmix;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::CopyContext;
 use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
@@ -126,8 +127,8 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
 {
     type VM = VM;
 
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<GenImmix<VM>>().unwrap();
         Self { plan, base }
     }
@@ -186,4 +187,24 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for GenImmixMatureProcessEdg
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = GenImmix<VM>;
+    type CopyContextType = GenImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::CopyContextType>;
+}
+
+pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
+    for GenImmixMatureGCWorkContext<VM, KIND>
+{
+    type VM = VM;
+    type PlanType = GenImmix<VM>;
+    type CopyContextType = GenImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;
 }

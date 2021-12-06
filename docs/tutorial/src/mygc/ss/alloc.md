@@ -12,8 +12,9 @@ Firstly, change the plan constraints. Some of these constraints are not used
 at the moment, but it's good to set them properly regardless.
 
 Look in `plan/plan_constraints.rs`. `PlanConstraints` lists all the possible
-options for plan-specific constraints. At the moment, `MYGC_CONSTRAINTS` in `mygc/global.rs` should be using
-the default value for `PlanConstraints`. We will make the following changes:
+options for plan-specific constraints. At the moment, `MYGC_CONSTRAINTS` in 
+`mygc/global.rs` should be using the default value for `PlanConstraints`. 
+We will make the following changes:
 
 1. Initialize `gc_header_bits` to 2. We reserve 2 bits in the header for GC use.
 1. Initialize `moves_objects` to `true`.
@@ -26,7 +27,8 @@ Finished code (step 1-3):
 
 ## Change the plan implementation
 
-Next, in `global.rs`, replace the old immortal (nogc) space with two copyspaces.
+Next, in `mygc/global.rs`, replace the old immortal (nogc) space with two 
+copyspaces.
 
 ### Imports
 
@@ -44,7 +46,7 @@ To the import statement block:
 
 Finished code (step 1):
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:imports}}
+{{#include ../../../code/mygc_semispace/global.rs:imports_no_gc_work}}
 ```
 
 ### Struct MyGC
@@ -68,7 +70,8 @@ Finished code (step 2):
 
 #### Constructor
 
-Change `fn new()`. This section initialises and prepares the objects in MyGC that you just defined.
+Change `fn new()`. This section initialises and prepares the objects in MyGC 
+that you just defined.
 
    1. Delete the definition of `mygc_space`. 
    Instead, we will define the two copyspaces here.
@@ -94,6 +97,26 @@ initializer calls are identical.
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:gc_init}}
 ```
+
+### Access MyGC spaces
+
+Add a new section of methods for MyGC:
+
+```rust
+impl<VM: VMBinding> MyGC<VM> {
+}
+```
+
+To this, add two helper methods, `tospace(&self)` 
+and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, 
+and return a reference to the tospace and fromspace respectively. 
+`tospace()` (see below) returns a reference to the tospace, 
+and `fromspace()` returns a reference to the fromspace.
+
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
+```
+
 #### Other methods in the Plan trait
 
 The trait `Plan` requires a `common()` method that should return a 
@@ -133,25 +156,6 @@ Add and override the following helper function:
 {{#include ../../../code/mygc_semispace/global.rs:plan_get_collection_reserve}}
 ```
 
-### Access MyGC spaces
-
-Add a new section of methods for MyGC:
-
-```rust
-impl<VM: VMBinding> MyGC<VM> {
-}
-```
-
-To this, add two helper methods, `tospace(&self)` 
-and `fromspace(&self)`. They both have return type `&CopySpace<VM>`, 
-and return a reference to the tospace and fromspace respectively. 
-`tospace()` (see below) returns a reference to the tospace, 
-and `fromspace()` returns a reference to the fromspace.
-
-```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
-```
-
 ## Change the mutator definition
 
 Next, we need to change the mutator, in `mutator.rs`, to allocate to the 
@@ -174,9 +178,9 @@ In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`,
 which maps the required allocation semantics to the corresponding allocators. 
 For example, for `Default`, we allocate using the first bump pointer allocator 
 (`BumpPointer(0)`):
-   1. Map `Default` to `BumpPointer(0)`.
-   2. Map `ReadOnly` to `BumpPointer(1)`.
-   3. Map `Los` to `LargeObject(0)`. 
+   1. Define a `ReservedAllocators` instance to declare that we need one bump allocator.
+   2. Map the common plan allocators using `create_allocator_mapping`.
+   3. Map `Default` to `BumpPointer(0)`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:allocator_mapping}}
@@ -189,7 +193,8 @@ space in `space_mapping`. Note that the space allocation is formatted as a list
 of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is 
 bound with `tospace`.
 
-Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in `MyGC`.
+Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in 
+`MyGC`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:plan_downcast}}
@@ -198,18 +203,18 @@ Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in `
 Then, use `mygc` to access the spaces in `MyGC`.
 
    1. `BumpPointer(0)` should map to the tospace.
-   2. `BumpPointer(1)` should map to `mygc.common.get_immortal()`.
-   3. `LargeObject(0)` should map to `mygc.common.get_los()`.
-   4. None of the above should be dereferenced (ie, they should not have 
+   2. Other common plan allocators should be mapped using `create_space_mapping`.
+   3. None of the above should be dereferenced (ie, they should not have
    the `&` prefix).
 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:space_mapping}}
 ```
      
-There may seem to be 2 extraneous spaces and allocators that have appeared all 
-of a sudden in these past 2 steps. These are parts of the MMTk common plan 
-itself.
+The `create_space_mapping` and `create_allocator_mapping` call that have appeared all
+of a sudden in these past 2 steps, are parts of the MMTk common plan
+itself. They are used to construct allocator-space mappings for the spaces defined
+by the common plan:
 
  1. The immortal space is used for objects that the virtual machine or a 
  library never expects to die.
@@ -217,6 +222,8 @@ itself.
  objects differently to normal objects, as the space overhead of copying 
  large objects is very high. Instead, this space is used by a free list 
  allocator in the common plan to avoid having to copy them. 
+ 3. The read-only space is used to store all the immutable objects.
+ 4. The code spaces are used for VM generated code objects.
 
 With this, you should have the allocation working, but not garbage collection. 
 Try building again. If you run HelloWorld or Fannkunchredux, they should

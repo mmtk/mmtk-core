@@ -3,7 +3,7 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
-use crate::plan::marksweep::gc_work::{MSProcessEdges, MSSweepChunks};
+use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -11,21 +11,16 @@ use crate::plan::PlanConstraints;
 use crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC;
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(not(feature = "global_alloc_bit"))]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
-#[cfg(feature = "analysis")]
-use crate::util::analysis::GcHookWork;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -59,27 +54,10 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        // Stop & scan mutators (mutator scanning can happen before STW)
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MSProcessEdges<VM>>::new());
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, NoCopy<VM>>::new(self));
+        scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<MSProcessEdges<VM>>::new());
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, NoCopy<VM>>::new(self));
-        #[cfg(feature = "analysis")]
-        scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, NoCopy<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

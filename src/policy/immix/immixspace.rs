@@ -58,7 +58,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        if !super::DEFRAG {
+            // If defrag is disabled, we won't forward objects.
+            self.is_marked(object, self.mark_state)
+        } else {
+            self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
+        }
     }
     fn is_movable(&self) -> bool {
         super::DEFRAG
@@ -290,12 +295,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if super::BLOCK_ONLY {
             return None;
         }
-        let result = self.reusable_blocks.pop();
-        if let Some(block) = result {
-            // println!("Reuse {:?}", block);
-            block.init(copy);
+        loop {
+            if let Some(block) = self.reusable_blocks.pop() {
+                // Skip blocks that should be evacuated.
+                if copy && block.is_defrag_source() {
+                    continue;
+                }
+                block.init(copy);
+                return Some(block);
+            } else {
+                return None;
+            }
         }
-        result
     }
 
     /// Trace and mark objects without evacuation.
@@ -488,6 +499,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some(start..end)
     }
+
+    pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
+        if super::DEFRAG {
+            did_defrag_for_last_gc
+        } else {
+            // If defrag is disabled, every GC is exhaustive.
+            true
+        }
+    }
 }
 
 /// A work packet to prepare each block for GC.
@@ -522,11 +542,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
                 continue;
             }
             // Check if this block needs to be defragmented.
-            if super::DEFRAG
-                && defrag_threshold != 0
-                && !state.is_reusable()
-                && block.get_holes() > defrag_threshold
-            {
+            if super::DEFRAG && defrag_threshold != 0 && block.get_holes() > defrag_threshold {
                 block.set_as_defrag_source(true);
             } else {
                 block.set_as_defrag_source(false);

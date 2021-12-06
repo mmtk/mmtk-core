@@ -1,7 +1,6 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureProcessEdges};
+use super::gc_work::{GenCopyCopyContext, GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -11,7 +10,6 @@ use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -21,8 +19,6 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::*;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
@@ -64,6 +60,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
+    fn force_full_heap_collection(&self) {
+        self.gen.force_full_heap_collection()
+    }
+
+    fn last_collection_full_heap(&self) -> bool {
+        self.gen.last_collection_full_heap()
+    }
+
     fn gc_init(
         &mut self,
         heap_size: usize,
@@ -77,50 +81,15 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         let is_full_heap = self.request_full_heap_collection();
-
-        // TODO: We should have a schedule_generational
-
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         if !is_full_heap {
             debug!("Nursery GC");
-            self.common()
-                .schedule_common::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>(
-                    &GENCOPY_CONSTRAINTS,
-                    scheduler,
-                );
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained].add(StopMutators::<
-                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-            >::new());
+            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
         } else {
             debug!("Full heap GC");
-            self.common()
-                .schedule_common::<GenCopyMatureProcessEdges<VM>>(&GENCOPY_CONSTRAINTS, scheduler);
-            // Stop & scan mutators (mutator scanning can happen before STW)
-            scheduler.work_buckets[WorkBucketStage::Unconstrained]
-                .add(StopMutators::<GenCopyMatureProcessEdges<VM>>::new());
+            scheduler.schedule_common_work::<GenCopyMatureGCWorkContext<VM>>(self);
         }
-
-        // Prepare global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, GenCopyCopyContext<VM>>::new(self));
-        if is_full_heap {
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
-                .add(ProcessWeakRefs::<GenCopyMatureProcessEdges<VM>>::new());
-        } else {
-            scheduler.work_buckets[WorkBucketStage::RefClosure].add(ProcessWeakRefs::<
-                GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>,
-            >::new());
-        }
-        // Release global/collectors/mutators
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, GenCopyCopyContext<VM>>::new(self));
-        // Resume mutators
-        #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final]
-            .add(ScheduleSanityGC::<Self, GenCopyCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

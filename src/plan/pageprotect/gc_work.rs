@@ -18,8 +18,9 @@ pub struct PPProcessEdges<VM: VMBinding> {
 impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
     const OVERWRITE_REFERENCE: bool = false;
     type VM = VM;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<PageProtect<VM>>().unwrap();
         Self { plan, base }
     }
@@ -55,4 +56,12 @@ impl<VM: VMBinding> DerefMut for PPProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub struct PPGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for PPGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = PageProtect<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = PPProcessEdges<VM>;
 }

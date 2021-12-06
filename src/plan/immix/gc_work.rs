@@ -93,35 +93,15 @@ impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
     fn immix(&self) -> &'static Immix<VM> {
         self.plan
     }
-
-    #[inline(always)]
-    fn fast_trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.immix().immix_space.in_space(object) {
-            self.immix().immix_space.fast_trace_object(self, object)
-        } else {
-            self.immix()
-                .common
-                .trace_object::<Self, ImmixCopyContext<VM>>(self, object)
-        }
-    }
-
-    /// Trace objects without evacuation.
-    #[inline(always)]
-    fn fast_process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
-        self.fast_trace_object(object);
-    }
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdges<VM, KIND> {
     type VM = VM;
+
     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
         Self { plan, base }
     }
@@ -146,12 +126,16 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
             return object;
         }
         if self.immix().immix_space.in_space(object) {
-            self.immix().immix_space.trace_object(
-                self,
-                object,
-                super::global::ALLOC_IMMIX,
-                unsafe { self.worker().local::<ImmixCopyContext<VM>>() },
-            )
+            if KIND == TraceKind::Fast {
+                self.immix().immix_space.fast_trace_object(self, object)
+            } else {
+                self.immix().immix_space.trace_object(
+                    self,
+                    object,
+                    super::global::ALLOC_IMMIX,
+                    unsafe { self.worker().local::<ImmixCopyContext<VM>>() },
+                )
+            }
         } else {
             self.immix()
                 .common
@@ -160,16 +144,11 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     }
 
     #[inline]
-    fn process_edges(&mut self) {
-        if KIND == TraceKind::Fast {
-            for i in 0..self.edges.len() {
-                // Use fast_process_edge since we don't need to forward any objects.
-                self.fast_process_edge(self.edges[i])
-            }
-        } else {
-            for i in 0..self.edges.len() {
-                self.process_edge(self.edges[i])
-            }
+    fn process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        let new_object = self.trace_object(object);
+        if KIND == TraceKind::Defrag && Self::OVERWRITE_REFERENCE {
+            unsafe { slot.store(new_object) };
         }
     }
 }
@@ -187,4 +166,16 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KI
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
+}
+
+pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
+    for ImmixGCWorkContext<VM, KIND>
+{
+    type VM = VM;
+    type PlanType = Immix<VM>;
+    type CopyContextType = ImmixCopyContext<VM>;
+    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
 }

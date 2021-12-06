@@ -154,7 +154,9 @@ pub enum WorkBucketStage {
     // TODO: We only support final reference at the moment. If we have references of multiple strengths,
     // we may need more than one buckets for each reference strength.
     RefClosure,
+    CalculateForwarding,
     RefForwarding,
+    Compact,
     Release,
     Final,
 }

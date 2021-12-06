@@ -123,6 +123,14 @@ impl<VM: VMBinding> Gen<VM> {
             .collection_required(plan, space_full, space)
     }
 
+    pub fn force_full_heap_collection(&self) {
+        self.next_gc_full_heap.store(true, Ordering::Relaxed);
+    }
+
+    pub fn last_collection_full_heap(&self) -> bool {
+        self.gc_full_heap.load(Ordering::Relaxed)
+    }
+
     /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
     pub fn request_full_heap_collection(&self, total_pages: usize, reserved_pages: usize) -> bool {

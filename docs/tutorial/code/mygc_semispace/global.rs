@@ -1,17 +1,17 @@
-// ANCHOR: imports
-use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+// ANCHOR: imports_no_gc_work
 use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*; // Add
 use crate::scheduler::*; // Modify
+use crate::scheduler::gc_work::*; // Add
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -25,9 +25,15 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
 use std::sync::Arc;
+// ANCHOR_END: imports_no_gc_work
+
+// ANCHOR: imports_gc_work
+use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
+//ANCHOR_END: imports_gc_work
+
 // Remove #[allow(unused_imports)].
-// Remove handle_user_collection_request.
-// ANCHOR_END: imports
+// Remove handle_user_collection_request().
+
 
 pub type SelectedPlan<VM> = MyGC<VM>;
 
@@ -89,15 +95,9 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // Modify
     // ANCHOR: schedule_collection
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        self.base().set_collection_kind();
+        self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.work_buckets[WorkBucketStage::Unconstrained]
-            .add(StopMutators::<MyGCProcessEdges<VM>>::new());
-        scheduler.work_buckets[WorkBucketStage::Prepare]
-            .add(Prepare::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.work_buckets[WorkBucketStage::Release]
-            .add(Release::<Self, MyGCCopyContext<VM>>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
+        scheduler.schedule_common_work::<MyGCWorkContext<VM>>(self);
     }
     // ANCHOR_END: schedule_collection
 

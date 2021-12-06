@@ -72,7 +72,7 @@ impl Mmapper for ByteMapMmapper {
         let start_chunk = Self::address_to_mmap_chunks_down(start);
         let end_chunk = Self::address_to_mmap_chunks_up(start + pages_to_bytes(pages));
         trace!(
-            "Calling ensure_mapped with start={:?} and {} pages, {}-{}",
+            "Calling quanrantine_address_range with start={:?} and {} pages, {}-{}",
             start,
             pages,
             Self::mmap_chunks_to_address(start_chunk),
