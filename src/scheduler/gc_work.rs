@@ -476,11 +476,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
-pub type CreateScanPacketClosure<VM> = Box<dyn (Fn(Vec<ObjectReference>) -> Box<dyn GCWork<VM>>) + Send>;
-
 pub struct MMTkProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<MMTkProcessEdges<VM>>,
-    create_scan_packet: Option<CreateScanPacketClosure<VM>>,
 }
 
 // FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
@@ -488,7 +485,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        Self { base, create_scan_packet: None }
+        Self { base }
     }
 
     #[cold]
@@ -496,14 +493,8 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
         if self.nodes.is_empty() {
             return;
         }
-        let nodes = self.pop_nodes();
-        if let Some(ref create_fn) = self.create_scan_packet {
-            let scan_objects_work = create_fn(nodes);
-            self.new_scan_work(scan_objects_work);
-        } else {
-            let scan_objects_work = ScanObjects::<Self>::new(nodes, false);
-            self.new_scan_work(box scan_objects_work);
-        }
+        let work = self.base.mmtk.plan.create_scan_work(self.pop_nodes());
+        self.new_scan_work(work);
     }
 
     #[inline]
@@ -524,13 +515,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
             None => CopySemantics::DefaultCopy,
         };
         sft.sft_trace_object(trace, object, semantics, worker)
-    }
-}
-
-impl<VM: VMBinding> MMTkProcessEdges<VM> {
-    pub fn new_with_custom_scan(edges: Vec<Address>, roots: bool, scan: CreateScanPacketClosure<VM>, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        Self { base, create_scan_packet: Some(scan) }
     }
 }
 

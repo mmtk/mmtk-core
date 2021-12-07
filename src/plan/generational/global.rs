@@ -89,6 +89,7 @@ impl<VM: VMBinding> Gen<VM> {
         let full_heap = !self.is_current_gc_nursery();
         self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
+        self.nursery.set_copy_semantics(Some(CopySemantics::PromoteMature));
     }
 
     /// Release Gen. This should be called by a single thread in GC release work.

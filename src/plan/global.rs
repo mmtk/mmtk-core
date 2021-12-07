@@ -32,6 +32,8 @@ use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use crate::util::Address;
+use crate::scheduler::gc_work::MMTkProcessEdges;
 
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
@@ -136,6 +138,11 @@ pub trait Plan: 'static + Sync + Downcast {
     }
     fn options(&self) -> &Options {
         &self.base().options
+    }
+
+    fn create_scan_work(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+        use crate::scheduler::gc_work::ScanObjects;
+        box ScanObjects::<MMTkProcessEdges<Self::VM>>::new(nodes, false)
     }
 
     // unsafe because this can only be called once by the init thread

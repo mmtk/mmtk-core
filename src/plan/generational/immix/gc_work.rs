@@ -47,26 +47,27 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
+        unreachable!()
+        // if object.is_null() {
+        //     return object;
+        // }
 
-        if self.plan.immix.in_space(object) {
-            if KIND == TraceKind::Fast {
-                return self.plan.immix.fast_trace_object(self, object);
-            } else {
-                return self.plan.immix.trace_object(
-                    self,
-                    object,
-                    crate::util::copy::CopySemantics::Mature,
-                    self.worker(),
-                );
-            }
-        }
+        // if self.plan.immix.in_space(object) {
+        //     if KIND == TraceKind::Fast {
+        //         return self.plan.immix.fast_trace_object(self, object);
+        //     } else {
+        //         return self.plan.immix.trace_object(
+        //             self,
+        //             object,
+        //             crate::util::copy::CopySemantics::Mature,
+        //             self.worker(),
+        //         );
+        //     }
+        // }
 
-        self.plan
-            .gen
-            .trace_object_full_heap::<Self>(self, object, self.worker())
+        // self.plan
+        //     .gen
+        //     .trace_object_full_heap::<Self>(self, object, self.worker())
     }
 }
 
@@ -89,7 +90,7 @@ pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type ProcessEdgesWorkType = GenNurseryProcessEdges<VM>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }
 
 pub(super) struct GenImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
@@ -100,5 +101,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = GenImmix<VM>;
-    type ProcessEdgesWorkType = GenImmixMatureProcessEdges<VM, KIND>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }

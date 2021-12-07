@@ -20,6 +20,9 @@ use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::util::ObjectReference;
+use crate::scheduler::GCWork;
+use crate::util::copy::*;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
@@ -79,6 +82,12 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 constraints: &GENIMMIX_CONSTRAINTS,
             },
         )
+    }
+
+    fn create_scan_work(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+        use crate::policy::immix::ScanObjectsAndMarkLines;
+        use crate::scheduler::gc_work::MMTkProcessEdges;
+        box ScanObjectsAndMarkLines::<MMTkProcessEdges<Self::VM>>::new(nodes, false, &self.immix)
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
@@ -157,6 +166,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.prepare(tls);
         if full_heap {
             self.immix.prepare(full_heap);
+            self.immix.set_copy_semantics(Some(CopySemantics::Mature));
         }
     }
 
