@@ -1,0 +1,82 @@
+name: Weekly Performance Regression CI
+
+on:
+    # On every monday 1200am UTC
+    schedule:
+      - cron: '0 0 * * MON'
+    # READ BEFORE ENABLING THE TRIGGER BELOW
+    # This trigger is only used when testing the scripts in a branch, and should be commented out in other cases.
+    # If this trigger is used, please change the following env: RESULT_REPO_BRANCH -> 'test' (MUST), DEPLOY -> 'false' (optional)
+    pull_request:
+        branches:
+        - master
+
+env:
+    # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
+    RESULT_REPO_BRANCH: 'test-chopin'
+    # Whether we deploy the generated page. Set to true for master.
+    DEPLOY: true
+
+jobs:
+    # OpenJDK
+    openjdk-perf-regression-weekly:
+        runs-on: [self-hosted, Linux, freq-scaling-off]
+        # allow 5 days to run
+        timeout-minutes: 7200
+        steps:
+            - name: Checkout MMTk Core
+              uses: actions/checkout@v2
+              with:
+                path: mmtk-core
+            - name: Checkout OpenJDK Binding
+              uses: actions/checkout@v2
+              with:
+                repository: mmtk/mmtk-openjdk
+                token: ${{ secrets.CI_ACCESS_TOKEN }}
+                path: mmtk-openjdk
+                submodules: true
+            # checkout perf-kit
+            - name: Checkout Perf Kit
+              uses: actions/checkout@v2
+              with:
+                repository: mmtk/ci-perf-kit
+                token: ${{ secrets.CI_ACCESS_TOKEN }}
+                ref: "0.7-test"
+                path: ci-perf-kit
+                submodules: true
+            # setup
+            - name: Overwrite MMTk core in openjdk binding
+              run: cp -r mmtk-core mmtk-openjdk/repos/
+            - name: Setup Rust Toolchain
+              run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+            # cleanup previosu build
+            - name: Cleanup previous build
+              run: |
+                rm -rf mmtk-openjdk/repos/openjdk/scratch
+                rm -rf mmtk-openjdk/repos/openjdk/build
+            - name: Setup
+              run: |
+                ./ci-perf-kit/scripts/history-run-setup.sh
+                sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+                sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+            - id: branch
+              # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+              run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"  
+            # run
+            - name: Performance Run
+              run: |
+                export RESULT_REPO=mmtk/ci-perf-result
+                export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
+                export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+                export FROM_DATE=2021-10-07
+                ./ci-perf-kit/scripts/openjdk-history-run-per-week.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}/per_week
+            # deploy
+            - name: Deploy to Github Page
+              if: ${{ env.DEPLOY == 'true' }}
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+                external_repository: mmtk/ci-perf-result
+                publish_dir: ./reports
+                publish_branch: gh-pages
+                keep_files: true
