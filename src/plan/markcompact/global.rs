@@ -137,9 +137,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         }
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(
-            crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self, NoCopy<VM>>::new(self),
-        );
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

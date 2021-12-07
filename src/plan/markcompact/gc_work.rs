@@ -113,9 +113,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
                 .mc_space()
                 .trace_mark_object::<Self>(self, object)
         } else {
-            self.markcompact()
-                .common
-                .trace_object::<Self>(self, object)
+            self.markcompact().common.trace_object::<Self>(self, object)
         }
     }
 }
@@ -165,9 +163,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
                 .mc_space()
                 .trace_forward_object::<Self>(self, object)
         } else {
-            self.markcompact()
-                .common
-                .trace_object::<Self>(self, object)
+            self.markcompact().common.trace_object::<Self>(self, object)
         }
     }
 }
