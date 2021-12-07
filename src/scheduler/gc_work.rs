@@ -418,16 +418,16 @@ pub trait ProcessEdgesWork:
     /// Create a new scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
     #[inline]
-    fn new_scan_work(&mut self, work_packet: impl GCWork<Self::VM>) {
+    fn new_scan_work(&mut self, work_packet: Box<dyn GCWork<Self::VM>>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
             // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
-            self.worker().do_work(work_packet);
+            self.worker().do_work_boxed(work_packet);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add_boxed(work_packet);
         }
     }
 
@@ -439,7 +439,7 @@ pub trait ProcessEdgesWork:
             return;
         }
         let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
-        self.new_scan_work(scan_objects_work);
+        self.new_scan_work(box scan_objects_work);
     }
 
     #[inline]
@@ -476,8 +476,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
+pub type CreateScanPacketClosure<VM> = Box<dyn (Fn(Vec<ObjectReference>) -> Box<dyn GCWork<VM>>) + Send>;
+
 pub struct MMTkProcessEdges<VM: VMBinding> {
     base: ProcessEdgesBase<MMTkProcessEdges<VM>>,
+    create_scan_packet: Option<CreateScanPacketClosure<VM>>,
 }
 
 // FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
@@ -485,7 +488,22 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        Self { base }
+        Self { base, create_scan_packet: None }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        if self.nodes.is_empty() {
+            return;
+        }
+        let nodes = self.pop_nodes();
+        if let Some(ref create_fn) = self.create_scan_packet {
+            let scan_objects_work = create_fn(nodes);
+            self.new_scan_work(scan_objects_work);
+        } else {
+            let scan_objects_work = ScanObjects::<Self>::new(nodes, false);
+            self.new_scan_work(box scan_objects_work);
+        }
     }
 
     #[inline]
@@ -506,6 +524,13 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
             None => CopySemantics::DefaultCopy,
         };
         sft.sft_trace_object(trace, object, semantics, worker)
+    }
+}
+
+impl<VM: VMBinding> MMTkProcessEdges<VM> {
+    pub fn new_with_custom_scan(edges: Vec<Address>, roots: bool, scan: CreateScanPacketClosure<VM>, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+        Self { base, create_scan_packet: Some(scan) }
     }
 }
 

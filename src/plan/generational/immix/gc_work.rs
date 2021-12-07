@@ -42,7 +42,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
             false,
             &self.plan.immix,
         );
-        self.new_scan_work(scan_objects_work);
+        self.new_scan_work(box scan_objects_work);
     }
 
     #[inline]

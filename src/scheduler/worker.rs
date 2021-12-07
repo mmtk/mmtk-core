@@ -103,6 +103,10 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk.unwrap());
     }
 
+    pub fn do_work_boxed(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
+        work.do_work(self, self.mmtk.unwrap());
+    }
+
     pub fn run(&mut self, mmtk: &'static MMTK<VM>) {
         self.mmtk = Some(mmtk);
         self.parked.store(false, Ordering::SeqCst);

@@ -47,7 +47,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
             false,
             &self.immix().immix_space,
         );
-        self.new_scan_work(scan_objects_work);
+        self.new_scan_work(box scan_objects_work);
     }
 
     /// Trace  and evacuate objects.
