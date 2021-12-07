@@ -178,9 +178,9 @@ In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`,
 which maps the required allocation semantics to the corresponding allocators. 
 For example, for `Default`, we allocate using the first bump pointer allocator 
 (`BumpPointer(0)`):
-   1. Map `Default` to `BumpPointer(0)`.
-   2. Map `ReadOnly` to `BumpPointer(1)`.
-   3. Map `Los` to `LargeObject(0)`. 
+   1. Define a `ReservedAllocators` instance to declare that we need one bump allocator.
+   2. Map the common plan allocators using `create_allocator_mapping`.
+   3. Map `Default` to `BumpPointer(0)`.
 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:allocator_mapping}}
@@ -203,18 +203,18 @@ Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in
 Then, use `mygc` to access the spaces in `MyGC`.
 
    1. `BumpPointer(0)` should map to the tospace.
-   2. `BumpPointer(1)` should map to `mygc.common.get_immortal()`.
-   3. `LargeObject(0)` should map to `mygc.common.get_los()`.
-   4. None of the above should be dereferenced (ie, they should not have 
+   2. Other common plan allocators should be mapped using `create_space_mapping`.
+   3. None of the above should be dereferenced (ie, they should not have
    the `&` prefix).
 
 ```rust
 {{#include ../../../code/mygc_semispace/mutator.rs:space_mapping}}
 ```
      
-There may seem to be 2 extraneous spaces and allocators that have appeared all 
-of a sudden in these past 2 steps. These are parts of the MMTk common plan 
-itself.
+The `create_space_mapping` and `create_allocator_mapping` call that have appeared all
+of a sudden in these past 2 steps, are parts of the MMTk common plan
+itself. They are used to construct allocator-space mappings for the spaces defined
+by the common plan:
 
  1. The immortal space is used for objects that the virtual machine or a 
  library never expects to die.
@@ -222,6 +222,8 @@ itself.
  objects differently to normal objects, as the space overhead of copying 
  large objects is very high. Instead, this space is used by a free list 
  allocator in the common plan to avoid having to copy them. 
+ 3. The read-only space is used to store all the immutable objects.
+ 4. The code spaces are used for VM generated code objects.
 
 With this, you should have the allocation working, but not garbage collection. 
 Try building again. If you run HelloWorld or Fannkunchredux, they should

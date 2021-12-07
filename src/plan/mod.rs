@@ -41,6 +41,7 @@ pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod generational;
 mod immix;
+mod markcompact;
 mod marksweep;
 mod nogc;
 mod pageprotect;
@@ -51,6 +52,7 @@ mod semispace;
 
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
+pub use markcompact::MARKCOMPACT_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
