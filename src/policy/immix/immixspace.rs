@@ -564,6 +564,8 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
+use crate::scheduler::gc_work::ScanObjectsWork;
+
 /// A work packet to scan the fields of each objects and mark lines.
 pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -602,6 +604,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
             {
                 self.immix_space.mark_lines(*object);
             }
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> ScanObjectsWork<E::VM> for ScanObjectsAndMarkLines<E> {
+    fn new(buffer: Vec<ObjectReference>, concurrent: bool, space: &'static dyn Space<E::VM>) -> Self {
+        Self {
+            buffer,
+            concurrent,
+            immix_space: space.downcast_ref::<ImmixSpace<E::VM>>().unwrap(),
         }
     }
 }

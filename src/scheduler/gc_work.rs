@@ -524,6 +524,11 @@ impl<VM: VMBinding> DerefMut for MMTkProcessEdges<VM> {
     }
 }
 
+use crate::policy::space::Space;
+pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> {
+    fn new(buffer: Vec<ObjectReference>, concurrent: bool, space: &'static dyn Space<VM>) -> Self;
+}
+
 /// Scan & update a list of object slots
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -547,6 +552,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
         trace!("ScanObjects");
         <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer, worker);
         trace!("ScanObjects End");
+    }
+}
+
+impl<E: ProcessEdgesWork> ScanObjectsWork<E::VM> for ScanObjects<E> {
+    fn new(buffer: Vec<ObjectReference>, concurrent: bool, _space: &'static dyn Space<E::VM>) -> Self {
+        Self::new(buffer, concurrent)
     }
 }
 
