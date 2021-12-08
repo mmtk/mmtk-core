@@ -39,9 +39,9 @@ pub struct GenImmix<VM: VMBinding> {
     /// An immix space as the mature space.
     pub immix: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
-    // This is not used. It should be used for last_collection_was_exhaustive.
-    // TODO: We need to fix this.
     pub last_gc_was_defrag: AtomicBool,
+    /// Whether the last GC was a full heap GC
+    pub last_gc_was_full_heap: AtomicBool,
 }
 
 pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -91,7 +91,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
-        self.last_gc_was_defrag.load(Ordering::Relaxed)
+        self.last_gc_was_full_heap.load(Ordering::Relaxed)
+            && ImmixSpace::<VM>::is_last_gc_exhaustive(
+                self.last_gc_was_defrag.load(Ordering::Relaxed),
+            )
     }
 
     fn force_full_heap_collection(&self) {
@@ -179,6 +182,8 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else {
             self.last_gc_was_defrag.store(false, Ordering::Relaxed);
         }
+        self.last_gc_was_full_heap
+            .store(full_heap, Ordering::Relaxed);
     }
 
     fn get_collection_reserve(&self) -> usize {
@@ -243,6 +248,7 @@ impl<VM: VMBinding> GenImmix<VM> {
             ),
             immix: immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
+            last_gc_was_full_heap: AtomicBool::new(false),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

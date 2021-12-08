@@ -517,6 +517,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some(start..end)
     }
+
+    pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
+        if super::DEFRAG {
+            did_defrag_for_last_gc
+        } else {
+            // If defrag is disabled, every GC is exhaustive.
+            true
+        }
+    }
 }
 
 /// A work packet to prepare each block for GC.
