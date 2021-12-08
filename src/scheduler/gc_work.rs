@@ -323,22 +323,22 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     }
 }
 
-pub struct ProcessEdgesBase<E: ProcessEdgesWork> {
+pub struct ProcessEdgesBase<VM: VMBinding> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
-    mmtk: &'static MMTK<E::VM>,
+    mmtk: &'static MMTK<VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
-    worker: *mut GCWorker<E::VM>,
+    worker: *mut GCWorker<VM>,
     pub roots: bool,
 }
 
-unsafe impl<E: ProcessEdgesWork> Send for ProcessEdgesBase<E> {}
+unsafe impl<VM: VMBinding> Send for ProcessEdgesBase<VM> {}
 
-impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
+impl<VM: VMBinding> ProcessEdgesBase<VM> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
-    pub fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<E::VM>) -> Self {
+    pub fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             for edge in &edges {
@@ -354,19 +354,19 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
             roots,
         }
     }
-    pub fn set_worker(&mut self, worker: &mut GCWorker<E::VM>) {
+    pub fn set_worker(&mut self, worker: &mut GCWorker<VM>) {
         self.worker = worker;
     }
     #[inline]
-    pub fn worker(&self) -> &'static mut GCWorker<E::VM> {
+    pub fn worker(&self) -> &'static mut GCWorker<VM> {
         unsafe { &mut *self.worker }
     }
     #[inline]
-    pub fn mmtk(&self) -> &'static MMTK<E::VM> {
+    pub fn mmtk(&self) -> &'static MMTK<VM> {
         self.mmtk
     }
     #[inline]
-    pub fn plan(&self) -> &'static dyn Plan<VM = E::VM> {
+    pub fn plan(&self) -> &'static dyn Plan<VM = VM> {
         &*self.mmtk.plan
     }
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
@@ -384,7 +384,7 @@ impl<E: ProcessEdgesWork> ProcessEdgesBase<E> {
 
 /// Scan & update a list of object slots
 pub trait ProcessEdgesWork:
-    Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self>>
+    Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self::VM>>
 {
     type VM: VMBinding;
 
@@ -477,7 +477,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
 }
 
 pub struct MMTkProcessEdges<VM: VMBinding> {
-    base: ProcessEdgesBase<MMTkProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 // FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
@@ -519,7 +519,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for MMTkProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

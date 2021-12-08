@@ -17,7 +17,7 @@ use crate::plan::immix::gc_work::TraceKind;
 /// of process_edge() as the immix plan does).
 pub(super) struct GenImmixMatureProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     plan: &'static GenImmix<VM>,
-    base: ProcessEdgesBase<GenImmixMatureProcessEdges<VM, KIND>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
@@ -72,7 +72,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> Deref for GenImmixMatureProcessEdges<VM, KIND> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

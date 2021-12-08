@@ -17,7 +17,7 @@ pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     // downcast for each traced object.
     plan: &'static Immix<VM>,
-    base: ProcessEdgesBase<Self>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
@@ -67,7 +67,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> Deref for ImmixProcessEdges<VM, KIND> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

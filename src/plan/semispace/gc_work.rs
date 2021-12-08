@@ -11,7 +11,7 @@ pub struct SSProcessEdges<VM: VMBinding> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     // downcast for each traced object.
     plan: &'static SemiSpace<VM>,
-    base: ProcessEdgesBase<SSProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> SSProcessEdges<VM> {
@@ -36,7 +36,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for SSProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
