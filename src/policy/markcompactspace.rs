@@ -9,6 +9,10 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
+use crate::util::copy::*;
+use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::policy::space::*;
+use crate::scheduler::GCWorker;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -51,6 +55,10 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     fn is_sane(&self) -> bool {
         true
     }
+
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+        unimplemented!()
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
@@ -76,6 +84,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("markcompactspace only releases pages enmasse")
+    }
+
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference {
+        unimplemented!()
     }
 }
 
