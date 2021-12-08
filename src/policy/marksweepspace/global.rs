@@ -179,6 +179,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn record_new_block(&self, block: Block) {
         block.init();
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        // eprintln!("b > {}", block.start());
     }
 
     #[inline]
@@ -202,6 +203,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Block) {
+        // eprintln!("b < {}", block.start());
         self.block_clear_metadata(block);
 
         block.deinit();
