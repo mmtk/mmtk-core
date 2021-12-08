@@ -316,19 +316,11 @@ impl Block {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
                 let mut block_list = self.load_block_list::<VM>();
-                unsafe { (*block_list).lock(); }
-                let prev = self.load_prev_block::<VM>();
-                let next = self.load_next_block::<VM>();
-                if next.is_zero() || prev.is_zero() {
-                    unsafe { 
-                        let mut block_list = self.load_block_list::<VM>();
-                        (*block_list).remove::<VM>(self);
-                    }
-                } else {
-                    next.store_prev_block::<VM>(prev);
-                    prev.store_next_block::<VM>(next);
+                unsafe {
+                    (*block_list).lock(); 
+                    (*block_list).remove::<VM>(self);
+                    (*block_list).release_lock();
                 }
-                unsafe { (*block_list).release_lock(); }
                 space.release_block(self);
                 true
             }
