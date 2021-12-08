@@ -477,7 +477,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
 }
 
 pub struct MMTkProcessEdges<VM: VMBinding> {
-    base: ProcessEdgesBase<VM>,
+    pub base: ProcessEdgesBase<VM>,
 }
 
 // FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.

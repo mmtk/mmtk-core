@@ -17,7 +17,7 @@ pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     // downcast for each traced object.
     plan: &'static Immix<VM>,
-    base: ProcessEdgesBase<VM>,
+    mmtk_process_edges: MMTkProcessEdges<VM>,
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
@@ -32,28 +32,35 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
-        Self { plan, base }
+        let plan = mmtk.plan.downcast_ref::<Immix<VM>>().unwrap();
+        Self { plan, mmtk_process_edges: MMTkProcessEdges::new(edges, roots, mmtk) }
     }
 
     #[cold]
     fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
-        let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
-            self.pop_nodes(),
-            false,
-            &self.immix().immix_space,
-        );
-        self.new_scan_work(box scan_objects_work);
+        self.mmtk_process_edges.flush()
     }
 
     /// Trace  and evacuate objects.
     #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        unreachable!()
+        if object.is_null() {
+            return object;
+        }
+        if self.immix().immix_space.in_space(object) {
+            if KIND == TraceKind::Fast {
+                self.immix().immix_space.fast_trace_object(self, object)
+            } else {
+                self.immix().immix_space.trace_object(
+                    self,
+                    object,
+                    CopySemantics::DefaultCopy,
+                    self.worker(),
+                )
+            }
+        } else {
+            self.mmtk_process_edges.trace_object(object)
+        }
     }
 
     #[inline]
@@ -70,14 +77,14 @@ impl<VM: VMBinding, const KIND: TraceKind> Deref for ImmixProcessEdges<VM, KIND>
     type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.base
+        &self.mmtk_process_edges.base
     }
 }
 
 impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KIND> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
+        &mut self.mmtk_process_edges.base
     }
 }
 
