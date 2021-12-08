@@ -110,7 +110,7 @@ pub struct FreeListAllocator<VM: VMBinding> {
     space: &'static MarkSweepSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
     available_blocks: BlockLists, // = pages in mimalloc
-    #[cfg(feature = "lazy_sweeping")]
+    #[cfg(not(feature = "eager_sweeping"))]
     unswept_blocks: BlockLists,
     consumed_blocks: BlockLists,
 }
@@ -156,7 +156,6 @@ impl BlockList {
                 self.last = prev;
                 prev.store_block_list::<VM>(self);
             } else {
-                unreachable!("remove: {} -> {} -> {}", prev.start(), block.start(), next.start());
                 prev.store_next_block::<VM>(next);
                 next.store_prev_block::<VM>(prev);
             }
@@ -304,6 +303,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         // set allocation bit
         set_alloc_bit(unsafe { free_list.to_object_reference() });
         debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
+        // eprintln!("a {}", free_list);
 
         free_list
     }
@@ -320,7 +320,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             space,
             plan,
             available_blocks: BLOCK_LISTS_EMPTY,
-            #[cfg(feature = "lazy_sweeping")]
+            #[cfg(not(feature = "eager_sweeping"))]
             unswept_blocks: BLOCK_LISTS_EMPTY,
             consumed_blocks: BLOCK_LISTS_EMPTY,
         }
@@ -348,6 +348,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 // set allocation bit
                 set_alloc_bit(unsafe { free_list.to_object_reference() });
                 debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
+                // eprintln!("a {}", free_list);
 
                 return free_list;
             }
@@ -439,9 +440,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
-        debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
-
-        #[cfg(feature = "lazy_sweeping")]
+        // attempt to sweep
+        #[cfg(not(feature = "eager_sweeping"))]
         loop {
             let block = self.unswept_blocks.get_mut(bin).unwrap().pop::<VM>();
             if block.is_zero() {
@@ -522,6 +522,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn sweep_block(&self, block: Block) {
+        // eprintln!("s {}", block.start());
         let cell_size = block.load_block_cell_size::<VM>();
         assert!(cell_size != 0, "b = {}", block.start());
         let mut cell = block.start();
@@ -548,6 +549,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn free(&self, addr: Address) {
+        // eprintln!("f {}", addr);
 
         let block = FreeListAllocator::<VM>::get_block(addr);
         let block_tls = block.load_tls::<VM>();
@@ -561,7 +563,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             block.store_local_free_list::<VM>(addr);
         } else {
             // different thread to allocator
-            unreachable!("{:?}, {:?}", self.tls.0, block_tls);
+            unreachable!("freeing {} from returned block {}", addr, block.start());
             // let mut success = false;
             // while !success {
             //     let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
@@ -580,7 +582,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_tls::<VM>(self.tls);
     }
 
-    #[cfg(feature = "lazy_sweeping")]
+    #[cfg(not(feature = "eager_sweeping"))]
     pub fn reset(&mut self) {
         trace!("reset");
         // consumed and available are now unswept
@@ -595,9 +597,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
     }
 
-    #[cfg(not(feature = "lazy_sweeping"))]
+    #[cfg(feature = "eager_sweeping")]
     pub fn reset(&mut self) {
-        // eprintln!("reset");
+        use crate::policy::marksweepspace::block::BlockState;
+
         trace!("reset");
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
@@ -606,8 +609,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             let mut block = available.first;
             while !block.is_zero() {
-                self.sweep_block(block);
-                block = block.load_next_block::<VM>();
+                let next = block.load_next_block::<VM>();
+                if !block.sweep(self.space) {
+                    self.sweep_block(block);
+                }
+                block = next;
             }
 
             let consumed = self.consumed_blocks.get_mut(bin).unwrap();

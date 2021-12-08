@@ -115,7 +115,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        #[cfg(not(feature="malloc"))]
+        #[cfg(not(any(feature="malloc", feature="eager_sweeping")))]
         self.ms.block_level_sweep();
         self.common.release(tls, true);
     }
