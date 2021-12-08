@@ -90,25 +90,9 @@ pub trait SFT {
     fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference;
 }
 
-pub struct MMTkProcessEdgesMutRef(usize);
-impl MMTkProcessEdgesMutRef {
-    pub fn new<VM: VMBinding>(r: &mut MMTkProcessEdges<VM>) -> Self {
-        Self ( unsafe { std::mem::transmute(r) })
-    }
-    pub fn as_mut<'a, VM: VMBinding>(self) -> &'a mut MMTkProcessEdges<VM> {
-        unsafe { std::mem::transmute(self.0) }
-    }
-}
-
-pub struct GCWorkerMutRef(usize);
-impl GCWorkerMutRef {
-    pub fn new<VM: VMBinding>(r: &mut GCWorker<VM>) -> Self {
-        Self ( unsafe { std::mem::transmute(r) })
-    }
-    pub fn as_mut<'a, VM: VMBinding>(self) -> &'a mut GCWorker<VM> {
-        unsafe { std::mem::transmute(self.0) }
-    }
-}
+use crate::util::erase_vm::define_erased_vm_mut_ref;
+define_erased_vm_mut_ref!(MMTkProcessEdgesMutRef = MMTkProcessEdges<VM>);
+define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
