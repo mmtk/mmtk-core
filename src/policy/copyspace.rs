@@ -16,6 +16,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
+use crate::policy::space::{CopySpaceRef, SFTDispatch};
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -70,6 +71,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::CopySpace(CopySpaceRef::new(self))
     }
 
     fn get_page_resource(&self) -> &dyn PageResource<VM> {

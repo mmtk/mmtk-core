@@ -26,6 +26,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
+use crate::policy::space::{MallocSpaceRef, SFTDispatch};
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
@@ -91,6 +92,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::MallocSpace(MallocSpaceRef::new(self))
     }
 
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
@@ -210,7 +215,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
-                crate::mmtk::SFT_MAP.update(self, address, actual_size);
+                crate::mmtk::SFT_MAP.update(self, self.as_dispatch(), address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 

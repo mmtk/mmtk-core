@@ -9,6 +9,7 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
+use crate::policy::space::{MarkCompactSpaceRef, SFTDispatch};
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -60,6 +61,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::MarkCompactSpace(MarkCompactSpaceRef::new(self))
     }
 
     fn get_page_resource(&self) -> &dyn PageResource<VM> {

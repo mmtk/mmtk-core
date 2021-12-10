@@ -57,6 +57,7 @@ pub(crate) mod statistics;
 pub(crate) mod test_util;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
+pub(crate) mod erase_vm;
 
 // These modules are private. They are only used by other util modules.
 

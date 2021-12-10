@@ -19,6 +19,7 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
+use crate::policy::space::{LargeObjectSpaceRef, SFTDispatch};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -87,6 +88,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::LargeObjectSpace(LargeObjectSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
