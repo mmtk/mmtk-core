@@ -23,6 +23,7 @@ use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::util::copy::CopySemantics;
 use crate::scheduler::GCWorker;
 use crate::policy::space::*;
+use crate::policy::space::{LargeObjectSpaceRef, SFTDispatch};
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -96,6 +97,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::LargeObjectSpace(LargeObjectSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr

@@ -13,6 +13,7 @@ use crate::util::copy::*;
 use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::policy::space::*;
 use crate::scheduler::GCWorker;
+use crate::policy::space::{MarkCompactSpaceRef, SFTDispatch};
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -68,6 +69,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::MarkCompactSpace(MarkCompactSpaceRef::new(self))
     }
 
     fn get_page_resource(&self) -> &dyn PageResource<VM> {

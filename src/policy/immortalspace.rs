@@ -20,6 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
 use crate::policy::space::*;
+use crate::policy::space::{ImmortalSpaceRef, SFTDispatch};
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the
@@ -93,6 +94,9 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::ImmortalSpace(ImmortalSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr

@@ -34,6 +34,7 @@ use std::{
 };
 use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::policy::space::*;
+use crate::policy::space::{ImmixSpaceRef, SFTDispatch};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -95,6 +96,9 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
+    }
+    fn as_dispatch(&self) -> SFTDispatch {
+        SFTDispatch::ImmixSpace(ImmixSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
