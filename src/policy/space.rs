@@ -83,11 +83,7 @@ pub trait SFT {
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 
-    fn copy_semantics(&self) -> Option<CopySemantics> {
-        None
-    }
-
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference;
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference;
 }
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
@@ -139,7 +135,7 @@ impl SFT for EmptySpaceSFT {
         )
     }
 
-    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _semantics: CopySemantics, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
         panic!(
             "Call sft_trace_object() on {:x}, which maps to an empty space",
             _object
@@ -196,6 +192,7 @@ impl<'a> SFTDispatch<'a> {
     dispatch_sft_call!(is_sane = () -> bool);
     dispatch_sft_call!(is_mmtk_object = (object: ObjectReference) -> bool);
     dispatch_sft_call!(initialize_object_metadata = (object: ObjectReference, alloc: bool) -> ());
+    dispatch_sft_call!(sft_trace_object = (trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference);
 }
 
 #[derive(Default)]
@@ -501,7 +498,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn release_multiple_pages(&mut self, start: Address);
 
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference;
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference;
 
     fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")

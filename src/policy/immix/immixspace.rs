@@ -80,13 +80,10 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
-        self.general_trace_object(trace, object, semantics, worker)
-    }
-    fn copy_semantics(&self) -> Option<CopySemantics> {
-        self.common.copy
+        self.general_trace_object(trace, object, self.common.copy, worker)
     }
 }
 
@@ -113,8 +110,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
     }
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference {
-        self.trace_object(trace, object, semantics, worker)
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object, semantics.unwrap(), worker)
     }
     fn set_copy_semantics(&mut self, semantics: Option<CopySemantics>) {
         self.common.copy = semantics;

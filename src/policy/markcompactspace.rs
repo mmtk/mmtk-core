@@ -57,7 +57,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         true
     }
 
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, semantics: CopySemantics, worker: GCWorkerMutRef) -> ObjectReference {
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         unimplemented!()
     }
 }
@@ -91,7 +91,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         panic!("markcompactspace only releases pages enmasse")
     }
 
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: CopySemantics, worker: &mut GCWorker<VM>) -> ObjectReference {
+    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
         unimplemented!()
     }
 }

@@ -509,12 +509,12 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
 
         let worker = GCWorkerMutRef::new(self.worker());
         let trace = MMTkProcessEdgesMutRef::new(self);
-        let semantics = match sft.copy_semantics() {
-            Some(s) => s,
-            // I need to rethink on this. Should we always use Option<CopySemantics> or add CopySemantics::NoCopy
-            None => CopySemantics::DefaultCopy,
-        };
-        sft.sft_trace_object(trace, object, semantics, worker)
+        // let semantics = match sft.copy_semantics() {
+        //     Some(s) => s,
+        //     // I need to rethink on this. Should we always use Option<CopySemantics> or add CopySemantics::NoCopy
+        //     None => CopySemantics::DefaultCopy,
+        // };
+        sft.sft_trace_object(trace, object, worker)
     }
 }
 
