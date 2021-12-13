@@ -80,6 +80,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
+    #[inline(always)]
     fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
@@ -110,6 +111,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
     }
+    #[inline(always)]
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
         self.trace_object(trace, object, semantics.unwrap(), worker)
     }

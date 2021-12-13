@@ -81,6 +81,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(object);
     }
+    #[inline(always)]
     fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
@@ -112,6 +113,7 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
         panic!("immortalspace only releases pages enmasse")
     }
 
+    #[inline(always)]
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
         debug_assert!(_semantics.is_none());
         self.trace_object(trace, object)

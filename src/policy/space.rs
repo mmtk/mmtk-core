@@ -167,7 +167,7 @@ pub enum SFTDispatch<'a> {
 macro_rules! dispatch_sft_call {
     ($fn: tt = ($($args: tt: $tys: ty),*) -> $ret_ty: ty) => {
         #[inline(always)]
-        fn $fn<VM: VMBinding>(&self, $($args: $tys),*) -> $ret_ty {
+        pub fn $fn<VM: VMBinding>(&self, $($args: $tys),*) -> $ret_ty {
             match self {
                 SFTDispatch::ImmortalSpace(r) => r.as_ref::<VM>().$fn($($args),*),
                 SFTDispatch::CopySpace(r) => r.as_ref::<VM>().$fn($($args),*),
@@ -236,6 +236,7 @@ impl<'a> SFTMap<'a> {
         res
     }
 
+    #[inline(always)]
     pub fn get_dispatch(&self, address: Address) -> SFTDispatch {
         self.sft_dispatch[address.chunk_index()]
     }
