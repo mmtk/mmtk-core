@@ -589,10 +589,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut bin = 0;
         while bin < MI_BIN_HUGE + 1 {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
+            unswept.lock();
             let available = self.available_blocks.get_mut(bin).unwrap();
-            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
+            available.lock();
             unswept.append::<VM>(available);
+            available.unlock();
+            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
+            consumed.lock();
             unswept.append::<VM>(consumed);
+            consumed.unlock();
+            unswept.unlock();
             bin += 1;
         }
     }
