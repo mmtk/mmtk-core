@@ -1,4 +1,4 @@
-use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use super::space::{CommonSpace, Space, SpaceOptions};
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::{LOG_BYTES_IN_WORD, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -9,7 +9,7 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
-use crate::policy::space::{MarkCompactSpaceRef, SFTDispatch};
+use crate::policy::sft::{MarkCompactSpaceRef, SFTDispatch, SFT};
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,

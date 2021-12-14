@@ -31,6 +31,8 @@ pub(crate) mod analysis;
 /// Logging edges to check duplicated edges in GC.
 #[cfg(feature = "extreme_assertions")]
 pub(crate) mod edge_logger;
+/// Non-generic refs to generic types of <VM>.
+pub(crate) mod erase_vm;
 /// Finalization implementation.
 pub(crate) mod finalizable_processor;
 /// Heap implementation, including page resource, mmapper, etc.
@@ -57,7 +59,6 @@ pub(crate) mod statistics;
 pub(crate) mod test_util;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
-pub(crate) mod erase_vm;
 
 // These modules are private. They are only used by other util modules.
 

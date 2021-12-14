@@ -1,6 +1,6 @@
 use atomic::Ordering;
 
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
@@ -16,7 +16,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
-use crate::policy::space::{ImmortalSpaceRef, SFTDispatch};
+use crate::policy::sft::{ImmortalSpaceRef, SFTDispatch, SFT};
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the

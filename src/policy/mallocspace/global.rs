@@ -1,7 +1,7 @@
 use super::metadata::*;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::CommonSpace;
-use crate::policy::space::SFT;
+use crate::policy::sft::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
@@ -26,7 +26,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
-use crate::policy::space::{MallocSpaceRef, SFTDispatch};
+use crate::policy::sft::{MallocSpaceRef, SFTDispatch};
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.

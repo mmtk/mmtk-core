@@ -6,7 +6,7 @@ use super::{
 };
 use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -31,7 +31,7 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
-use crate::policy::space::{ImmixSpaceRef, SFTDispatch};
+use crate::policy::sft::{ImmixSpaceRef, SFTDispatch, SFT};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,

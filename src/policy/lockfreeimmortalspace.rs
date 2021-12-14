@@ -1,8 +1,8 @@
 use crate::mmtk::SFT_MAP;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
-use crate::policy::space::{LockFreeImmortalSpaceRef, SFTDispatch};
+use crate::policy::sft::{LockFreeImmortalSpaceRef, SFTDispatch, SFT};
 use crate::util::ObjectReference;
 
 use crate::util::conversions;

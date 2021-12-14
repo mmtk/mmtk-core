@@ -13,6 +13,13 @@
 /// memory).
 pub mod space;
 
+/// Space funciton table captures functions that reflect _space-specific per-object
+/// semantics_.   These functions are implemented for each object via a special
+/// space-based dynamic/static dispatch mechanism where the semantics are _not_
+/// determined by the object's _type_, but rather, are determined by the _space_
+/// that the object is in.
+pub mod sft;
+
 pub mod copyspace;
 pub mod immix;
 pub mod immortalspace;
