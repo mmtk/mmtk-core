@@ -5,6 +5,7 @@ use super::{
     defrag::Defrag,
 };
 use crate::plan::ObjectsClosure;
+use crate::policy::sft::{ImmixSpaceRef, SFTDispatch, SFT};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -31,7 +32,6 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
-use crate::policy::sft::{ImmixSpaceRef, SFTDispatch, SFT};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,

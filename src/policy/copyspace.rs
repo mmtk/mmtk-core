@@ -1,5 +1,6 @@
 use crate::plan::TransitiveClosure;
 use crate::plan::{AllocationSemantics, CopyContext};
+use crate::policy::sft::{CopySpaceRef, SFTDispatch, SFT};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
@@ -16,7 +17,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::policy::sft::{CopySpaceRef, SFTDispatch, SFT};
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 

@@ -13,6 +13,8 @@ use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
+use crate::policy::sft::SFTDispatch;
+use crate::policy::sft::SFT;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -21,8 +23,6 @@ use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
-use crate::policy::sft::SFTDispatch;
-use crate::policy::sft::SFT;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -32,7 +32,9 @@ use downcast_rs::Downcast;
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
-    fn as_dispatch(&self) -> SFTDispatch { unimplemented!() }
+    fn as_dispatch(&self) -> SFTDispatch {
+        unimplemented!()
+    }
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
@@ -163,7 +165,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
+        SFT_MAP.update(
+            self.as_sft(),
+            self.as_dispatch(),
+            self.common().start,
+            self.common().extent,
+        );
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper

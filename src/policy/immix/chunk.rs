@@ -206,6 +206,12 @@ impl ChunkMap {
     }
 }
 
+impl Default for ChunkMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Chunk sweeping work packet.
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,

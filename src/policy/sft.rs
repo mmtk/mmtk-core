@@ -1,9 +1,9 @@
-use crate::util::conversions::*;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::conversions;
+use crate::util::conversions::*;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
@@ -130,7 +130,7 @@ pub enum SFTDispatch<'a> {
     MarkCompactSpace(MarkCompactSpaceRef<'a>),
     MallocSpace(MallocSpaceRef<'a>),
     ImmixSpace(ImmixSpaceRef<'a>),
-    Empty(&'a EmptySpaceSFT)
+    Empty(&'a EmptySpaceSFT),
 }
 
 /// This macro defines a given function, which forwards the call to the space-specific implementation
@@ -183,7 +183,7 @@ impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
-            sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS]
+            sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -258,7 +258,13 @@ impl<'a> SFTMap<'a> {
     /// Update SFT map for the given address range.
     /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
     /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: &(dyn SFT + Sync + 'static), dispatch: SFTDispatch, start: Address, bytes: usize) {
+    pub fn update(
+        &self,
+        space: &(dyn SFT + Sync + 'static),
+        dispatch: SFTDispatch,
+        start: Address,
+        bytes: usize,
+    ) {
         if DEBUG_SFT {
             self.log_update(space, start, bytes);
         }
@@ -277,13 +283,21 @@ impl<'a> SFTMap<'a> {
     pub fn clear(&self, chunk_start: Address) {
         assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
         let chunk_idx = chunk_start.chunk_index();
-        self.set(chunk_idx, &EMPTY_SPACE_SFT, SFTDispatch::Empty(&EMPTY_SPACE_SFT));
+        self.set(
+            chunk_idx,
+            &EMPTY_SPACE_SFT,
+            SFTDispatch::Empty(&EMPTY_SPACE_SFT),
+        );
     }
 
     // Currently only used by 32 bits vm map
     #[allow(dead_code)]
     pub fn clear_by_index(&self, chunk_idx: usize) {
-        self.set(chunk_idx, &EMPTY_SPACE_SFT, SFTDispatch::Empty(&EMPTY_SPACE_SFT))
+        self.set(
+            chunk_idx,
+            &EMPTY_SPACE_SFT,
+            SFTDispatch::Empty(&EMPTY_SPACE_SFT),
+        )
     }
 
     fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static), dispatch: SFTDispatch) {

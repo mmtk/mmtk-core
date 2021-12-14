@@ -11,12 +11,12 @@ use crate::util::{metadata, ObjectReference};
 use crate::plan::TransitiveClosure;
 
 use crate::plan::PlanConstraints;
+use crate::policy::sft::{ImmortalSpaceRef, SFTDispatch, SFT};
 use crate::policy::space::SpaceOptions;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
-use crate::policy::sft::{ImmortalSpaceRef, SFTDispatch, SFT};
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the

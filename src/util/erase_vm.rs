@@ -19,14 +19,14 @@ macro_rules! define_erased_vm_ref {
         impl<'a> $new_type<'a> {
             #[inline(always)]
             pub fn new<VM: VMBinding>(r: &'a $orig_type) -> Self {
-                Self ( unsafe { std::mem::transmute(r) }, PhantomData)
+                Self(unsafe { std::mem::transmute(r) }, PhantomData)
             }
             #[inline(always)]
             pub fn as_ref<VM: VMBinding>(self) -> &'a $orig_type {
                 unsafe { std::mem::transmute(self.0) }
             }
         }
-    }
+    };
 }
 
 pub(crate) use define_erased_vm_ref;
