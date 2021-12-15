@@ -194,6 +194,7 @@ impl Block {
             None,
         );
         let loaded = self.load_block_list::<VM>();
+        unsafe{assert!((*loaded).first == block_list.first);}
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {

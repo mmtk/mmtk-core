@@ -38,6 +38,8 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
+#[cfg(feature="malloc")]
+use super::gc_work::MSSweepChunks;
 pub struct MarkSweep<VM: VMBinding> {
     common: CommonPlan<VM>,
     #[cfg(feature="malloc")]

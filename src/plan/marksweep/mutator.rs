@@ -68,6 +68,15 @@ lazy_static! {
     };
 }
 
+#[cfg(not(feature="malloc"))]
+lazy_static! {
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
+        AllocationType::Default | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::FreeList(0),
+        AllocationType::Immortal | AllocationType::LargeCode => AllocatorSelector::BumpPointer(0),
+        AllocationType::Los => AllocatorSelector::LargeObject(0),
+    };
+}
+
 pub fn create_ms_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
     plan: &'static dyn Plan<VM = VM>,
