@@ -2,7 +2,6 @@
 
 use super::block::{Block, BlockState};
 use super::MarkSweepSpace;
-use crate::util::alloc::free_list_allocator::{BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK};
 use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
 use crate::{
@@ -28,7 +27,7 @@ impl Chunk {
     /// Bytes in chunk
     pub const BYTES: usize = 1 << Self::LOG_BYTES;
     /// Log blocks in chunk
-    pub const LOG_BLOCKS: usize = Self::LOG_BYTES - LOG_BYTES_IN_BLOCK;
+    pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
     /// Blocks in chunk
     pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
 
@@ -56,7 +55,7 @@ impl Chunk {
         let a = Block::align(self.0);
         let b = Block::from(a);
         let start = Block::from(Block::align(self.0));
-        let end = Block::from(start.start() + (Self::BLOCKS << LOG_BYTES_IN_BLOCK));
+        let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
         start..end
     }
 
@@ -82,7 +81,7 @@ impl Chunk {
     }
 }
 
-unsafe impl Step for Chunk {
+impl Step for Chunk {
     /// Get the number of chunks between the given two chunks.
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
@@ -135,13 +134,9 @@ pub struct ChunkMap {
 }
 
 impl ChunkMap {
-    /// Chunk alloc table
-    pub const ALLOC_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::TLS_TABLE),
-        log_num_of_bits: 3,
-        log_min_obj_size: Chunk::LOG_BYTES,
-    };
+
+    pub const ALLOC_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::MS_CHUNK_MARK;
 
     pub fn new() -> Self {
         Self {

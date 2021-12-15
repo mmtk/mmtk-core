@@ -4,84 +4,53 @@ use std::iter::Step;
 
 use atomic::Ordering;
 
-use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, BlockList, FreeListAllocator, LOG_BYTES_IN_BLOCK}, metadata::{MetadataSpec, load_metadata, side_metadata::{
-                self, SideMetadataOffset, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_OFFSET,
-            }, store_metadata}, VMThread, alloc_bit::is_alloced}, vm::VMBinding, policy::marksweepspace::metadata::is_marked};
+use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{BlockList}, metadata::{MetadataSpec, load_metadata, side_metadata::{
+                self, SideMetadataSpec,
+            }, store_metadata}, VMThread}, vm::VMBinding};
 
-use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
-use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK}}, metadata::side_metadata::{self, LOCAL_SIDE_METADATA_BASE_OFFSET, SideMetadataOffset, SideMetadataSpec}}, vm::VMBinding};
-
-use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
+use super::{MarkSweepSpace, chunk::Chunk};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
 impl Block {
+
+    pub const LOG_BYTES: usize = 16;
+
+    pub const BYTES: usize = 1 << Block::LOG_BYTES;
+
     /// Align the address to a block boundary.
     pub const fn align(address: Address) -> Address {
-        address.align_down(BYTES_IN_BLOCK)
+        address.align_down(Block::BYTES)
     }
 
     /// Block mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET,
-        log_num_of_bits: 3,
-        log_min_obj_size: free_list_allocator::LOG_BYTES_IN_BLOCK,
-    };
+    pub const MARK_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK;
 
-    pub const NEXT_BLOCK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const NEXT_BLOCK_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_NEXT;
 
-    pub const PREV_BLOCK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::NEXT_BLOCK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const PREV_BLOCK_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_PREV;
 
-    pub const FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::PREV_BLOCK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const SIZE_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::SIZE_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::LOCAL_FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const FREE_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_FREE;
+        
+    pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
-    pub const BLOCK_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::THREAD_FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
 
-    pub const TLS_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::BLOCK_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const SIZE_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE;
+
+    pub const BLOCK_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_LIST;
+
+    pub const TLS_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
     #[inline]
     pub fn load_free_list<VM: VMBinding>(&self) -> Address {
@@ -225,7 +194,6 @@ impl Block {
             None,
         );
         let loaded = self.load_block_list::<VM>();
-        unsafe{assert!((*loaded).first == block_list.first);}
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
@@ -318,11 +286,18 @@ impl Block {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
-                let mut block_list = self.load_block_list::<VM>();
                 unsafe {
-                    (*block_list).lock(); 
+                    let block_list = loop {
+                        let list = self.load_block_list::<VM>();
+                        (*list).lock();
+                        if list == self.load_block_list::<VM>() {
+                            break list
+                        }
+                        (*list).unlock();
+                    };
+                    // (*block_list).lock(); 
                     (*block_list).remove::<VM>(self);
-                    (*block_list).release_lock();
+                    (*block_list).unlock();
                 }
                 space.release_block(self);
                 true
@@ -362,7 +337,7 @@ impl Block {
     }
 }
 
-unsafe impl Step for Block {
+impl Step for Block {
     /// Get the number of blocks between the given two blocks.
     #[inline(always)]
     #[allow(clippy::assertions_on_constants)]
@@ -370,17 +345,17 @@ unsafe impl Step for Block {
         if start > end {
             return None;
         }
-        Some((end.start() - start.start()) >> LOG_BYTES_IN_BLOCK)
+        Some((end.start() - start.start()) >> Block::LOG_BYTES)
     }
     /// result = block_address + count * block_size
     #[inline(always)]
     fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << LOG_BYTES_IN_BLOCK))
+        Self::from(start.start() + (count << Block::LOG_BYTES))
     }
     /// result = block_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << LOG_BYTES_IN_BLOCK) {
+        if start.start().as_usize() > usize::MAX - (count << Block::LOG_BYTES) {
             return None;
         }
         Some(Self::forward(start, count))
@@ -388,12 +363,12 @@ unsafe impl Step for Block {
     /// result = block_address + count * block_size
     #[inline(always)]
     fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << LOG_BYTES_IN_BLOCK))
+        Self::from(start.start() - (count << Block::LOG_BYTES))
     }
     /// result = block_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << LOG_BYTES_IN_BLOCK) {
+        if start.start().as_usize() < (count << Block::LOG_BYTES) {
             return None;
         }
         Some(Self::backward(start, count))

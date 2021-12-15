@@ -1,0 +1,374 @@
+Warn: unable to set threads="". Cant parse value. Default value will be used.
+[2021-12-15T06:33:23Z INFO  mmtk::memory_manager] Initialized MMTk with MarkSweep
+Using scaled threading model. 24 processors detected, 24 threads used to drive the workload, in a possible range of [1,64]
+[2021-12-15T06:33:24Z INFO  mmtk::plan::global] User triggering collection
+8504[2021-12-15T06:33:24Z INFO  mmtk::scheduler::gc_work] End of GC
+8504===== DaCapo 9.12-MR1 lusearch starting =====
+[2021-12-15T06:33:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:24Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8590[2021-12-15T06:33:24Z INFO  mmtk::scheduler::gc_work] End of GC
+8590[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:33:25Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:25Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8582[2021-12-15T06:33:25Z INFO  mmtk::scheduler::gc_work] End of GC
+8582[2021-12-15T06:33:26Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:26Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8582[2021-12-15T06:33:26Z INFO  mmtk::scheduler::gc_work] End of GC
+8582[2021-12-15T06:33:27Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:27Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:33:27Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:33:28Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:28Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8590[2021-12-15T06:33:29Z INFO  mmtk::scheduler::gc_work] End of GC
+8590[2021-12-15T06:33:30Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:30Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8589[2021-12-15T06:33:30Z INFO  mmtk::scheduler::gc_work] End of GC
+8589[2021-12-15T06:33:32Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:32Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:32Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8592[2021-12-15T06:33:32Z INFO  mmtk::scheduler::gc_work] End of GC
+8592[2021-12-15T06:33:33Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:33Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8580[2021-12-15T06:33:33Z INFO  mmtk::scheduler::gc_work] End of GC
+8580[2021-12-15T06:33:35Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:35Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8581[2021-12-15T06:33:35Z INFO  mmtk::scheduler::gc_work] End of GC
+8581[2021-12-15T06:33:36Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:36Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:36Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8580[2021-12-15T06:33:37Z INFO  mmtk::scheduler::gc_work] End of GC
+8580[2021-12-15T06:33:38Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:38Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8589[2021-12-15T06:33:38Z INFO  mmtk::scheduler::gc_work] End of GC
+8589[2021-12-15T06:33:40Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:40Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:40Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8589[2021-12-15T06:33:40Z INFO  mmtk::scheduler::gc_work] End of GC
+8589[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:41Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8580[2021-12-15T06:33:41Z INFO  mmtk::scheduler::gc_work] End of GC
+8580[2021-12-15T06:33:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:43Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8589[2021-12-15T06:33:43Z INFO  mmtk::scheduler::gc_work] End of GC
+8589[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:44Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8584[2021-12-15T06:33:44Z INFO  mmtk::scheduler::gc_work] End of GC
+8584[2021-12-15T06:33:46Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:46Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:46Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:46Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:46Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:46Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:33:46Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:33:48Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:48Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:48Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:33:48Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:33:49Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:49Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:49Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8588[2021-12-15T06:33:49Z INFO  mmtk::scheduler::gc_work] End of GC
+8588[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:51Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8581[2021-12-15T06:33:51Z INFO  mmtk::scheduler::gc_work] End of GC
+8581[2021-12-15T06:33:52Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:52Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:52Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:52Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8575[2021-12-15T06:33:53Z INFO  mmtk::scheduler::gc_work] End of GC
+8575[2021-12-15T06:33:54Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:54Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:54Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:54Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8572[2021-12-15T06:33:54Z INFO  mmtk::scheduler::gc_work] End of GC
+85724 query batches completed
+8 query batches completed
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:55Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8592[2021-12-15T06:33:55Z INFO  mmtk::scheduler::gc_work] End of GC
+859212 query batches completed
+16 query batches completed
+20 query batches completed
+[2021-12-15T06:33:56Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:56Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:56Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:56Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8575[2021-12-15T06:33:56Z INFO  mmtk::scheduler::gc_work] End of GC
+857524 query batches completed
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:57Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8572[2021-12-15T06:33:57Z INFO  mmtk::scheduler::gc_work] End of GC
+8572[2021-12-15T06:33:58Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:33:58Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8582[2021-12-15T06:33:59Z INFO  mmtk::scheduler::gc_work] End of GC
+8582[2021-12-15T06:34:00Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:00Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:34:00Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:34:02Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:02Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:02Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:02Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8585[2021-12-15T06:34:02Z INFO  mmtk::scheduler::gc_work] End of GC
+8585[2021-12-15T06:34:03Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:03Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:03Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8585[2021-12-15T06:34:03Z INFO  mmtk::scheduler::gc_work] End of GC
+8585[2021-12-15T06:34:05Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:05Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:05Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:05Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:05Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:05Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8581[2021-12-15T06:34:05Z INFO  mmtk::scheduler::gc_work] End of GC
+8581[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:07Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8575[2021-12-15T06:34:07Z INFO  mmtk::scheduler::gc_work] End of GC
+8575[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:08Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:34:08Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:34:10Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:10Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:10Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:10Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:10Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:34:10Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:34:12Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:12Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:12Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:12Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:12Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:34:12Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:34:13Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:13Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8569[2021-12-15T06:34:13Z INFO  mmtk::scheduler::gc_work] End of GC
+8569[2021-12-15T06:34:15Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:15Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:15Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:15Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:15Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:34:15Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:17Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8581[2021-12-15T06:34:17Z INFO  mmtk::scheduler::gc_work] End of GC
+8581[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:18Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8587[2021-12-15T06:34:19Z INFO  mmtk::scheduler::gc_work] End of GC
+8587[2021-12-15T06:34:20Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:20Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:20Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:34:20Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:34:22Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:22Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:22Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:22Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:22Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8577[2021-12-15T06:34:22Z INFO  mmtk::scheduler::gc_work] End of GC
+8577[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:24Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8586[2021-12-15T06:34:24Z INFO  mmtk::scheduler::gc_work] End of GC
+8586[2021-12-15T06:34:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:25Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:25Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8570[2021-12-15T06:34:26Z INFO  mmtk::scheduler::gc_work] End of GC
+8570[2021-12-15T06:34:27Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:27Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:27Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:27Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:27Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8587[2021-12-15T06:34:27Z INFO  mmtk::scheduler::gc_work] End of GC
+858728 query batches completed
+32 query batches completed
+36 query batches completed
+[2021-12-15T06:34:28Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:28Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:28Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:28Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8584[2021-12-15T06:34:28Z INFO  mmtk::scheduler::gc_work] End of GC
+858440 query batches completed
+44 query batches completed
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:29Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8572[2021-12-15T06:34:29Z INFO  mmtk::scheduler::gc_work] End of GC
+857248 query batches completed
+[2021-12-15T06:34:30Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:30Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8578[2021-12-15T06:34:30Z INFO  mmtk::scheduler::gc_work] End of GC
+8578[2021-12-15T06:34:31Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:31Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8576[2021-12-15T06:34:31Z INFO  mmtk::scheduler::gc_work] End of GC
+8576[2021-12-15T06:34:32Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:32Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:32Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8584[2021-12-15T06:34:33Z INFO  mmtk::scheduler::gc_work] End of GC
+8584[2021-12-15T06:34:34Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:34Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8583[2021-12-15T06:34:34Z INFO  mmtk::scheduler::gc_work] End of GC
+8583[2021-12-15T06:34:35Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:35Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8580[2021-12-15T06:34:35Z INFO  mmtk::scheduler::gc_work] End of GC
+8580[2021-12-15T06:34:37Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:37Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:34:37Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:34:38Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:38Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8583[2021-12-15T06:34:38Z INFO  mmtk::scheduler::gc_work] End of GC
+8583[2021-12-15T06:34:39Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:39Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:39Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:39Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8569[2021-12-15T06:34:40Z INFO  mmtk::scheduler::gc_work] End of GC
+8569[2021-12-15T06:34:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:41Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:41Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8579[2021-12-15T06:34:41Z INFO  mmtk::scheduler::gc_work] End of GC
+8579[2021-12-15T06:34:42Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:42Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:42Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:42Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:42Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8583[2021-12-15T06:34:42Z INFO  mmtk::scheduler::gc_work] End of GC
+8583[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:43Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8582[2021-12-15T06:34:44Z INFO  mmtk::scheduler::gc_work] End of GC
+858252 query batches completed
+[2021-12-15T06:34:45Z WARN  mmtk::util::alloc::allocator] mmtk::util::alloc::free_list_allocator::FreeListAllocator<mmtk_openjdk::OpenJDK> does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).
+[2021-12-15T06:34:45Z INFO  mmtk::plan::global]   [POLL] MSspace: Triggering collection
+8583[2021-12-15T06:34:45Z INFO  mmtk::scheduler::gc_work] End of GC
+858356 query batches completed
+60 query batches completed
+64 query batches completed
+===== DaCapo 9.12-MR1 lusearch PASSED in 81353 msec =====
