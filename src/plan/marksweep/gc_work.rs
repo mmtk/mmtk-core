@@ -12,6 +12,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+#[cfg(feature="malloc")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -26,9 +27,10 @@ pub struct MSProcessEdges<VM: VMBinding> {
 
 impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
     type VM = VM;
+
     const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<Address>, _roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, mmtk);
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
         Self { plan, base }
     }
@@ -129,4 +131,12 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
 
         mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
+}
+
+pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
+    type VM = VM;
+    type PlanType = MarkSweep<VM>;
+    type CopyContextType = NoCopy<VM>;
+    type ProcessEdgesWorkType = MSProcessEdges<VM>;
 }

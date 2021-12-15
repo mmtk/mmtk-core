@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.6.0"
+version = "0.8.0"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -33,7 +33,7 @@ atomic-traits = "0.2.0"
 atomic = "0.4.6"
 spin = "0.5.2"
 env_logger = "0.8.2"
-pfm = {version = "0.0.8", optional = true}
+pfm = {version = "0.1.0-beta.1", optional = true}
 
 [dev-dependencies]
 crossbeam = "0.7.3"
@@ -75,6 +75,9 @@ single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
+
+# Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
+nogc_multi_space = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

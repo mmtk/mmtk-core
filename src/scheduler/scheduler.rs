@@ -62,7 +62,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
+                WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
                 WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
             },
@@ -139,10 +141,67 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             open_next(Closure);
             open_next(RefClosure);
+            open_next(CalculateForwarding);
             open_next(RefForwarding);
+            open_next(Compact);
             open_next(Release);
             open_next(Final);
         }
+    }
+
+    /// Schedule all the common work packets
+    pub fn schedule_common_work<C: GCWorkContext<VM = VM> + 'static>(
+        &self,
+        plan: &'static C::PlanType,
+    ) {
+        use crate::plan::Plan;
+        use crate::scheduler::gc_work::*;
+        // Stop & scan mutators (mutator scanning can happen before STW)
+        self.work_buckets[WorkBucketStage::Unconstrained]
+            .add(StopMutators::<C::ProcessEdgesWorkType>::new());
+
+        // Prepare global/collectors/mutators
+        self.work_buckets[WorkBucketStage::Prepare].add(Prepare::<C>::new(plan));
+
+        // VM-specific weak ref processing
+        self.work_buckets[WorkBucketStage::RefClosure]
+            .add(ProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
+
+        // Release global/collectors/mutators
+        self.work_buckets[WorkBucketStage::Release].add(Release::<C>::new(plan));
+
+        // Analysis GC work
+        #[cfg(feature = "analysis")]
+        {
+            use crate::util::analysis::GcHookWork;
+            self.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
+        }
+
+        // Sanity
+        #[cfg(feature = "sanity")]
+        {
+            use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+            self.work_buckets[WorkBucketStage::Final]
+                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(
+                    plan,
+                ));
+        }
+
+        // Finalization
+        if !plan.base().options.no_finalizer {
+            use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
+            // finalization
+            self.work_buckets[WorkBucketStage::RefClosure]
+                .add(Finalization::<C::ProcessEdgesWorkType>::new());
+            // forward refs
+            if plan.constraints().needs_forward_after_liveness {
+                self.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
+            }
+        }
+
+        // Set EndOfGC to run at the end
+        self.set_finalizer(Some(EndOfGC));
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
@@ -235,7 +294,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::CalculateForwarding].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
+        debug_assert!(!self.work_buckets[WorkBucketStage::Compact].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
     }
@@ -244,7 +305,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
+        self.work_buckets[WorkBucketStage::Compact].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }
@@ -253,7 +316,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // self.work_buckets[WorkBucketStage::Prepare].deactivate();
         self.work_buckets[WorkBucketStage::Closure].deactivate();
         self.work_buckets[WorkBucketStage::RefClosure].deactivate();
+        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
         self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
+        self.work_buckets[WorkBucketStage::Compact].deactivate();
         self.work_buckets[WorkBucketStage::Release].deactivate();
         self.work_buckets[WorkBucketStage::Final].deactivate();
     }

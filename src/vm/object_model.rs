@@ -221,6 +221,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn get_current_size(object: ObjectReference) -> usize;
 
+    /// Return the size when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_size_when_copied(object: ObjectReference) -> usize;
+
+    /// Return the alignment when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_align_when_copied(object: ObjectReference) -> usize;
+
+    /// Return the alignment offset when an object is copied.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn get_align_offset_when_copied(object: ObjectReference) -> isize;
+
     /// Get the type descriptor for an object.
     ///
     /// FIXME: Do we need this? If so, determine lifetime, return byte[]
@@ -278,17 +296,19 @@ pub mod specs {
                 pub const fn side_first() -> Self {
                     if Self::IS_GLOBAL {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: GLOBAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     } else {
                         Self(MetadataSpec::OnSide(SideMetadataSpec {
+                            name: stringify!($spec_name),
                             is_global: Self::IS_GLOBAL,
                             offset: LOCAL_SIDE_METADATA_VM_BASE_OFFSET,
                             log_num_of_bits: Self::LOG_NUM_BITS,
-                            log_min_obj_size: $side_min_obj_size as usize,
+                            log_bytes_in_region: $side_min_obj_size as usize,
                         }))
                     }
                 }
@@ -297,10 +317,11 @@ pub mod specs {
                     let side_spec = spec.extract_side_spec();
                     debug_assert!(side_spec.is_global == Self::IS_GLOBAL);
                     Self(MetadataSpec::OnSide(SideMetadataSpec {
+                        name: stringify!($spec_name),
                         is_global: Self::IS_GLOBAL,
                         offset: SideMetadataOffset::layout_after(side_spec),
                         log_num_of_bits: Self::LOG_NUM_BITS,
-                        log_min_obj_size: $side_min_obj_size as usize,
+                        log_bytes_in_region: $side_min_obj_size as usize,
                     }))
                 }
                 #[inline(always)]

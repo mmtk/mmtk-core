@@ -30,25 +30,31 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
     }
+
     fn is_live(&self, object: ObjectReference) -> bool {
         !self.from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
+
     fn is_movable(&self) -> bool {
         true
     }
+
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
         !self.from_space()
     }
+
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
+
     #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !self.from_space() {
             return None;
         }
+
         if object_forwarding::is_forwarded::<VM>(object) {
             Some(object_forwarding::read_forwarding_pointer::<VM>(object))
         } else {
@@ -61,12 +67,15 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
+
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
         self
     }
+
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
+
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
@@ -181,17 +190,22 @@ impl<VM: VMBinding> CopySpace<VM> {
         copy_context: &mut C,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        if !self.from_space() {
-            return object;
-        }
+        debug_assert!(
+            self.from_space(),
+            "Trace object called for object ({:?}) in to-space",
+            object
+        );
+
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
             crate::util::alloc_bit::is_alloced(object),
             "{:x}: alloc bit not set",
             object
         );
+
         trace!("attempting to forward");
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
+
         trace!("checking if object is being forwarded");
         if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");

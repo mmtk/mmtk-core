@@ -65,6 +65,7 @@ pub fn pages_to_bytes(pages: usize) -> usize {
     pages << LOG_BYTES_IN_PAGE
 }
 
+/// Convert size in bytes to the number of pages (aligned up)
 pub fn bytes_to_pages_up(bytes: usize) -> usize {
     (bytes + BYTES_IN_PAGE - 1) >> LOG_BYTES_IN_PAGE
 }
@@ -86,6 +87,22 @@ pub fn bytes_to_pages(bytes: usize) -> usize {
     }
 
     pages
+}
+
+/// Convert size in bytes to a readable short string, such as 1GB, 2TB, etc. It only keeps the major unit and keeps no fraction.
+pub fn bytes_to_formatted_string(bytes: usize) -> String {
+    const UNITS: [&str; 6] = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+    let mut i = 0;
+    let mut num = bytes;
+    while i < UNITS.len() - 1 {
+        let new_num = num >> 10;
+        if new_num == 0 {
+            return format!("{}{}", num, UNITS[i]);
+        }
+        num = new_num;
+        i += 1;
+    }
+    return format!("{}{}", num, UNITS.last().unwrap());
 }
 
 #[cfg(test)]
@@ -112,5 +129,22 @@ mod tests {
         assert_eq!(chunk_align_up(addr), unsafe {
             Address::from_usize(0x2380_0000)
         });
+    }
+
+    #[test]
+    fn test_bytes_to_formatted_string() {
+        assert_eq!(bytes_to_formatted_string(0), "0B");
+        assert_eq!(bytes_to_formatted_string(1023), "1023B");
+        assert_eq!(bytes_to_formatted_string(1024), "1KiB");
+        assert_eq!(bytes_to_formatted_string(1025), "1KiB");
+        assert_eq!(bytes_to_formatted_string(1 << 20), "1MiB");
+        assert_eq!(bytes_to_formatted_string(1 << 30), "1GiB");
+        #[cfg(target_pointer_width = "64")]
+        {
+            assert_eq!(bytes_to_formatted_string(1 << 40), "1TiB");
+            assert_eq!(bytes_to_formatted_string(1 << 50), "1PiB");
+            assert_eq!(bytes_to_formatted_string(1 << 60), "1024PiB");
+            assert_eq!(bytes_to_formatted_string(1 << 63), "8192PiB");
+        }
     }
 }
