@@ -17,6 +17,7 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+use std::collections::HashSet;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
@@ -51,6 +52,8 @@ pub struct MallocSpace<VM: VMBinding> {
     pub completed_work_packets: AtomicU32,
     #[cfg(debug_assertions)]
     pub work_live_bytes: AtomicUsize,
+    /// Set of allocated objects used for conservative-scan.
+    pub alive_objects: Option<Mutex<HashSet<Address>>>,
 }
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
@@ -85,6 +88,28 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 }
 
 impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
+    /// Checks if `address` is allocated in [MallocSpace] and returns correct object address if it is.
+    ///
+    /// FIXME: This function should search for header start if object is in the space but at the moment
+    /// it just checks hash set for address.
+    fn find_conservatively(&self, address: Address) -> Option<ObjectReference> {
+        if VM::CONSERVATIVE_SCANNING {
+            if self
+                .alive_objects
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .contains(&address)
+            {
+                unsafe { Some(address.to_object_reference()) }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
@@ -190,6 +215,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
             completed_work_packets: AtomicU32::new(0),
             #[cfg(debug_assertions)]
             work_live_bytes: AtomicUsize::new(0),
+            alive_objects: if VM::CONSERVATIVE_SCANNING {
+                Some(Mutex::new(HashSet::new()))
+            } else {
+                None
+            },
         }
     }
 
@@ -223,6 +253,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 debug_assert!(actual_size != 0);
                 self.active_mem.lock().unwrap().insert(address, actual_size);
             }
+            if VM::CONSERVATIVE_SCANNING {
+                self.alive_objects
+                    .as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .insert(address);
+            }
         }
 
         address
@@ -242,7 +280,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 free(ptr);
             }
         }
-
+        if VM::CONSERVATIVE_SCANNING {
+            // remove object from `alive_objects` if conservative scanning is enabled.
+            assert!(
+                self.alive_objects
+                    .as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .remove(&addr),
+                "Trying to free unallocated address {:p}",
+                addr.to_ptr::<()>()
+            );
+        }
         self.active_bytes.fetch_sub(bytes, Ordering::SeqCst);
 
         #[cfg(debug_assertions)]

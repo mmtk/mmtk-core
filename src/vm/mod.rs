@@ -61,4 +61,6 @@ where
     /// Note that MMTk does not attempt to do anything to align the cursor to this value, but
     /// it merely asserts with this constant.
     const ALLOC_END_ALIGNMENT: usize = 1;
+
+    const CONSERVATIVE_SCANNING: bool = false;
 }

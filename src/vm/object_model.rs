@@ -266,6 +266,16 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Arguments:
     /// * `object`: The object to be dumped.
     fn dump_object(object: ObjectReference);
+
+    /// Possibly decode NaN-boxed/pointer tagged value that is found on stack into real address.
+    ///
+    /// Arguments:
+    /// * `address`: The address of possibly a pointer on the stack.
+    ///
+    /// NOTE: By default this method is no-op.
+    fn decode_conservative_address(address: Address) -> Address {
+        address
+    }
 }
 
 pub mod specs {
