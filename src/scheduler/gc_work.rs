@@ -444,6 +444,11 @@ pub trait ProcessEdgesWork:
         }
     }
 
+    fn process_conservative_roots(&mut self, start: Address, end: Address) {
+        let _ = start;
+        let _ = end;
+        unreachable!("Unable to process conservative roots under this plan.");
+    }
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
     #[cold]

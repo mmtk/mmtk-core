@@ -11,6 +11,7 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use std::mem::size_of;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
@@ -46,6 +47,19 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
             self.plan
                 .common()
                 .trace_object::<Self, NoCopy<VM>>(self, object)
+        }
+    }
+
+    fn process_conservative_roots(&mut self, start: Address, end: Address) {
+        let mut cursor = start;
+        while cursor < end {
+            unsafe {
+                let address = cursor.load::<Address>();
+                if let Some(object) = self.plan.ms_space().find_conservatively(address) {
+                    self.trace_object(object);
+                }
+            }
+            cursor = cursor.add(size_of::<usize>());
         }
     }
 }
