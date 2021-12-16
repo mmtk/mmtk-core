@@ -514,8 +514,9 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
         // };
         // let sft = crate::mmtk::SFT_MAP.get_dispatch(object.to_address());
         // sft.sft_trace_object::<VM>(trace, object, worker)
-        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
-        sft.sft_trace_object(trace, object, worker)
+        // let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        // sft.sft_trace_object(trace, object, worker)
+        unimplemented!()
     }
 }
 

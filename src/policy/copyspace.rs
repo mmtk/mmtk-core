@@ -68,10 +68,10 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     #[inline(always)]
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn sft_trace_object(&self, trace: SSProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
-        self.general_trace_object(trace, object, self.common.copy, worker)
+        self.trace_object(trace, object, self.common.copy.unwrap(), worker)
     }
 }
 

@@ -1,6 +1,6 @@
 //! Plan: semispace
 
-pub(super) mod gc_work;
+pub mod gc_work;
 pub(super) mod global;
 pub(super) mod mutator;
 

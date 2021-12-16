@@ -31,7 +31,53 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        unreachable!();
+        if object.is_null() || self.ss().tospace().in_space(object) {
+            return object;
+        }
+
+        // baseline
+        // self.ss()
+        //     .fromspace()
+        //     .trace_object::<Self>(
+        //         self,
+        //         object,
+        //         CopySemantics::DefaultCopy,
+        //         self.worker(),
+        //     )
+
+        // if switch
+
+        // We don't need to trace the object if it is already in the to-space
+        // if self.ss().fromspace().in_space(object) {
+        //     self.ss()
+        //         .fromspace()
+        //         .trace_object::<Self>(
+        //             self,
+        //             object,
+        //             CopySemantics::DefaultCopy,
+        //             self.worker(),
+        //         )
+        // } else {
+        //     self.ss()
+        //         .common
+        //         .trace_object::<Self>(self, object)
+        // }
+
+        {
+            use crate::policy::space::*;
+            use crate::util::copy::*;
+
+            let worker = GCWorkerMutRef::new(self.worker());
+            let trace = SSProcessEdgesMutRef::new(self);
+
+            // SFT
+            // let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+            // sft.sft_trace_object(trace, object, worker)
+
+            // enum dispatch
+            let sft = crate::mmtk::SFT_MAP.get_dispatch(object.to_address());
+            sft.sft_trace_object::<VM>(trace, object, worker)
+        }
     }
 }
 
@@ -55,5 +101,5 @@ pub struct SSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for SSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = SemiSpace<VM>;
-    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
+    type ProcessEdgesWorkType = SSProcessEdges<VM>;
 }

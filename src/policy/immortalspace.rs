@@ -82,10 +82,8 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
     }
     #[inline(always)]
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
-        let trace = trace.as_mut::<VM>();
-        let worker = worker.as_mut::<VM>();
-        self.general_trace_object(trace, object, None, worker)
+    fn sft_trace_object(&self, trace: SSProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+        unimplemented!()
     }
 }
 

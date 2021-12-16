@@ -40,11 +40,16 @@ const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     ..ReservedAllocators::DEFAULT
 };
 
+use enum_map::enum_map;
+
 lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
-        let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
-        map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
-        map
+    // pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
+    //     let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
+    //     map[AllocationSemantics::Default] = AllocatorSelector::BumpPointer(0);
+    //     map
+    // };
+    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = enum_map!{
+        _ => AllocatorSelector::BumpPointer(0),
     };
 }
 
