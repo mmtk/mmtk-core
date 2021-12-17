@@ -32,12 +32,6 @@ const DISCONTIG_INDEX_INCREMENT: usize = 1 << TYPE_BITS;
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct SpaceDescriptor(usize);
 
-impl Default for SpaceDescriptor {
-    fn default() -> Self {
-        Self::UNINITIALIZED
-    }
-}
-
 impl SpaceDescriptor {
     pub const UNINITIALIZED: Self = SpaceDescriptor(0);
 

@@ -18,7 +18,6 @@ use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
-use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -399,11 +398,6 @@ pub struct BasePlan<VM: VMBinding> {
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 
-    /// The mapping between allocation semantics and space descriptor. A plan can use this
-    /// to quickly check whether an object is allocated in the given semantic. This field
-    /// is only available after gc_init().
-    pub alloc_semantics_mapping: EnumMap<AllocationSemantics, SpaceDescriptor>,
-
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     pub code_space: ImmortalSpace<VM>,
@@ -529,7 +523,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
-            alloc_semantics_mapping: EnumMap::new(),
         }
     }
 
@@ -538,7 +531,6 @@ impl<VM: VMBinding> BasePlan<VM> {
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
-        // mutator_config: &MutatorConfig<VM>,
     ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(
