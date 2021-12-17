@@ -172,6 +172,25 @@ Change the following import statements:
 {{#include ../../../code/mygc_semispace/mutator.rs:imports}}
 ```
 
+### Prepare and release mutator
+
+First, we define two functions that will be used before and after GCs to prepare and
+release mutators.
+
+For our semispace GC, we do not need to do anything special for a mutator before a GC.
+So we leave the implementation of the prepare function as empty.
+
+```rust
+{{#include ../../../code/mygc_semispace/mutator.rs:mutator_prepare}}
+```
+
+As we will flip the from space and the to space in each GC, we will have to rebind
+each mutator after a GC to the new to space. So we do the rebind in the release function.
+
+```rust
+{{#include ../../../code/mygc_semispace/mutator.rs:mutator_release}}
+```
+
 ### Allocator mapping
 
 In `lazy_static!`, make the following changes to `ALLOCATOR_MAPPING`, 
@@ -186,35 +205,37 @@ For example, for `Default`, we allocate using the first bump pointer allocator
 {{#include ../../../code/mygc_semispace/mutator.rs:allocator_mapping}}
 ```
 
-### Space mapping
+### Create mutator config
 
-Next, in `create_mygc_mutator`, change which allocator is allocated to what 
-space in `space_mapping`. Note that the space allocation is formatted as a list 
-of tuples. For example, the first bump pointer allocator (`BumpPointer(0)`) is 
-bound with `tospace`.
+We need to provide an implementation of the mutator configuration in the `Plan` trait.
+Here we implement `create_mutator_config()` from the functions and mappings we defined in
+the last few steps.
 
-Downcast the dynamic `Plan` type to `MyGC` so we can access specific spaces in 
-`MyGC`.
-
-```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:plan_downcast}}
-```
-
-Then, use `mygc` to access the spaces in `MyGC`.
-
-   1. `BumpPointer(0)` should map to the tospace.
-   2. Other common plan allocators should be mapped using `create_space_mapping`.
-   3. None of the above should be dereferenced (ie, they should not have
-   the `&` prefix).
+The implementation of `create_mutator_config()` is quite straight forward. We have defined
+the prepare and the release functions, and we have defined the allocator mapping. We simply
+use them in the mutator config.
 
 ```rust
-{{#include ../../../code/mygc_semispace/mutator.rs:space_mapping}}
+{{#include ../../../code/mygc_semispace/global.rs:create_mutator_config}}
 ```
-     
-The `create_space_mapping` and `create_allocator_mapping` call that have appeared all
-of a sudden in these past 2 steps, are parts of the MMTk common plan
-itself. They are used to construct allocator-space mappings for the spaces defined
-by the common plan:
+
+One thing that is worth noting is the space mapping in the mutator config.
+the space allocation is formatted as a list of tuples. Similar to `create_allocator_mapping()`,
+we use `create_space_mapping()` to create a default space mapping. Then we bind
+the first bump pointer allocator (`BumpPointer(0)`) with `tospace`.
+
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:create_mutator_config_space_mapping}}
+```
+
+### Under the hood (common and base spaces)
+
+Apart from the to and the from space used in our semispace plan, any MMTk plan includes
+a few base spaces and common spaces. The allocator mapping and space mapping for those spaces
+are handled by the `create_space_mapping` and `create_allocator_mapping` calls that we used above.
+Thus the plan implementor does not need to worry about mapping for those spaces.
+
+To be specific, those spaces include:
 
  1. The immortal space is used for objects that the virtual machine or a 
  library never expects to die.

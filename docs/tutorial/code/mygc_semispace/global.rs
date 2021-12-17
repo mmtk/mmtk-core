@@ -3,6 +3,7 @@ use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
@@ -65,6 +66,25 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     fn constraints(&self) -> &'static PlanConstraints {
         &MYGC_CONSTRAINTS
     }
+
+    // ANCHOR: create_mutator_config
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            // ANCHOR: create_mutator_config_space_mapping
+            space_mapping: box {
+                let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, self);
+                vec.push((AllocatorSelector::BumpPointer(0), self.tospace()));
+                vec
+            },
+            // ANCHOR_END: create_mutator_config_space_mapping
+            prepare_func: &mygc_mutator_prepare,
+            release_func: &mygc_mutator_release,
+        }
+    }
+    // ANCHOR_END: create_mutator_config
 
     // ANCHOR: create_worker_local
     fn create_worker_local(

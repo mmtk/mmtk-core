@@ -18,15 +18,17 @@ use enum_map::EnumMap;
 // ANCHOR_END: imports
 
 // Add
+// ANCHOR: mutator_prepare
 pub fn mygc_mutator_prepare<VM: VMBinding>(
     _mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
 ) {
     // Do nothing
 }
+// ANCHOR_END: mutator_prepare
 
 // Add
-// ANCHOR: release
+// ANCHOR: mutator_release
 pub fn mygc_mutator_release<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     _tls: VMWorkerThread,
@@ -47,11 +49,11 @@ pub fn mygc_mutator_release<VM: VMBinding>(
             .tospace(),
     );
 }
-// ANCHOR_END: release
+// ANCHOR_END: mutator_release
 
 // Modify
 // ANCHOR: allocator_mapping
-const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+pub(super) const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 1,
     ..ReservedAllocators::DEFAULT
 };
