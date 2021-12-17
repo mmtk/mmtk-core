@@ -3,6 +3,7 @@ use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::Plan;
+#[cfg(feature="malloc")]
 use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 #[cfg(not(feature="malloc"))]
@@ -65,15 +66,6 @@ lazy_static! {
         map[AllocationSemantics::Immortal] = AllocatorSelector::BumpPointer(0);
         map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(0);
         map
-    };
-}
-
-#[cfg(not(feature="malloc"))]
-lazy_static! {
-    pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationType, AllocatorSelector> = enum_map! {
-        AllocationType::Default | AllocationType::Code | AllocationType::ReadOnly => AllocatorSelector::FreeList(0),
-        AllocationType::Immortal | AllocationType::LargeCode => AllocatorSelector::BumpPointer(0),
-        AllocationType::Los => AllocatorSelector::LargeObject(0),
     };
 }
 

@@ -290,7 +290,7 @@ impl Block {
     }
 }
 
-unsafe impl Step for Block {
+impl Step for Block {
     /// Get the number of blocks between the given two blocks.
     #[inline(always)]
     #[allow(clippy::assertions_on_constants)]

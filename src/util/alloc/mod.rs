@@ -23,9 +23,6 @@ pub use malloc_allocator::MallocAllocator;
 mod markcompact_allocator;
 pub use markcompact_allocator::MarkCompactAllocator;
 
-pub mod free_list_allocator;
-pub use self::free_list_allocator::FreeListAllocator;
-
 pub(crate) mod dump_linear_scan;
 pub(crate) mod embedded_meta_data;
 pub(crate) mod linear_scan;
