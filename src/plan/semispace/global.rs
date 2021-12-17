@@ -2,6 +2,7 @@ use super::gc_work::{SSCopyContext, SSGCWorkContext};
 use crate::mmtk::MMTK;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -48,6 +49,21 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &SS_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box {
+                let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, self);
+                vec.push((AllocatorSelector::BumpPointer(0), self.tospace()));
+                vec
+            },
+            prepare_func: &ss_mutator_prepare,
+            release_func: &ss_mutator_release,
+        }
     }
 
     fn create_worker_local(

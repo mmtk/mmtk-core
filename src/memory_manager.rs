@@ -86,7 +86,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
-    crate::plan::create_mutator(tls, mmtk)
+    box crate::plan::Mutator::new(tls, &*mmtk.plan, mmtk)
 }
 
 /// Reclaim a mutator that is no longer needed.

@@ -3,9 +3,10 @@
 use super::controller_collector_context::ControllerCollectorContext;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
+use crate::plan::barriers::Barrier;
 use crate::plan::generational::global::Gen;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::transitive_closure::TransitiveClosure;
-use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
 use crate::policy::space::Space;
@@ -17,6 +18,7 @@ use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
+use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -113,34 +115,6 @@ impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
     }
 }
 
-pub fn create_mutator<VM: VMBinding>(
-    tls: VMMutatorThread,
-    mmtk: &'static MMTK<VM>,
-) -> Box<Mutator<VM>> {
-    Box::new(match mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
-        PlanSelector::SemiSpace => {
-            crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
-        }
-        PlanSelector::GenCopy => {
-            crate::plan::generational::copying::mutator::create_gencopy_mutator(tls, mmtk)
-        }
-        PlanSelector::GenImmix => {
-            crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
-        }
-        PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
-        }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
-        PlanSelector::PageProtect => {
-            crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.plan)
-        }
-        PlanSelector::MarkCompact => {
-            crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
-        }
-    })
-}
-
 pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     vm_map: &'static VMMap,
@@ -203,6 +177,15 @@ pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
+
+    /// Create mutator configuration for the plan.
+    fn create_mutator_config(&'static self) -> MutatorConfig<Self::VM>;
+
+    /// Create write barrier for the plan.
+    fn create_write_barrier(&'static self, _mmtk: &'static MMTK<Self::VM>) -> Box<dyn Barrier> {
+        box crate::plan::barriers::NoBarrier
+    }
+
     fn create_worker_local(
         &self,
         tls: VMWorkerThread,
@@ -416,6 +399,11 @@ pub struct BasePlan<VM: VMBinding> {
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 
+    /// The mapping between allocation semantics and space descriptor. A plan can use this
+    /// to quickly check whether an object is allocated in the given semantic. This field
+    /// is only available after gc_init().
+    pub alloc_semantics_mapping: EnumMap<AllocationSemantics, SpaceDescriptor>,
+
     // Spaces in base plan
     #[cfg(feature = "code_space")]
     pub code_space: ImmortalSpace<VM>,
@@ -541,6 +529,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
+            alloc_semantics_mapping: EnumMap::new(),
         }
     }
 
@@ -549,6 +538,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         heap_size: usize,
         vm_map: &'static VMMap,
         scheduler: &Arc<GCWorkScheduler<VM>>,
+        // mutator_config: &MutatorConfig<VM>,
     ) {
         vm_map.boot();
         vm_map.finalize_static_space_map(

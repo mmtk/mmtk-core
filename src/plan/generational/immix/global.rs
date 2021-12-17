@@ -1,11 +1,13 @@
 use super::gc_work::{
     GenImmixCopyContext, GenImmixMatureGCWorkContext, GenImmixNurseryGCWorkContext,
 };
+use crate::plan::barriers::Barrier;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::immix::gc_work::TraceKind;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -63,6 +65,28 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &GENIMMIX_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::super::create_gen_space_mapping;
+        use super::mutator::*;
+
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box create_gen_space_mapping(self, &self.gen.nursery),
+            prepare_func: &genimmix_mutator_prepare,
+            release_func: &genimmix_mutator_release,
+        }
+    }
+
+    fn create_write_barrier(&'static self, mmtk: &'static MMTK<Self::VM>) -> Box<dyn Barrier> {
+        use super::super::gc_work::GenNurseryProcessEdges;
+        use crate::plan::barriers::ObjectRememberingBarrier;
+
+        box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenImmixCopyContext<VM>>>::new(
+            mmtk,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        )
     }
 
     fn create_worker_local(

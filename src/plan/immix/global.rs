@@ -3,6 +3,7 @@ use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -55,6 +56,21 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &IMMIX_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box {
+                let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, self);
+                vec.push((AllocatorSelector::Immix(0), &self.immix_space));
+                vec
+            },
+            prepare_func: &immix_mutator_prepare,
+            release_func: &immix_mutator_release,
+        }
     }
 
     fn create_worker_local(

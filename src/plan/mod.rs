@@ -20,7 +20,6 @@ pub use barriers::BarrierSelector;
 mod controller_collector_context;
 
 mod global;
-pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
 pub use global::CopyContext;

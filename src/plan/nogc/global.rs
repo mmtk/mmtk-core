@@ -1,5 +1,6 @@
 use crate::mmtk::MMTK;
 use crate::plan::global::{BasePlan, NoCopy};
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -17,6 +18,7 @@ use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
+use crate::util::opaque_pointer::VMMutatorThread;
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
@@ -42,6 +44,23 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &NOGC_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box {
+                let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, self);
+                vec.push((AllocatorSelector::BumpPointer(0), &self.nogc_space));
+                vec.push((AllocatorSelector::BumpPointer(1), &self.immortal));
+                vec.push((AllocatorSelector::BumpPointer(2), &self.los));
+                vec
+            },
+            prepare_func: &nogc_mutator_noop,
+            release_func: &nogc_mutator_noop,
+        }
     }
 
     fn create_worker_local(

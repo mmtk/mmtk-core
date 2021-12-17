@@ -5,6 +5,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::global::NoCopy;
 use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -23,6 +24,7 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
+
 use std::sync::Arc;
 
 use enum_map::EnumMap;
@@ -96,6 +98,21 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &MS_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box {
+                let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, self);
+                vec.push((AllocatorSelector::Malloc(0), self.ms_space()));
+                vec
+            },
+            prepare_func: &ms_mutator_prepare,
+            release_func: &ms_mutator_release,
+        }
     }
 
     fn create_worker_local(

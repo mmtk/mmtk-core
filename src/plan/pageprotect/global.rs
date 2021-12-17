@@ -2,6 +2,7 @@ use super::gc_work::PPGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
 use crate::plan::global::GcStatus;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -21,6 +22,7 @@ use crate::{
     policy::largeobjectspace::LargeObjectSpace,
     util::opaque_pointer::VMWorkerThread,
 };
+
 use enum_map::EnumMap;
 use std::sync::Arc;
 
@@ -39,6 +41,21 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::mutator::*;
+        use crate::plan::mutator_context::create_space_mapping;
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box {
+                let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, self);
+                vec.push((AllocatorSelector::LargeObject(0), &self.space));
+                vec
+            },
+            prepare_func: &pp_mutator_prepare,
+            release_func: &pp_mutator_release,
+        }
     }
 
     fn create_worker_local(

@@ -1,10 +1,12 @@
 use super::gc_work::{GenCopyCopyContext, GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::mmtk::MMTK;
+use crate::plan::barriers::Barrier;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -21,6 +23,7 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -41,6 +44,28 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &GENCOPY_CONSTRAINTS
+    }
+
+    fn create_mutator_config(&'static self) -> MutatorConfig<VM> {
+        use super::super::create_gen_space_mapping;
+        use super::mutator::*;
+
+        MutatorConfig {
+            allocator_mapping: &*ALLOCATOR_MAPPING,
+            space_mapping: box create_gen_space_mapping(self, &self.gen.nursery),
+            prepare_func: &gencopy_mutator_prepare,
+            release_func: &gencopy_mutator_release,
+        }
+    }
+
+    fn create_write_barrier(&'static self, mmtk: &'static MMTK<Self::VM>) -> Box<dyn Barrier> {
+        use super::super::gc_work::GenNurseryProcessEdges;
+        use crate::plan::barriers::ObjectRememberingBarrier;
+
+        box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new(
+            mmtk,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        )
     }
 
     fn create_worker_local(

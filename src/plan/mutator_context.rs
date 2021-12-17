@@ -8,6 +8,7 @@ use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 use crate::util::{Address, ObjectReference};
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
+use crate::MMTK;
 
 use enum_map::EnumMap;
 
@@ -62,6 +63,24 @@ pub struct Mutator<VM: VMBinding> {
     pub mutator_tls: VMMutatorThread,
     pub plan: &'static dyn Plan<VM = VM>,
     pub config: MutatorConfig<VM>,
+}
+
+impl<VM: VMBinding> Mutator<VM> {
+    pub fn new(
+        tls: VMMutatorThread,
+        plan: &'static dyn Plan<VM = VM>,
+        mmtk: &'static MMTK<VM>,
+    ) -> Self {
+        let config = plan.create_mutator_config();
+        let barrier = plan.create_write_barrier(mmtk);
+        Mutator {
+            allocators: Allocators::<VM>::new(tls, plan, &config.space_mapping),
+            barrier,
+            mutator_tls: tls,
+            config,
+            plan,
+        }
+    }
 }
 
 impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
