@@ -197,23 +197,22 @@ impl<'a> SFTDispatch<'a> {
     dispatch_sft_call!(sft_trace_object = (trace: SSProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference);
 }
 
-#[derive(Default)]
 pub struct SFTMap<'a> {
-    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+    sft: [&'a (dyn SFT + Sync + 'static); MAX_CHUNKS],
 
-    sft_dispatch: Vec<SFTDispatch<'a>>,
+    sft_dispatch: [SFTDispatch<'a>; MAX_CHUNKS],
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl<'a> Sync for SFTMap<'a> {}
 
-static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
+const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
-            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
-            sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS]
+            sft: [&EMPTY_SPACE_SFT; MAX_CHUNKS],
+            sft_dispatch: [SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS]
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -334,8 +333,8 @@ impl<'a> SFTMap<'a> {
                 new
             );
         }
-        self_mut.sft[chunk] = sft;
-        self_mut.sft_dispatch[chunk] = dispatch;
+        self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
+        self_mut.sft_dispatch[chunk] = unsafe { std::mem::transmute(dispatch) };
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -462,7 +461,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            SFT_MAP.update(self.as_sft(), self.as_dispatch(), start, bytes);
+            unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.as_dispatch(), start, bytes);
         }
     }
 
@@ -480,7 +479,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
+        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -714,7 +713,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
+            unsafe { SFT_MAP.assume_init_ref() }.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
         }
     }
 

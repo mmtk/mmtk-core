@@ -477,7 +477,7 @@ impl ObjectReference {
         if self.is_null() {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_reachable(self)
+            unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_reachable(self)
         }
     }
 
@@ -486,27 +486,27 @@ impl ObjectReference {
         if self.0 == 0 {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_live(self)
+            unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_live(self)
         }
     }
 
     pub fn is_movable(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_movable()
+        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     pub fn get_forwarded_object(self) -> Option<Self> {
-        SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
+        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).get_forwarded_object(self)
     }
 
     pub fn is_mapped(self) -> bool {
-        SFT_MAP.is_in_space(self)
+        unsafe { SFT_MAP.assume_init_ref() }.is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_sane()
+        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_sane()
     }
 }
 

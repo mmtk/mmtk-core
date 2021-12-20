@@ -31,10 +31,11 @@ lazy_static! {
 
     /// A global Mmapper for mmaping and protection of virtual memory.
     pub static ref MMAPPER: Mmapper = Mmapper::new();
-
-    // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-    pub static ref SFT_MAP: SFTMap<'static> = SFTMap::new();
 }
+
+use std::mem::MaybeUninit;
+// A global space function table that allows efficient dispatch space specific code for addresses in our heap.
+pub static mut SFT_MAP: MaybeUninit<SFTMap<'static>> = MaybeUninit::uninit();
 
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
@@ -60,6 +61,7 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
+        unsafe { SFT_MAP = MaybeUninit::new(SFTMap::new()) };
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),
