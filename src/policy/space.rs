@@ -127,20 +127,19 @@ impl SFT for EmptySpaceSFT {
     }
 }
 
-#[derive(Default)]
 pub struct SFTMap<'a> {
-    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+    sft: [&'a (dyn SFT + Sync + 'static); MAX_CHUNKS],
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl<'a> Sync for SFTMap<'a> {}
 
-static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
+const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
-            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
+            sft: [&EMPTY_SPACE_SFT; MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -256,7 +255,7 @@ impl<'a> SFTMap<'a> {
                 new
             );
         }
-        self_mut.sft[chunk] = sft;
+        self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -382,7 +381,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            SFT_MAP.update(self.as_sft(), start, bytes);
+            unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), start, bytes);
         }
     }
 
@@ -400,7 +399,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
+        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -624,7 +623,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), self.start, self.extent);
+            unsafe { SFT_MAP.assume_init_ref() }.update(space.as_sft(), self.start, self.extent);
         }
     }
 

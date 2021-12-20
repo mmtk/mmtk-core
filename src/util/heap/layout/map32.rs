@@ -269,7 +269,7 @@ impl Map32 {
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
             self.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
-            SFT_MAP.clear_by_index((chunk + offset) as usize);
+            unsafe { SFT_MAP.assume_init_ref() }.clear_by_index((chunk + offset) as usize);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }
         chunks as _

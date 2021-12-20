@@ -103,7 +103,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), AVAILABLE_START, total_bytes);
+        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), AVAILABLE_START, total_bytes);
     }
 
     fn reserved_pages(&self) -> usize {
