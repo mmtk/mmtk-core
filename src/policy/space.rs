@@ -128,7 +128,7 @@ impl SFT for EmptySpaceSFT {
 }
 
 pub struct SFTMap<'a> {
-    sft: [&'a (dyn SFT + Sync + 'static); MAX_CHUNKS],
+    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
@@ -139,7 +139,7 @@ const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
-            sft: [&EMPTY_SPACE_SFT; MAX_CHUNKS],
+            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -152,7 +152,8 @@ impl<'a> SFTMap<'a> {
     }
 
     pub fn get(&self, address: Address) -> &'a dyn SFT {
-        let res = self.sft[address.chunk_index()];
+        debug_assert!(address.chunk_index() < MAX_CHUNKS);
+        let res = unsafe { self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
@@ -161,7 +162,7 @@ impl<'a> SFTMap<'a> {
                 res.name()
             );
         }
-        res
+        *res
     }
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
