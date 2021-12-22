@@ -78,6 +78,7 @@ impl Chunk {
         if allocated_blocks == 0 {
             space.chunk_map.set(*self, ChunkState::Free)
         }
+        eprintln!("done sweep {}", self.start());
     }
 }
 
