@@ -14,6 +14,7 @@ use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, B
 use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[repr(C)]
 pub struct Block(Address);
 
 impl Block {
@@ -237,6 +238,7 @@ impl Block {
             Some(Ordering::SeqCst),
         );
         let ptr = unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) };
+        eprintln!("load {}'s list={:?}", self.start(), ptr);
         ptr
     }
 
@@ -320,11 +322,22 @@ impl Block {
             BlockState::Unmarked => {
                 let mut block_list = self.load_block_list::<VM>();
                 unsafe {
-                    (*block_list).lock(); 
+                    let block_list = loop {
+                        let list = self.load_block_list::<VM>();
+                        eprintln!("{} unmarked, list = {:?}", self.start(), list);
+                        (*list).lock();
+                        if list == self.load_block_list::<VM>() {
+                            break list
+                        }
+                        eprintln!("block {} was moved to a different list", self.start());
+                        (*list).unlock();
+                    };
+                    // (*block_list).lock(); 
                     (*block_list).remove::<VM>(self);
                     (*block_list).release_lock();
                 }
                 space.release_block(self);
+                eprintln!("done removing {}", self.start());
                 true
             }
             BlockState::Marked => {

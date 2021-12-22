@@ -48,15 +48,15 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
+            AllocatorSelector::FreeList(index) => {
+                self.free_list[index as usize].assume_init_ref()
+            }
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_ref()
             }
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
             AllocatorSelector::Malloc(index) => {
                 self.malloc[index as usize].assume_init_ref()
-            }
-            AllocatorSelector::FreeList(index) => {
-                &**self.free_list[index as usize].assume_init_ref()
             }
         }
     }
@@ -79,7 +79,7 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.malloc[index as usize].assume_init_mut()
             }
             AllocatorSelector::FreeList(index) => {
-                &mut **self.free_list[index as usize].assume_init_mut()
+                self.free_list[index as usize].assume_init_mut()
             }
         }
     }
@@ -130,11 +130,11 @@ impl<VM: VMBinding> Allocators<VM> {
                     ));
                 }
                 AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(Box::new(FreeListAllocator::new(
+                    ret.free_list[index as usize].write(FreeListAllocator::new(
                         mutator_tls.0,
                         space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
                         plan,
-                    )));
+                    ));
                 }
                 AllocatorSelector::MarkCompact(index) => {
                     ret.markcompact[index as usize].write(MarkCompactAllocator::new(
