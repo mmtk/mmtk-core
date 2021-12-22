@@ -1,3 +1,22 @@
+0.9.0 (2021-12-16)
+===
+
+GC Plans
+---
+* Added a Lisp2-style mark compact plan.
+* Added a GCWorkContext type for each plan which specifies the types used for this plan's GC work packet.
+* Changed the allocation semantics mapping for each plan. Now each plan has 1-to-1 mapping between allocation semantics and spaces.
+
+Policies
+---
+* Fixed a few bugs for Immix space when `DEFRAG` is disabled.
+
+Misc
+---
+* Added an option `precise_stress` (which defaults to `true`). For precise stress test, MMTk will check for stress GC in
+  each allocation (including thread local fastpath allocation). For non-precise stress test, MMTk only checks for stress GC in global allocation.
+* Refactored the code about counting scanned stacks to make it easier to read.
+
 0.8.0 (2021-11-01)
 ===
 
