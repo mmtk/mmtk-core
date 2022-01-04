@@ -236,7 +236,7 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         .store(false, Ordering::SeqCst);
 }
 
-/// Process MMTk run-time options.
+/// Process MMTk run-time options. Returns true if the option is processed successfully.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -250,6 +250,15 @@ pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) 
     assert!(name != "plan");
 
     unsafe { mmtk.options.process(name, value) }
+}
+
+/// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+pub fn process_bulk<VM: VMBinding>(mmtk: &'static MMTK<VM>, options: &str) -> bool {
+    unsafe { mmtk.options.process_bulk(options) }
 }
 
 /// Return used memory in bytes.

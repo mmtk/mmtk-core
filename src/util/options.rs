@@ -91,17 +91,108 @@ impl UnsafeOptionsWrapper {
     pub const fn new(o: Options) -> UnsafeOptionsWrapper {
         UnsafeOptionsWrapper(UnsafeCell::new(o))
     }
+
+    /// Process option. Returns true if the key and the value are both valid.
+    ///
+    /// Arguments:
+    /// * `name`: the name of the option. See `options!` for all the valid options.
+    /// * `value`: the value of the option in string format.
+    ///
     /// # Safety
     /// This method is not thread safe, as internally it acquires a mutable reference to self.
     /// It is supposed to be used by one thread during boot time.
     pub unsafe fn process(&self, name: &str, value: &str) -> bool {
+        println!("Set option {} = {}", name, value);
         (&mut *self.0.get()).set_from_camelcase_str(name, value)
+    }
+
+    /// Bulk process options. Returns true if all the options are processed successfully.
+    /// This method returns false if the option string is invalid, or if it includes any invalid option.
+    ///
+    /// Arguments:
+    /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+    ///
+    /// # Safety
+    /// This method is not thread safe, as internally it acquires a mutable reference to self.
+    /// It is supposed to be used by one thread during boot time.
+    pub unsafe fn process_bulk(&self, options: &str) -> bool {
+        for opt in options.split_ascii_whitespace() {
+            let kv_pair: Vec<&str> = opt.split("=").collect();
+            if kv_pair.len() != 2 {
+                return false;
+            }
+
+            let key = kv_pair[0];
+            let val = kv_pair[1];
+            if !self.process(key, val) {
+                return false
+            }
+        }
+
+        true
     }
 }
 impl Deref for UnsafeOptionsWrapper {
     type Target = Options;
     fn deref(&self) -> &Options {
         unsafe { &*self.0.get() }
+    }
+}
+
+#[cfg(test)]
+mod process_tests {
+    use super::*;
+    use crate::util::options::Options;
+    use crate::util::test_util::serial_test;
+
+    #[test]
+    fn test_process_valid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process("threads", "1") };
+            assert!(success);
+            assert_eq!(options.threads, 1);
+        })
+    }
+
+    #[test]
+    fn test_process_invalid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let default_threads = options.threads;
+            let success = unsafe { options.process("threads", "a") };
+            assert!(!success);
+            assert_eq!(options.threads, default_threads);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_empty() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("") };
+            assert!(success);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_valid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("threads=1 stress_factor=42") };
+            assert!(success);
+            assert_eq!(options.threads, 1);
+            assert_eq!(options.stress_factor, 42);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_invalid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("threads=a stress_factor=42") };
+            assert!(!success);
+        })
     }
 }
 
