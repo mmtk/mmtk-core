@@ -97,5 +97,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
+    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
 }

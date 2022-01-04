@@ -58,7 +58,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[inline(always)]
-    fn sft_trace_object(&self, trace: SSProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         unimplemented!()
     }
 }

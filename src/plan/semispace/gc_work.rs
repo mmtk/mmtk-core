@@ -71,12 +71,14 @@ impl<VM: VMBinding> ProcessEdgesWork for SSProcessEdges<VM> {
             let trace = SSProcessEdgesMutRef::new(self);
 
             // SFT
-            let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get(object.to_address());
-            sft.sft_trace_object(trace, object, worker)
+            // let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get(object.to_address());
+            // sft.sft_trace_object(trace, object, worker)
 
             // enum dispatch
             // let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get_dispatch(object.to_address());
             // sft.sft_trace_object::<VM>(trace, object, worker)
+
+            unimplemented!()
         }
     }
 }

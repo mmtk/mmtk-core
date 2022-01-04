@@ -505,18 +505,21 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
             return object;
         }
 
-        let worker = GCWorkerMutRef::new(self.worker());
-        let trace = MMTkProcessEdgesMutRef::new(self);
-        // let semantics = match sft.copy_semantics() {
-        //     Some(s) => s,
-        //     // I need to rethink on this. Should we always use Option<CopySemantics> or add CopySemantics::NoCopy
-        //     None => CopySemantics::DefaultCopy,
-        // };
-        // let sft = crate::mmtk::SFT_MAP.get_dispatch(object.to_address());
-        // sft.sft_trace_object::<VM>(trace, object, worker)
-        // let sft = crate::mmtk::SFT_MAP.get(object.to_address());
-        // sft.sft_trace_object(trace, object, worker)
-        unimplemented!()
+        {
+            use crate::policy::space::*;
+            use crate::util::copy::*;
+
+            let worker = GCWorkerMutRef::new(self.worker());
+            let trace = MMTkProcessEdgesMutRef::new(self);
+
+            // SFT
+            // let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get(object.to_address());
+            // sft.sft_trace_object(trace, object, worker)
+
+            // enum dispatch
+            let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get_dispatch(object.to_address());
+            sft.sft_trace_object::<VM>(trace, object, worker)
+        }
     }
 }
 
