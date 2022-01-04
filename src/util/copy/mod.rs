@@ -65,11 +65,13 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         offset: isize,
         semantics: CopySemantics,
     ) -> Address {
-        debug_assert!(
-            bytes <= self.config.constraints.max_non_los_default_alloc_bytes,
-            "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
-            bytes, self.config.constraints.max_non_los_default_alloc_bytes
-        );
+        #[cfg(debug_assertions)]
+        if bytes > self.config.constraints.max_non_los_default_alloc_bytes {
+            warn!(
+                "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+                bytes, self.config.constraints.max_non_los_default_alloc_bytes
+            );
+        }
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
                 unsafe { self.copy[index as usize].assume_init_mut() }
