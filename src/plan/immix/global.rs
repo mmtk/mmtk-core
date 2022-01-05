@@ -85,7 +85,7 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             true,
             self.base().cur_collection_attempts.load(Ordering::SeqCst),
             self.base().is_user_triggered_collection(),
-            self.base().options.full_heap_system_gc,
+            *self.base().options.full_heap_system_gc,
         );
 
         // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.

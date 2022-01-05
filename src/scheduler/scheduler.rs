@@ -188,7 +188,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         // Finalization
-        if !plan.base().options.no_finalizer {
+        if !*plan.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             self.work_buckets[WorkBucketStage::RefClosure]

@@ -54,7 +54,7 @@ impl<VM: VMBinding> MMTK<VM> {
         let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan = crate::plan::create_plan(
-            options.plan,
+            *options.plan,
             &VM_MAP,
             &MMAPPER,
             options.clone(),

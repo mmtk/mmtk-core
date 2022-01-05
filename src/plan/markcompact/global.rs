@@ -131,7 +131,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
 
         // Finalization
-        if !self.base().options.no_finalizer {
+        if !*self.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             // treat finalizable objects as roots and perform a closure (marking)

@@ -193,7 +193,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
         !mmtk.plan.is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
-    mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
+    mmtk.scheduler.initialize(*mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 }
@@ -237,6 +237,7 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
+/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -253,6 +254,7 @@ pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) 
 }
 
 /// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
+/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -421,7 +423,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
 pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
-    if mmtk.options.no_finalizer {
+    if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
 
@@ -437,7 +439,7 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectRefer
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
-    if mmtk.options.no_finalizer {
+    if *mmtk.options.no_finalizer {
         warn!("get_object_for_finalization() is called when no_finalizer = true");
     }
 
