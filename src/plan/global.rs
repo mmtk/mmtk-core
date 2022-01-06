@@ -511,7 +511,7 @@ impl<VM: VMBinding> BasePlan<VM> {
                 vm_map,
                 mmapper,
                 &mut heap,
-                options.vm_space_size,
+                *options.vm_space_size,
                 constraints,
                 global_side_metadata_specs,
             ),

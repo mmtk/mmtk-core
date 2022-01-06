@@ -355,35 +355,6 @@ options! {
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [always_valid] = PerfEventOptions {events: vec![]}
 }
 
-// impl Options {
-//     fn set_from_camelcase_str(&mut self, s: &str, val: &str) -> bool {
-//         trace!("Trying to process option pair: ({}, {})", s, val);
-
-//         let mut sr = String::with_capacity(s.len());
-//         for c in s.chars() {
-//             if c.is_uppercase() {
-//                 sr.push('_');
-//                 for c in c.to_lowercase() {
-//                     sr.push(c);
-//                 }
-//             } else {
-//                 sr.push(c)
-//             }
-//         }
-
-//         let result = self.set_from_str(sr.as_str(), val);
-
-//         trace!("Trying to process option pair: ({})", sr);
-
-//         if result {
-//             trace!("Validation passed");
-//         } else {
-//             trace!("Validation failed")
-//         }
-//         result
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;

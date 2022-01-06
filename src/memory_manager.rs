@@ -71,7 +71,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan
         .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
-    info!("Initialized MMTk with {:?}", mmtk.options.plan);
+    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
 }
@@ -244,12 +244,6 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `name`: The name of the option.
 /// * `value`: The value of the option (as a string).
 pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) -> bool {
-    // Note that currently we cannot process options for setting plan,
-    // as we have set plan when creating an MMTK instance, and processing options is after creating on an instance.
-    // The only way to set plan is to use the env var 'MMTK_PLAN'.
-    // FIXME: We should remove this function, and ask for options when creating an MMTk instance.
-    assert!(name != "plan");
-
     unsafe { mmtk.options.process(name, value) }
 }
 
