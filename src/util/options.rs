@@ -117,7 +117,7 @@ impl UnsafeOptionsWrapper {
     /// It is supposed to be used by one thread during boot time.
     pub unsafe fn process_bulk(&self, options: &str) -> bool {
         for opt in options.split_ascii_whitespace() {
-            let kv_pair: Vec<&str> = opt.split("=").collect();
+            let kv_pair: Vec<&str> = opt.split('=').collect();
             if kv_pair.len() != 2 {
                 return false;
             }
@@ -125,7 +125,7 @@ impl UnsafeOptionsWrapper {
             let key = kv_pair[0];
             let val = kv_pair[1];
             if !self.process(key, val) {
-                return false
+                return false;
             }
         }
 
@@ -151,7 +151,7 @@ mod process_tests {
             let options = UnsafeOptionsWrapper::new(Options::default());
             let success = unsafe { options.process("threads", "1") };
             assert!(success);
-            assert_eq!(options.threads, 1);
+            assert_eq!(*options.threads, 1);
         })
     }
 
@@ -159,10 +159,10 @@ mod process_tests {
     fn test_process_invalid() {
         serial_test(|| {
             let options = UnsafeOptionsWrapper::new(Options::default());
-            let default_threads = options.threads;
+            let default_threads = *options.threads;
             let success = unsafe { options.process("threads", "a") };
             assert!(!success);
-            assert_eq!(options.threads, default_threads);
+            assert_eq!(*options.threads, default_threads);
         })
     }
 
@@ -181,8 +181,8 @@ mod process_tests {
             let options = UnsafeOptionsWrapper::new(Options::default());
             let success = unsafe { options.process_bulk("threads=1 stress_factor=42") };
             assert!(success);
-            assert_eq!(options.threads, 1);
-            assert_eq!(options.stress_factor, 42);
+            assert_eq!(*options.threads, 1);
+            assert_eq!(*options.stress_factor, 42);
         })
     }
 
@@ -201,7 +201,8 @@ fn always_valid<T>(_: &T) -> bool {
 }
 
 /// An MMTk option of a given type.
-/// This type allows us to store some metadata for the option.
+/// This type allows us to store some metadata for the option. To get the value of an option,
+/// you can simply dereference it (for example, *options.threads).
 #[derive(Debug, Clone)]
 pub struct MMTKOption<T: Clone> {
     pub value: T,
@@ -366,7 +367,7 @@ mod tests {
     fn no_env_var() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+            assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
         })
     }
 
@@ -378,7 +379,7 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, 4096);
+                    assert_eq!(*options.stress_factor, 4096);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -396,8 +397,8 @@ mod tests {
                     std::env::set_var("MMTK_NO_FINALIZER", "true");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, 4096);
-                    assert!(options.no_finalizer);
+                    assert_eq!(*options.stress_factor, 4096);
+                    assert!(*options.no_finalizer);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -416,7 +417,7 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -434,7 +435,7 @@ mod tests {
                     std::env::set_var("MMTK_ABC", "42");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_ABC");
@@ -448,8 +449,8 @@ mod tests {
         serial_test(|| {
             let options = Options::default();
             assert_eq!(
-                &options.work_perf_events,
-                &PerfEventOptions { events: vec![] }
+                *options.work_perf_events,
+                PerfEventOptions { events: vec![] }
             );
         })
     }
@@ -463,8 +464,8 @@ mod tests {
 
                     let options = Options::default();
                     assert_eq!(
-                        &options.work_perf_events,
-                        &PerfEventOptions {
+                        *options.work_perf_events,
+                        PerfEventOptions {
                             events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
                         }
                     );
@@ -487,8 +488,8 @@ mod tests {
                     let options = Options::default();
                     // invalid value from env var, use default.
                     assert_eq!(
-                        &options.work_perf_events,
-                        &PerfEventOptions { events: vec![] }
+                        *options.work_perf_events,
+                        PerfEventOptions { events: vec![] }
                     );
                 },
                 || {
