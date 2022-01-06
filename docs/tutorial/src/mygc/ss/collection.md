@@ -4,21 +4,21 @@ We need to add a few more things to get garbage collection working.
 Specifically, we need to config the `GCWorkerCopyContext`, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.
 
-## GCWorkerCopyContext
+## CopyConfig
 
-`GCWorkerCopyContext` is a thread local struct for GC worker threads that is used to copy objects.
-Similar to the `Mutator` struct, you would need to config `GCWorkerCopyContext` for your plan.
+`CopyConfig` defines how a GC plan copies objects.
+Similar to the `MutatorConfig` struct, you would need to define `CopyConfig` for your plan.
 
-In `impl<VM: VMBinding> Plan for MyGC<VM>`, override the method `create_worker_local()`.
-The default implementation provides a stub `GCWorkerCopyContext` for non-copying plans.
-For copying plans, you would have to provide an implementation, in which you will create a proper
-`GCWorkerCopyContext`.
+In `impl<VM: VMBinding> Plan for MyGC<VM>`, override the method `create_copy_config()`.
+The default implementation provides a default `CopyConfig` for non-copying plans. So for non-copying plans,
+you do not need to override the method. But
+for copying plans, you would have to provide a proper copy configuration.
 
 In a semispace GC, objects will be copied between the two copy spaces. We will use one
 `CopySpaceCopyContext` for the copying, and will rebind the copy context to the proper tospace
 in the preparation step of a GC (which will be discussed later when we talk about preparing for collections).
 
-We provide a `CopyConfig` for our semispace GC. We use `CopySemantics::DefaultCopy` for our copy
+We use `CopySemantics::DefaultCopy` for our copy
 operation, and bind it with the first `CopySpaceCopyContext` (`CopySemantics::DefaultCopy => CopySelector::CopySpace(0)`).
 And for the rest copy semantics, they are unused for this plan. We also provide an initial space
 binding for `CopySpaceCopyContext`. However, we will flip tospace in every GC, and rebind the
@@ -26,7 +26,7 @@ copy context to the new tospace in each GC, so it does not matter which space we
 space here.
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:create_worker_local}}
+{{#include ../../../code/mygc_semispace/global.rs:create_copy_config}}
 ```
 
 ## MyGCProcessEdges
@@ -61,25 +61,6 @@ Add a new constructor, `new()`.
 ```
 
 ## Introduce collection to MyGC plan
-
-Now that they've been added, you should import `MyGCCopyContext` and
-`MyGCProcessEdges` into `mygc/global.rs`, which we will be working in for the
-next few steps. 
-
-```rust
-{{#include ../../../code/mygc_semispace/global.rs:imports_gc_work}}
-```
-
-In `create_worker_local()` in `impl Plan for MyGC`, create an instance of 
-`MyGCCopyContext`.
-
-```rust
-{{#include ../../../code/mygc_semispace/global.rs:create_worker_local}}
-```
-
-`NoCopy` is now no longer needed. Remove it from the import statement block. 
-For the next step, import `crate::scheduler::gc_work::*;`, and modify the
-line importing `MMTK` scheduler to read `use crate::scheduler::*;`.
 
 Add a new method to `Plan for MyGC`, `schedule_collection()`. This function 
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,

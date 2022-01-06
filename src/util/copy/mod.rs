@@ -36,6 +36,16 @@ pub struct CopyConfig<VM: VMBinding> {
     pub constraints: &'static PlanConstraints,
 }
 
+impl<VM: VMBinding> Default for CopyConfig<VM> {
+    fn default() -> Self {
+        CopyConfig {
+            copy_mapping: EnumMap::default(),
+            space_mapping: vec![],
+            constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
+        }
+    }
+}
+
 /// The thread local struct for each GC worker for copying. Each GC worker should include
 /// one instance of this struct for copying operations.
 pub struct GCWorkerCopyContext<VM: VMBinding> {
@@ -192,11 +202,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
-            config: CopyConfig {
-                copy_mapping: EnumMap::default(),
-                space_mapping: vec![],
-                constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
-            },
+            config: CopyConfig::default(),
         }
     }
 }

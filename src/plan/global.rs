@@ -14,7 +14,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
-use crate::util::copy::GCWorkerCopyContext;
+use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -94,6 +94,14 @@ pub fn create_plan<VM: VMBinding>(
     }
 }
 
+/// Create thread local GC worker.
+pub fn create_worker<VM: VMBinding>(
+    tls: VMWorkerThread,
+    mmtk: &'static MMTK<VM>,
+) -> GCWorkerCopyContext<VM> {
+    GCWorkerCopyContext::<VM>::new(tls, &*mmtk.plan, mmtk.plan.create_copy_config())
+}
+
 /// A plan describes the global core functionality for all memory management schemes.
 /// All global MMTk plans should implement this trait.
 ///
@@ -124,11 +132,13 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn constraints(&self) -> &'static PlanConstraints;
 
-    /// Create thread local GC worker. For copying plan, they will have to override this method,
-    /// and use the correct copy context as GC workers.
-    fn create_worker_local(&'static self, _tls: VMWorkerThread) -> GCWorkerCopyContext<Self::VM> {
-        GCWorkerCopyContext::<Self::VM>::new_non_copy()
+    /// Create a copy config for this plan. A copying GC plan MUST override this method,
+    /// and provide a valid config.
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        // Use the empty default copy config for non copying GC.
+        CopyConfig::default()
     }
+
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {

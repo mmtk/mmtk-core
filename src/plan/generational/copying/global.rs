@@ -11,7 +11,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::copy::GCWorkerCopyContext;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -41,26 +41,20 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &GENCOPY_CONSTRAINTS
     }
 
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use crate::util::copy::*;
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
         use enum_map::enum_map;
-
-        GCWorkerCopyContext::new(
-            tls,
-            self,
-            CopyConfig {
-                copy_mapping: enum_map! {
-                    CopySemantics::Mature => CopySelector::CopySpace(0),
-                    CopySemantics::PromoteMature => CopySelector::CopySpace(0),
-                    _ => CopySelector::Unused,
-                },
-                space_mapping: vec![
-                    // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                    (CopySelector::CopySpace(0), self.tospace()),
-                ],
-                constraints: &GENCOPY_CONSTRAINTS,
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::Mature => CopySelector::CopySpace(0),
+                CopySemantics::PromoteMature => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
             },
-        )
+            space_mapping: vec![
+                // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), self.tospace()),
+            ],
+            constraints: &GENCOPY_CONSTRAINTS,
+        }
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
