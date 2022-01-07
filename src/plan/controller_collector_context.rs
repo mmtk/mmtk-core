@@ -50,6 +50,15 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
     }
 
     pub fn run(&self, tls: VMWorkerThread) {
+        // Initialize the GC worker for coordinator. We are not using the run() method from
+        // GCWorker so we manually initialize the worker here.
+        self.scheduler
+            .read()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .initialize_coordinator_worker(tls);
+
         loop {
             debug!("[STWController: Waiting for request...]");
             self.wait_for_request();
@@ -62,7 +71,6 @@ impl<VM: VMBinding> ControllerCollectorContext<VM> {
 
             let scheduler = self.scheduler.read().unwrap();
             let scheduler = scheduler.as_ref().unwrap();
-            scheduler.initialize_worker(tls);
             scheduler.set_initializer(Some(ScheduleCollection));
             scheduler.wait_for_completion();
             debug!("[STWController: Worker threads complete!]");

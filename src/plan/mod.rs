@@ -19,9 +19,9 @@ pub use barriers::BarrierSelector;
 mod controller_collector_context;
 
 mod global;
+pub(crate) use global::create_gc_worker_context;
 pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
-pub(crate) use global::create_worker;
 pub use global::AllocationSemantics;
 pub(crate) use global::GcStatus;
 pub use global::Plan;
