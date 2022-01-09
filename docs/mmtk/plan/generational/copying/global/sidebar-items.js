@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["ALLOC_SS",""],["GENCOPY_CONSTRAINTS",""]],"struct":[["GenCopy",""]]});
+initSidebarItems({"constant":[["GENCOPY_CONSTRAINTS",""]],"struct":[["GenCopy",""]]});

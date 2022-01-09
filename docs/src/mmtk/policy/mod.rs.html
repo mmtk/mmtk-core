@@ -21,6 +21,9 @@
 <span id="20">20</span>
 <span id="21">21</span>
 <span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Memory policies that can be used for spaces.</span>
 
 <span class="doccomment">/// This class defines and manages spaces.  Each policy is an instance</span>
@@ -35,6 +38,9 @@
 <span class="doccomment">/// policy, spaces also manage memory consumption (&lt;i&gt;used&lt;/i&gt; virtual</span>
 <span class="doccomment">/// memory).</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">space</span>;
+
+<span class="doccomment">/// Copy context defines the thread local copy allocator for copying policies.</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">copy_context</span>;
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">copyspace</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immix</span>;

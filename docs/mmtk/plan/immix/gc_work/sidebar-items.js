@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["TraceKind",""]],"struct":[["ImmixCopyContext","Immix copy allocator"],["ImmixGCWorkContext",""],["ImmixProcessEdges",""]]});
+initSidebarItems({"enum":[["TraceKind",""]],"struct":[["ImmixGCWorkContext",""],["ImmixProcessEdges",""]]});

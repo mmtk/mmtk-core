@@ -124,12 +124,7 @@
 <span id="123">123</span>
 <span id="124">124</span>
 <span id="125">125</span>
-<span id="126">126</span>
-<span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::NoCopy</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::Plan</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::metadata::is_chunk_mapped</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::metadata::is_chunk_marked_unsafe</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::MallocSpace</span>;
@@ -170,9 +165,7 @@
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">ms_space</span>().<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">ms_space</span>().<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">object</span>)
         } <span class="kw">else</span> {
-            <span class="self">self</span>.<span class="ident">plan</span>
-                .<span class="ident">common</span>()
-                .<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">object</span>)
+            <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">object</span>)
         }
     }
 }
@@ -254,7 +247,6 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkContext</span> <span class="kw">for</span> <span class="ident">MSGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
     <span class="kw">type</span> <span class="ident">PlanType</span> <span class="op">=</span> <span class="ident">MarkSweep</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">CopyContextType</span> <span class="op">=</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="kw">type</span> <span class="ident">ProcessEdgesWorkType</span> <span class="op">=</span> <span class="ident">MSProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
 }
 </code></pre></div>

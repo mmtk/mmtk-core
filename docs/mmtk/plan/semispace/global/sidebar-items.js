@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["ALLOC_SS",""],["SS_CONSTRAINTS",""]],"struct":[["SemiSpace",""]]});
+initSidebarItems({"constant":[["SS_CONSTRAINTS",""]],"struct":[["SemiSpace",""]]});

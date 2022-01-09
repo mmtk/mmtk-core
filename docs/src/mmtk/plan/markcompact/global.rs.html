@@ -212,31 +212,14 @@
 <span id="211">211</span>
 <span id="212">212</span>
 <span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
     <span class="ident">CalculateForwardingAddress</span>, <span class="ident">Compact</span>, <span class="ident">ForwardingProcessEdges</span>, <span class="ident">MarkingProcessEdges</span>,
     <span class="ident">UpdateReferences</span>,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::NoCopy</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::markcompact::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -279,18 +262,6 @@
 
     <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
         <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">create_worker_local</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">GCWorkerLocalPtr</span> {
-        <span class="comment">// mark compact does not use a threadlocal copy allocator</span>
-        <span class="comment">// therefore, NoCopy is used instead of CopyContext</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">NoCopy::new</span>(<span class="ident">mmtk</span>);
-        <span class="ident">c</span>.<span class="ident">init</span>(<span class="ident">tls</span>);
-        <span class="ident">GCWorkerLocalPtr::new</span>(<span class="ident">c</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">gc_init</span>(
@@ -380,9 +351,8 @@
             <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Unconstrained</span>].<span class="ident">add</span>(<span class="ident">GcHookWork</span>);
         }
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>].<span class="ident">add</span>(
-            <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span>, <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>),
-        );
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
+            .<span class="ident">add</span>(<span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
         <span class="ident">scheduler</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 

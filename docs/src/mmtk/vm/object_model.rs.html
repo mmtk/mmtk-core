@@ -359,14 +359,15 @@
 <span id="358">358</span>
 <span id="359">359</span>
 <span id="360">360</span>
+<span id="361">361</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::CopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::header_metadata::HeaderMetadataSpec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// VM-specific methods for object model.</span>
 <span class="doccomment">///</span>
@@ -542,16 +543,17 @@
     ) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/// Copy an object and return the address of the new object. Usually in the implementation of this method,</span>
-    <span class="doccomment">/// `alloc_copy()` and `post_copy()` from a plan&#39;s [`CopyContext`](../trait.CopyContext.html) are used for copying.</span>
+    <span class="doccomment">/// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)</span>
+    <span class="doccomment">/// are used for copying.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `from`: The address of the object to be copied.</span>
-    <span class="doccomment">/// * `semantics`: The allocation semantic to use.</span>
-    <span class="doccomment">/// * `copy_context`: The `CopyContext` for the GC thread.</span>
+    <span class="doccomment">/// * `semantics`: The copy semantic to use.</span>
+    <span class="doccomment">/// * `copy_context`: The `GCWorkerCopyContext` for the GC thread.</span>
     <span class="kw">fn</span> <span class="ident">copy</span>(
         <span class="ident">from</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+        <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
+        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span>;
 
     <span class="doccomment">/// Copy an object. This is required</span>

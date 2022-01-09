@@ -597,6 +597,59 @@
 <span id="596">596</span>
 <span id="597">597</span>
 <span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -606,6 +659,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectsClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
@@ -622,7 +676,7 @@
         <span class="ident">heap::FreeListPageResource</span>,
         <span class="ident">opaque_pointer</span>::{<span class="ident">VMThread</span>, <span class="ident">VMWorkerThread</span>},
     },
-    <span class="ident">AllocationSemantics</span>, <span class="ident">CopyContext</span>, <span class="ident">MMTK</span>,
+    <span class="ident">MMTK</span>,
 };
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{
@@ -924,8 +978,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+        <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="macro">debug_assert!</span>(
@@ -934,7 +988,7 @@
             <span class="ident">object</span>
         );
         <span class="kw">if</span> <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">is_defrag_source</span>() {
-            <span class="self">self</span>.<span class="ident">trace_object_with_opportunistic_copy</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
+            <span class="self">self</span>.<span class="ident">trace_object_with_opportunistic_copy</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">worker</span>)
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">trace_object_without_moving</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
         }
@@ -969,9 +1023,10 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">CopyContext</span>,
+        <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw">let</span> <span class="ident">copy_context</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">get_copy_context_mut</span>();
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="kw">let</span> <span class="ident">forwarding_status</span> <span class="op">=</span> <span class="ident">ForwardingWord::attempt_to_forward</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="kw">if</span> <span class="ident">ForwardingWord::state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_status</span>) {
@@ -988,7 +1043,7 @@
             } <span class="kw">else</span> {
                 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
                 <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit</span>(<span class="ident">object</span>);
-                <span class="ident">ForwardingWord::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="kw">_</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
+                <span class="ident">ForwardingWord::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
             };
             <span class="kw">if</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME</span> {
                 <span class="self">self</span>.<span class="ident">mark_lines</span>(<span class="ident">new_object</span>);
@@ -1192,6 +1247,57 @@
             {
                 <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">mark_lines</span>(<span class="kw-2">*</span><span class="ident">object</span>);
             }
+        }
+    }
+}
+
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::ImmixAllocator</span>;
+
+<span class="doccomment">/// Immix copy allocator</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="ident">copy_allocator</span>: <span class="ident">ImmixAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">defrag_allocator</span>: <span class="ident">ImmixAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">PolicyCopyContext</span> <span class="kw">for</span> <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+
+    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">copy_allocator</span>.<span class="ident">reset</span>();
+        <span class="self">self</span>.<span class="ident">defrag_allocator</span>.<span class="ident">reset</span>();
+    }
+    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">copy_allocator</span>.<span class="ident">reset</span>();
+        <span class="self">self</span>.<span class="ident">defrag_allocator</span>.<span class="ident">reset</span>();
+    }
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">alloc_copy</span>(
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
+        <span class="ident">_original</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">bytes</span>: <span class="ident">usize</span>,
+        <span class="ident">align</span>: <span class="ident">usize</span>,
+        <span class="ident">offset</span>: <span class="ident">isize</span>,
+    ) -&gt; <span class="ident">Address</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">defrag_allocator</span>.<span class="ident">immix_space</span>().<span class="ident">in_defrag</span>() {
+            <span class="self">self</span>.<span class="ident">defrag_allocator</span>.<span class="ident">alloc</span>(<span class="ident">bytes</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+        } <span class="kw">else</span> {
+            <span class="self">self</span>.<span class="ident">copy_allocator</span>.<span class="ident">alloc</span>(<span class="ident">bytes</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+        }
+    }
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ImmixCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
+        <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
+        <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="self">Self</span> {
+        <span class="ident">ImmixCopyContext</span> {
+            <span class="ident">copy_allocator</span>: <span class="ident">ImmixAllocator::new</span>(<span class="ident">tls</span>.<span class="number">0</span>, <span class="prelude-val">Some</span>(<span class="ident">space</span>), <span class="ident">plan</span>, <span class="bool-val">false</span>),
+            <span class="ident">defrag_allocator</span>: <span class="ident">ImmixAllocator::new</span>(<span class="ident">tls</span>.<span class="number">0</span>, <span class="prelude-val">Some</span>(<span class="ident">space</span>), <span class="ident">plan</span>, <span class="bool-val">true</span>),
         }
     }
 }

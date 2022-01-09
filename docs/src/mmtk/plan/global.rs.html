@@ -936,66 +936,6 @@
 <span id="935">935</span>
 <span id="936">936</span>
 <span id="937">937</span>
-<span id="938">938</span>
-<span id="939">939</span>
-<span id="940">940</span>
-<span id="941">941</span>
-<span id="942">942</span>
-<span id="943">943</span>
-<span id="944">944</span>
-<span id="945">945</span>
-<span id="946">946</span>
-<span id="947">947</span>
-<span id="948">948</span>
-<span id="949">949</span>
-<span id="950">950</span>
-<span id="951">951</span>
-<span id="952">952</span>
-<span id="953">953</span>
-<span id="954">954</span>
-<span id="955">955</span>
-<span id="956">956</span>
-<span id="957">957</span>
-<span id="958">958</span>
-<span id="959">959</span>
-<span id="960">960</span>
-<span id="961">961</span>
-<span id="962">962</span>
-<span id="963">963</span>
-<span id="964">964</span>
-<span id="965">965</span>
-<span id="966">966</span>
-<span id="967">967</span>
-<span id="968">968</span>
-<span id="969">969</span>
-<span id="970">970</span>
-<span id="971">971</span>
-<span id="972">972</span>
-<span id="973">973</span>
-<span id="974">974</span>
-<span id="975">975</span>
-<span id="976">976</span>
-<span id="977">977</span>
-<span id="978">978</span>
-<span id="979">979</span>
-<span id="980">980</span>
-<span id="981">981</span>
-<span id="982">982</span>
-<span id="983">983</span>
-<span id="984">984</span>
-<span id="985">985</span>
-<span id="986">986</span>
-<span id="987">987</span>
-<span id="988">988</span>
-<span id="989">989</span>
-<span id="990">990</span>
-<span id="991">991</span>
-<span id="992">992</span>
-<span id="993">993</span>
-<span id="994">994</span>
-<span id="995">995</span>
-<span id="996">996</span>
-<span id="997">997</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::controller_collector_context::ControllerCollectorContext</span>;
@@ -1012,6 +952,7 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::AnalysisManager</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::{<span class="ident">CopyConfig</span>, <span class="ident">GCWorkerCopyContext</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::map::Map</span>;
@@ -1022,94 +963,13 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::PlanSelector</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options</span>::{<span class="ident">Options</span>, <span class="ident">UnsafeOptionsWrapper</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::stats::Stats</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
-<span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
-
-<span class="doccomment">/// A GC worker&#39;s context for copying GCs.</span>
-<span class="doccomment">/// Each GC plan should provide their implementation of a CopyContext.</span>
-<span class="doccomment">/// For non-copying GC, NoCopy can be used.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CopyContext</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
-    <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
-    <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>;
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">alloc_copy</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">original</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">offset</span>: <span class="ident">isize</span>,
-        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-    ) -&gt; <span class="ident">Address</span>;
-    <span class="kw">fn</span> <span class="ident">post_copy</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">_obj</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_tib</span>: <span class="ident">Address</span>,
-        <span class="ident">_bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">_semantics</span>: <span class="ident">AllocationSemantics</span>,
-    ) {
-    }
-    <span class="kw">fn</span> <span class="ident">copy_check_allocator</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_from</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">align</span>: <span class="ident">usize</span>,
-        <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
-    ) -&gt; <span class="ident">AllocationSemantics</span> {
-        <span class="kw">let</span> <span class="ident">large</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::get_maximum_aligned_size</span>::<span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>(
-            <span class="ident">bytes</span>,
-            <span class="ident">align</span>,
-            <span class="ident"><span class="self">Self</span>::VM::MIN_ALIGNMENT</span>,
-        ) <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">constraints</span>().<span class="ident">max_non_los_copy_bytes</span>;
-        <span class="kw">if</span> <span class="ident">large</span> {
-            <span class="ident">AllocationSemantics::Los</span>
-        } <span class="kw">else</span> {
-            <span class="ident">semantics</span>
-        }
-    }
-}
-
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CopyContext</span> <span class="kw">for</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
-
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
-    <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span> {
-        <span class="macro">unreachable!</span>()
-    }
-    <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {}
-    <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {}
-    <span class="kw">fn</span> <span class="ident">alloc_copy</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">_original</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">_bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">_align</span>: <span class="ident">usize</span>,
-        <span class="ident">_offset</span>: <span class="ident">isize</span>,
-        <span class="ident">_semantics</span>: <span class="ident">AllocationSemantics</span>,
-    ) -&gt; <span class="ident">Address</span> {
-        <span class="macro">unreachable!</span>()
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">PhantomData</span>)
-    }
-}
-
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerLocal</span> <span class="kw">for</span> <span class="ident">NoCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="ident">CopyContext::init</span>(<span class="self">self</span>, <span class="ident">tls</span>);
-    }
-}
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>,
@@ -1172,6 +1032,14 @@
     }
 }
 
+<span class="doccomment">/// Create thread local GC worker.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
+    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+) -&gt; <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="ident">GCWorkerCopyContext</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">create_copy_config</span>())
+}
+
 <span class="doccomment">/// A plan describes the global core functionality for all memory management schemes.</span>
 <span class="doccomment">/// All global MMTk plans should implement this trait.</span>
 <span class="doccomment">///</span>
@@ -1201,11 +1069,14 @@
     <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;
 
     <span class="kw">fn</span> <span class="ident">constraints</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>;
-    <span class="kw">fn</span> <span class="ident">create_worker_local</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">GCWorkerLocalPtr</span>;
+
+    <span class="doccomment">/// Create a copy config for this plan. A copying GC plan MUST override this method,</span>
+    <span class="doccomment">/// and provide a valid config.</span>
+    <span class="kw">fn</span> <span class="ident">create_copy_config</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) -&gt; <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
+        <span class="comment">// Use the empty default copy config for non copying GC.</span>
+        <span class="ident">CopyConfig::default</span>()
+    }
+
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">_scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>);
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
@@ -1261,7 +1132,16 @@
             .<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
     }
 
+    <span class="doccomment">/// Prepare the plan before a GC. This is invoked in an initial step in the GC.</span>
+    <span class="doccomment">/// This is invoked once per GC by one worker thread. &#39;tls&#39; is the worker thread that executes this method.</span>
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+
+    <span class="doccomment">/// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific</span>
+    <span class="doccomment">/// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.</span>
+    <span class="kw">fn</span> <span class="ident">prepare_worker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) {}
+
+    <span class="doccomment">/// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.</span>
+    <span class="doccomment">/// This is invoked once per GC by one worker thread. &#39;tls&#39; is the worker thread that executes this method.</span>
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
 
     <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
@@ -1626,7 +1506,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="ident">pages</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="ident">C</span>: <span class="ident">CopyContext</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">_trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
@@ -1927,7 +1807,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_pages_used</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="ident">C</span>: <span class="ident">CopyContext</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
@@ -1940,7 +1820,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in los&quot;</span>);
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>);
         }
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {

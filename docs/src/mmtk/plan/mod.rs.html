@@ -70,8 +70,7 @@
 <span class="doccomment">//!   also included here.</span>
 <span class="doccomment">//! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines</span>
 <span class="doccomment">//!   plan-specific constants.</span>
-<span class="doccomment">//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan</span>
-<span class="doccomment">//!   implements a copying GC, a [`CopyContext`](crate::plan::CopyContext) also needs to be provided.</span>
+<span class="doccomment">//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).</span>
 
@@ -83,8 +82,8 @@
 <span class="kw">mod</span> <span class="ident">global</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_mutator</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_plan</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::create_worker</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global::AllocationSemantics</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global::CopyContext</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">global::GcStatus</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global::Plan</span>;
 
@@ -94,6 +93,7 @@
 
 <span class="kw">mod</span> <span class="ident">plan_constraints</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints::PlanConstraints</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints::DEFAULT_PLAN_CONSTRAINTS</span>;
 
 <span class="kw">mod</span> <span class="ident">tracelocal</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracelocal::TraceLocal</span>;

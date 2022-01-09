@@ -223,6 +223,12 @@
 <span id="222">222</span>
 <span id="223">223</span>
 <span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::block</span>::{<span class="ident">Block</span>, <span class="ident">BlockState</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::immixspace::ImmixSpace</span>;
@@ -428,6 +434,12 @@
     ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">mark_histograms</span>.<span class="ident">lock</span>().<span class="ident">clear</span>();
         <span class="self">self</span>.<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> <span class="kw">box</span> <span class="ident">SweepChunk</span> { <span class="ident">space</span>, <span class="ident">chunk</span> })
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">ChunkMap</span> {
+    <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
+        <span class="ident"><span class="self">Self</span>::new</span>()
     }
 }
 

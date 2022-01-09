@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["ALLOC_IMMIX",""],["IMMIX_CONSTRAINTS",""]],"struct":[["Immix",""]]});
+initSidebarItems({"constant":[["IMMIX_CONSTRAINTS",""]],"struct":[["Immix",""]]});

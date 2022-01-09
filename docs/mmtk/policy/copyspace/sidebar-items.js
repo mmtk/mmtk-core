@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["META_DATA_PAGES_PER_REGION",""]],"struct":[["CopySpace","This type implements a simple copying space."]]});
+initSidebarItems({"constant":[["META_DATA_PAGES_PER_REGION",""]],"struct":[["CopySpace","This type implements a simple copying space."],["CopySpaceCopyContext","Copy allocator for CopySpace"]]});

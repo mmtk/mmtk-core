@@ -257,9 +257,8 @@
 <span id="256">256</span>
 <span id="257">257</span>
 <span id="258">258</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
-    <span class="ident">GenImmixCopyContext</span>, <span class="ident">GenImmixMatureGCWorkContext</span>, <span class="ident">GenImmixNurseryGCWorkContext</span>,
-};
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
@@ -271,9 +270,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ImmixSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkerLocalPtr</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
@@ -281,7 +279,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
 
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
@@ -324,14 +321,17 @@
         <span class="kw-2">&amp;</span><span class="ident">GENIMMIX_CONSTRAINTS</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">create_worker_local</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">GCWorkerLocalPtr</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">c</span> <span class="op">=</span> <span class="ident">GenImmixCopyContext::new</span>(<span class="ident">mmtk</span>);
-        <span class="ident">c</span>.<span class="ident">init</span>(<span class="ident">tls</span>);
-        <span class="ident">GCWorkerLocalPtr::new</span>(<span class="ident">c</span>)
+    <span class="kw">fn</span> <span class="ident">create_copy_config</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>) -&gt; <span class="ident">CopyConfig</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span> {
+        <span class="kw">use</span> <span class="ident">enum_map::enum_map</span>;
+        <span class="ident">CopyConfig</span> {
+            <span class="ident">copy_mapping</span>: <span class="macro">enum_map!</span> {
+                <span class="ident">CopySemantics::PromoteMature</span> =&gt; <span class="ident">CopySelector::Immix</span>(<span class="number">0</span>),
+                <span class="ident">CopySemantics::Mature</span> =&gt; <span class="ident">CopySelector::Immix</span>(<span class="number">0</span>),
+                <span class="kw">_</span> =&gt; <span class="ident">CopySelector::Unused</span>,
+            },
+            <span class="ident">space_mapping</span>: <span class="macro">vec!</span>[(<span class="ident">CopySelector::Immix</span>(<span class="number">0</span>), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix</span>)],
+            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">GENIMMIX_CONSTRAINTS</span>,
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">last_collection_was_exhaustive</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {

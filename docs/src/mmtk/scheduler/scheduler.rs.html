@@ -415,8 +415,6 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">WorkerGroup</span>};
@@ -601,9 +599,7 @@
         {
             <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>;
             <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
-                .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="ident">C::PlanType</span>, <span class="ident">C::CopyContextType</span><span class="op">&gt;</span><span class="ident">::new</span>(
-                    <span class="ident">plan</span>,
-                ));
+                .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="ident">C::PlanType</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
         }
 
         <span class="comment">// Finalization</span>

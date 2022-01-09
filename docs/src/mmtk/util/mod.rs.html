@@ -76,6 +76,8 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.</span>
 
 <span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,</span>
@@ -93,6 +95,8 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">constants</span>;
 <span class="doccomment">/// Calculation, conversion and rounding for memory related numbers.</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">conversions</span>;
+<span class="doccomment">/// The copy allocators for a GC worker.</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">copy</span>;
 <span class="doccomment">/// Wrapper functions for memory syscalls such as mmap, mprotect, etc.</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">memory</span>;
 <span class="doccomment">/// Opaque pointers used in MMTk, e.g. VMThread.</span>

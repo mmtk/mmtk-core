@@ -7,7 +7,7 @@
 
 
         <!-- Custom HTML head -->
-
+        
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -89,7 +89,7 @@
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                <div id="menu-bar-hover-placeholder"></div>
+                                <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky bordered">
                     <div class="left-buttons">
                         <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
@@ -144,12 +144,47 @@
                     <main>
                         <h1 id="collection-implement-garbage-collection"><a class="header" href="#collection-implement-garbage-collection">Collection: Implement garbage collection</a></h1>
 <p>We need to add a few more things to get garbage collection working. 
-Specifically, we need to add a <code>CopyContext</code>, which a GC worker uses for 
+Specifically, we need to config the <code>GCWorkerCopyContext</code>, which a GC worker uses for 
 copying objects, and GC work packets that will be scheduled for a collection.</p>
-<h2 id="copycontext"><a class="header" href="#copycontext">CopyContext</a></h2>
-<p>At the moment, none of the files in the plan are suited for garbage collection 
-operations. So, we need to add a new file to hold the <code>CopyContext</code> and other 
-structures and functions that will give the collector proper functionality.</p>
+<h2 id="copyconfig"><a class="header" href="#copyconfig">CopyConfig</a></h2>
+<p><code>CopyConfig</code> defines how a GC plan copies objects.
+Similar to the <code>MutatorConfig</code> struct, you would need to define <code>CopyConfig</code> for your plan.</p>
+<p>In <code>impl&lt;VM: VMBinding&gt; Plan for MyGC&lt;VM&gt;</code>, override the method <code>create_copy_config()</code>.
+The default implementation provides a default <code>CopyConfig</code> for non-copying plans. So for non-copying plans,
+you do not need to override the method. But
+for copying plans, you would have to provide a proper copy configuration.</p>
+<p>In a semispace GC, objects will be copied between the two copy spaces. We will use one
+<code>CopySpaceCopyContext</code> for the copying, and will rebind the copy context to the proper tospace
+in the preparation step of a GC (which will be discussed later when we talk about preparing for collections).</p>
+<p>We use <code>CopySemantics::DefaultCopy</code> for our copy
+operation, and bind it with the first <code>CopySpaceCopyContext</code> (<code>CopySemantics::DefaultCopy =&gt; CopySelector::CopySpace(0)</code>).
+And for the rest copy semantics, they are unused for this plan. We also provide an initial space
+binding for <code>CopySpaceCopyContext</code>. However, we will flip tospace in every GC, and rebind the
+copy context to the new tospace in each GC, so it does not matter which space we use as the initial
+space here.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn create_copy_config(&amp;'static self) -&gt; CopyConfig&lt;Self::VM&gt; {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy =&gt; CopySelector::CopySpace(0),
+                _ =&gt; CopySelector::Unused,
+            },
+            space_mapping: vec![
+                // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &amp;self.copyspace0)
+            ],
+            constraints: &amp;MYGC_CONSTRAINTS,
+        }
+    }
+<span class="boring">}
+</span></code></pre></pre>
+<h2 id="mygcprocessedges"><a class="header" href="#mygcprocessedges">MyGCProcessEdges</a></h2>
+<p>We will create the tracing work packet for our GC.
+At the moment, none of the files in the plan are suited for implementing this
+GC packet. So, we need to add a new file to hold the <code>MyGCProcessEdges</code>.</p>
 <p>Make a new file under <code>mygc</code>, called <code>gc_work.rs</code>. 
 In <code>mod.rs</code>, import <code>gc_work</code> as a module by adding the line <code>mod gc_work</code>.
 In <code>gc_work.rs</code>, add the following import statements:</p>
@@ -157,112 +192,15 @@ In <code>gc_work.rs</code>, add the following import statements:</p>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use super::global::MyGC;
-use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::util::alloc::{Allocator, BumpAllocator};
-use crate::util::object_forwarding;
+use crate::util::copy::CopySemantics;
 use crate::util::{Address, ObjectReference};
-use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::plan::PlanConstraints;
-use crate::scheduler::GCWorkerLocal;
 use std::ops::{Deref, DerefMut};
 <span class="boring">}
 </span></code></pre></pre>
-<p>Add a new structure, <code>MyGCCopyContext</code>, with the type parameter 
-<code>VM: VMBinding</code>. It should have the fields <code>plan: &amp;'static MyGC&lt;VM&gt;</code>
-and <code>mygc: BumpAllocator</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct MyGCCopyContext&lt;VM: VMBinding&gt; {
-    plan:&amp;'static MyGC&lt;VM&gt;,
-    mygc: BumpAllocator&lt;VM&gt;,
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>Create an implementation block - 
-<code>impl&lt;VM: VMBinding&gt; CopyContext for MyGCCopyContext&lt;VM&gt;</code>.
-Define the associate type <code>VM</code> for <code>CopyContext</code> as the VMBinding type 
-given to the class as <code>VM</code>: <code>type VM = VM</code>. </p>
-<p>Add the following skeleton functions (taken from <code>plan/global.rs</code>):</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
-    unimplemented!()
-}
-fn init(&amp;mut self, tls: OpaquePointer) {
-    unimplemented!()
-}
-fn prepare(&amp;mut self) {
-    unimplemented!()
-}
-fn release(&amp;mut self) {
-    unimplemented!()
-}
-fn alloc_copy(
-    &amp;mut self,
-    original: ObjectReference,
-    bytes: usize,
-    align: usize,
-    offset: isize,
-    semantics: AllocationSemantics,
-) -&gt; Address {
-    unimplemented!()
-}
-fn post_copy(
-    &amp;mut self,
-    _obj: ObjectReference,
-    _tib: Address,
-    _bytes: usize,
-    _semantics: AllocationSemantics,
-) {
-    unimplemented!()
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>In <code>init()</code>, set the <code>tls</code> variable in the held instance of <code>mygc</code> to the one 
-passed to the function. In <code>constraints()</code>, return a reference of 
-<code>MYGC_CONSTRAINTS</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    fn constraints(&amp;self) -&gt; &amp;'static PlanConstraints {
-        &amp;super::global::MYGC_CONSTRAINTS
-    }
-    fn init(&amp;mut self, tls: VMWorkerThread) {
-        self.mygc.tls = tls.0;
-    }
-<span class="boring">}
-</span></code></pre></pre>
-<p>We just leave the rest of the functions empty for now and will implement them 
-later.</p>
-<p>Add a constructor to <code>MyGCCopyContext</code> and implement the <code>WorkerLocal</code> trait 
-for <code>MyGCCopyContext</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; MyGCCopyContext&lt;VM&gt; {
-    pub fn new(mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-        let plan = &amp;mmtk.plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-        Self {
-            plan,
-            mygc: BumpAllocator::new(VMThread::UNINITIALIZED, plan.tospace(), &amp;*mmtk.plan),
-        }
-    }
-}
-
-impl&lt;VM: VMBinding&gt; GCWorkerLocal for MyGCCopyContext&lt;VM&gt; {
-    fn init(&amp;mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
-<span class="boring">}
-</span></code></pre></pre>
-<h2 id="mygcprocessedges"><a class="header" href="#mygcprocessedges">MyGCProcessEdges</a></h2>
 <p>Add a new public structure, <code>MyGCProcessEdges</code>, with the type parameter 
 <code>&lt;VM:VMBinding&gt;</code>. It will hold an instance of <code>ProcessEdgesBase</code> and 
 <code>MyGC</code>. This is the core part for tracing objects in the <code>MyGC</code> plan.</p>
@@ -291,34 +229,6 @@ Add a new constructor, <code>new()</code>.</p>
 <span class="boring">}
 </span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
-<p>Now that they've been added, you should import <code>MyGCCopyContext</code> and
-<code>MyGCProcessEdges</code> into <code>mygc/global.rs</code>, which we will be working in for the
-next few steps. </p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
-<span class="boring">}
-</span></code></pre></pre>
-<p>In <code>create_worker_local()</code> in <code>impl Plan for MyGC</code>, create an instance of 
-<code>MyGCCopyContext</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    fn create_worker_local(
-        &amp;self,
-        tls: VMWorkerThread,
-        mmtk: &amp;'static MMTK&lt;Self::VM&gt;,
-    ) -&gt; GCWorkerLocalPtr {
-        let mut c = MyGCCopyContext::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
-    }
-<span class="boring">}
-</span></code></pre></pre>
-<p><code>NoCopy</code> is now no longer needed. Remove it from the import statement block. 
-For the next step, import <code>crate::scheduler::gc_work::*;</code>, and modify the
-line importing <code>MMTK</code> scheduler to read <code>use crate::scheduler::*;</code>.</p>
 <p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
 it stops all mutators, runs the
@@ -336,7 +246,6 @@ and implement the trait <code>GCWorkContext</code> for it. We create this type i
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type CopyContextType = MyGCCopyContext&lt;VM&gt;;
     type ProcessEdgesWorkType = MyGCProcessEdges&lt;VM&gt;;
 }
 
@@ -377,16 +286,17 @@ call, and add the following code:</p>
 <p>This function is called at the start of a collection. It prepares the two 
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.</p>
-<h3 id="prepare-copycontext"><a class="header" href="#prepare-copycontext">Prepare CopyContext</a></h3>
-<p>First, fill in some more of the skeleton functions we added to the 
-<code>CopyContext</code> (in <code>gc_work.rs</code>) earlier.
-In <code>prepare()</code>, rebind the allocator to the tospace using the function
-<code>self.mygc.rebind(Some(self.plan.tospace()))</code>.</p>
+<h3 id="prepare-worker"><a class="header" href="#prepare-worker">Prepare worker</a></h3>
+<p>As we flip tospac for the plan, we also need to rebind the copy context
+to the new tospace. We will override <code>prepare_worker()</code> in our <code>Plan</code> implementation.
+<code>Plan.prepare_worker()</code> is executed by each GC worker in the preparation phase of a GC. The code
+is straightforward -- we get the first <code>CopySpaceCopyContext</code>, and call <code>rebind()</code> on it with
+the new <code>tospace</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn prepare(&amp;mut self) {
-        self.mygc.rebind(self.plan.tospace());
+</span>    fn prepare_worker(&amp;self, worker: &amp;mut GCWorker&lt;VM&gt;) {
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
     }
 <span class="boring">}
 </span></code></pre></pre>
@@ -420,21 +330,21 @@ its spaces (e.g. immortal or large object space):</p>
             return object;
         }
         if self.mygc().tospace().in_space(object) {
-            self.mygc().tospace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+            self.mygc().tospace().trace_object::&lt;Self&gt;(
                 self,
                 object,
-                super::global::ALLOC_MyGC,
-                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+                CopySemantics::DefaultCopy,
+                self.worker(),
             )
         } else if self.mygc().fromspace().in_space(object) {
-            self.mygc().fromspace().trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(
+            self.mygc().fromspace().trace_object::&lt;Self&gt;(
                 self,
                 object,
-                super::global::ALLOC_MyGC,
-                unsafe { self.worker().local::&lt;MyGCCopyContext&lt;VM&gt;&gt;() },
+                CopySemantics::DefaultCopy,
+                self.worker(),
             )
         } else {
-            self.mygc().common.trace_object::&lt;Self, MyGCCopyContext&lt;VM&gt;&gt;(self, object)
+            self.mygc().common.trace_object::&lt;Self&gt;(self, object)
         }
     }
 <span class="boring">}
@@ -468,37 +378,18 @@ use an inline attribute (<code>#[inline(always)]</code>) to tell the Rust compil
 to always inline the function.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    #[inline(always)]
-    fn alloc_copy(
-        &amp;mut self,
-        _original: ObjectReference,
-        bytes: usize,
-        align: usize,
-        offset: isize,
-        _semantics: crate::AllocationSemantics,
-    ) -&gt; Address {
-        self.mygc.alloc(bytes, align, offset)
-    }
-<span class="boring">}
+</span>
+<span class="boring">fn main() {
+</span><span class="boring">}
 </span></code></pre></pre>
 <p>To <code>post_copy()</code>, in the <code>CopyContext</code> implementations block, add 
 <code>forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);</code>. Also, add an 
 inline attribute.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    #[inline(always)]
-    fn post_copy(
-        &amp;mut self,
-        obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        _semantics: crate::AllocationSemantics,
-    ) {
-        object_forwarding::clear_forwarding_bits::&lt;VM&gt;(obj);
-    }
-<span class="boring">}
+</span>
+<span class="boring">fn main() {
+</span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="release"><a class="header" href="#release">Release</a></h2>
 <p>Finally, we need to fill out the functions that are, roughly speaking, 

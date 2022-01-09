@@ -236,11 +236,7 @@
 <span id="235">235</span>
 <span id="236">236</span>
 <span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::CopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
@@ -248,6 +244,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
@@ -258,7 +255,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -409,37 +405,37 @@
     }
 
     <span class="doccomment">/// Trace objects for spaces in generational and common plans for a full heap GC.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_full_heap</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="ident">C</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_full_heap</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">C</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
                 <span class="ident">trace</span>,
                 <span class="ident">object</span>,
-                <span class="ident">AllocationSemantics::Default</span>,
-                <span class="ident">copy_context</span>,
+                <span class="ident">CopySemantics::PromoteMature</span>,
+                <span class="ident">worker</span>,
             );
         }
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
     }
 
     <span class="doccomment">/// Trace objects for spaces in generational and common plans for a nursery GC.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_nursery</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="ident">C</span>: <span class="ident">CopyContext</span> <span class="op">+</span> <span class="ident">GCWorkerLocal</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_nursery</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">copy_context</span>: <span class="kw-2">&amp;mut</span> <span class="ident">C</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="comment">// Evacuate nursery objects</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">C</span><span class="op">&gt;</span>(
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
                 <span class="ident">trace</span>,
                 <span class="ident">object</span>,
-                <span class="ident"><span class="kw">crate</span>::plan::global::AllocationSemantics::Default</span>,
-                <span class="ident">copy_context</span>,
+                <span class="ident">CopySemantics::PromoteMature</span>,
+                <span class="ident">worker</span>,
             );
         }
         <span class="comment">// We may alloc large object into LOS as nursery objects. Trace them here.</span>
