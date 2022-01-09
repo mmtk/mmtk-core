@@ -1,6 +1,4 @@
 use crate::plan::global::CommonPlan;
-use crate::plan::AllocationSemantics;
-use crate::plan::CopyContext;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
@@ -8,6 +6,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::conversions;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
@@ -18,7 +17,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
-
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -169,37 +167,37 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
-    pub fn trace_object_full_heap<T: TransitiveClosure, C: CopyContext + GCWorkerLocal>(
+    pub fn trace_object_full_heap<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
-        copy_context: &mut C,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T, C>(
+            return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                AllocationSemantics::Default,
-                copy_context,
+                CopySemantics::PromoteMature,
+                worker,
             );
         }
-        self.common.trace_object::<T, C>(trace, object)
+        self.common.trace_object::<T>(trace, object)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.
-    pub fn trace_object_nursery<T: TransitiveClosure, C: CopyContext + GCWorkerLocal>(
+    pub fn trace_object_nursery<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
-        copy_context: &mut C,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T, C>(
+            return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                crate::plan::global::AllocationSemantics::Default,
-                copy_context,
+                CopySemantics::PromoteMature,
+                worker,
             );
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.

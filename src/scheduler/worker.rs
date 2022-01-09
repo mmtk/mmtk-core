@@ -2,54 +2,12 @@ use super::stat::WorkerLocalStat;
 use super::work_bucket::*;
 use super::*;
 use crate::mmtk::MMTK;
+use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, VMBinding};
-use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Weak};
-
-/// Thread-local data for each worker thread.
-///
-/// For mmtk, each gc can define their own worker-local data, to contain their required copy allocators and other stuffs.
-pub trait GCWorkerLocal {
-    fn init(&mut self, _tls: VMWorkerThread) {}
-}
-
-/// This struct will be accessed during trace_object(), which is performance critical.
-/// However, we do not know its concrete type as the plan and its copy context is dynamically selected.
-/// Instead use a void* type to store it, and during trace_object() we cast it to the correct copy context type.
-#[derive(Copy, Clone)]
-pub struct GCWorkerLocalPtr {
-    data: *mut c_void,
-    // Save the type name for debug builds, so we can later do type check
-    #[cfg(debug_assertions)]
-    ty: &'static str,
-}
-
-impl GCWorkerLocalPtr {
-    pub const UNINITIALIZED: Self = GCWorkerLocalPtr {
-        data: std::ptr::null_mut(),
-        #[cfg(debug_assertions)]
-        ty: "uninitialized",
-    };
-
-    pub fn new<W: GCWorkerLocal>(worker_local: W) -> Self {
-        GCWorkerLocalPtr {
-            data: Box::into_raw(Box::new(worker_local)) as *mut c_void,
-            #[cfg(debug_assertions)]
-            ty: std::any::type_name::<W>(),
-        }
-    }
-
-    /// # Safety
-    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
-    pub unsafe fn as_type<W: GCWorkerLocal>(&mut self) -> &mut W {
-        #[cfg(debug_assertions)]
-        debug_assert_eq!(self.ty, std::any::type_name::<W>());
-        &mut *(self.data as *mut W)
-    }
-}
 
 const LOCALLY_CACHED_WORKS: usize = 1;
 
@@ -58,7 +16,7 @@ pub struct GCWorker<VM: VMBinding> {
     pub ordinal: usize,
     pub parked: AtomicBool,
     scheduler: Arc<GCWorkScheduler<VM>>,
-    local: GCWorkerLocalPtr,
+    copy: GCWorkerCopyContext<VM>,
     pub local_work_bucket: WorkBucket<VM>,
     pub sender: Sender<CoordinatorMessage<VM>>,
     pub stat: WorkerLocalStat<VM>,
@@ -82,7 +40,8 @@ impl<VM: VMBinding> GCWorker<VM> {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
             ordinal,
             parked: AtomicBool::new(true),
-            local: GCWorkerLocalPtr::UNINITIALIZED,
+            // We will set this later
+            copy: GCWorkerCopyContext::new_non_copy(),
             local_work_bucket: WorkBucket::new(true, scheduler.worker_monitor.clone()),
             sender,
             scheduler,
@@ -126,15 +85,14 @@ impl<VM: VMBinding> GCWorker<VM> {
         &self.scheduler
     }
 
-    /// # Safety
-    /// The user needs to guarantee that the type supplied here is the same type used to create this pointer.
-    #[inline]
-    pub unsafe fn local<W: 'static + GCWorkerLocal>(&mut self) -> &mut W {
-        self.local.as_type::<W>()
+    // TODO: We should be able to remove this method. We can create the copy context without a proper tls.
+    // In init(), we set tls for the worker and for the copy context.
+    pub fn set_local(&mut self, copy: GCWorkerCopyContext<VM>) {
+        self.copy = copy;
     }
 
-    pub fn set_local(&mut self, local: GCWorkerLocalPtr) {
-        self.local = local;
+    pub fn get_copy_context_mut(&mut self) -> &mut GCWorkerCopyContext<VM> {
+        &mut self.copy
     }
 
     pub fn init(&mut self, tls: VMWorkerThread) {

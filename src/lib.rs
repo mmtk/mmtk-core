@@ -78,6 +78,7 @@ pub mod util;
 pub mod vm;
 
 pub use crate::plan::{
-    AllocationSemantics, BarrierSelector, CopyContext, Mutator, MutatorContext, Plan, TraceLocal,
+    AllocationSemantics, BarrierSelector, Mutator, MutatorContext, Plan, TraceLocal,
     TransitiveClosure,
 };
+pub use crate::policy::copy_context::PolicyCopyContext;

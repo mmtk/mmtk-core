@@ -1,6 +1,5 @@
-use super::gc_work::{GenCopyCopyContext, GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
+use super::gc_work::{GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::mmtk::MMTK;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -12,6 +11,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -24,8 +24,6 @@ use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct GenCopy<VM: VMBinding> {
     pub gen: Gen<VM>,
@@ -43,14 +41,20 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &GENCOPY_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        let mut c = GenCopyCopyContext::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::Mature => CopySelector::CopySpace(0),
+                CopySemantics::PromoteMature => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![
+                // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), self.tospace()),
+            ],
+            constraints: &GENCOPY_CONSTRAINTS,
+        }
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
@@ -106,6 +110,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+    }
+
+    fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

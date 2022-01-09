@@ -14,6 +14,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::conversions::bytes_to_pages;
+use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -24,94 +25,13 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::PlanSelector;
 use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
-use crate::util::{Address, ObjectReference};
+use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
-use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-
-/// A GC worker's context for copying GCs.
-/// Each GC plan should provide their implementation of a CopyContext.
-/// For non-copying GC, NoCopy can be used.
-pub trait CopyContext: 'static + Send {
-    type VM: VMBinding;
-    fn constraints(&self) -> &'static PlanConstraints;
-    fn init(&mut self, tls: VMWorkerThread);
-    fn prepare(&mut self);
-    fn release(&mut self);
-    fn alloc_copy(
-        &mut self,
-        original: ObjectReference,
-        bytes: usize,
-        align: usize,
-        offset: isize,
-        semantics: AllocationSemantics,
-    ) -> Address;
-    fn post_copy(
-        &mut self,
-        _obj: ObjectReference,
-        _tib: Address,
-        _bytes: usize,
-        _semantics: AllocationSemantics,
-    ) {
-    }
-    fn copy_check_allocator(
-        &self,
-        _from: ObjectReference,
-        bytes: usize,
-        align: usize,
-        semantics: AllocationSemantics,
-    ) -> AllocationSemantics {
-        let large = crate::util::alloc::allocator::get_maximum_aligned_size::<Self::VM>(
-            bytes,
-            align,
-            Self::VM::MIN_ALIGNMENT,
-        ) > self.constraints().max_non_los_copy_bytes;
-        if large {
-            AllocationSemantics::Los
-        } else {
-            semantics
-        }
-    }
-}
-
-pub struct NoCopy<VM: VMBinding>(PhantomData<VM>);
-
-impl<VM: VMBinding> CopyContext for NoCopy<VM> {
-    type VM = VM;
-
-    fn init(&mut self, _tls: VMWorkerThread) {}
-    fn constraints(&self) -> &'static PlanConstraints {
-        unreachable!()
-    }
-    fn prepare(&mut self) {}
-    fn release(&mut self) {}
-    fn alloc_copy(
-        &mut self,
-        _original: ObjectReference,
-        _bytes: usize,
-        _align: usize,
-        _offset: isize,
-        _semantics: AllocationSemantics,
-    ) -> Address {
-        unreachable!()
-    }
-}
-
-impl<VM: VMBinding> NoCopy<VM> {
-    pub fn new(_mmtk: &'static MMTK<VM>) -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<VM: VMBinding> GCWorkerLocal for NoCopy<VM> {
-    fn init(&mut self, tls: VMWorkerThread) {
-        CopyContext::init(self, tls);
-    }
-}
 
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
@@ -174,6 +94,14 @@ pub fn create_plan<VM: VMBinding>(
     }
 }
 
+/// Create thread local GC worker.
+pub fn create_worker<VM: VMBinding>(
+    tls: VMWorkerThread,
+    mmtk: &'static MMTK<VM>,
+) -> GCWorkerCopyContext<VM> {
+    GCWorkerCopyContext::<VM>::new(tls, &*mmtk.plan, mmtk.plan.create_copy_config())
+}
+
 /// A plan describes the global core functionality for all memory management schemes.
 /// All global MMTk plans should implement this trait.
 ///
@@ -203,11 +131,14 @@ pub trait Plan: 'static + Sync + Downcast {
     type VM: VMBinding;
 
     fn constraints(&self) -> &'static PlanConstraints;
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr;
+
+    /// Create a copy config for this plan. A copying GC plan MUST override this method,
+    /// and provide a valid config.
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        // Use the empty default copy config for non copying GC.
+        CopyConfig::default()
+    }
+
     fn base(&self) -> &BasePlan<Self::VM>;
     fn schedule_collection(&'static self, _scheduler: &GCWorkScheduler<Self::VM>);
     fn common(&self) -> &CommonPlan<Self::VM> {
@@ -263,7 +194,16 @@ pub trait Plan: 'static + Sync + Downcast {
             .load(Ordering::SeqCst)
     }
 
+    /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
+    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn prepare(&mut self, tls: VMWorkerThread);
+
+    /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
+    /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
+    fn prepare_worker(&self, _worker: &mut GCWorker<Self::VM>) {}
+
+    /// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.
+    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
     fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -628,7 +568,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,
@@ -929,7 +869,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_pages_used()
     }
 
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -942,7 +882,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return self.los.trace_object(trace, object);
         }
-        self.base.trace_object::<T, C>(trace, object)
+        self.base.trace_object::<T>(trace, object)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

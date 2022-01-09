@@ -9,8 +9,7 @@
 //!   also included here.
 //! * A constant for [`PlanConstraints`](crate::plan::PlanConstraints), which defines
 //!   plan-specific constants.
-//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC. If the plan
-//!   implements a copying GC, a [`CopyContext`](crate::plan::CopyContext) also needs to be provided.
+//! * Plan-specific [`GCWork`](crate::scheduler::GCWork), which is scheduled during GC.
 //!
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
@@ -22,8 +21,8 @@ mod controller_collector_context;
 mod global;
 pub(crate) use global::create_mutator;
 pub(crate) use global::create_plan;
+pub(crate) use global::create_worker;
 pub use global::AllocationSemantics;
-pub use global::CopyContext;
 pub(crate) use global::GcStatus;
 pub use global::Plan;
 
@@ -33,6 +32,7 @@ pub use mutator_context::MutatorContext;
 
 mod plan_constraints;
 pub use plan_constraints::PlanConstraints;
+pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
 mod tracelocal;
 pub use tracelocal::TraceLocal;
