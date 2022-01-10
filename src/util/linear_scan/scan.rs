@@ -5,6 +5,7 @@ use crate::util::alloc_bit;
 use crate::vm::VMBinding;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::address::ByteSize;
 use crate::vm::ObjectModel;
 
 use std::marker::PhantomData;
@@ -41,16 +42,19 @@ pub struct LinearScanIterator<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> 
     start: Address,
     end: Address,
     cursor: Address,
+    /// Extra size in bytes for an object
+    extra_size: ByteSize,
     _p: PhantomData<VM>
 }
 
 impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT> {
-    pub fn new(start: Address, end: Address) -> Self {
+    pub fn new(start: Address, end: Address, extra_size: ByteSize) -> Self {
         debug_assert!(start < end);
         LinearScanIterator {
             start,
             end,
             cursor: start,
+            extra_size,
             _p: PhantomData,
         }
     }
@@ -69,7 +73,7 @@ impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator for L
 
             if is_object {
                 let object = unsafe { self.cursor.to_object_reference() };
-                let bytes = VM::VMObjectModel::get_current_size(object);
+                let bytes = VM::VMObjectModel::get_current_size(object) + self.extra_size;
                 self.cursor += bytes;
                 return Some(object);
             } else {
