@@ -44,6 +44,18 @@ pub struct LinearScanIterator<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> 
     _p: PhantomData<VM>
 }
 
+impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT> {
+    pub fn new(start: Address, end: Address) -> Self {
+        debug_assert!(start < end);
+        LinearScanIterator {
+            start,
+            end,
+            cursor: start,
+            _p: PhantomData,
+        }
+    }
+}
+
 impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator for LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT> {
     type Item = ObjectReference;
 
