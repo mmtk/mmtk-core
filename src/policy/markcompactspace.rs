@@ -245,7 +245,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = start;
 
-        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end, Self::HEADER_RESERVED_IN_BYTES);
+        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
         while let Some(obj) = iter.next() {
             if Self::to_be_compacted(obj) {
                 let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
@@ -256,6 +256,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
                 unsafe { forwarding_pointer_addr.store(to) }
                 to += copied_size;
+
+                // iter.offset_cursor(Self::HEADER_RESERVED_IN_BYTES as isize);
             }
         }
     }
@@ -265,31 +267,33 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = end;
 
-        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end, Self::HEADER_RESERVED_IN_BYTES);
+        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
         while let Some(obj) = iter.next() {
-                // clear the alloc bit
-                alloc_bit::unset_addr_alloc_bit(obj.to_address());
+            // clear the alloc bit
+            alloc_bit::unset_addr_alloc_bit(obj.to_address());
 
-                let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
-                let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
-                if forwarding_pointer != Address::ZERO {
-                    let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
-                        + Self::HEADER_RESERVED_IN_BYTES;
-                    to = forwarding_pointer;
-                    let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
-                    // clear forwarding pointer
-                    crate::util::memory::zero(
-                        forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES - GC_EXTRA_HEADER_BYTES,
-                        GC_EXTRA_HEADER_BYTES,
-                    );
-                    crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
-                    // copy object
-                    let target = unsafe { object_addr.to_object_reference() };
-                    VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
-                    // update alloc_bit,
-                    alloc_bit::set_alloc_bit(target);
-                    to += copied_size
-                }
+            let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
+            let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
+            if forwarding_pointer != Address::ZERO {
+                let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
+                    + Self::HEADER_RESERVED_IN_BYTES;
+                to = forwarding_pointer;
+                let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
+                // clear forwarding pointer
+                crate::util::memory::zero(
+                    forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES - GC_EXTRA_HEADER_BYTES,
+                    GC_EXTRA_HEADER_BYTES,
+                );
+                crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
+                // copy object
+                let target = unsafe { object_addr.to_object_reference() };
+                VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
+                // update alloc_bit,
+                alloc_bit::set_alloc_bit(target);
+                to += copied_size
+            }
+
+            // iter.offset_cursor(Self::HEADER_RESERVED_IN_BYTES as isize);
         }
 
         // reset the bump pointer

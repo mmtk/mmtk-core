@@ -328,7 +328,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Call the relevant sweep function depending on the location of the mark bits
         match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
-                self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec);
+                self.sweep_chunk_mark_on_side_linear_scan(chunk_start, local_mark_bit_side_spec);
             }
             _ => {
                 self.sweep_chunk_mark_in_header(chunk_start);
@@ -344,6 +344,194 @@ impl<VM: VMBinding> MallocSpace<VM> {
         crate::mmtk::SFT_MAP.clear(chunk_start);
     }
 
+    fn sweep_chunk_mark_on_side_linear_scan(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
+        #[cfg(debug_assertions)]
+        let mut live_bytes = 0;
+
+        debug!("Check active chunk {:?}", chunk_start);
+        // let mut chunk_is_empty = true;
+        let mut address = chunk_start;
+        let chunk_end = chunk_start + BYTES_IN_CHUNK;
+        // let mut page = conversions::page_align_down(address);
+        // let mut page_is_empty = true;
+        // let mut last_on_page_boundary = false;
+
+        debug_assert!(
+            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                == mark_bit_spec.log_bytes_in_region,
+            "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+        );
+
+        // For bulk xor'ing 128-bit vectors on architectures with vector instructions
+        // Each bit represents an object of LOG_MIN_OBJ_SIZE size
+        let bulk_load_size: usize =
+            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+
+        // The end of last object (object_start + size)
+        let mut last_live_object_end = Address::ZERO;
+        debug_assert!(last_live_object_end.is_zero());
+
+        while address < chunk_end {
+            // We extensively tested the performance of the following if-statement and were
+            // surprised to note that in the case of newer AMD microarchitecures (>= Zen), some
+            // microarchitectural state/idiosyncrasies result in favourable cache placement/locality
+            // for the case where the conditionals (i.e. just the body of both the if-statements are left
+            // in the hot loop) which lead to a large performance speedup. Even more surprising was the
+            // revelation that the hot loop has worse cache placement/locality if the entire if-statement
+            // was commented out -- effectively meaning that [more work in the hot loop => better performance]
+            // which was counterintuitive to our beliefs.
+            //
+            // The performance tradeoffs on Intel and older AMD microarchitectures were as expected, i.e.
+            // wherein the performance of the hot loop decreased if more work was done in the loop.
+            // if address - page >= BYTES_IN_PAGE {
+            //     if page_is_empty {
+            //         unsafe { unset_page_mark_unsafe(page) };
+            //     }
+            //     page = conversions::page_align_down(address);
+            //     page_is_empty = !last_on_page_boundary;
+            //     last_on_page_boundary = false;
+            // }
+
+            let alloc_128: u128 =
+                unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+            let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
+
+            // Check if there are dead objects in the bulk loaded region
+            if alloc_128 ^ mark_128 != 0 {
+                let end = address + bulk_load_size;
+
+                let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(address, end);
+                while let Some(obj) = iter.next() {
+                    let obj_start = VM::VMObjectModel::object_start_ref(obj);
+
+                    let offset_malloc_bit = is_offset_malloc(obj_start);
+                    let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
+
+                    if !is_marked::<VM>(obj, None) {
+                        // Dead object
+                        trace!("Object {} has been allocated but not marked", obj);
+
+                        // Free object
+                        self.free(obj_start, bytes, offset_malloc_bit);
+                        trace!("free object {}", obj);
+                        unsafe { unset_alloc_bit_unsafe(obj) };
+                    } else {
+                        // Live object
+
+                        // TODO: Unset marks for free pages and update last_object_end
+                        if !last_live_object_end.is_zero() {
+                            // unset marks for pages since last object
+                            let empty_page_start = last_live_object_end.align_up(BYTES_IN_PAGE);
+                            let empty_page_end = obj.to_address().align_down(BYTES_IN_PAGE);
+
+                            let mut page = empty_page_start;
+                            while page < empty_page_end {
+                                unsafe { unset_page_mark_unsafe(page) };
+                                page += BYTES_IN_PAGE;
+                            }
+                        }
+                        // Update last_object_end
+                        let this_obj_end = obj_start + bytes;
+                        last_live_object_end = this_obj_end;
+                    }
+
+                    // TODO: offset cursor (cursor was increased by ObjectModel::get_current_size(obj), we should move cursor by get_malloc_usable_size)
+                }
+            } else {
+                // TODO we aren't actually accounting for the case where an object is alive and spans
+                // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
+                // if alloc_128 != 0 {
+                //     // For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero
+                //     chunk_is_empty = false;
+                //     page_is_empty = false;
+                // }
+                if alloc_128 != 0 {
+                    last_live_object_end = address + bulk_load_size;
+                }
+            }
+            address += bulk_load_size;
+
+            // Aligning addresses to `bulk_load_size` just makes life easier, even though
+            // we may be processing some addresses twice
+            debug_assert!(address.is_aligned_to(bulk_load_size));
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            let mut address = chunk_start;
+            while address < chunk_end {
+                // Check if the address is an object
+                if unsafe { is_alloced_object_unsafe(address) } {
+                    let object = unsafe { address.to_object_reference() };
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
+
+                    let bytes = get_malloc_usable_size(obj_start, is_offset_malloc(obj_start));
+
+                    #[cfg(debug_assertions)]
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
+
+                    assert!(
+                        is_marked::<VM>(object, None),
+                        "Dead object = {} found after sweep",
+                        object
+                    );
+
+                    live_bytes += bytes;
+
+                    // Skip to next object
+                    address += bytes;
+                } else {
+                    // not an object
+                    address += VM::MIN_ALIGNMENT;
+                }
+            }
+        }
+
+        // Clear all the mark bits
+        bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
+
+        if last_live_object_end.is_zero() {
+            self.clean_up_empty_chunk(chunk_start);
+        }
+
+        debug!(
+            "Used bytes after releasing: {}",
+            self.active_bytes.load(Ordering::SeqCst)
+        );
+
+        #[cfg(debug_assertions)]
+        {
+            let completed_packets = self.completed_work_packets.fetch_add(1, Ordering::SeqCst) + 1;
+            self.work_live_bytes.fetch_add(live_bytes, Ordering::SeqCst);
+
+            if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
+                trace!(
+                    "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    live_bytes,
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
+
+                debug_assert_eq!(
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
+            }
+        }
+    }
+
     /// This function is called when the mark bits sit on the side metadata.
     /// This has been optimized with the use of bulk loading and bulk zeroing of
     /// metadata.
@@ -352,52 +540,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
     fn sweep_chunk_mark_on_side(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
-        struct SweepScan<'a, VM: VMBinding> {
-            chunk_is_empty: &'a mut bool,
-            page_is_empty: &'a mut bool,
-            last_on_page_boundary: &'a mut bool,
-            page: &'a mut Address,
-            space: &'a MallocSpace<VM>
-        }
-        impl<'a, VM: VMBinding> LinearScanCallback for SweepScan<'a, VM> {
-            fn on_object(&mut self, object: ObjectReference) -> ByteSize {
-                let obj_start = VM::VMObjectModel::object_start_ref(object);
-
-                let offset_malloc_bit = is_offset_malloc(obj_start);
-                let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
-
-                if !is_marked::<VM>(object, None) {
-                    // Dead object
-                    trace!("Object {} has been allocated but not marked", object);
-
-                    // Free object
-                    self.space.free(obj_start, bytes, offset_malloc_bit);
-                    trace!("free object {}", object);
-                    unsafe { unset_alloc_bit_unsafe(object) };
-                } else {
-                    // Live object
-                    // This chunk and page are still active.
-                    *self.chunk_is_empty = false;
-                    *self.page_is_empty = false;
-
-                    if object.to_address() + bytes - *self.page > BYTES_IN_PAGE {
-                        *self.last_on_page_boundary = true;
-                    }
-                }
-
-                bytes
-            }
-
-            fn on_page(&mut self, previous_page: Address) {
-                if *self.page_is_empty {
-                    unsafe { unset_page_mark_unsafe(previous_page) };
-                }
-                *self.page = previous_page + BYTES_IN_PAGE;
-                *self.page_is_empty = !*self.last_on_page_boundary;
-                *self.last_on_page_boundary = false;
-            }
-        }
-
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -448,62 +590,52 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Check if there are dead objects in the bulk loaded region
             if alloc_128 ^ mark_128 != 0 {
                 let end = address + bulk_load_size;
-
-                let mut scan = SweepScan {
-                    chunk_is_empty: &mut chunk_is_empty,
-                    page_is_empty: &mut page_is_empty,
-                    last_on_page_boundary: &mut last_on_page_boundary,
-                    page: &mut page,
-                    space: self
-                };
-                scan_region::<VM, SweepScan<VM>, false>(address, end, &mut scan);
-
                 // Linearly scan through region to free dead objects
-                // while address < end {
-                //     trace!("Checking address = {}, end = {}", address, end);
-                //     if address - page >= BYTES_IN_PAGE {
-                //         if page_is_empty {
-                //             unsafe { unset_page_mark_unsafe(page) };
-                //         }
-                //         page = conversions::page_align_down(address);
-                //         page_is_empty = !last_on_page_boundary;
-                //         last_on_page_boundary = false;
-                //     }
+                while address < end {
+                    trace!("Checking address = {}, end = {}", address, end);
+                    if address - page >= BYTES_IN_PAGE {
+                        if page_is_empty {
+                            unsafe { unset_page_mark_unsafe(page) };
+                        }
+                        page = conversions::page_align_down(address);
+                        page_is_empty = !last_on_page_boundary;
+                        last_on_page_boundary = false;
+                    }
 
-                //     // Check if the address is an object
-                //     if unsafe { is_alloced_object_unsafe(address) } {
-                //         let object = unsafe { address.to_object_reference() };
-                //         let obj_start = VM::VMObjectModel::object_start_ref(object);
+                    // Check if the address is an object
+                    if unsafe { is_alloced_object_unsafe(address) } {
+                        let object = unsafe { address.to_object_reference() };
+                        let obj_start = VM::VMObjectModel::object_start_ref(object);
 
-                //         let offset_malloc_bit = is_offset_malloc(obj_start);
-                //         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
+                        let offset_malloc_bit = is_offset_malloc(obj_start);
+                        let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
-                //         if !is_marked::<VM>(object, None) {
-                //             // Dead object
-                //             trace!("Object {} has been allocated but not marked", object);
+                        if !is_marked::<VM>(object, None) {
+                            // Dead object
+                            trace!("Object {} has been allocated but not marked", object);
 
-                //             // Free object
-                //             self.free(obj_start, bytes, offset_malloc_bit);
-                //             trace!("free object {}", object);
-                //             unsafe { unset_alloc_bit_unsafe(object) };
-                //         } else {
-                //             // Live object
-                //             // This chunk and page are still active.
-                //             chunk_is_empty = false;
-                //             page_is_empty = false;
+                            // Free object
+                            self.free(obj_start, bytes, offset_malloc_bit);
+                            trace!("free object {}", object);
+                            unsafe { unset_alloc_bit_unsafe(object) };
+                        } else {
+                            // Live object
+                            // This chunk and page are still active.
+                            chunk_is_empty = false;
+                            page_is_empty = false;
 
-                //             if address + bytes - page > BYTES_IN_PAGE {
-                //                 last_on_page_boundary = true;
-                //             }
-                //         }
+                            if address + bytes - page > BYTES_IN_PAGE {
+                                last_on_page_boundary = true;
+                            }
+                        }
 
-                //         // Skip to next object
-                //         address += bytes;
-                //     } else {
-                //         // not an object
-                //         address += VM::MIN_ALIGNMENT;
-                //     }
-                // }
+                        // Skip to next object
+                        address += bytes;
+                    } else {
+                        // not an object
+                        address += VM::MIN_ALIGNMENT;
+                    }
+                }
             } else {
                 // TODO we aren't actually accounting for the case where an object is alive and spans
                 // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
@@ -512,6 +644,196 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     chunk_is_empty = false;
                     page_is_empty = false;
                 }
+
+                address += bulk_load_size;
+            }
+
+            // Aligning addresses to `bulk_load_size` just makes life easier, even though
+            // we may be processing some addresses twice
+            address = address.align_down(bulk_load_size);
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            let mut address = chunk_start;
+            while address < chunk_end {
+                // Check if the address is an object
+                if unsafe { is_alloced_object_unsafe(address) } {
+                    let object = unsafe { address.to_object_reference() };
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
+
+                    let bytes = get_malloc_usable_size(obj_start, is_offset_malloc(obj_start));
+
+                    #[cfg(debug_assertions)]
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
+
+                    assert!(
+                        is_marked::<VM>(object, None),
+                        "Dead object = {} found after sweep",
+                        object
+                    );
+
+                    live_bytes += bytes;
+
+                    // Skip to next object
+                    address += bytes;
+                } else {
+                    // not an object
+                    address += VM::MIN_ALIGNMENT;
+                }
+            }
+        }
+
+        // Clear all the mark bits
+        bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
+
+        if chunk_is_empty {
+            self.clean_up_empty_chunk(chunk_start);
+        }
+
+        debug!(
+            "Used bytes after releasing: {}",
+            self.active_bytes.load(Ordering::SeqCst)
+        );
+
+        #[cfg(debug_assertions)]
+        {
+            let completed_packets = self.completed_work_packets.fetch_add(1, Ordering::SeqCst) + 1;
+            self.work_live_bytes.fetch_add(live_bytes, Ordering::SeqCst);
+
+            if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
+                trace!(
+                    "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    live_bytes,
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
+
+                debug_assert_eq!(
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
+            }
+        }
+    }
+
+    fn sweep_chunk_mark_on_side_refactor(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
+        #[cfg(debug_assertions)]
+        let mut live_bytes = 0;
+
+        debug!("Check active chunk {:?}", chunk_start);
+        let mut chunk_is_empty = true;
+        let mut address = chunk_start;
+        let chunk_end = chunk_start + BYTES_IN_CHUNK;
+        // let mut page = conversions::page_align_down(address);
+        // let mut page_is_empty = true;
+        // let mut last_on_page_boundary = false;
+
+        debug_assert!(
+            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                == mark_bit_spec.log_bytes_in_region,
+            "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+        );
+
+        // For bulk xor'ing 128-bit vectors on architectures with vector instructions
+        // Each bit represents an object of LOG_MIN_OBJ_SIZE size
+        let bulk_load_size: usize =
+            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+
+        while address < chunk_end {
+            // We extensively tested the performance of the following if-statement and were
+            // surprised to note that in the case of newer AMD microarchitecures (>= Zen), some
+            // microarchitectural state/idiosyncrasies result in favourable cache placement/locality
+            // for the case where the conditionals (i.e. just the body of both the if-statements are left
+            // in the hot loop) which lead to a large performance speedup. Even more surprising was the
+            // revelation that the hot loop has worse cache placement/locality if the entire if-statement
+            // was commented out -- effectively meaning that [more work in the hot loop => better performance]
+            // which was counterintuitive to our beliefs.
+            //
+            // The performance tradeoffs on Intel and older AMD microarchitectures were as expected, i.e.
+            // wherein the performance of the hot loop decreased if more work was done in the loop.
+            // if address - page >= BYTES_IN_PAGE {
+            //     if page_is_empty {
+            //         unsafe { unset_page_mark_unsafe(page) };
+            //     }
+            //     page = conversions::page_align_down(address);
+            //     page_is_empty = !last_on_page_boundary;
+            //     last_on_page_boundary = false;
+            // }
+
+            let alloc_128: u128 =
+                unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+            let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
+
+            // Check if there are dead objects in the bulk loaded region
+            if alloc_128 ^ mark_128 != 0 {
+                let end = address + bulk_load_size;
+                // Linearly scan through region to free dead objects
+                while address < end {
+                    trace!("Checking address = {}, end = {}", address, end);
+                    // if address - page >= BYTES_IN_PAGE {
+                    //     if page_is_empty {
+                    //         unsafe { unset_page_mark_unsafe(page) };
+                    //     }
+                    //     page = conversions::page_align_down(address);
+                    //     page_is_empty = !last_on_page_boundary;
+                    //     last_on_page_boundary = false;
+                    // }
+
+                    // Check if the address is an object
+                    if unsafe { is_alloced_object_unsafe(address) } {
+                        let object = unsafe { address.to_object_reference() };
+                        let obj_start = VM::VMObjectModel::object_start_ref(object);
+
+                        let offset_malloc_bit = is_offset_malloc(obj_start);
+                        let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
+
+                        if !is_marked::<VM>(object, None) {
+                            // Dead object
+                            trace!("Object {} has been allocated but not marked", object);
+
+                            // Free object
+                            self.free(obj_start, bytes, offset_malloc_bit);
+                            trace!("free object {}", object);
+                            unsafe { unset_alloc_bit_unsafe(object) };
+                        } else {
+                            // Live object
+                            // This chunk and page are still active.
+                            // chunk_is_empty = false;
+                            // page_is_empty = false;
+
+                            // if address + bytes - page > BYTES_IN_PAGE {
+                            //     last_on_page_boundary = true;
+                            // }
+                        }
+
+                        // Skip to next object
+                        address += bytes;
+                    } else {
+                        // not an object
+                        address += VM::MIN_ALIGNMENT;
+                    }
+                }
+            } else {
+                // TODO we aren't actually accounting for the case where an object is alive and spans
+                // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
+                // if alloc_128 != 0 {
+                //     // For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero
+                //     chunk_is_empty = false;
+                //     page_is_empty = false;
+                // }
 
                 address += bulk_load_size;
             }
