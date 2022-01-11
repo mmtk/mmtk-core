@@ -160,6 +160,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.in_nursery_gc = !full_heap;
     }
 
+    pub fn prepare_for_re_scanning(&mut self, full_heap: bool) {
+        if full_heap {
+            self.mark_state = MARK_BIT - self.mark_state;
+        }
+    }
+
     pub fn release(&mut self, full_heap: bool) {
         self.sweep_large_pages(true);
         debug_assert!(self.treadmill.nursery_empty());
@@ -193,6 +199,30 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
+                trace.process_node(object);
+            }
+        }
+        object
+    }
+
+    // Allow nested-if for this function to make it clear that test_and_mark() is only executed
+    // for the outer condition is met.
+    #[allow(clippy::collapsible_if)]
+    pub fn re_trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced(object),
+            "{:x}: alloc bit not set",
+            object
+        );
+        let nursery_object = self.is_in_nursery(object);
+        if !self.in_nursery_gc || nursery_object {
+            // Note that test_and_mark() has side effects
+            if self.test_and_mark(object, self.mark_state) {
                 trace.process_node(object);
             }
         }

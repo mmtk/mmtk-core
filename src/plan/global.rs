@@ -885,10 +885,34 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.base.trace_object::<T>(trace, object)
     }
 
+    pub fn re_trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if self.immortal.in_space(object) {
+            trace!("trace_object: object in immortal space");
+            return self.immortal.trace_object(trace, object);
+        }
+        if self.los.in_space(object) {
+            trace!("trace_object: object in los");
+            return self.los.re_trace_object(trace, object);
+        }
+        self.base.trace_object::<T>(trace, object)
+    }
+
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
         self.base.prepare(tls, full_heap)
+    }
+
+    pub fn prepare_for_re_scanning(&mut self, tls: VMWorkerThread, full_heap: bool) {
+        VM::VMScanning::prepare_for_roots_re_scanning();
+        self.base.prepare_for_stack_scanning();
+        self.los.prepare_for_re_scanning(full_heap);
+        self.immortal.prepare();
+        self.base.prepare(tls, full_heap);
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {

@@ -7,7 +7,6 @@ use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ActivePlan;
-use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -39,12 +38,16 @@ pub struct UpdateReferences<VM: VMBinding> {
 
 impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
     #[inline]
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
-        VM::VMScanning::prepare_for_roots_re_scanning();
-        mmtk.plan.base().prepare_for_stack_scanning();
-        #[cfg(feature = "extreme_assertions")]
-        crate::util::edge_logger::reset();
+        {
+            #[allow(clippy::cast_ref_to_mut)]
+            let plan_mut: &mut crate::plan::global::CommonPlan<VM> =
+                unsafe { &mut *(mmtk.plan.common() as *const _ as *mut _) };
+            plan_mut.prepare_for_re_scanning(worker.tls, true);
+            #[cfg(feature = "extreme_assertions")]
+            crate::util::edge_logger::reset();
+        }
 
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
@@ -163,7 +166,9 @@ impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
                 .mc_space()
                 .trace_forward_object::<Self>(self, object)
         } else {
-            self.markcompact().common.trace_object::<Self>(self, object)
+            self.markcompact()
+                .common
+                .re_trace_object::<Self>(self, object)
         }
     }
 }
