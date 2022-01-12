@@ -15,14 +15,14 @@ pub mod alloc;
 pub mod constants;
 /// Calculation, conversion and rounding for memory related numbers.
 pub mod conversions;
+/// Linear scan through a heap range
+pub mod linear_scan;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.
 pub mod opaque_pointer;
 /// Reference processing implementation.
 pub mod reference_processor;
-/// Linear scan through a heap range
-pub mod linear_scan;
 
 // The following modules are only public in the mmtk crate. They should only be used in MMTk core.
 /// Alloc bit

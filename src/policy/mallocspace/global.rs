@@ -17,7 +17,6 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
-use crate::util::address::ByteSize;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
@@ -31,13 +30,7 @@ use std::sync::Mutex;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
-const ASSERT_ALLOCATION: bool = true;
-
-// We will do non-atomic load and save for alloc bit during sweeping. A chunk is only accessed by one thread at a time.
-// Non-atomic load/save for alloc bit will read/write one byte at a time, and we need to make sure a byte always represents addresses in the same chunk.
-// If any of the assertions fails, doing non-atomic load/save for alloc bit in sweeping can be incorrect.
-static_assertions::const_assert!(crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT.log_num_of_bits <= crate::util::constants::LOG_BITS_IN_BYTE as usize);
-static_assertions::const_assert!(BYTES_IN_CHUNK % (1 << (crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT.log_num_of_bits + crate::util::metadata::side_metadata::spec_defs::ALLOC_BIT.log_bytes_in_region - crate::util::constants::LOG_BITS_IN_BYTE as usize)) == 0);
+const ASSERT_ALLOCATION: bool = false;
 
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
@@ -404,7 +397,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         let completed_packets = self.completed_work_packets.fetch_add(1, Ordering::SeqCst) + 1;
-        self.work_live_bytes.fetch_add(live_bytes_in_the_chunk, Ordering::SeqCst);
+        self.work_live_bytes
+            .fetch_add(live_bytes_in_the_chunk, Ordering::SeqCst);
 
         if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
             trace!(
@@ -461,8 +455,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
                 // Linear scan through the bulk load region.
-                let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(address, end);
-                while let Some(object) = iter.next() {
+                let bulk_load_scan =
+                    crate::util::linear_scan::LinearScanIterator::<VM, false>::new(address, end);
+                for object in bulk_load_scan {
                     self.sweep_object(object, &mut empty_page_start);
 
                     // TODO: offset cursor (cursor was increased by ObjectModel::get_current_size(obj), we should move cursor by get_malloc_usable_size)
@@ -484,8 +479,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
         #[cfg(debug_assertions)]
         {
-            let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(chunk_start, chunk_end);
-            while let Some(object) = iter.next() {
+            let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(
+                chunk_start,
+                chunk_end,
+            );
+            for object in chunk_linear_scan {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
 
                 if ASSERT_ALLOCATION {
@@ -538,8 +536,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         let mut empty_page_start = Address::ZERO;
 
-        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
-        while let Some(object) = iter.next() {
+        let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(
+            chunk_start,
+            chunk_start + BYTES_IN_CHUNK,
+        );
+        for object in chunk_linear_scan {
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);

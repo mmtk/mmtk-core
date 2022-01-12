@@ -245,11 +245,11 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = start;
 
-        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
-        while let Some(obj) = iter.next() {
+        let linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
+        for obj in linear_scan {
             if Self::to_be_compacted(obj) {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
-                    + Self::HEADER_RESERVED_IN_BYTES;
+                let copied_size =
+                    VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
                 let align = VM::VMObjectModel::get_align_when_copied(obj);
                 let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
                 to = align_allocation_no_fill::<VM>(to, align, offset);
@@ -267,16 +267,16 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = end;
 
-        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
-        while let Some(obj) = iter.next() {
+        let linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
+        for obj in linear_scan {
             // clear the alloc bit
             alloc_bit::unset_addr_alloc_bit(obj.to_address());
 
             let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
             let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
             if forwarding_pointer != Address::ZERO {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
-                    + Self::HEADER_RESERVED_IN_BYTES;
+                let copied_size =
+                    VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
                 to = forwarding_pointer;
                 let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
                 // clear forwarding pointer

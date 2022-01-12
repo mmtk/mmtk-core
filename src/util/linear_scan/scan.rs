@@ -1,22 +1,22 @@
-use crate::util::conversions;
-use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::alloc_bit;
-use crate::vm::VMBinding;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::address::ByteOffset;
 use crate::vm::ObjectModel;
+use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
 pub struct LinearScanIterator<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> {
     start: Address,
     end: Address,
     cursor: Address,
-    _p: PhantomData<VM>
+    _p: PhantomData<VM>,
 }
 
-impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT> {
+impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool>
+    LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT>
+{
     pub fn new(start: Address, end: Address) -> Self {
+        // We should assert that alloc bit is used.
         debug_assert!(start < end);
         LinearScanIterator {
             start,
@@ -34,7 +34,9 @@ impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> LinearScanIterator<VM, AT
     // }
 }
 
-impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator for LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT> {
+impl<VM: VMBinding, const ATOMIC_LOAD_ALLOC_BIT: bool> std::iter::Iterator
+    for LinearScanIterator<VM, ATOMIC_LOAD_ALLOC_BIT>
+{
     type Item = ObjectReference;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
