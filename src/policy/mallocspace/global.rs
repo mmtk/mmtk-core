@@ -384,27 +384,27 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
                 // Linear scan through the bulk load region.
                 let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(address, end);
-                while let Some(obj) = iter.next() {
-                    let obj_start = VM::VMObjectModel::object_start_ref(obj);
+                while let Some(object) = iter.next() {
+                    let obj_start = VM::VMObjectModel::object_start_ref(object);
 
                     let offset_malloc_bit = is_offset_malloc(obj_start);
                     let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
 
-                    if !is_marked::<VM>(obj, None) {
+                    if !is_marked::<VM>(object, None) {
                         // Dead object
-                        trace!("Object {} has been allocated but not marked", obj);
+                        trace!("Object {} has been allocated but not marked", object);
 
                         // Free object
                         self.free(obj_start, bytes, offset_malloc_bit);
-                        trace!("free object {}", obj);
-                        unsafe { unset_alloc_bit_unsafe(obj) };
+                        trace!("free object {}", object);
+                        unsafe { unset_alloc_bit_unsafe(object) };
                     } else {
                         // Live object that we have marked
 
                         // Unset marks for free pages and update last_object_end
                         if !empty_page_start.is_zero() {
                             // unset marks for pages since last object
-                            let current_page = obj.to_address().align_down(BYTES_IN_PAGE);
+                            let current_page = object.to_address().align_down(BYTES_IN_PAGE);
 
                             let mut page = empty_page_start;
                             while page < current_page {
@@ -466,7 +466,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Clear all the mark bits
         bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
-        // If we never updated empty_memory_start, the entire chunk is empty.
+        // If we never updated empty_page_start, the entire chunk is empty.
         if empty_page_start.is_zero() {
             self.clean_up_empty_chunk(chunk_start);
         }
@@ -686,6 +686,101 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     self.active_bytes.load(Ordering::Relaxed)
                 );
 
+                debug_assert_eq!(
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
+            }
+        }
+    }
+
+    fn sweep_chunk_mark_in_header_linear_scan(&self, chunk_start: Address) {
+        #[cfg(debug_assertions)]
+        let mut live_bytes = 0;
+
+        debug!("Check active chunk {:?}", chunk_start);
+
+        // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
+        let mut empty_page_start = Address::ZERO;
+
+        let mut iter = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
+        while let Some(object) = iter.next() {
+            let obj_start = VM::VMObjectModel::object_start_ref(object);
+            let offset_malloc_bit = is_offset_malloc(obj_start);
+            let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
+
+            #[cfg(debug_assertions)]
+            if ASSERT_ALLOCATION {
+                debug_assert!(
+                    self.active_mem.lock().unwrap().contains_key(&obj_start),
+                    "Address {} with alloc bit is not in active_mem",
+                    obj_start
+                );
+                debug_assert_eq!(
+                    self.active_mem.lock().unwrap().get(&obj_start),
+                    Some(&bytes),
+                    "Address {} size in active_mem does not match the size from malloc_usable_size",
+                    obj_start
+                );
+            }
+
+            if !is_marked::<VM>(object, None) {
+                // Dead object
+                trace!("Object {} has been allocated but not marked", object);
+
+                // Free object
+                self.free(obj_start, bytes, offset_malloc_bit);
+                trace!("free object {}", object);
+                unsafe { unset_alloc_bit_unsafe(object) };
+            } else {
+                // Live object. Unset mark bit
+                unset_mark_bit::<VM>(object, None);
+
+                // Unset marks for free pages and update last_object_end
+                if !empty_page_start.is_zero() {
+                    // unset marks for pages since last object
+                    let current_page = object.to_address().align_down(BYTES_IN_PAGE);
+
+                    let mut page = empty_page_start;
+                    while page < current_page {
+                        unsafe { unset_page_mark_unsafe(page) };
+                        page += BYTES_IN_PAGE;
+                    }
+                }
+
+                // Update last_object_end
+                empty_page_start = (obj_start + bytes).align_up(BYTES_IN_PAGE);
+
+                #[cfg(debug_assertions)]
+                {
+                    // Accumulate live bytes
+                    live_bytes += bytes;
+                }
+            }
+        }
+
+        // If we never updated empty_page_start, the entire chunk is empty.
+        if empty_page_start.is_zero() {
+            self.clean_up_empty_chunk(chunk_start);
+        }
+
+        debug!(
+            "Used bytes after releasing: {}",
+            self.active_bytes.load(Ordering::SeqCst)
+        );
+
+        #[cfg(debug_assertions)]
+        {
+            let completed_packets = self.completed_work_packets.fetch_add(1, Ordering::SeqCst) + 1;
+            self.work_live_bytes.fetch_add(live_bytes, Ordering::SeqCst);
+
+            if completed_packets == self.total_work_packets.load(Ordering::Relaxed) {
+                trace!(
+                    "work_live_bytes = {}, live_bytes = {}, active_bytes = {}",
+                    self.work_live_bytes.load(Ordering::Relaxed),
+                    live_bytes,
+                    self.active_bytes.load(Ordering::Relaxed)
+                );
                 debug_assert_eq!(
                     self.work_live_bytes.load(Ordering::Relaxed),
                     self.active_bytes.load(Ordering::Relaxed)
