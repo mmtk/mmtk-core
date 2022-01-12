@@ -1,8 +1,10 @@
 use crate::plan::TransitiveClosure;
-use crate::plan::{AllocationSemantics, CopyContext};
+use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
@@ -182,12 +184,12 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure, C: CopyContext>(
+    pub fn trace_object<T: TransitiveClosure>(
         &self,
         trace: &mut T,
         object: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut C,
+        semantics: CopySemantics,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         debug_assert!(
@@ -215,8 +217,11 @@ impl<VM: VMBinding> CopySpace<VM> {
             new_object
         } else {
             trace!("... no it isn't. Copying");
-            let new_object =
-                object_forwarding::forward_object::<VM, _>(object, semantics, copy_context);
+            let new_object = object_forwarding::forward_object::<VM>(
+                object,
+                semantics,
+                worker.get_copy_context_mut(),
+            );
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
@@ -256,5 +261,53 @@ impl<VM: VMBinding> CopySpace<VM> {
             );
         }
         trace!("Unprotect {:x} {:x}", start, start + extent);
+    }
+}
+
+use crate::plan::Plan;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::BumpAllocator;
+use crate::util::opaque_pointer::VMWorkerThread;
+
+/// Copy allocator for CopySpace
+pub struct CopySpaceCopyContext<VM: VMBinding> {
+    copy_allocator: BumpAllocator<VM>,
+}
+
+impl<VM: VMBinding> PolicyCopyContext for CopySpaceCopyContext<VM> {
+    type VM = VM;
+
+    fn prepare(&mut self) {}
+
+    fn release(&mut self) {}
+
+    #[inline(always)]
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+    ) -> Address {
+        self.copy_allocator.alloc(bytes, align, offset)
+    }
+}
+
+impl<VM: VMBinding> CopySpaceCopyContext<VM> {
+    pub fn new(
+        tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        tospace: &'static CopySpace<VM>,
+    ) -> Self {
+        CopySpaceCopyContext {
+            copy_allocator: BumpAllocator::new(tls.0, tospace, plan),
+        }
+    }
+}
+
+impl<VM: VMBinding> CopySpaceCopyContext<VM> {
+    pub fn rebind(&mut self, space: &CopySpace<VM>) {
+        self.copy_allocator
+            .rebind(unsafe { &*{ space as *const _ } });
     }
 }

@@ -1,5 +1,4 @@
 use super::global::MarkCompact;
-use crate::plan::global::NoCopy;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
@@ -114,9 +113,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
                 .mc_space()
                 .trace_mark_object::<Self>(self, object)
         } else {
-            self.markcompact()
-                .common
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+            self.markcompact().common.trace_object::<Self>(self, object)
         }
     }
 }
@@ -166,9 +163,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
                 .mc_space()
                 .trace_forward_object::<Self>(self, object)
         } else {
-            self.markcompact()
-                .common
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+            self.markcompact().common.trace_object::<Self>(self, object)
         }
     }
 }
@@ -192,6 +187,5 @@ pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>)
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkCompact<VM>;
-    type CopyContextType = NoCopy<VM>;
     type ProcessEdgesWorkType = MarkingProcessEdges<VM>;
 }

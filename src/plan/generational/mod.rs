@@ -10,12 +10,9 @@ use crate::policy::space::Space;
 use crate::util::alloc::AllocatorSelector;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
-
-use std::sync::atomic::Ordering;
 
 use super::mutator_context::create_space_mapping;
 use super::mutator_context::ReservedAllocators;
@@ -41,11 +38,6 @@ pub(super) mod global;
 pub const ACTIVE_BARRIER: BarrierSelector = BarrierSelector::ObjectBarrier;
 /// Full heap collection as nursery GC.
 pub const FULL_NURSERY_GC: bool = false;
-/// Force object barrier never enters the slow-path.
-/// If enabled,
-///  - `FULL_NURSERY_GC` must be `true`.
-///  - `ACTIVE_BARRIER` must be `ObjectBarrier`.
-pub const NO_SLOW: bool = false;
 
 /// Constraints for generational plans. Each generational plan should overwrite based on this constant.
 pub const GEN_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -71,19 +63,6 @@ pub fn new_generational_global_metadata_specs<VM: VMBinding>() -> Vec<SideMetada
         vec![]
     };
     SideMetadataContext::new_global_specs(&specs)
-}
-
-/// Post copying operation for generational plans.
-pub fn generational_post_copy<VM: VMBinding>(
-    obj: ObjectReference,
-    _tib: Address,
-    _bytes: usize,
-    _semantics: AllocationSemantics,
-) {
-    crate::util::object_forwarding::clear_forwarding_bits::<VM>(obj);
-    if !NO_SLOW && ACTIVE_BARRIER == BarrierSelector::ObjectBarrier {
-        VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(obj, Ordering::SeqCst);
-    }
 }
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
