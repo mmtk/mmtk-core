@@ -369,9 +369,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let bulk_load_size: usize =
             128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
 
-        // The start of last empty memory. This will be updated during the sweeping, and always points to the end of last live objects,
-        // or the end of last live memory.
-        let mut empty_memory_start = Address::ZERO;
+        // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
+        let mut empty_page_start = Address::ZERO;
 
         while address < chunk_end {
             let alloc_128: u128 =
@@ -403,20 +402,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
                         // Live object that we have marked
 
                         // Unset marks for free pages and update last_object_end
-                        if !empty_memory_start.is_zero() {
+                        if !empty_page_start.is_zero() {
                             // unset marks for pages since last object
-                            let empty_page_start = empty_memory_start.align_up(BYTES_IN_PAGE);
-                            let empty_page_end = obj.to_address().align_down(BYTES_IN_PAGE);
+                            let current_page = obj.to_address().align_down(BYTES_IN_PAGE);
 
                             let mut page = empty_page_start;
-                            while page < empty_page_end {
+                            while page < current_page {
                                 unsafe { unset_page_mark_unsafe(page) };
                                 page += BYTES_IN_PAGE;
                             }
                         }
+
                         // Update last_object_end
-                        let this_obj_end = obj_start + bytes;
-                        empty_memory_start = this_obj_end;
+                        empty_page_start = (obj_start + bytes).align_up(BYTES_IN_PAGE);
                     }
 
                     // TODO: offset cursor (cursor was increased by ObjectModel::get_current_size(obj), we should move cursor by get_malloc_usable_size)
@@ -425,7 +423,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // TODO we aren't actually accounting for the case where an object is alive and spans
                 // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
                 if alloc_128 != 0 {
-                    empty_memory_start = address + bulk_load_size;
+                    empty_page_start = address + bulk_load_size;
                 }
             }
 
@@ -469,7 +467,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
 
         // If we never updated empty_memory_start, the entire chunk is empty.
-        if empty_memory_start.is_zero() {
+        if empty_page_start.is_zero() {
             self.clean_up_empty_chunk(chunk_start);
         }
 
