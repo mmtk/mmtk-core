@@ -17,7 +17,6 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
-use crate::util::linear_scan::{callback::LinearScanCallback, scan_region};
 use crate::util::address::ByteSize;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
