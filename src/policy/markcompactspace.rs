@@ -245,6 +245,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = start;
 
+        // TODO: the iterator's cursor is increased by ObjectModel::get_current_size(obj), and we should move cursor by get_current_size() + Self::HEADER_RESERVED_IN_BYTES.
+        // The difference may have some overhead.
         let linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
         for obj in linear_scan {
             if Self::to_be_compacted(obj) {
@@ -267,6 +269,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = end;
 
+        // TODO: the iterator's cursor is increased by ObjectModel::get_current_size(obj), and we should move cursor by get_current_size() + Self::HEADER_RESERVED_IN_BYTES.
+        // The difference may have some overhead.
         let linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, true>::new(start, end);
         for obj in linear_scan {
             // clear the alloc bit
