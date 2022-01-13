@@ -455,10 +455,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
                 // Linear scan through the bulk load region.
-                // TODO: the iterator's cursor is increased by ObjectModel::get_current_size(obj), and we should move cursor by get_malloc_usable_size().
-                // The difference may have some overhead.
-                let bulk_load_scan =
-                    crate::util::linear_scan::LinearScanIterator::<VM, false>::new(address, end);
+                let bulk_load_scan = crate::util::linear_scan::LinearScanIterator::<
+                    VM,
+                    MallocObjectSize<VM>,
+                    false,
+                >::new(address, end);
                 for object in bulk_load_scan {
                     self.sweep_object(object, &mut empty_page_start);
                 }
@@ -479,10 +480,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
         #[cfg(debug_assertions)]
         {
-            let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(
-                chunk_start,
-                chunk_end,
-            );
+            let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<
+                VM,
+                MallocObjectSize<VM>,
+                false,
+            >::new(chunk_start, chunk_end);
             for object in chunk_linear_scan {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
 
@@ -536,12 +538,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         let mut empty_page_start = Address::ZERO;
 
-        // TODO: the iterator's cursor is increased by ObjectModel::get_current_size(obj), and we should move cursor by get_malloc_usable_size().
-        // The difference may have some overhead.
-        let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<VM, false>::new(
-            chunk_start,
-            chunk_start + BYTES_IN_CHUNK,
-        );
+        let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<
+            VM,
+            MallocObjectSize<VM>,
+            false,
+        >::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
         for object in chunk_linear_scan {
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
@@ -580,5 +581,13 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         #[cfg(debug_assertions)]
         self.debug_sweep_chunk_done(live_bytes);
+    }
+}
+
+struct MallocObjectSize<VM>(PhantomData<VM>);
+impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObjectSize<VM> {
+    fn size(object: ObjectReference) -> usize {
+        let (_, _, bytes) = MallocSpace::<VM>::get_malloc_addr_size(object);
+        bytes
     }
 }
