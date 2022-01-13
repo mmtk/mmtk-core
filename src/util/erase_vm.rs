@@ -14,7 +14,7 @@
 
 macro_rules! define_erased_vm_ref {
     ($new_type: ident = $orig_type: ty) => {
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         pub struct $new_type<'a>(usize, PhantomData<&'a ()>);
         impl<'a> $new_type<'a> {
             #[inline(always)]

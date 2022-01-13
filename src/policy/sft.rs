@@ -63,7 +63,7 @@ pub trait SFT {
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
@@ -121,7 +121,7 @@ define_erased_vm_ref!(ImmixSpaceRef = super::immix::ImmixSpace<VM>);
 /// This enum helps dispatch SFT calls using a switch statement rather than virtual dispatch table.
 /// The benefit is that with a switch statement, the call is static, thus can be inlined, which
 /// may give us performance improvement.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SFTDispatch<'a> {
     ImmortalSpace(ImmortalSpaceRef<'a>),
     CopySpace(CopySpaceRef<'a>),
@@ -138,7 +138,7 @@ pub enum SFTDispatch<'a> {
 macro_rules! dispatch_sft_call {
     ($fn: tt = ($($args: tt: $tys: ty),*) -> $ret_ty: ty) => {
         #[inline(always)]
-        fn $fn<VM: VMBinding>(&self, $($args: $tys),*) -> $ret_ty {
+        pub fn $fn<VM: VMBinding>(&self, $($args: $tys),*) -> $ret_ty {
             match self {
                 SFTDispatch::ImmortalSpace(r) => r.as_ref::<VM>().$fn($($args),*),
                 SFTDispatch::CopySpace(r) => r.as_ref::<VM>().$fn($($args),*),
@@ -169,7 +169,7 @@ impl<'a> SFTDispatch<'a> {
 #[derive(Default)]
 pub struct SFTMap<'a> {
     /// SFT table for dynamic SFT pointer.
-    sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+    // sft: Vec<&'a (dyn SFT + Sync + 'static)>,
     /// SFT table for SFT dispatch enum.
     sft_dispatch: Vec<SFTDispatch<'a>>,
 }
@@ -182,7 +182,7 @@ static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
-            sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
+            // sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
             sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS],
         }
     }
@@ -197,18 +197,18 @@ impl<'a> SFTMap<'a> {
 
     /// Get the dyn SFT for the given address. Note that this returns a fat pointer for SFT,
     /// and dispatch on dyn SFT will be a dynamic dispatch.
-    pub fn get(&self, address: Address) -> &'a dyn SFT {
-        let res = self.sft[address.chunk_index()];
-        if DEBUG_SFT {
-            trace!(
-                "Get SFT for {} #{} = {}",
-                address,
-                address.chunk_index(),
-                res.name()
-            );
-        }
-        res
-    }
+    // pub fn get(&self, address: Address) -> &'a dyn SFT {
+    //     let res = self.sft[address.chunk_index()];
+    //     if DEBUG_SFT {
+    //         trace!(
+    //             "Get SFT for {} #{} = {}",
+    //             address,
+    //             address.chunk_index(),
+    //             res.name()
+    //         );
+    //     }
+    //     res
+    // }
 
     /// Get the SFTDispatch for the given address. Note that this returns an enum for the SFT,
     /// and dispatch on this is static. However, the caller needs to know the <VM> type parameter
@@ -217,15 +217,24 @@ impl<'a> SFTMap<'a> {
     #[allow(unused)]
     #[inline(always)]
     pub fn get_dispatch(&self, address: Address) -> SFTDispatch {
-        self.sft_dispatch[address.chunk_index()]
+        let res = self.sft_dispatch[address.chunk_index()];
+        if DEBUG_SFT {
+            trace!(
+                "Get SFT for {} #{} = {:?}",
+                address,
+                address.chunk_index(),
+                res,
+            );
+        }
+        res
     }
 
-    fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
+    fn log_update(&self, space: SFTDispatch, start: Address, bytes: usize) {
         debug!(
-            "Update SFT for [{}, {}) as {}",
+            "Update SFT for [{}, {}) as {:?}",
             start,
             start + bytes,
-            space.name()
+            space
         );
         let first = start.chunk_index();
         let last = conversions::chunk_align_up(start + bytes).chunk_index();
@@ -242,15 +251,15 @@ impl<'a> SFTMap<'a> {
         if log::log_enabled!(log::Level::Trace) {
             // print the entire SFT map
             const SPACE_PER_LINE: usize = 10;
-            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
-                let max = if i + SPACE_PER_LINE > self.sft.len() {
-                    self.sft.len()
+            for i in (0..self.sft_dispatch.len()).step_by(SPACE_PER_LINE) {
+                let max = if i + SPACE_PER_LINE > self.sft_dispatch.len() {
+                    self.sft_dispatch.len()
                 } else {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
-                trace!("Chunk {}: {}", i, space_names.join(","));
+                let spaces: Vec<String> = chunks.iter().map(|&x| format!("{:?}", self.sft_dispatch[x])).collect();
+                trace!("Chunk {}: {}", i, spaces.join(","));
             }
         }
     }
@@ -260,18 +269,17 @@ impl<'a> SFTMap<'a> {
     /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
     pub fn update(
         &self,
-        space: &(dyn SFT + Sync + 'static),
         dispatch: SFTDispatch,
         start: Address,
         bytes: usize,
     ) {
         if DEBUG_SFT {
-            self.log_update(space, start, bytes);
+            self.log_update(dispatch, start, bytes);
         }
         let first = start.chunk_index();
         let last = conversions::chunk_align_up(start + bytes).chunk_index();
         for chunk in first..last {
-            self.set(chunk, space, dispatch);
+            self.set(chunk, dispatch);
         }
         if DEBUG_SFT {
             self.trace_sft_map();
@@ -285,7 +293,6 @@ impl<'a> SFTMap<'a> {
         let chunk_idx = chunk_start.chunk_index();
         self.set(
             chunk_idx,
-            &EMPTY_SPACE_SFT,
             SFTDispatch::Empty(&EMPTY_SPACE_SFT),
         );
     }
@@ -295,12 +302,11 @@ impl<'a> SFTMap<'a> {
     pub fn clear_by_index(&self, chunk_idx: usize) {
         self.set(
             chunk_idx,
-            &EMPTY_SPACE_SFT,
             SFTDispatch::Empty(&EMPTY_SPACE_SFT),
         )
     }
 
-    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static), dispatch: SFTDispatch) {
+    fn set(&self, chunk: usize, dispatch: SFTDispatch) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -313,26 +319,26 @@ impl<'a> SFTMap<'a> {
         let self_mut = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
-            let old = self_mut.sft[chunk].name();
-            let new = sft.name();
+            let old = self_mut.sft_dispatch[chunk];
+            let new = dispatch;
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
             debug_assert!(
-                old == EMPTY_SFT_NAME || new == EMPTY_SFT_NAME || old == new,
-                "attempt to overwrite a non-empty chunk {} in SFT map (from {} to {})",
+                matches!(old, SFTDispatch::Empty(_)) || matches!(new, SFTDispatch::Empty(_)) || old == new,
+                "attempt to overwrite a non-empty chunk {} in SFT map (from {:?} to {:?})",
                 chunk,
                 old,
                 new
             );
         }
-        self_mut.sft[chunk] = sft;
+        // self_mut.sft[chunk] = sft;
         self_mut.sft_dispatch[chunk] = dispatch;
     }
 
-    pub fn is_in_space(&self, object: ObjectReference) -> bool {
-        if object.to_address().chunk_index() >= self.sft.len() {
+    pub fn is_in_space<VM: VMBinding>(&self, object: ObjectReference) -> bool {
+        if object.to_address().chunk_index() >= self.sft_dispatch.len() {
             return false;
         }
-        self.get(object.to_address()).is_mmtk_object(object)
+        self.get_dispatch(object.to_address()).is_mmtk_object::<VM>(object)
     }
 }

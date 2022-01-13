@@ -215,7 +215,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
-                crate::mmtk::SFT_MAP.update(self, self.as_dispatch(), address, actual_size);
+                crate::mmtk::SFT_MAP.update(self.as_dispatch(), address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 

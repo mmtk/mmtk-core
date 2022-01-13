@@ -300,7 +300,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     fn modify_check(&self, object: ObjectReference) {
         assert!(
-            !(self.base().gc_in_progress_proper() && object.is_movable()),
+            !(self.base().gc_in_progress_proper() && object.is_movable::<Self::VM>()),
             "GC modifying a potentially moving object via Java (i.e. not magic) obj= {}",
             object
         );

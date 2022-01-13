@@ -299,8 +299,8 @@ pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMut
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_live_object(object: ObjectReference) -> bool {
-    object.is_live()
+pub fn is_live_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    object.is_live::<VM>()
 }
 
 /// Is the object in the mapped memory? The runtime can use this function to check
@@ -308,8 +308,8 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_mapped_object(object: ObjectReference) -> bool {
-    object.is_mapped()
+pub fn is_mapped_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    object.is_mapped::<VM>()
 }
 
 /// Is the address in the mapped memory? The runtime can use this function to check

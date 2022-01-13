@@ -313,7 +313,7 @@ impl ReferenceProcessor {
             trace!("Processing reference: {:?}", reference);
         }
 
-        if !reference.is_live() {
+        if !reference.is_live::<VM>() {
             /*
              * Reference is currently unreachable but may get reachable by the
              * following trace. We postpone the decision.

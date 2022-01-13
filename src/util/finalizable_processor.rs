@@ -62,7 +62,7 @@ impl FinalizableProcessor {
             .collect::<Vec<ObjectReference>>()
         {
             trace!("Pop {:?} for finalization", reff);
-            if reff.is_live() {
+            if reff.is_live::<E::VM>() {
                 let res = FinalizableProcessor::get_forwarded_finalizable(e, reff);
                 trace!("{:?} is live, push {:?} back to candidates", reff, res);
                 self.candidates.push(res);

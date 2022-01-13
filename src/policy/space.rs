@@ -147,7 +147,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            SFT_MAP.update(self.as_sft(), self.as_dispatch(), start, bytes);
+            SFT_MAP.update(self.as_dispatch(), start, bytes);
         }
     }
 
@@ -166,7 +166,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             panic!("failed to mmap meta memory");
         }
         SFT_MAP.update(
-            self.as_sft(),
             self.as_dispatch(),
             self.common().start,
             self.common().extent,
@@ -394,7 +393,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
+            SFT_MAP.update(space.as_dispatch(), self.start, self.extent);
         }
     }
 

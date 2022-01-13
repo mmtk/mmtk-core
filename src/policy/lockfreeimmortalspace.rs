@@ -107,7 +107,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             panic!("failed to mmap meta memory");
         }
         SFT_MAP.update(
-            self.as_sft(),
             self.as_dispatch(),
             AVAILABLE_START,
             total_bytes,
