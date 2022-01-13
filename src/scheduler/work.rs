@@ -15,6 +15,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
     #[inline]
     fn do_work_with_stat(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         debug!("{}", std::any::type_name::<Self>());
+        debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
         let stat = worker
             .stat
             .measure_work(TypeId::of::<Self>(), type_name::<Self>(), mmtk);
