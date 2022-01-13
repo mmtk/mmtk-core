@@ -245,24 +245,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = start;
 
-        let linear_scan = crate::util::linear_scan::LinearScanIterator::<
-            VM,
-            MarkCompactObjectSize<VM>,
-            true,
-        >::new(start, end);
-        for obj in linear_scan {
-            if Self::to_be_compacted(obj) {
-                let copied_size =
-                    VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
-                let align = VM::VMObjectModel::get_align_when_copied(obj);
-                let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
-                to = align_allocation_no_fill::<VM>(to, align, offset);
-                let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
-                unsafe { forwarding_pointer_addr.store(to) }
-                to += copied_size;
-
-                // iter.offset_cursor(Self::HEADER_RESERVED_IN_BYTES as isize);
-            }
+        let linear_scan =
+            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+                start, end,
+            );
+        for obj in linear_scan.filter(|obj| Self::to_be_compacted(*obj)) {
+            let copied_size =
+                VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
+            let align = VM::VMObjectModel::get_align_when_copied(obj);
+            let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+            to = align_allocation_no_fill::<VM>(to, align, offset);
+            let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
+            unsafe { forwarding_pointer_addr.store(to) }
+            to += copied_size;
         }
     }
 
@@ -271,11 +266,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         let end = self.pr.cursor();
         let mut to = end;
 
-        let linear_scan = crate::util::linear_scan::LinearScanIterator::<
-            VM,
-            MarkCompactObjectSize<VM>,
-            true,
-        >::new(start, end);
+        let linear_scan =
+            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+                start, end,
+            );
         for obj in linear_scan {
             // clear the alloc bit
             alloc_bit::unset_addr_alloc_bit(obj.to_address());
@@ -300,8 +294,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 alloc_bit::set_alloc_bit(target);
                 to += copied_size
             }
-
-            // iter.offset_cursor(Self::HEADER_RESERVED_IN_BYTES as isize);
         }
 
         // reset the bump pointer

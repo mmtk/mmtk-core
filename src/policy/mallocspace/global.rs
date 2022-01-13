@@ -455,7 +455,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
                 // Linear scan through the bulk load region.
-                let bulk_load_scan = crate::util::linear_scan::LinearScanIterator::<
+                let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
                     VM,
                     MallocObjectSize<VM>,
                     false,
@@ -480,7 +480,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
         #[cfg(debug_assertions)]
         {
-            let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<
+            let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
                 VM,
                 MallocObjectSize<VM>,
                 false,
@@ -538,7 +538,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
         let mut empty_page_start = Address::ZERO;
 
-        let chunk_linear_scan = crate::util::linear_scan::LinearScanIterator::<
+        let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
             VM,
             MallocObjectSize<VM>,
             false,
