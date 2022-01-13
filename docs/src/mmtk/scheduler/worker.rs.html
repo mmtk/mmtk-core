@@ -147,14 +147,6 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
-<span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
-<span id="153">153</span>
-<span id="154">154</span>
-<span id="155">155</span>
-<span id="156">156</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::WorkerLocalStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -242,25 +234,17 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">scheduler</span>
     }
 
-    <span class="comment">// TODO: We should be able to remove this method. We can create the copy context without a proper tls.</span>
-    <span class="comment">// In init(), we set tls for the worker and for the copy context.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_local</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">copy</span>: <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">copy</span> <span class="op">=</span> <span class="ident">copy</span>;
-    }
-
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_copy_context_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copy</span>
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="ident">work</span>.<span class="ident">do_work</span>(<span class="self">self</span>, <span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">unwrap</span>());
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">run</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
+        <span class="self">self</span>.<span class="ident">copy</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::create_gc_worker_context</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
         <span class="self">self</span>.<span class="ident">mmtk</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mmtk</span>);
         <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="kw">loop</span> {

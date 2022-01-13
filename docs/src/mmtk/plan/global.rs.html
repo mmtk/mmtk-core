@@ -1033,7 +1033,7 @@
 }
 
 <span class="doccomment">/// Create thread local GC worker.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_gc_worker_context</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) -&gt; <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
