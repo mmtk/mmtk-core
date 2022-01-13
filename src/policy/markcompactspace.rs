@@ -303,6 +303,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
 struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
+    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
             + MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES

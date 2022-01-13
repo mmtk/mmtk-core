@@ -586,6 +586,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
 struct MallocObjectSize<VM>(PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObjectSize<VM> {
+    #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         let (_, _, bytes) = MallocSpace::<VM>::get_malloc_addr_size(object);
         bytes
