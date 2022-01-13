@@ -16,6 +16,13 @@ pub enum BarrierSelector {
     ObjectBarrier,
 }
 
+impl BarrierSelector {
+    pub const fn equals(&self, other: BarrierSelector) -> bool {
+        // cast enum to u8 then compare. Otherwise, we cannot do it in a const fn.
+        *self as u8 == other as u8
+    }
+}
+
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
 pub enum WriteTarget {
     Object(ObjectReference),
