@@ -18,7 +18,6 @@ pub use work_bucket::WorkBucketStage;
 
 mod worker;
 pub use worker::GCWorker;
-pub(crate) use worker::{GCWorkerLocal, GCWorkerLocalPtr};
 
 pub(crate) mod gc_work;
 pub use gc_work::ProcessEdgesWork;

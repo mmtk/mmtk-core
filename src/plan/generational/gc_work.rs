@@ -1,22 +1,18 @@
 use crate::plan::generational::global::Gen;
-use crate::plan::CopyContext;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::scheduler::GCWorkerLocal;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
 /// Process edges for a nursery GC. A generatinoal plan should use this type for a nursery GC.
-pub struct GenNurseryProcessEdges<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> {
+pub struct GenNurseryProcessEdges<VM: VMBinding> {
     gen: &'static Gen<VM>,
-    base: ProcessEdgesBase<GenNurseryProcessEdges<VM, C>>,
+    base: ProcessEdgesBase<GenNurseryProcessEdges<VM>>,
 }
 
-impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> ProcessEdgesWork
-    for GenNurseryProcessEdges<VM, C>
-{
+impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
     type VM = VM;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -29,8 +25,7 @@ impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> ProcessEdgesWork
         if object.is_null() {
             return object;
         }
-        self.gen
-            .trace_object_nursery(self, object, unsafe { self.worker().local::<C>() })
+        self.gen.trace_object_nursery(self, object, self.worker())
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {
@@ -41,18 +36,14 @@ impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> ProcessEdgesWork
     }
 }
 
-impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> Deref
-    for GenNurseryProcessEdges<VM, C>
-{
+impl<VM: VMBinding> Deref for GenNurseryProcessEdges<VM> {
     type Target = ProcessEdgesBase<Self>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding, C: CopyContext<VM = VM> + GCWorkerLocal> DerefMut
-    for GenNurseryProcessEdges<VM, C>
-{
+impl<VM: VMBinding> DerefMut for GenNurseryProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

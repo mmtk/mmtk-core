@@ -1,4 +1,3 @@
-use crate::plan::global::NoCopy;
 use crate::plan::global::Plan;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
@@ -40,9 +39,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
         if self.plan.ms_space().in_space(object) {
             self.plan.ms_space().trace_object::<Self>(self, object)
         } else {
-            self.plan
-                .common()
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+            self.plan.common().trace_object::<Self>(self, object)
         }
     }
 }
@@ -124,6 +121,5 @@ pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
-    type CopyContextType = NoCopy<VM>;
     type ProcessEdgesWorkType = MSProcessEdges<VM>;
 }

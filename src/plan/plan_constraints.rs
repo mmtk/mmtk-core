@@ -53,5 +53,7 @@ impl PlanConstraints {
     }
 }
 
+pub const DEFAULT_PLAN_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
+
 // Use 16 pages as the size limit for non-LOS objects to avoid copying large objects
 pub const MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN: usize = 16 << LOG_BYTES_IN_PAGE;

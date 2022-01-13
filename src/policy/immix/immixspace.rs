@@ -8,6 +8,7 @@ use crate::plan::ObjectsClosure;
 use crate::policy::sft::{ImmixSpaceRef, SFTDispatch, SFT};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -24,7 +25,7 @@ use crate::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
-    AllocationSemantics, CopyContext, MMTK,
+    MMTK,
 };
 use atomic::Ordering;
 use std::{
@@ -329,8 +330,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
+        semantics: CopySemantics,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
@@ -339,7 +340,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object
         );
         if Block::containing::<VM>(object).is_defrag_source() {
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, copy_context)
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker)
         } else {
             self.trace_object_without_moving(trace, object)
         }
@@ -374,9 +375,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
-        semantics: AllocationSemantics,
-        copy_context: &mut impl CopyContext,
+        semantics: CopySemantics,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
@@ -393,7 +395,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 #[cfg(feature = "global_alloc_bit")]
                 crate::util::alloc_bit::unset_alloc_bit(object);
-                ForwardingWord::forward_object::<VM, _>(object, semantics, copy_context)
+                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             if !super::MARK_LINE_AT_SCAN_TIME {
                 self.mark_lines(new_object);
@@ -597,6 +599,57 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
             {
                 self.immix_space.mark_lines(*object);
             }
+        }
+    }
+}
+
+use crate::plan::Plan;
+use crate::policy::copy_context::PolicyCopyContext;
+use crate::util::alloc::Allocator;
+use crate::util::alloc::ImmixAllocator;
+
+/// Immix copy allocator
+pub struct ImmixCopyContext<VM: VMBinding> {
+    copy_allocator: ImmixAllocator<VM>,
+    defrag_allocator: ImmixAllocator<VM>,
+}
+
+impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
+    type VM = VM;
+
+    fn prepare(&mut self) {
+        self.copy_allocator.reset();
+        self.defrag_allocator.reset();
+    }
+    fn release(&mut self) {
+        self.copy_allocator.reset();
+        self.defrag_allocator.reset();
+    }
+    #[inline(always)]
+    fn alloc_copy(
+        &mut self,
+        _original: ObjectReference,
+        bytes: usize,
+        align: usize,
+        offset: isize,
+    ) -> Address {
+        if self.defrag_allocator.immix_space().in_defrag() {
+            self.defrag_allocator.alloc(bytes, align, offset)
+        } else {
+            self.copy_allocator.alloc(bytes, align, offset)
+        }
+    }
+}
+
+impl<VM: VMBinding> ImmixCopyContext<VM> {
+    pub fn new(
+        tls: VMWorkerThread,
+        plan: &'static dyn Plan<VM = VM>,
+        space: &'static ImmixSpace<VM>,
+    ) -> Self {
+        ImmixCopyContext {
+            copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
+            defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
         }
     }
 }

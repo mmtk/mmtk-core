@@ -19,6 +19,8 @@ pub mod space;
 /// determined by the object's _type_, but rather, are determined by the _space_
 /// that the object is in.
 pub mod sft;
+/// Copy context defines the thread local copy allocator for copying policies.
+pub mod copy_context;
 
 pub mod copyspace;
 pub mod immix;

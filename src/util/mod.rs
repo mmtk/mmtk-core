@@ -15,6 +15,8 @@ pub mod alloc;
 pub mod constants;
 /// Calculation, conversion and rounding for memory related numbers.
 pub mod conversions;
+/// The copy allocators for a GC worker.
+pub mod copy;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.
