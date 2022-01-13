@@ -64,10 +64,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
-    }
-    fn as_dispatch(&self) -> SFTDispatch {
+    fn as_sft(&self) -> SFTDispatch {
         SFTDispatch::LockFreeImmortalSpace(LockFreeImmortalSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
@@ -107,7 +104,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             panic!("failed to mmap meta memory");
         }
         SFT_MAP.update(
-            self.as_dispatch(),
+            self.as_sft(),
             AVAILABLE_START,
             total_bytes,
         );

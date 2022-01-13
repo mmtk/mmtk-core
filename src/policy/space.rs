@@ -31,10 +31,7 @@ use downcast_rs::Downcast;
 
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
-    fn as_dispatch(&self) -> SFTDispatch {
-        unimplemented!()
-    }
+    fn as_sft(&self) -> SFTDispatch;
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
@@ -147,7 +144,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            SFT_MAP.update(self.as_dispatch(), start, bytes);
+            SFT_MAP.update(self.as_sft(), start, bytes);
         }
     }
 
@@ -166,7 +163,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             panic!("failed to mmap meta memory");
         }
         SFT_MAP.update(
-            self.as_dispatch(),
+            self.as_sft(),
             self.common().start,
             self.common().extent,
         );
@@ -393,7 +390,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_dispatch(), self.start, self.extent);
+            SFT_MAP.update(space.as_sft(), self.start, self.extent);
         }
     }
 

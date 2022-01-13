@@ -86,10 +86,7 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
         self
     }
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
-    }
-    fn as_dispatch(&self) -> SFTDispatch {
+    fn as_sft(&self) -> SFTDispatch {
         SFTDispatch::LargeObjectSpace(LargeObjectSpaceRef::new(self))
     }
     fn get_page_resource(&self) -> &dyn PageResource<VM> {

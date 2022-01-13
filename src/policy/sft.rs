@@ -133,7 +133,7 @@ pub enum SFTDispatch<'a> {
     Empty(&'a EmptySpaceSFT),
 }
 
-/// This macro defines a given function, which forwards the call to the space-specific implementation
+/// This macro defines a given function, which forwards the call to the SFT implementation
 /// depending on the enum type.
 macro_rules! dispatch_sft_call {
     ($fn: tt = ($($args: tt: $tys: ty),*) -> $ret_ty: ty) => {
@@ -168,10 +168,8 @@ impl<'a> SFTDispatch<'a> {
 
 #[derive(Default)]
 pub struct SFTMap<'a> {
-    /// SFT table for dynamic SFT pointer.
-    // sft: Vec<&'a (dyn SFT + Sync + 'static)>,
     /// SFT table for SFT dispatch enum.
-    sft_dispatch: Vec<SFTDispatch<'a>>,
+    sft: Vec<SFTDispatch<'a>>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
@@ -183,7 +181,7 @@ impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             // sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
-            sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS],
+            sft: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -217,7 +215,7 @@ impl<'a> SFTMap<'a> {
     #[allow(unused)]
     #[inline(always)]
     pub fn get_dispatch(&self, address: Address) -> SFTDispatch {
-        let res = self.sft_dispatch[address.chunk_index()];
+        let res = self.sft[address.chunk_index()];
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {:?}",
@@ -251,14 +249,14 @@ impl<'a> SFTMap<'a> {
         if log::log_enabled!(log::Level::Trace) {
             // print the entire SFT map
             const SPACE_PER_LINE: usize = 10;
-            for i in (0..self.sft_dispatch.len()).step_by(SPACE_PER_LINE) {
-                let max = if i + SPACE_PER_LINE > self.sft_dispatch.len() {
-                    self.sft_dispatch.len()
+            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
+                let max = if i + SPACE_PER_LINE > self.sft.len() {
+                    self.sft.len()
                 } else {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let spaces: Vec<String> = chunks.iter().map(|&x| format!("{:?}", self.sft_dispatch[x])).collect();
+                let spaces: Vec<String> = chunks.iter().map(|&x| format!("{:?}", self.sft[x])).collect();
                 trace!("Chunk {}: {}", i, spaces.join(","));
             }
         }
@@ -319,7 +317,7 @@ impl<'a> SFTMap<'a> {
         let self_mut = unsafe { self.mut_self() };
         // It is okay to set empty to valid, or set valid to empty. It is wrong if we overwrite a valid value with another valid value.
         if cfg!(debug_assertions) {
-            let old = self_mut.sft_dispatch[chunk];
+            let old = self_mut.sft[chunk];
             let new = dispatch;
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
@@ -332,11 +330,11 @@ impl<'a> SFTMap<'a> {
             );
         }
         // self_mut.sft[chunk] = sft;
-        self_mut.sft_dispatch[chunk] = dispatch;
+        self_mut.sft[chunk] = dispatch;
     }
 
     pub fn is_in_space<VM: VMBinding>(&self, object: ObjectReference) -> bool {
-        if object.to_address().chunk_index() >= self.sft_dispatch.len() {
+        if object.to_address().chunk_index() >= self.sft.len() {
             return false;
         }
         self.get_dispatch(object.to_address()).is_mmtk_object::<VM>(object)

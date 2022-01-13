@@ -59,11 +59,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         self
     }
 
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
-    }
-
-    fn as_dispatch(&self) -> SFTDispatch {
+    fn as_sft(&self) -> SFTDispatch {
         SFTDispatch::MarkCompactSpace(MarkCompactSpaceRef::new(self))
     }
 

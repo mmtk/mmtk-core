@@ -71,11 +71,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         self
     }
 
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
-    }
-
-    fn as_dispatch(&self) -> SFTDispatch {
+    fn as_sft(&self) -> SFTDispatch {
         SFTDispatch::CopySpace(CopySpaceRef::new(self))
     }
 

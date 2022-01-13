@@ -90,11 +90,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         self
     }
 
-    fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        self
-    }
-
-    fn as_dispatch(&self) -> SFTDispatch {
+    fn as_sft(&self) -> SFTDispatch {
         SFTDispatch::MallocSpace(MallocSpaceRef::new(self))
     }
 
@@ -215,7 +211,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
-                crate::mmtk::SFT_MAP.update(self.as_dispatch(), address, actual_size);
+                crate::mmtk::SFT_MAP.update(self.as_sft(), address, actual_size);
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
