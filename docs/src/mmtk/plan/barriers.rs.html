@@ -115,6 +115,13 @@
 <span id="114">114</span>
 <span id="115">115</span>
 <span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.</span>
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -131,6 +138,13 @@
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BarrierSelector</span> {
     <span class="ident">NoBarrier</span>,
     <span class="ident">ObjectBarrier</span>,
+}
+
+<span class="kw">impl</span> <span class="ident">BarrierSelector</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">equals</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">other</span>: <span class="ident">BarrierSelector</span>) -&gt; <span class="ident">bool</span> {
+        <span class="comment">// cast enum to u8 then compare. Otherwise, we cannot do it in a const fn.</span>
+        <span class="kw-2">*</span><span class="self">self</span> <span class="kw">as</span> <span class="ident">u8</span> <span class="op">==</span> <span class="ident">other</span> <span class="kw">as</span> <span class="ident">u8</span>
+    }
 }
 
 <span class="doccomment">/// For field writes in HotSpot, we cannot always get the source object pointer and the field address</span>

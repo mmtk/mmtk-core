@@ -239,11 +239,6 @@
 <span id="238">238</span>
 <span id="239">239</span>
 <span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::mem::MaybeUninit</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -349,14 +344,9 @@
         <span class="comment">// Clear forwarding bits.</span>
         <span class="ident">object_forwarding::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="comment">// If we are copying objects in mature space, we would need to mark the object as mature.</span>
-        <span class="kw">if</span> <span class="ident">semantics</span>.<span class="ident">is_mature</span>() {
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">constraints</span>.<span class="ident">needs_log_bit</span> {
-                <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)</span>
-                <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>
-                    .<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
-            } <span class="kw">else</span> {
-                <span class="macro">unimplemented!</span>(<span class="string">&quot;Mature copy is used but the plan does not use unlogged bit&quot;</span>);
-            }
+        <span class="kw">if</span> <span class="ident">semantics</span>.<span class="ident">is_mature</span>() <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">constraints</span>.<span class="ident">needs_log_bit</span> {
+            <span class="comment">// If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)</span>
+            <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>.<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
         }
         <span class="comment">// Policy specific post copy.</span>
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">config</span>.<span class="ident">copy_mapping</span>[<span class="ident">semantics</span>] {
