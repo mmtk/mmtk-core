@@ -1,9 +1,9 @@
+use crate::vm::VMBinding;
 use atomic_traits::Atomic;
 use std::fmt;
 use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
-use crate::vm::VMBinding;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::util::heap::layout::mmapper::Mmapper;
@@ -477,7 +477,9 @@ impl ObjectReference {
         if self.is_null() {
             false
         } else {
-            SFT_MAP.get_dispatch(Address(self.0)).is_reachable::<VM>(self)
+            SFT_MAP
+                .get_dispatch(Address(self.0))
+                .is_reachable::<VM>(self)
         }
     }
 
@@ -497,7 +499,9 @@ impl ObjectReference {
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     pub fn get_forwarded_object<VM: VMBinding>(self) -> Option<Self> {
-        SFT_MAP.get_dispatch(Address(self.0)).get_forwarded_object::<VM>(self)
+        SFT_MAP
+            .get_dispatch(Address(self.0))
+            .get_forwarded_object::<VM>(self)
     }
 
     pub fn is_mapped<VM: VMBinding>(self) -> bool {
@@ -505,8 +509,8 @@ impl ObjectReference {
     }
 
     #[cfg(feature = "sanity")]
-    pub fn is_sane(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_sane()
+    pub fn is_sane<VM: VMBinding>(self) -> bool {
+        SFT_MAP.get_dispatch(Address(self.0)).is_sane::<VM>()
     }
 }
 

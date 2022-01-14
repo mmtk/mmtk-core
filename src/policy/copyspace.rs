@@ -1,8 +1,8 @@
 use crate::plan::TransitiveClosure;
+use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::sft::{CopySpaceRef, SFTDispatch, SFT};
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
-use crate::policy::copy_context::PolicyCopyContext;
 use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::copy::*;

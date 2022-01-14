@@ -162,11 +162,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(
-            self.as_sft(),
-            self.common().start,
-            self.common().extent,
-        );
+        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper

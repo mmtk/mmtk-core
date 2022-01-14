@@ -57,7 +57,7 @@ pub extern "C" fn post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectRefere
 
 #[no_mangle]
 pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
-    !object.is_movable()
+    !object.is_movable::<DummyVM>()
 }
 
 #[no_mangle]
@@ -97,12 +97,12 @@ pub extern "C" fn total_bytes() -> usize {
 
 #[no_mangle]
 pub extern "C" fn is_live_object(object: ObjectReference) -> bool{
-    object.is_live()
+    object.is_live::<DummyVM>()
 }
 
 #[no_mangle]
 pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
-    object.is_mapped()
+    object.is_mapped::<DummyVM>()
 }
 
 #[no_mangle]

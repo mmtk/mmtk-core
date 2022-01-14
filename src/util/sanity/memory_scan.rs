@@ -1,7 +1,8 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::vm::VMBinding;
 
-pub fn scan_region() {
+pub fn scan_region<VM: VMBinding>() {
     loop {
         let mut buf = String::new();
         println!("start end <value>");
@@ -24,7 +25,7 @@ pub fn scan_region() {
                 if object.to_address() == unsafe { Address::from_usize(value) } {
                     println!("{} REF: {}", slot, object);
                 }
-            } else if !object.is_sane() {
+            } else if !object.is_sane::<VM>() {
                 println!("{} REF: {}", slot, object);
             }
             // FIXME steveb Consider VM-specific integrity check on reference.

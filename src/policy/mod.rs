@@ -13,14 +13,14 @@
 /// memory).
 pub mod space;
 
+/// Copy context defines the thread local copy allocator for copying policies.
+pub mod copy_context;
 /// Space funciton table captures functions that reflect _space-specific per-object
 /// semantics_.   These functions are implemented for each object via a special
 /// space-based dynamic/static dispatch mechanism where the semantics are _not_
 /// determined by the object's _type_, but rather, are determined by the _space_
 /// that the object is in.
 pub mod sft;
-/// Copy context defines the thread local copy allocator for copying policies.
-pub mod copy_context;
 
 pub mod copyspace;
 pub mod immix;

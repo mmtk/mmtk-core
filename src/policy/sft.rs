@@ -25,6 +25,9 @@ use std::marker::PhantomData;
 ///
 /// We use the SFT trait to simplify typing for Rust, so our table is a
 /// table of SFT rather than Space.
+///
+/// Each policy needs to implement SFT, and SFTDispatch needs to implement
+/// each method here and forward the call to each policy.
 pub trait SFT {
     /// The space name
     fn name(&self) -> &str;
@@ -67,6 +70,7 @@ const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 pub struct EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
+const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
@@ -107,7 +111,7 @@ impl SFT for EmptySpaceSFT {
 }
 
 // Create erased VM refs for each space type. In this way, we can store the refs in SFTMap (which
-// cannot have a generic type parameter for VM, as it is a global variable)
+// cannot have a generic type parameter for VM, as it is global)
 
 use crate::util::erase_vm::define_erased_vm_ref;
 define_erased_vm_ref!(ImmortalSpaceRef = super::immortalspace::ImmortalSpace<VM>);
@@ -130,11 +134,11 @@ pub enum SFTDispatch<'a> {
     MarkCompactSpace(MarkCompactSpaceRef<'a>),
     MallocSpace(MallocSpaceRef<'a>),
     ImmixSpace(ImmixSpaceRef<'a>),
-    Empty(&'a EmptySpaceSFT),
+    Empty,
 }
 
-/// This macro defines a given function, which forwards the call to the SFT implementation
-/// depending on the enum type.
+/// This macro defines a function with the given name and the given signature, and forwards the call to the
+/// SFT implementation depending on the enum type.
 macro_rules! dispatch_sft_call {
     ($fn: tt = ($($args: tt: $tys: ty),*) -> $ret_ty: ty) => {
         #[inline(always)]
@@ -147,12 +151,14 @@ macro_rules! dispatch_sft_call {
                 SFTDispatch::MarkCompactSpace(r) => r.as_ref::<VM>().$fn($($args),*),
                 SFTDispatch::MallocSpace(r) => r.as_ref::<VM>().$fn($($args),*),
                 SFTDispatch::ImmixSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::Empty(r) => r.$fn($($args),*),
+                SFTDispatch::Empty => EMPTY_SPACE_SFT.$fn($($args),*),
             }
         }
     }
 }
 
+// We should implement each method in SFT for SFTDispatch. However, we are not able to enforce this easily,
+// as each call in SFTDispatch needs a type parameter of <VM>.
 #[allow(unused)]
 impl<'a> SFTDispatch<'a> {
     dispatch_sft_call!(name = () -> &str);
@@ -175,13 +181,11 @@ pub struct SFTMap<'a> {
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl<'a> Sync for SFTMap<'a> {}
 
-static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
-
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             // sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
-            sft: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS],
+            sft: vec![SFTDispatch::Empty; MAX_CHUNKS],
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -192,21 +196,6 @@ impl<'a> SFTMap<'a> {
     unsafe fn mut_self(&self) -> &mut Self {
         &mut *(self as *const _ as *mut _)
     }
-
-    /// Get the dyn SFT for the given address. Note that this returns a fat pointer for SFT,
-    /// and dispatch on dyn SFT will be a dynamic dispatch.
-    // pub fn get(&self, address: Address) -> &'a dyn SFT {
-    //     let res = self.sft[address.chunk_index()];
-    //     if DEBUG_SFT {
-    //         trace!(
-    //             "Get SFT for {} #{} = {}",
-    //             address,
-    //             address.chunk_index(),
-    //             res.name()
-    //         );
-    //     }
-    //     res
-    // }
 
     /// Get the SFTDispatch for the given address. Note that this returns an enum for the SFT,
     /// and dispatch on this is static. However, the caller needs to know the <VM> type parameter
@@ -256,7 +245,10 @@ impl<'a> SFTMap<'a> {
                     i + SPACE_PER_LINE
                 };
                 let chunks: Vec<usize> = (i..max).collect();
-                let spaces: Vec<String> = chunks.iter().map(|&x| format!("{:?}", self.sft[x])).collect();
+                let spaces: Vec<String> = chunks
+                    .iter()
+                    .map(|&x| format!("{:?}", self.sft[x]))
+                    .collect();
                 trace!("Chunk {}: {}", i, spaces.join(","));
             }
         }
@@ -265,12 +257,7 @@ impl<'a> SFTMap<'a> {
     /// Update SFT map for the given address range.
     /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
     /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(
-        &self,
-        dispatch: SFTDispatch,
-        start: Address,
-        bytes: usize,
-    ) {
+    pub fn update(&self, dispatch: SFTDispatch, start: Address, bytes: usize) {
         if DEBUG_SFT {
             self.log_update(dispatch, start, bytes);
         }
@@ -289,19 +276,13 @@ impl<'a> SFTMap<'a> {
     pub fn clear(&self, chunk_start: Address) {
         assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
         let chunk_idx = chunk_start.chunk_index();
-        self.set(
-            chunk_idx,
-            SFTDispatch::Empty(&EMPTY_SPACE_SFT),
-        );
+        self.set(chunk_idx, SFTDispatch::Empty);
     }
 
     // Currently only used by 32 bits vm map
     #[allow(dead_code)]
     pub fn clear_by_index(&self, chunk_idx: usize) {
-        self.set(
-            chunk_idx,
-            SFTDispatch::Empty(&EMPTY_SPACE_SFT),
-        )
+        self.set(chunk_idx, SFTDispatch::Empty)
     }
 
     fn set(&self, chunk: usize, dispatch: SFTDispatch) {
@@ -322,7 +303,9 @@ impl<'a> SFTMap<'a> {
             // Allow overwriting the same SFT pointer. E.g., if we have set SFT map for a space, then ensure_mapped() is called on the same,
             // in which case, we still set SFT map again.
             debug_assert!(
-                matches!(old, SFTDispatch::Empty(_)) || matches!(new, SFTDispatch::Empty(_)) || old == new,
+                matches!(old, SFTDispatch::Empty)
+                    || matches!(new, SFTDispatch::Empty)
+                    || old == new,
                 "attempt to overwrite a non-empty chunk {} in SFT map (from {:?} to {:?})",
                 chunk,
                 old,
@@ -337,6 +320,7 @@ impl<'a> SFTMap<'a> {
         if object.to_address().chunk_index() >= self.sft.len() {
             return false;
         }
-        self.get_dispatch(object.to_address()).is_mmtk_object::<VM>(object)
+        self.get_dispatch(object.to_address())
+            .is_mmtk_object::<VM>(object)
     }
 }
