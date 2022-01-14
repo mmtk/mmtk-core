@@ -1,4 +1,4 @@
-use crate::mmtk::SFT_MAP;
+use crate::mmtk::get_sft_map;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
@@ -103,7 +103,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), AVAILABLE_START, total_bytes);
+        get_sft_map().update(self.as_sft(), AVAILABLE_START, total_bytes);
     }
 
     fn reserved_pages(&self) -> usize {

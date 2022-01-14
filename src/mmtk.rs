@@ -35,7 +35,14 @@ lazy_static! {
 
 use std::mem::MaybeUninit;
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-pub static mut SFT_MAP: MaybeUninit<SFTMap<'static>> = MaybeUninit::uninit();
+static mut SFT_MAP: MaybeUninit<SFTMap<'static>> = MaybeUninit::uninit();
+static SFT_MAP_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
+/// Get SFT map. SFT map is only usable after an MMTk instance is created (MMTK::new() is called).
+pub(crate) fn get_sft_map() -> &'static SFTMap<'static> {
+    debug_assert!(SFT_MAP_INITIALIZED.load(Ordering::SeqCst));
+    unsafe { SFT_MAP.assume_init_ref() }
+}
 
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
@@ -61,7 +68,15 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
-        unsafe { SFT_MAP = MaybeUninit::new(SFTMap::new()) };
+        // Make sure we only initialize SFT_MAP once.
+        if SFT_MAP_INITIALIZED
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            unsafe {
+                SFT_MAP = MaybeUninit::new(SFTMap::new());
+            };
+        }
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),

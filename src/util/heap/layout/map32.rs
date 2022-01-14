@@ -1,5 +1,5 @@
 use super::map::Map;
-use crate::mmtk::SFT_MAP;
+use crate::mmtk::get_sft_map;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
@@ -269,7 +269,7 @@ impl Map32 {
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
             self.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
-            unsafe { SFT_MAP.assume_init_ref() }.clear_by_index((chunk + offset) as usize);
+            get_sft_map().clear_by_index((chunk + offset) as usize);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }
         chunks as _

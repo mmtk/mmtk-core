@@ -4,7 +4,7 @@ use std::mem;
 use std::ops::*;
 use std::sync::atomic::Ordering;
 
-use crate::mmtk::{MMAPPER, SFT_MAP};
+use crate::mmtk::{get_sft_map, MMAPPER};
 use crate::util::heap::layout::mmapper::Mmapper;
 
 /// size in bytes
@@ -476,7 +476,7 @@ impl ObjectReference {
         if self.is_null() {
             false
         } else {
-            unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_reachable(self)
+            get_sft_map().get(Address(self.0)).is_reachable(self)
         }
     }
 
@@ -485,27 +485,29 @@ impl ObjectReference {
         if self.0 == 0 {
             false
         } else {
-            unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_live(self)
+            get_sft_map().get(Address(self.0)).is_live(self)
         }
     }
 
     pub fn is_movable(self) -> bool {
-        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_movable()
+        get_sft_map().get(Address(self.0)).is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     pub fn get_forwarded_object(self) -> Option<Self> {
-        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).get_forwarded_object(self)
+        get_sft_map()
+            .get(Address(self.0))
+            .get_forwarded_object(self)
     }
 
     pub fn is_mapped(self) -> bool {
-        unsafe { SFT_MAP.assume_init_ref() }.is_in_space(self)
+        get_sft_map().is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
-        unsafe { SFT_MAP.assume_init_ref() }.get(Address(self.0)).is_sane()
+        get_sft_map().get(Address(self.0)).is_sane()
     }
 }
 

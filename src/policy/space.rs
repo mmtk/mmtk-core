@@ -12,7 +12,7 @@ use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
-use crate::mmtk::SFT_MAP;
+use crate::mmtk::get_sft_map;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -382,7 +382,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), start, bytes);
+            get_sft_map().update(self.as_sft(), start, bytes);
         }
     }
 
@@ -400,7 +400,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.common().start, self.common().extent);
+        get_sft_map().update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -624,7 +624,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            unsafe { SFT_MAP.assume_init_ref() }.update(space.as_sft(), self.start, self.extent);
+            get_sft_map().update(space.as_sft(), self.start, self.extent);
         }
     }
 
