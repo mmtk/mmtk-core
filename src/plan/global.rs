@@ -95,7 +95,7 @@ pub fn create_plan<VM: VMBinding>(
 }
 
 /// Create thread local GC worker.
-pub fn create_worker<VM: VMBinding>(
+pub fn create_gc_worker_context<VM: VMBinding>(
     tls: VMWorkerThread,
     mmtk: &'static MMTK<VM>,
 ) -> GCWorkerCopyContext<VM> {
