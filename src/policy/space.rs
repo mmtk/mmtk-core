@@ -127,6 +127,7 @@ impl SFT for EmptySpaceSFT {
     }
 }
 
+#[derive(Default)]
 pub struct SFTMap<'a> {
     sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
@@ -153,7 +154,7 @@ impl<'a> SFTMap<'a> {
 
     pub fn get(&self, address: Address) -> &'a dyn SFT {
         debug_assert!(address.chunk_index() < MAX_CHUNKS);
-        let res = unsafe { self.sft.get_unchecked(address.chunk_index()) };
+        let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
@@ -162,7 +163,7 @@ impl<'a> SFTMap<'a> {
                 res.name()
             );
         }
-        *res
+        res
     }
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
@@ -256,7 +257,7 @@ impl<'a> SFTMap<'a> {
                 new
             );
         }
-        self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
+        self_mut.sft[chunk] = sft;
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
