@@ -7,6 +7,7 @@ pub const fn min_of_usize(a: usize, b: usize) -> usize {
     }
 }
 
+use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -16,14 +17,14 @@ use std::sync::atomic::Ordering;
 /// Unlike the `lazy_static!` which checks whether the static is initialized
 /// in every read, InitializeOnce has no extra check for reads.
 pub struct InitializeOnce<T> {
-    v: MaybeUninit<T>,
+    v: UnsafeCell<MaybeUninit<T>>,
     initialized: AtomicBool,
 }
 
 impl<T> InitializeOnce<T> {
     pub const fn new() -> Self {
         InitializeOnce {
-            v: MaybeUninit::uninit(),
+            v: UnsafeCell::new(MaybeUninit::uninit()),
             initialized: AtomicBool::new(false),
         }
     }
@@ -35,9 +36,7 @@ impl<T> InitializeOnce<T> {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
         {
-            // This is only called once.
-            let mut_self: &mut InitializeOnce<T> = unsafe { &mut *(self as *const _ as *mut _) };
-            mut_self.v.write(val);
+            unsafe { &mut *self.v.get() }.write(val);
         }
         debug_assert!(self.initialized.load(Ordering::SeqCst));
     }
@@ -47,7 +46,7 @@ impl<T> InitializeOnce<T> {
     pub fn get_ref(&self) -> &T {
         // We only assert in debug builds.
         debug_assert!(self.initialized.load(Ordering::SeqCst));
-        unsafe { self.v.assume_init_ref() }
+        unsafe { (&*self.v.get()).assume_init_ref() }
     }
 }
 
