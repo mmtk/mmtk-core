@@ -515,8 +515,8 @@ mod tests {
                     let options = Options::default();
                     // invalid value from env var, use default.
                     assert_eq!(
-                        &options.work_perf_events,
-                        &PerfEventOptions { events: vec![] }
+                        *options.work_perf_events,
+                        PerfEventOptions { events: vec![] }
                     );
                 },
                 || {
