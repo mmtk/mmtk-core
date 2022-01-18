@@ -71,7 +71,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
     assert!(heap_size > 0, "Invalid heap size");
     mmtk.plan
         .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
-    info!("Initialized MMTk with {:?}", mmtk.options.plan);
+    info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
 }
@@ -174,9 +174,7 @@ pub fn start_worker<VM: VMBinding>(
     worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
-    worker.init(tls);
-    worker.set_local(mmtk.plan.create_worker_local(tls));
-    worker.run(mmtk);
+    worker.run(tls, mmtk);
 }
 
 /// Initialize the scheduler and GC workers that are required for doing garbage collections.
@@ -193,7 +191,7 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
         !mmtk.plan.is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
-    mmtk.scheduler.initialize(mmtk.options.threads, mmtk, tls);
+    mmtk.scheduler.initialize(*mmtk.options.threads, mmtk, tls);
     VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 }
@@ -236,20 +234,25 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         .store(false, Ordering::SeqCst);
 }
 
-/// Process MMTk run-time options.
+/// Process MMTk run-time options. Returns true if the option is processed successfully.
+/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `name`: The name of the option.
 /// * `value`: The value of the option (as a string).
 pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) -> bool {
-    // Note that currently we cannot process options for setting plan,
-    // as we have set plan when creating an MMTK instance, and processing options is after creating on an instance.
-    // The only way to set plan is to use the env var 'MMTK_PLAN'.
-    // FIXME: We should remove this function, and ask for options when creating an MMTk instance.
-    assert!(name != "plan");
-
     unsafe { mmtk.options.process(name, value) }
+}
+
+/// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
+/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+pub fn process_bulk<VM: VMBinding>(mmtk: &'static MMTK<VM>, options: &str) -> bool {
+    unsafe { mmtk.options.process_bulk(options) }
 }
 
 /// Return used memory in bytes.
@@ -412,7 +415,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
 pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
-    if mmtk.options.no_finalizer {
+    if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
 
@@ -428,7 +431,7 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectRefer
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
-    if mmtk.options.no_finalizer {
+    if *mmtk.options.no_finalizer {
         warn!("get_object_for_finalization() is called when no_finalizer = true");
     }
 

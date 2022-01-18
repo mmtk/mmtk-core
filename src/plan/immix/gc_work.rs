@@ -143,9 +143,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
                 )
             }
         } else {
-            self.immix()
-                .common
-                .trace_object::<Self>(self, object)
+            self.immix().common.trace_object::<Self>(self, object)
         }
     }
 

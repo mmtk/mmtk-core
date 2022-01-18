@@ -12,7 +12,7 @@ use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::copy::GCWorkerCopyContext;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -65,29 +65,23 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &GENIMMIX_CONSTRAINTS
     }
 
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
-        use crate::util::copy::*;
-        use enum_map::enum_map;
-
-        GCWorkerCopyContext::new(
-            tls,
-            self,
-            CopyConfig {
-                copy_mapping: enum_map! {
-                    CopySemantics::PromoteMature => CopySelector::Immix(0),
-                    CopySemantics::Mature => CopySelector::Immix(0),
-                    _ => CopySelector::Unused,
-                },
-                space_mapping: vec![(CopySelector::Immix(0), &self.immix)],
-                constraints: &GENIMMIX_CONSTRAINTS,
-            },
-        )
-    }
-
     fn create_scan_work(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
         use crate::policy::immix::ScanObjectsAndMarkLines;
         use crate::scheduler::gc_work::MMTkProcessEdges;
         box ScanObjectsAndMarkLines::<MMTkProcessEdges<Self::VM>>::new(nodes, false, &self.immix)
+    }
+
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::PromoteMature => CopySelector::Immix(0),
+                CopySemantics::Mature => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![(CopySelector::Immix(0), &self.immix)],
+            constraints: &GENIMMIX_CONSTRAINTS,
+        }
     }
 
     fn last_collection_was_exhaustive(&self) -> bool {
@@ -138,7 +132,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 true,
                 self.base().cur_collection_attempts.load(Ordering::SeqCst),
                 self.base().is_user_triggered_collection(),
-                self.base().options.full_heap_system_gc,
+                *self.base().options.full_heap_system_gc,
             )
         } else {
             false

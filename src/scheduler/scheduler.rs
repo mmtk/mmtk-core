@@ -186,7 +186,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         // Finalization
-        if !plan.base().options.no_finalizer {
+        if !*plan.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             self.work_buckets[WorkBucketStage::RefClosure]
@@ -206,9 +206,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn initialize_worker(self: &Arc<Self>, tls: VMWorkerThread) {
+    pub fn initialize_coordinator_worker(self: &Arc<Self>, tls: VMWorkerThread) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
-        coordinator_worker.init(tls);
+        coordinator_worker.tls = tls;
     }
 
     pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {

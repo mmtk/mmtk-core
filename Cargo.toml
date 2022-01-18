@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -78,6 +78,9 @@ extreme_assertions = []
 
 # Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
 nogc_multi_space = []
+
+# To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
+work_packet_stats = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --

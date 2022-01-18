@@ -49,24 +49,19 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &SS_CONSTRAINTS
     }
 
-    fn create_worker_local(&'static self, tls: VMWorkerThread) -> GCWorkerCopyContext<VM> {
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
         use enum_map::enum_map;
-
-        GCWorkerCopyContext::new(
-            tls,
-            self,
-            CopyConfig {
-                copy_mapping: enum_map! {
-                    CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
-                    _ => CopySelector::Unused,
-                },
-                space_mapping: vec![
-                    // // The tospace argument doesn't matter, we will rebind before a GC anyway.
-                    (CopySelector::CopySpace(0), &self.copyspace0),
-                ],
-                constraints: &SS_CONSTRAINTS,
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
             },
-        )
+            space_mapping: vec![
+                // // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &self.copyspace0),
+            ],
+            constraints: &SS_CONSTRAINTS,
+        }
     }
 
     fn gc_init(

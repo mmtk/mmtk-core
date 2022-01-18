@@ -91,11 +91,44 @@ impl UnsafeOptionsWrapper {
     pub const fn new(o: Options) -> UnsafeOptionsWrapper {
         UnsafeOptionsWrapper(UnsafeCell::new(o))
     }
+
+    /// Process option. Returns true if the key and the value are both valid.
+    ///
+    /// Arguments:
+    /// * `name`: the name of the option. See `options!` for all the valid options.
+    /// * `value`: the value of the option in string format.
+    ///
     /// # Safety
     /// This method is not thread safe, as internally it acquires a mutable reference to self.
     /// It is supposed to be used by one thread during boot time.
     pub unsafe fn process(&self, name: &str, value: &str) -> bool {
-        (&mut *self.0.get()).set_from_camelcase_str(name, value)
+        (&mut *self.0.get()).set_from_command_line(name, value)
+    }
+
+    /// Bulk process options. Returns true if all the options are processed successfully.
+    /// This method returns false if the option string is invalid, or if it includes any invalid option.
+    ///
+    /// Arguments:
+    /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+    ///
+    /// # Safety
+    /// This method is not thread safe, as internally it acquires a mutable reference to self.
+    /// It is supposed to be used by one thread during boot time.
+    pub unsafe fn process_bulk(&self, options: &str) -> bool {
+        for opt in options.split_ascii_whitespace() {
+            let kv_pair: Vec<&str> = opt.split('=').collect();
+            if kv_pair.len() != 2 {
+                return false;
+            }
+
+            let key = kv_pair[0];
+            let val = kv_pair[1];
+            if !self.process(key, val) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 impl Deref for UnsafeOptionsWrapper {
@@ -105,20 +138,120 @@ impl Deref for UnsafeOptionsWrapper {
     }
 }
 
+#[cfg(test)]
+mod process_tests {
+    use super::*;
+    use crate::util::options::Options;
+    use crate::util::test_util::serial_test;
+
+    #[test]
+    fn test_process_valid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process("threads", "1") };
+            assert!(success);
+            assert_eq!(*options.threads, 1);
+        })
+    }
+
+    #[test]
+    fn test_process_invalid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let default_threads = *options.threads;
+            let success = unsafe { options.process("threads", "a") };
+            assert!(!success);
+            assert_eq!(*options.threads, default_threads);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_empty() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("") };
+            assert!(success);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_valid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("threads=1 stress_factor=42") };
+            assert!(success);
+            assert_eq!(*options.threads, 1);
+            assert_eq!(*options.stress_factor, 42);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_invalid() {
+        serial_test(|| {
+            let options = UnsafeOptionsWrapper::new(Options::default());
+            let success = unsafe { options.process_bulk("threads=a stress_factor=42") };
+            assert!(!success);
+        })
+    }
+}
+
 fn always_valid<T>(_: &T) -> bool {
     true
 }
 
+/// An MMTk option of a given type.
+/// This type allows us to store some metadata for the option. To get the value of an option,
+/// you can simply dereference it (for example, *options.threads).
+#[derive(Debug, Clone)]
+pub struct MMTKOption<T: Clone> {
+    pub value: T,
+
+    /// Can we set this option through env vars?
+    pub from_env_var: bool,
+    /// Can we set this option through command line options/API?
+    pub from_command_line: bool,
+}
+
+// Dereference an option to get its value.
+impl<T: Clone> std::ops::Deref for MMTKOption<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
 macro_rules! options {
-    ($($name:ident: $type:ty[$validator:expr] = $default:expr),*,) => [
-        options!($($name: $type[$validator] = $default),*);
+    // Verify whether we can set an option through env var or command line.
+    (@verify_set_from($self: expr, $key: expr, $verify_field: ident, $($name: ident),*)) => {
+        match $key {
+            $(stringify!($name) => { assert!($self.$name.$verify_field, "cannot set option {} (not {})", $key, stringify!($verify_field)) }),*
+            _ => panic!("Invalid Options key")
+        }
+    };
+
+    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*,) => [
+        options!($($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
     ];
-    ($($name:ident: $type:ty[$validator:expr] = $default:expr),*) => [
+    ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
         pub struct Options {
-            $(pub $name: $type),*
+            $(pub $name: MMTKOption<$type>),*
         }
         impl Options {
-            pub fn set_from_str(&mut self, s: &str, val: &str)->bool {
+            /// Set an option from env var
+            pub fn set_from_env_var(&mut self, s: &str, val: &str) -> bool {
+                options!(@verify_set_from(self, s, from_env_var, $($name),*));
+                self.set_inner(s, val)
+            }
+
+            /// Set an option from command line
+            pub fn set_from_command_line(&mut self, s: &str, val: &str) -> bool {
+                options!(@verify_set_from(self, s, from_command_line, $($name),*));
+                self.set_inner(s, val)
+            }
+
+            /// Set an option and run its validator for its value.
+            fn set_inner(&mut self, s: &str, val: &str)->bool {
                 match s {
                     // Parse the given value from str (by env vars or by calling process()) to the right type
                     $(stringify!($name) => if let Ok(ref val) = val.parse::<$type>() {
@@ -127,7 +260,7 @@ macro_rules! options {
                         let is_valid = validate_fn(val);
                         if is_valid {
                             // Only set value if valid.
-                            self.$name = val.clone();
+                            self.$name.value = val.clone();
                         } else {
                             eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", s, val);
                         }
@@ -143,7 +276,11 @@ macro_rules! options {
         impl Default for Options {
             fn default() -> Self {
                 let mut options = Options {
-                    $($name: $default),*
+                    $($name: MMTKOption {
+                        value: $default,
+                        from_env_var: $env_var,
+                        from_command_line: $command_line,
+                    }),*
                 };
 
                 // If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
@@ -154,7 +291,7 @@ macro_rules! options {
                     if let Some(rest_of_key) = key.strip_prefix(PREFIX) {
                         let lowercase: &str = &rest_of_key.to_lowercase();
                         match lowercase {
-                            $(stringify!($name) => { options.set_from_str(lowercase, &val); },)*
+                            $(stringify!($name) => { options.set_from_env_var(lowercase, &val); },)*
                             _ => {}
                         }
                     }
@@ -164,84 +301,61 @@ macro_rules! options {
         }
     ]
 }
+
+// Currently we allow all the options to be set by env var for the sake of convenience.
+// At some point, we may disallow this and most options can only be set by command line.
 options! {
     // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    plan:                  PlanSelector         [always_valid] = PlanSelector::NoGC,
+    plan:                  PlanSelector         [env_var: true, command_line: false] [always_valid] = PlanSelector::NoGC,
     // Number of GC threads.
-    threads:               usize                [|v: &usize| *v > 0]    = num_cpus::get(),
+    threads:               usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0]    = num_cpus::get(),
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
-    use_short_stack_scans: bool                 [always_valid] = false,
+    use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
-    use_return_barrier:    bool                 [always_valid] = false,
+    use_return_barrier:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should we eagerly finish sweeping at the start of a collection? (not supported)
-    eager_complete_sweep:  bool                 [always_valid] = false,
+    eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
-    ignore_system_g_c:     bool                 [always_valid] = false,
+    ignore_system_g_c:     bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    max_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
+    max_nursery:           usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
     // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    min_nursery:           usize                [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
+    min_nursery:           usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
     // Should a major GC be performed when a system GC is required?
-    full_heap_system_gc:   bool                 [always_valid] = false,
+    full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should we shrink/grow the heap to adjust to application working set? (not supported)
-    variable_size_heap:    bool                 [always_valid] = true,
+    variable_size_heap:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
     // Should finalization be disabled?
-    no_finalizer:          bool                 [always_valid] = false,
+    no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should reference type processing be disabled?
-    no_reference_types:    bool                 [always_valid] = false,
+    no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
-    nursery_zeroing:       NurseryZeroingOptions[always_valid] = NurseryZeroingOptions::Temporal,
+    nursery_zeroing:       NurseryZeroingOptions[env_var: true, command_line: true]  [always_valid] = NurseryZeroingOptions::Temporal,
     // How frequent (every X bytes) should we do a stress GC?
-    stress_factor:         usize                [always_valid] = DEFAULT_STRESS_FACTOR,
+    stress_factor:         usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
     // How frequent (every X bytes) should we run analysis (a STW event that collects data)
-    analysis_factor:       usize                [always_valid] = DEFAULT_STRESS_FACTOR,
+    analysis_factor:       usize                [env_var: true, command_line: true]  [always_valid] = DEFAULT_STRESS_FACTOR,
     // Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness
     // and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches
     // the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.
     // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     // factor (e.g. tens of metabytes).
-    precise_stress:        bool                 [always_valid] = true,
+    precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
     // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
-    vm_space_size:         usize                [|v: &usize| *v > 0]    = 0x7cc_cccc,
+    vm_space_size:         usize                [env_var: true, command_line: false] [|v: &usize| *v > 0]    = 0x7cc_cccc,
     // Perf events to measure
     // Semicolons are used to separate events
-    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
+    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    // For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
     //
-    // Measuring perf events for work packets
-    work_perf_events:       PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]},
+    // Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
+    // TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
+    work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
-    phase_perf_events:      PerfEventOptions     [always_valid] = PerfEventOptions {events: vec![]}
-}
-
-impl Options {
-    fn set_from_camelcase_str(&mut self, s: &str, val: &str) -> bool {
-        trace!("Trying to process option pair: ({}, {})", s, val);
-
-        let mut sr = String::with_capacity(s.len());
-        for c in s.chars() {
-            if c.is_uppercase() {
-                sr.push('_');
-                for c in c.to_lowercase() {
-                    sr.push(c);
-                }
-            } else {
-                sr.push(c)
-            }
-        }
-
-        let result = self.set_from_str(sr.as_str(), val);
-
-        trace!("Trying to process option pair: ({})", sr);
-
-        if result {
-            trace!("Validation passed");
-        } else {
-            trace!("Validation failed")
-        }
-        result
-    }
+    // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
+    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]}
 }
 
 #[cfg(test)]
@@ -255,7 +369,7 @@ mod tests {
     fn no_env_var() {
         serial_test(|| {
             let options = Options::default();
-            assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+            assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
         })
     }
 
@@ -267,7 +381,7 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "4096");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, 4096);
+                    assert_eq!(*options.stress_factor, 4096);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -285,8 +399,8 @@ mod tests {
                     std::env::set_var("MMTK_NO_FINALIZER", "true");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, 4096);
-                    assert!(options.no_finalizer);
+                    assert_eq!(*options.stress_factor, 4096);
+                    assert!(*options.no_finalizer);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -305,7 +419,7 @@ mod tests {
                     std::env::set_var("MMTK_STRESS_FACTOR", "abc");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_STRESS_FACTOR");
@@ -323,7 +437,7 @@ mod tests {
                     std::env::set_var("MMTK_ABC", "42");
 
                     let options = Options::default();
-                    assert_eq!(options.stress_factor, DEFAULT_STRESS_FACTOR);
+                    assert_eq!(*options.stress_factor, DEFAULT_STRESS_FACTOR);
                 },
                 || {
                     std::env::remove_var("MMTK_ABC");
@@ -337,14 +451,15 @@ mod tests {
         serial_test(|| {
             let options = Options::default();
             assert_eq!(
-                &options.work_perf_events,
-                &PerfEventOptions { events: vec![] }
+                *options.work_perf_events,
+                PerfEventOptions { events: vec![] }
             );
         })
     }
 
     #[test]
-    fn test_str_option_from_env_var() {
+    #[cfg(all(feature = "perf_counter", feature = "work_packet_stats"))]
+    fn test_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
@@ -352,8 +467,8 @@ mod tests {
 
                     let options = Options::default();
                     assert_eq!(
-                        &options.work_perf_events,
-                        &PerfEventOptions {
+                        *options.work_perf_events,
+                        PerfEventOptions {
                             events: vec![("PERF_COUNT_HW_CPU_CYCLES".into(), 0, -1)]
                         }
                     );
@@ -366,7 +481,8 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_str_option_from_env_var() {
+    #[cfg(all(feature = "perf_counter", feature = "work_packet_stats"))]
+    fn test_invalid_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
@@ -376,12 +492,35 @@ mod tests {
                     let options = Options::default();
                     // invalid value from env var, use default.
                     assert_eq!(
-                        &options.work_perf_events,
-                        &PerfEventOptions { events: vec![] }
+                        *options.work_perf_events,
+                        PerfEventOptions { events: vec![] }
                     );
                 },
                 || {
                     std::env::remove_var("MMTK_WORK_PERF_EVENTS");
+                },
+            )
+        })
+    }
+
+    #[test]
+    #[cfg(not(feature = "perf_counter"))]
+    fn test_phase_perf_events_option_without_feature() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
+                    std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(
+                        *options.work_perf_events,
+                        PerfEventOptions { events: vec![] }
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
                 },
             )
         })

@@ -1,6 +1,6 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
 use crate::util::alloc::allocator::align_allocation_no_fill;
-use crate::util::constants::{LOG_BYTES_IN_WORD, MIN_OBJECT_SIZE};
+use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
 use crate::util::metadata::load_metadata;
@@ -260,70 +260,71 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     pub fn calculate_forwarding_pointer(&self) {
-        let mut from = self.common.start;
-        let mut to = self.common.start;
+        let start = self.common.start;
         let end = self.pr.cursor();
-        while from < end {
-            if alloc_bit::is_alloced_object(from) {
-                let obj = unsafe { from.to_object_reference() };
-                let size =
-                    VM::VMObjectModel::get_current_size(obj) + Self::HEADER_RESERVED_IN_BYTES;
+        let mut to = start;
 
-                if Self::to_be_compacted(obj) {
-                    let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
-                        + Self::HEADER_RESERVED_IN_BYTES;
-                    let align = VM::VMObjectModel::get_align_when_copied(obj);
-                    let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
-                    to = align_allocation_no_fill::<VM>(to, align, offset);
-                    let forwarding_pointer_addr = from - GC_EXTRA_HEADER_BYTES;
-                    unsafe { forwarding_pointer_addr.store(to) }
-                    to += copied_size;
-                }
-                from += size;
-            } else {
-                from += MIN_OBJECT_SIZE
-            }
+        let linear_scan =
+            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+                start, end,
+            );
+        for obj in linear_scan.filter(|obj| Self::to_be_compacted(*obj)) {
+            let copied_size =
+                VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
+            let align = VM::VMObjectModel::get_align_when_copied(obj);
+            let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+            to = align_allocation_no_fill::<VM>(to, align, offset);
+            let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
+            unsafe { forwarding_pointer_addr.store(to) }
+            to += copied_size;
         }
     }
 
     pub fn compact(&self) {
-        let mut from = self.common.start;
+        let start = self.common.start;
         let end = self.pr.cursor();
         let mut to = end;
-        while from < end {
-            if alloc_bit::is_alloced_object(from) {
-                // clear the alloc bit
-                alloc_bit::unset_addr_alloc_bit(from);
-                let obj = unsafe { from.to_object_reference() };
-                let size =
-                    VM::VMObjectModel::get_current_size(obj) + Self::HEADER_RESERVED_IN_BYTES;
 
-                let forwarding_pointer_addr = from - GC_EXTRA_HEADER_BYTES;
-                let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
-                if forwarding_pointer != Address::ZERO {
-                    let copied_size = VM::VMObjectModel::get_size_when_copied(obj)
-                        + Self::HEADER_RESERVED_IN_BYTES;
-                    to = forwarding_pointer;
-                    let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
-                    // clear forwarding pointer
-                    crate::util::memory::zero(
-                        forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES - GC_EXTRA_HEADER_BYTES,
-                        GC_EXTRA_HEADER_BYTES,
-                    );
-                    crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
-                    // copy object
-                    let target = unsafe { object_addr.to_object_reference() };
-                    VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
-                    // update alloc_bit,
-                    alloc_bit::set_alloc_bit(target);
-                    to += copied_size
-                }
-                from += size;
-            } else {
-                from += MIN_OBJECT_SIZE
+        let linear_scan =
+            crate::util::linear_scan::ObjectIterator::<VM, MarkCompactObjectSize<VM>, true>::new(
+                start, end,
+            );
+        for obj in linear_scan {
+            // clear the alloc bit
+            alloc_bit::unset_addr_alloc_bit(obj.to_address());
+
+            let forwarding_pointer_addr = obj.to_address() - GC_EXTRA_HEADER_BYTES;
+            let forwarding_pointer = unsafe { forwarding_pointer_addr.load::<Address>() };
+            if forwarding_pointer != Address::ZERO {
+                let copied_size =
+                    VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
+                to = forwarding_pointer;
+                let object_addr = forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES;
+                // clear forwarding pointer
+                crate::util::memory::zero(
+                    forwarding_pointer + Self::HEADER_RESERVED_IN_BYTES - GC_EXTRA_HEADER_BYTES,
+                    GC_EXTRA_HEADER_BYTES,
+                );
+                crate::util::memory::zero(forwarding_pointer_addr, GC_EXTRA_HEADER_BYTES);
+                // copy object
+                let target = unsafe { object_addr.to_object_reference() };
+                VM::VMObjectModel::copy_to(obj, target, Address::ZERO);
+                // update alloc_bit,
+                alloc_bit::set_alloc_bit(target);
+                to += copied_size
             }
         }
+
         // reset the bump pointer
         self.pr.reset_cursor(to);
+    }
+}
+
+struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
+impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
+    #[inline(always)]
+    fn size(object: ObjectReference) -> usize {
+        VM::VMObjectModel::get_current_size(object)
+            + MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES
     }
 }

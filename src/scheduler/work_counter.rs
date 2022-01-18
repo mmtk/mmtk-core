@@ -34,7 +34,7 @@ impl<T: 'static + WorkCounter + Clone> WorkCounterClone for T {
 /// the same work packet and the types are not statically known.
 /// The overhead should be negligible compared with the cost of executing
 /// a work packet.
-pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug {
+pub(super) trait WorkCounter: WorkCounterClone + std::fmt::Debug + Send {
     // TODO: consolidate with crate::util::statistics::counter::Counter;
     /// Start the counter
     fn start(&mut self);

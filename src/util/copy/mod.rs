@@ -36,6 +36,16 @@ pub struct CopyConfig<VM: VMBinding> {
     pub constraints: &'static PlanConstraints,
 }
 
+impl<VM: VMBinding> Default for CopyConfig<VM> {
+    fn default() -> Self {
+        CopyConfig {
+            copy_mapping: EnumMap::default(),
+            space_mapping: vec![],
+            constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
+        }
+    }
+}
+
 /// The thread local struct for each GC worker for copying. Each GC worker should include
 /// one instance of this struct for copying operations.
 pub struct GCWorkerCopyContext<VM: VMBinding> {
@@ -65,11 +75,13 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         offset: isize,
         semantics: CopySemantics,
     ) -> Address {
-        // debug_assert!(
-        //     bytes <= self.config.constraints.max_non_los_default_alloc_bytes,
-        //     "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
-        //     bytes, self.config.constraints.max_non_los_default_alloc_bytes
-        // );
+        #[cfg(debug_assertions)]
+        if bytes > self.config.constraints.max_non_los_default_alloc_bytes {
+            warn!(
+                "Attempted to copy an object of {} bytes (> {}) which should be allocated with LOS and not be copied.",
+                bytes, self.config.constraints.max_non_los_default_alloc_bytes
+            );
+        }
         match self.config.copy_mapping[semantics] {
             CopySelector::CopySpace(index) => {
                 unsafe { self.copy[index as usize].assume_init_mut() }
@@ -91,14 +103,9 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         // Clear forwarding bits.
         object_forwarding::clear_forwarding_bits::<VM>(object);
         // If we are copying objects in mature space, we would need to mark the object as mature.
-        if semantics.is_mature() {
-            if self.config.constraints.needs_log_bit {
-                // If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
-                VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                    .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-            } else {
-                unimplemented!("Mature copy is used but the plan does not use unlogged bit");
-            }
+        if semantics.is_mature() && self.config.constraints.needs_log_bit {
+            // If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         // Policy specific post copy.
         match self.config.copy_mapping[semantics] {
@@ -190,11 +197,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         GCWorkerCopyContext {
             copy: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
-            config: CopyConfig {
-                copy_mapping: EnumMap::default(),
-                space_mapping: vec![],
-                constraints: &crate::plan::DEFAULT_PLAN_CONSTRAINTS,
-            },
+            config: CopyConfig::default(),
         }
     }
 }
