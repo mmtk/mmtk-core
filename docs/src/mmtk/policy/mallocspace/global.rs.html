@@ -593,70 +593,6 @@
 <span id="592">592</span>
 <span id="593">593</span>
 <span id="594">594</span>
-<span id="595">595</span>
-<span id="596">596</span>
-<span id="597">597</span>
-<span id="598">598</span>
-<span id="599">599</span>
-<span id="600">600</span>
-<span id="601">601</span>
-<span id="602">602</span>
-<span id="603">603</span>
-<span id="604">604</span>
-<span id="605">605</span>
-<span id="606">606</span>
-<span id="607">607</span>
-<span id="608">608</span>
-<span id="609">609</span>
-<span id="610">610</span>
-<span id="611">611</span>
-<span id="612">612</span>
-<span id="613">613</span>
-<span id="614">614</span>
-<span id="615">615</span>
-<span id="616">616</span>
-<span id="617">617</span>
-<span id="618">618</span>
-<span id="619">619</span>
-<span id="620">620</span>
-<span id="621">621</span>
-<span id="622">622</span>
-<span id="623">623</span>
-<span id="624">624</span>
-<span id="625">625</span>
-<span id="626">626</span>
-<span id="627">627</span>
-<span id="628">628</span>
-<span id="629">629</span>
-<span id="630">630</span>
-<span id="631">631</span>
-<span id="632">632</span>
-<span id="633">633</span>
-<span id="634">634</span>
-<span id="635">635</span>
-<span id="636">636</span>
-<span id="637">637</span>
-<span id="638">638</span>
-<span id="639">639</span>
-<span id="640">640</span>
-<span id="641">641</span>
-<span id="642">642</span>
-<span id="643">643</span>
-<span id="644">644</span>
-<span id="645">645</span>
-<span id="646">646</span>
-<span id="647">647</span>
-<span id="648">648</span>
-<span id="649">649</span>
-<span id="650">650</span>
-<span id="651">651</span>
-<span id="652">652</span>
-<span id="653">653</span>
-<span id="654">654</span>
-<span id="655">655</span>
-<span id="656">656</span>
-<span id="657">657</span>
-<span id="658">658</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
@@ -993,12 +929,84 @@
         }
     }
 
+    <span class="doccomment">/// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">get_malloc_addr_size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; (<span class="ident">Address</span>, <span class="ident">bool</span>, <span class="ident">usize</span>) {
+        <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">offset_malloc_bit</span> <span class="op">=</span> <span class="ident">is_offset_malloc</span>(<span class="ident">obj_start</span>);
+        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>);
+        (<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>, <span class="ident">bytes</span>)
+    }
+
     <span class="doccomment">/// Clean up for an empty chunk</span>
     <span class="kw">fn</span> <span class="ident">clean_up_empty_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
         <span class="comment">// Since the chunk mark metadata is a byte, we don&#39;t need synchronization</span>
         <span class="kw">unsafe</span> { <span class="ident">unset_chunk_mark_unsafe</span>(<span class="ident">chunk_start</span>) };
         <span class="comment">// Clear the SFT entry</span>
         <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">clear</span>(<span class="ident">chunk_start</span>);
+    }
+
+    <span class="doccomment">/// Sweep an object if it is dead, and unset page marks for empty pages before this object.</span>
+    <span class="doccomment">/// Return true if the object is swept.</span>
+    <span class="kw">fn</span> <span class="ident">sweep_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">empty_page_start</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">let</span> (<span class="ident">obj_start</span>, <span class="ident">offset_malloc</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_malloc_addr_size</span>(<span class="ident">object</span>);
+
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) {
+            <span class="comment">// Dead object</span>
+            <span class="macro">trace!</span>(<span class="string">&quot;Object {} has been allocated but not marked&quot;</span>, <span class="ident">object</span>);
+
+            <span class="comment">// Free object</span>
+            <span class="self">self</span>.<span class="ident">free</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, <span class="ident">object</span>);
+            <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>) };
+
+            <span class="bool-val">true</span>
+        } <span class="kw">else</span> {
+            <span class="comment">// Live object that we have marked</span>
+
+            <span class="comment">// Unset marks for free pages and update last_object_end</span>
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">empty_page_start</span>.<span class="ident">is_zero</span>() {
+                <span class="comment">// unset marks for pages since last object</span>
+                <span class="kw">let</span> <span class="ident">current_page</span> <span class="op">=</span> <span class="ident">object</span>.<span class="ident">to_address</span>().<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>);
+
+                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">empty_page_start</span>;
+                <span class="kw">while</span> <span class="ident">page</span> <span class="op">&lt;</span> <span class="ident">current_page</span> {
+                    <span class="kw">unsafe</span> { <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page</span>) };
+                    <span class="ident">page</span> <span class="op">+</span><span class="op">=</span> <span class="ident">BYTES_IN_PAGE</span>;
+                }
+            }
+
+            <span class="comment">// Update last_object_end</span>
+            <span class="kw-2">*</span><span class="ident">empty_page_start</span> <span class="op">=</span> (<span class="ident">obj_start</span> <span class="op">+</span> <span class="ident">bytes</span>).<span class="ident">align_up</span>(<span class="ident">BYTES_IN_PAGE</span>);
+
+            <span class="bool-val">false</span>
+        }
+    }
+
+    <span class="doccomment">/// Used when each chunk is done. Only called in debug build.</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">debug_sweep_chunk_done</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">live_bytes_in_the_chunk</span>: <span class="ident">usize</span>) {
+        <span class="macro">debug!</span>(
+            <span class="string">&quot;Used bytes after releasing: {}&quot;</span>,
+            <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+        );
+
+        <span class="kw">let</span> <span class="ident">completed_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">completed_work_packets</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">+</span> <span class="number">1</span>;
+        <span class="self">self</span>.<span class="ident">work_live_bytes</span>
+            .<span class="ident">fetch_add</span>(<span class="ident">live_bytes_in_the_chunk</span>, <span class="ident">Ordering::SeqCst</span>);
+
+        <span class="kw">if</span> <span class="ident">completed_packets</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">total_work_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
+            <span class="macro">trace!</span>(
+                <span class="string">&quot;work_live_bytes = {}, live_bytes = {}, active_bytes = {}&quot;</span>,
+                <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
+                <span class="ident">live_bytes_in_the_chunk</span>,
+                <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+            );
+            <span class="macro">debug_assert_eq!</span>(
+                <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
+                <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+            );
+        }
     }
 
     <span class="doccomment">/// This function is called when the mark bits sit on the side metadata.</span>
@@ -1013,12 +1021,8 @@
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">live_bytes</span> <span class="op">=</span> <span class="number">0</span>;
 
         <span class="macro">debug!</span>(<span class="string">&quot;Check active chunk {:?}&quot;</span>, <span class="ident">chunk_start</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">true</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">chunk_start</span>;
         <span class="kw">let</span> <span class="ident">chunk_end</span> <span class="op">=</span> <span class="ident">chunk_start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">address</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">false</span>;
 
         <span class="macro">debug_assert!</span>(
             <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">log_bytes_in_region</span>
@@ -1031,27 +1035,11 @@
         <span class="kw">let</span> <span class="ident">bulk_load_size</span>: <span class="ident">usize</span> <span class="op">=</span>
             <span class="number">128</span> <span class="op">*</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">log_bytes_in_region</span>);
 
-        <span class="kw">while</span> <span class="ident">address</span> <span class="op">&lt;</span> <span class="ident">chunk_end</span> {
-            <span class="comment">// We extensively tested the performance of the following if-statement and were</span>
-            <span class="comment">// surprised to note that in the case of newer AMD microarchitecures (&gt;= Zen), some</span>
-            <span class="comment">// microarchitectural state/idiosyncrasies result in favourable cache placement/locality</span>
-            <span class="comment">// for the case where the conditionals (i.e. just the body of both the if-statements are left</span>
-            <span class="comment">// in the hot loop) which lead to a large performance speedup. Even more surprising was the</span>
-            <span class="comment">// revelation that the hot loop has worse cache placement/locality if the entire if-statement</span>
-            <span class="comment">// was commented out -- effectively meaning that [more work in the hot loop =&gt; better performance]</span>
-            <span class="comment">// which was counterintuitive to our beliefs.</span>
-            <span class="comment">//</span>
-            <span class="comment">// The performance tradeoffs on Intel and older AMD microarchitectures were as expected, i.e.</span>
-            <span class="comment">// wherein the performance of the hot loop decreased if more work was done in the loop.</span>
-            <span class="kw">if</span> <span class="ident">address</span> <span class="op">-</span> <span class="ident">page</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BYTES_IN_PAGE</span> {
-                <span class="kw">if</span> <span class="ident">page_is_empty</span> {
-                    <span class="kw">unsafe</span> { <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page</span>) };
-                }
-                <span class="ident">page</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">address</span>);
-                <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="op">!</span><span class="ident">last_on_page_boundary</span>;
-                <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            }
+        <span class="comment">// The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">empty_page_start</span> <span class="op">=</span> <span class="ident">Address::ZERO</span>;
 
+        <span class="comment">// Scan the chunk by every &#39;bulk_load_size&#39; region.</span>
+        <span class="kw">while</span> <span class="ident">address</span> <span class="op">&lt;</span> <span class="ident">chunk_end</span> {
             <span class="kw">let</span> <span class="ident">alloc_128</span>: <span class="ident">u128</span> <span class="op">=</span>
                 <span class="kw">unsafe</span> { <span class="ident">load128</span>(<span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>, <span class="ident">address</span>) };
             <span class="kw">let</span> <span class="ident">mark_128</span>: <span class="ident">u128</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">load128</span>(<span class="kw-2">&amp;</span><span class="ident">mark_bit_spec</span>, <span class="ident">address</span>) };
@@ -1059,185 +1047,42 @@
             <span class="comment">// Check if there are dead objects in the bulk loaded region</span>
             <span class="kw">if</span> <span class="ident">alloc_128</span> <span class="op">^</span> <span class="ident">mark_128</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
                 <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">address</span> <span class="op">+</span> <span class="ident">bulk_load_size</span>;
-                <span class="comment">// Linearly scan through region to free dead objects</span>
-                <span class="kw">while</span> <span class="ident">address</span> <span class="op">&lt;</span> <span class="ident">end</span> {
-                    <span class="macro">trace!</span>(<span class="string">&quot;Checking address = {}, end = {}&quot;</span>, <span class="ident">address</span>, <span class="ident">end</span>);
-                    <span class="kw">if</span> <span class="ident">address</span> <span class="op">-</span> <span class="ident">page</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BYTES_IN_PAGE</span> {
-                        <span class="kw">if</span> <span class="ident">page_is_empty</span> {
-                            <span class="kw">unsafe</span> { <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page</span>) };
-                        }
-                        <span class="ident">page</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">address</span>);
-                        <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="op">!</span><span class="ident">last_on_page_boundary</span>;
-                        <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                    }
 
-                    <span class="comment">// Check if the address is an object</span>
-                    <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">is_alloced_object_unsafe</span>(<span class="ident">address</span>) } {
-                        <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">address</span>.<span class="ident">to_object_reference</span>() };
-                        <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
-
-                        <span class="kw">let</span> <span class="ident">offset_malloc_bit</span> <span class="op">=</span> <span class="ident">is_offset_malloc</span>(<span class="ident">obj_start</span>);
-                        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>);
-
-                        <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) {
-                            <span class="comment">// Dead object</span>
-                            <span class="macro">trace!</span>(<span class="string">&quot;Object {} has been allocated but not marked&quot;</span>, <span class="ident">object</span>);
-
-                            <span class="comment">// Free object</span>
-                            <span class="self">self</span>.<span class="ident">free</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc_bit</span>);
-                            <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, <span class="ident">object</span>);
-                            <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>) };
-                        } <span class="kw">else</span> {
-                            <span class="comment">// Live object</span>
-                            <span class="comment">// This chunk and page are still active.</span>
-                            <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                            <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
-
-                            <span class="kw">if</span> <span class="ident">address</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="ident">page</span> <span class="op">&gt;</span> <span class="ident">BYTES_IN_PAGE</span> {
-                                <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                            }
-                        }
-
-                        <span class="comment">// Skip to next object</span>
-                        <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
-                    } <span class="kw">else</span> {
-                        <span class="comment">// not an object</span>
-                        <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>;
-                    }
+                <span class="comment">// We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.</span>
+                <span class="comment">// Linear scan through the bulk load region.</span>
+                <span class="kw">let</span> <span class="ident">bulk_load_scan</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::ObjectIterator</span>::<span class="op">&lt;</span>
+                    <span class="ident">VM</span>,
+                    <span class="ident">MallocObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+                    <span class="bool-val">false</span>,
+                <span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">address</span>, <span class="ident">end</span>);
+                <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="ident">bulk_load_scan</span> {
+                    <span class="self">self</span>.<span class="ident">sweep_object</span>(<span class="ident">object</span>, <span class="kw-2">&amp;mut</span> <span class="ident">empty_page_start</span>);
                 }
             } <span class="kw">else</span> {
                 <span class="comment">// TODO we aren&#39;t actually accounting for the case where an object is alive and spans</span>
                 <span class="comment">// a page boundary as we don&#39;t know what the object sizes are/what is alive in the bulk region</span>
                 <span class="kw">if</span> <span class="ident">alloc_128</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-                    <span class="comment">// For the chunk/page to be alive, both alloc128 and mark128 values need to be not zero</span>
-                    <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                    <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
+                    <span class="ident">empty_page_start</span> <span class="op">=</span> <span class="ident">address</span> <span class="op">+</span> <span class="ident">bulk_load_size</span>;
                 }
-
-                <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bulk_load_size</span>;
             }
 
-            <span class="comment">// Aligning addresses to `bulk_load_size` just makes life easier, even though</span>
-            <span class="comment">// we may be processing some addresses twice</span>
-            <span class="ident">address</span> <span class="op">=</span> <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident">bulk_load_size</span>);
+            <span class="comment">// We have processed this bulk load memory. Step to the next.</span>
+            <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bulk_load_size</span>;
+            <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident">bulk_load_size</span>));
         }
 
+        <span class="comment">// Linear scan through the chunk, and add up all the live object sizes.</span>
+        <span class="comment">// We have to do this as a separate pass, as in the above pass, we did not go through all the live objects</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">chunk_start</span>;
-            <span class="kw">while</span> <span class="ident">address</span> <span class="op">&lt;</span> <span class="ident">chunk_end</span> {
-                <span class="comment">// Check if the address is an object</span>
-                <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">is_alloced_object_unsafe</span>(<span class="ident">address</span>) } {
-                    <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">address</span>.<span class="ident">to_object_reference</span>() };
-                    <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">chunk_linear_scan</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::ObjectIterator</span>::<span class="op">&lt;</span>
+                <span class="ident">VM</span>,
+                <span class="ident">MallocObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+                <span class="bool-val">false</span>,
+            <span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">chunk_start</span>, <span class="ident">chunk_end</span>);
+            <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="ident">chunk_linear_scan</span> {
+                <span class="kw">let</span> (<span class="ident">obj_start</span>, <span class="kw">_</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_malloc_addr_size</span>(<span class="ident">object</span>);
 
-                    <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">obj_start</span>, <span class="ident">is_offset_malloc</span>(<span class="ident">obj_start</span>));
-
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-                    <span class="kw">if</span> <span class="ident">ASSERT_ALLOCATION</span> {
-                        <span class="macro">debug_assert!</span>(
-                            <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>),
-                            <span class="string">&quot;Address {} with alloc bit is not in active_mem&quot;</span>,
-                            <span class="ident">obj_start</span>
-                        );
-                        <span class="macro">debug_assert_eq!</span>(
-                            <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>),
-                            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>),
-                            <span class="string">&quot;Address {} size in active_mem does not match the size from malloc_usable_size&quot;</span>,
-                            <span class="ident">obj_start</span>
-                        );
-                    }
-
-                    <span class="macro">assert!</span>(
-                        <span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>),
-                        <span class="string">&quot;Dead object = {} found after sweep&quot;</span>,
-                        <span class="ident">object</span>
-                    );
-
-                    <span class="ident">live_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
-
-                    <span class="comment">// Skip to next object</span>
-                    <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
-                } <span class="kw">else</span> {
-                    <span class="comment">// not an object</span>
-                    <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>;
-                }
-            }
-        }
-
-        <span class="comment">// Clear all the mark bits</span>
-        <span class="ident">bzero_metadata</span>(<span class="kw-2">&amp;</span><span class="ident">mark_bit_spec</span>, <span class="ident">chunk_start</span>, <span class="ident">BYTES_IN_CHUNK</span>);
-
-        <span class="kw">if</span> <span class="ident">chunk_is_empty</span> {
-            <span class="self">self</span>.<span class="ident">clean_up_empty_chunk</span>(<span class="ident">chunk_start</span>);
-        }
-
-        <span class="macro">debug!</span>(
-            <span class="string">&quot;Used bytes after releasing: {}&quot;</span>,
-            <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-        );
-
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-        {
-            <span class="kw">let</span> <span class="ident">completed_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">completed_work_packets</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">+</span> <span class="number">1</span>;
-            <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">fetch_add</span>(<span class="ident">live_bytes</span>, <span class="ident">Ordering::SeqCst</span>);
-
-            <span class="kw">if</span> <span class="ident">completed_packets</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">total_work_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
-                <span class="macro">trace!</span>(
-                    <span class="string">&quot;work_live_bytes = {}, live_bytes = {}, active_bytes = {}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="ident">live_bytes</span>,
-                    <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
-                );
-
-                <span class="macro">debug_assert_eq!</span>(
-                    <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
-                );
-            }
-        }
-    }
-
-    <span class="doccomment">/// This sweep function is called when the mark bit sits in the object header</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// This function uses non-atomic accesses to side metadata (although these</span>
-    <span class="doccomment">/// non-atomic accesses should not have race conditions associated with them)</span>
-    <span class="doccomment">/// as well as calls libc functions (`malloc_usable_size()`, `free()`)</span>
-    <span class="kw">fn</span> <span class="ident">sweep_chunk_mark_in_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">live_bytes</span> <span class="op">=</span> <span class="number">0</span>;
-
-        <span class="macro">debug!</span>(<span class="string">&quot;Check active chunk {:?}&quot;</span>, <span class="ident">chunk_start</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">chunk_start</span>;
-        <span class="kw">let</span> <span class="ident">chunk_end</span> <span class="op">=</span> <span class="ident">chunk_start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">address</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="bool-val">true</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">false</span>;
-
-        <span class="comment">// Linear scan through the chunk</span>
-        <span class="kw">while</span> <span class="ident">address</span> <span class="op">&lt;</span> <span class="ident">chunk_end</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;Check address {}&quot;</span>, <span class="ident">address</span>);
-
-            <span class="kw">if</span> <span class="ident">address</span> <span class="op">-</span> <span class="ident">page</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">BYTES_IN_PAGE</span> {
-                <span class="kw">if</span> <span class="ident">page_is_empty</span> {
-                    <span class="kw">unsafe</span> { <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page</span>) };
-                }
-                <span class="ident">page</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">address</span>);
-                <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="op">!</span><span class="ident">last_on_page_boundary</span>;
-                <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">false</span>;
-            }
-
-            <span class="comment">// Check if the address is an object</span>
-            <span class="kw">if</span> <span class="kw">unsafe</span> { <span class="ident">is_alloced_object_unsafe</span>(<span class="ident">address</span>) } {
-                <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">address</span>.<span class="ident">to_object_reference</span>() };
-                <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
-
-                <span class="kw">let</span> <span class="ident">offset_malloc_bit</span> <span class="op">=</span> <span class="ident">is_offset_malloc</span>(<span class="ident">obj_start</span>);
-
-                <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>);
-
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
                 <span class="kw">if</span> <span class="ident">ASSERT_ALLOCATION</span> {
                     <span class="macro">debug_assert!</span>(
                         <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>),
@@ -1252,67 +1097,94 @@
                     );
                 }
 
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) {
-                    <span class="comment">// Dead object</span>
-                    <span class="macro">trace!</span>(<span class="string">&quot;Object {} has been allocated but not marked&quot;</span>, <span class="ident">object</span>);
+                <span class="macro">debug_assert!</span>(
+                    <span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>),
+                    <span class="string">&quot;Dead object = {} found after sweep&quot;</span>,
+                    <span class="ident">object</span>
+                );
 
-                    <span class="comment">// Free object</span>
-                    <span class="self">self</span>.<span class="ident">free</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc_bit</span>);
-                    <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, <span class="ident">object</span>);
-                    <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>) };
-                } <span class="kw">else</span> {
-                    <span class="comment">// Live object. Unset mark bit</span>
-                    <span class="ident">unset_mark_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>);
-                    <span class="comment">// This chunk and page are still active.</span>
-                    <span class="ident">chunk_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
-                    <span class="ident">page_is_empty</span> <span class="op">=</span> <span class="bool-val">false</span>;
-
-                    <span class="kw">if</span> <span class="ident">address</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="ident">page</span> <span class="op">&gt;</span> <span class="ident">BYTES_IN_PAGE</span> {
-                        <span class="ident">last_on_page_boundary</span> <span class="op">=</span> <span class="bool-val">true</span>;
-                    }
-
-                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-                    {
-                        <span class="comment">// Accumulate live bytes</span>
-                        <span class="ident">live_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
-                    }
-                }
-
-                <span class="comment">// Skip to next object</span>
-                <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
-            } <span class="kw">else</span> {
-                <span class="comment">// not an object</span>
-                <span class="ident">address</span> <span class="op">+</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>;
+                <span class="ident">live_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
             }
         }
 
-        <span class="kw">if</span> <span class="ident">chunk_is_empty</span> {
+        <span class="comment">// Clear all the mark bits</span>
+        <span class="ident">bzero_metadata</span>(<span class="kw-2">&amp;</span><span class="ident">mark_bit_spec</span>, <span class="ident">chunk_start</span>, <span class="ident">BYTES_IN_CHUNK</span>);
+
+        <span class="comment">// If we never updated empty_page_start, the entire chunk is empty.</span>
+        <span class="kw">if</span> <span class="ident">empty_page_start</span>.<span class="ident">is_zero</span>() {
             <span class="self">self</span>.<span class="ident">clean_up_empty_chunk</span>(<span class="ident">chunk_start</span>);
         }
 
-        <span class="macro">debug!</span>(
-            <span class="string">&quot;Used bytes after releasing: {}&quot;</span>,
-            <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-        );
-
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-        {
-            <span class="kw">let</span> <span class="ident">completed_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">completed_work_packets</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">+</span> <span class="number">1</span>;
-            <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">fetch_add</span>(<span class="ident">live_bytes</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">debug_sweep_chunk_done</span>(<span class="ident">live_bytes</span>);
+    }
 
-            <span class="kw">if</span> <span class="ident">completed_packets</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">total_work_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
-                <span class="macro">trace!</span>(
-                    <span class="string">&quot;work_live_bytes = {}, live_bytes = {}, active_bytes = {}&quot;</span>,
-                    <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="ident">live_bytes</span>,
-                    <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+    <span class="doccomment">/// This sweep function is called when the mark bit sits in the object header</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function uses non-atomic accesses to side metadata (although these</span>
+    <span class="doccomment">/// non-atomic accesses should not have race conditions associated with them)</span>
+    <span class="doccomment">/// as well as calls libc functions (`malloc_usable_size()`, `free()`)</span>
+    <span class="kw">fn</span> <span class="ident">sweep_chunk_mark_in_header</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">live_bytes</span> <span class="op">=</span> <span class="number">0</span>;
+
+        <span class="macro">debug!</span>(<span class="string">&quot;Check active chunk {:?}&quot;</span>, <span class="ident">chunk_start</span>);
+
+        <span class="comment">// The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">empty_page_start</span> <span class="op">=</span> <span class="ident">Address::ZERO</span>;
+
+        <span class="kw">let</span> <span class="ident">chunk_linear_scan</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::ObjectIterator</span>::<span class="op">&lt;</span>
+            <span class="ident">VM</span>,
+            <span class="ident">MallocObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+            <span class="bool-val">false</span>,
+        <span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">chunk_start</span>, <span class="ident">chunk_start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>);
+        <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="ident">chunk_linear_scan</span> {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+            <span class="kw">if</span> <span class="ident">ASSERT_ALLOCATION</span> {
+                <span class="kw">let</span> (<span class="ident">obj_start</span>, <span class="kw">_</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_malloc_addr_size</span>(<span class="ident">object</span>);
+                <span class="macro">debug_assert!</span>(
+                    <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">contains_key</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>),
+                    <span class="string">&quot;Address {} with alloc bit is not in active_mem&quot;</span>,
+                    <span class="ident">obj_start</span>
                 );
                 <span class="macro">debug_assert_eq!</span>(
-                    <span class="self">self</span>.<span class="ident">work_live_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                    <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>)
+                    <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">obj_start</span>),
+                    <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">bytes</span>),
+                    <span class="string">&quot;Address {} size in active_mem does not match the size from malloc_usable_size&quot;</span>,
+                    <span class="ident">obj_start</span>
                 );
             }
+
+            <span class="kw">let</span> <span class="ident">live</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">sweep_object</span>(<span class="ident">object</span>, <span class="kw-2">&amp;mut</span> <span class="ident">empty_page_start</span>);
+            <span class="kw">if</span> <span class="ident">live</span> {
+                <span class="comment">// Live object. Unset mark bit</span>
+                <span class="ident">unset_mark_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>);
+
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+                {
+                    <span class="comment">// Accumulate live bytes</span>
+                    <span class="kw">let</span> (<span class="kw">_</span>, <span class="kw">_</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_malloc_addr_size</span>(<span class="ident">object</span>);
+                    <span class="ident">live_bytes</span> <span class="op">+</span><span class="op">=</span> <span class="ident">bytes</span>;
+                }
+            }
         }
+
+        <span class="comment">// If we never updated empty_page_start, the entire chunk is empty.</span>
+        <span class="kw">if</span> <span class="ident">empty_page_start</span>.<span class="ident">is_zero</span>() {
+            <span class="self">self</span>.<span class="ident">clean_up_empty_chunk</span>(<span class="ident">chunk_start</span>);
+        }
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+        <span class="self">self</span>.<span class="ident">debug_sweep_chunk_done</span>(<span class="ident">live_bytes</span>);
+    }
+}
+
+<span class="kw">struct</span> <span class="ident">MallocObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::LinearScanObjectSize</span> <span class="kw">for</span> <span class="ident">MallocObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
+        <span class="kw">let</span> (<span class="kw">_</span>, <span class="kw">_</span>, <span class="ident">bytes</span>) <span class="op">=</span> <span class="ident">MallocSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::get_malloc_addr_size</span>(<span class="ident">object</span>);
+        <span class="ident">bytes</span>
     }
 }
 </code></pre></div>

@@ -309,9 +309,10 @@
 <span id="308">308</span>
 <span id="309">309</span>
 <span id="310">310</span>
+<span id="311">311</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SpaceOptions</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::{<span class="ident">LOG_BYTES_IN_WORD</span>, <span class="ident">MIN_OBJECT_SIZE</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_WORD</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">HeapMeta</span>, <span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::load_metadata</span>;
@@ -552,71 +553,72 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">calculate_forwarding_pointer</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">from</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>;
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>;
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">cursor</span>();
-        <span class="kw">while</span> <span class="ident">from</span> <span class="op">&lt;</span> <span class="ident">end</span> {
-            <span class="kw">if</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">from</span>) {
-                <span class="kw">let</span> <span class="ident">obj</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">from</span>.<span class="ident">to_object_reference</span>() };
-                <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span>
-                    <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">obj</span>) <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to</span> <span class="op">=</span> <span class="ident">start</span>;
 
-                <span class="kw">if</span> <span class="ident"><span class="self">Self</span>::to_be_compacted</span>(<span class="ident">obj</span>) {
-                    <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>)
-                        <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
-                    <span class="kw">let</span> <span class="ident">align</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_when_copied</span>(<span class="ident">obj</span>);
-                    <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_offset_when_copied</span>(<span class="ident">obj</span>);
-                    <span class="ident">to</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">to</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-                    <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">from</span> <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
-                    <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">store</span>(<span class="ident">to</span>) }
-                    <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>;
-                }
-                <span class="ident">from</span> <span class="op">+</span><span class="op">=</span> <span class="ident">size</span>;
-            } <span class="kw">else</span> {
-                <span class="ident">from</span> <span class="op">+</span><span class="op">=</span> <span class="ident">MIN_OBJECT_SIZE</span>
-            }
+        <span class="kw">let</span> <span class="ident">linear_scan</span> <span class="op">=</span>
+            <span class="ident"><span class="kw">crate</span>::util::linear_scan::ObjectIterator</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">MarkCompactObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="bool-val">true</span><span class="op">&gt;</span><span class="ident">::new</span>(
+                <span class="ident">start</span>, <span class="ident">end</span>,
+            );
+        <span class="kw">for</span> <span class="ident">obj</span> <span class="kw">in</span> <span class="ident">linear_scan</span>.<span class="ident">filter</span>(<span class="op">|</span><span class="ident">obj</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::to_be_compacted</span>(<span class="kw-2">*</span><span class="ident">obj</span>)) {
+            <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span>
+                <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>) <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
+            <span class="kw">let</span> <span class="ident">align</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_when_copied</span>(<span class="ident">obj</span>);
+            <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_offset_when_copied</span>(<span class="ident">obj</span>);
+            <span class="ident">to</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">to</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
+            <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
+            <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">store</span>(<span class="ident">to</span>) }
+            <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>;
         }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compact</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">from</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>;
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>;
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">cursor</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to</span> <span class="op">=</span> <span class="ident">end</span>;
-        <span class="kw">while</span> <span class="ident">from</span> <span class="op">&lt;</span> <span class="ident">end</span> {
-            <span class="kw">if</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">from</span>) {
-                <span class="comment">// clear the alloc bit</span>
-                <span class="ident">alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">from</span>);
-                <span class="kw">let</span> <span class="ident">obj</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">from</span>.<span class="ident">to_object_reference</span>() };
-                <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span>
-                    <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">obj</span>) <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
 
-                <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">from</span> <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
-                <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>() };
-                <span class="kw">if</span> <span class="ident">forwarding_pointer</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Address::ZERO</span> {
-                    <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>)
-                        <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
-                    <span class="ident">to</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span>;
-                    <span class="kw">let</span> <span class="ident">object_addr</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
-                    <span class="comment">// clear forwarding pointer</span>
-                    <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(
-                        <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span> <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
-                        <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
-                    );
-                    <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">forwarding_pointer_addr</span>, <span class="ident">GC_EXTRA_HEADER_BYTES</span>);
-                    <span class="comment">// copy object</span>
-                    <span class="kw">let</span> <span class="ident">target</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">object_addr</span>.<span class="ident">to_object_reference</span>() };
-                    <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">target</span>, <span class="ident">Address::ZERO</span>);
-                    <span class="comment">// update alloc_bit,</span>
-                    <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">target</span>);
-                    <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>
-                }
-                <span class="ident">from</span> <span class="op">+</span><span class="op">=</span> <span class="ident">size</span>;
-            } <span class="kw">else</span> {
-                <span class="ident">from</span> <span class="op">+</span><span class="op">=</span> <span class="ident">MIN_OBJECT_SIZE</span>
+        <span class="kw">let</span> <span class="ident">linear_scan</span> <span class="op">=</span>
+            <span class="ident"><span class="kw">crate</span>::util::linear_scan::ObjectIterator</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">MarkCompactObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="bool-val">true</span><span class="op">&gt;</span><span class="ident">::new</span>(
+                <span class="ident">start</span>, <span class="ident">end</span>,
+            );
+        <span class="kw">for</span> <span class="ident">obj</span> <span class="kw">in</span> <span class="ident">linear_scan</span> {
+            <span class="comment">// clear the alloc bit</span>
+            <span class="ident">alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">obj</span>.<span class="ident">to_address</span>());
+
+            <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
+            <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>() };
+            <span class="kw">if</span> <span class="ident">forwarding_pointer</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Address::ZERO</span> {
+                <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span>
+                    <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>) <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
+                <span class="ident">to</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span>;
+                <span class="kw">let</span> <span class="ident">object_addr</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
+                <span class="comment">// clear forwarding pointer</span>
+                <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(
+                    <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span> <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
+                    <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
+                );
+                <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">forwarding_pointer_addr</span>, <span class="ident">GC_EXTRA_HEADER_BYTES</span>);
+                <span class="comment">// copy object</span>
+                <span class="kw">let</span> <span class="ident">target</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">object_addr</span>.<span class="ident">to_object_reference</span>() };
+                <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">target</span>, <span class="ident">Address::ZERO</span>);
+                <span class="comment">// update alloc_bit,</span>
+                <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">target</span>);
+                <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>
             }
         }
+
         <span class="comment">// reset the bump pointer</span>
         <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">reset_cursor</span>(<span class="ident">to</span>);
+    }
+}
+
+<span class="kw">struct</span> <span class="ident">MarkCompactObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">std::marker::PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::LinearScanObjectSize</span> <span class="kw">for</span> <span class="ident">MarkCompactObjectSize</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
+        <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">object</span>)
+            <span class="op">+</span> <span class="ident">MarkCompactSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::HEADER_RESERVED_IN_BYTES</span>
     }
 }
 </code></pre></div>
