@@ -38,9 +38,27 @@
 <span id="37">37</span>
 <span id="38">38</span>
 <span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident">std::any</span>::{<span class="ident">type_name</span>, <span class="ident">TypeId</span>};
 
 <span class="doccomment">/// A special kind of work that will execute on the coordinator (i.e. controller) thread</span>
@@ -51,15 +69,31 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
+    <span class="doccomment">/// Define the work for this packet. However, this is not supposed to be called directly.</span>
+    <span class="doccomment">/// Usually `do_work_with_stat()` should be used.</span>
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+
+    <span class="doccomment">/// Do work and collect statistics. This internally calls `do_work()`. In most cases,</span>
+    <span class="doccomment">/// this should be called rather than `do_work()` so that MMTk can correctly collect</span>
+    <span class="doccomment">/// statistics for the work packets.</span>
+    <span class="doccomment">/// If the feature &quot;work_packet_stats&quot; is not enabled, this call simply forwards the call</span>
+    <span class="doccomment">/// to `do_work()`.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">do_work_with_stat</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
         <span class="macro">debug!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">tls</span>.<span class="number">0.0</span>.<span class="ident">is_null</span>(), <span class="string">&quot;TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.&quot;</span>, <span class="ident">worker</span>.<span class="ident">ordinal</span>);
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
+        <span class="comment">// Start collecting statistics</span>
         <span class="kw">let</span> <span class="ident">stat</span> <span class="op">=</span> <span class="ident">worker</span>
             .<span class="ident">stat</span>
             .<span class="ident">measure_work</span>(<span class="ident">TypeId::of</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="ident">type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="ident">mmtk</span>);
+
+        <span class="comment">// Do the actual work</span>
         <span class="self">self</span>.<span class="ident">do_work</span>(<span class="ident">worker</span>, <span class="ident">mmtk</span>);
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>)]</span>
+        <span class="comment">// Finish collecting statistics</span>
         <span class="ident">stat</span>.<span class="ident">end_of_work</span>(<span class="kw-2">&amp;mut</span> <span class="ident">worker</span>.<span class="ident">stat</span>);
     }
 }
