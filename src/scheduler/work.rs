@@ -26,7 +26,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
         debug!("{}", std::any::type_name::<Self>());
         debug_assert!(!worker.tls.0.0.is_null(), "TLS must be set correctly for a GC worker before the worker does any work. GC Worker {} has no valid tls.", worker.ordinal);
 
-       #[cfg(feature = "work_packet_stats")]
+        #[cfg(feature = "work_packet_stats")]
         // Start collecting statistics
         let stat = worker
             .stat
