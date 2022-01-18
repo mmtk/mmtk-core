@@ -102,7 +102,6 @@ impl UnsafeOptionsWrapper {
     /// This method is not thread safe, as internally it acquires a mutable reference to self.
     /// It is supposed to be used by one thread during boot time.
     pub unsafe fn process(&self, name: &str, value: &str) -> bool {
-        println!("Set option {} = {}", name, value);
         (&mut *self.0.get()).set_from_command_line(name, value)
     }
 
