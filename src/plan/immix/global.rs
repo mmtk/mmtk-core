@@ -1,4 +1,5 @@
-use super::gc_work::{ImmixCopyContext, ImmixGCWorkContext, TraceKind};
+use super::gc_work::ImmixGCWorkContext;
+use super::gc_work::TraceKind;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -9,6 +10,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -17,14 +19,12 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
-use crate::{mmtk::MMTK, policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
+use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
-
-pub const ALLOC_IMMIX: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
@@ -57,14 +57,16 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         &IMMIX_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        let mut c = ImmixCopyContext::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![(CopySelector::Immix(0), &self.immix_space)],
+            constraints: &IMMIX_CONSTRAINTS,
+        }
     }
 
     fn gc_init(

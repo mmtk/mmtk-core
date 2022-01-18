@@ -182,9 +182,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         {
             use crate::util::sanity::sanity_checker::ScheduleSanityGC;
             self.work_buckets[WorkBucketStage::Final]
-                .add(ScheduleSanityGC::<C::PlanType, C::CopyContextType>::new(
-                    plan,
-                ));
+                .add(ScheduleSanityGC::<C::PlanType>::new(plan));
         }
 
         // Finalization
@@ -208,9 +206,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn initialize_worker(self: &Arc<Self>, tls: VMWorkerThread) {
+    pub fn initialize_coordinator_worker(self: &Arc<Self>, tls: VMWorkerThread) {
         let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
-        coordinator_worker.init(tls);
+        coordinator_worker.tls = tls;
     }
 
     pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {

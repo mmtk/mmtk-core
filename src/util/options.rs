@@ -348,12 +348,15 @@ options! {
     vm_space_size:         usize                [env_var: true, command_line: false] [|v: &usize| *v > 0]    = 0x7cc_cccc,
     // Perf events to measure
     // Semicolons are used to separate events
-    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean)
+    // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).
+    // For example, PERF_COUNT_HW_CPU_CYCLES,0,-1 measures the CPU cycles for the current process on all the CPU cores.
     //
-    // Measuring perf events for work packets
-    work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [always_valid] = PerfEventOptions {events: vec![]},
+    // Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.
+    // TODO: Ideally this option should only be included when the features 'perf_counter' and 'work_packet_stats' are enabled. The current macro does not allow us to do this.
+    work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
-    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [always_valid] = PerfEventOptions {events: vec![]}
+    // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
+    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]}
 }
 
 #[cfg(test)]
@@ -456,7 +459,8 @@ mod tests {
     }
 
     #[test]
-    fn test_str_option_from_env_var() {
+    #[cfg(all(feature = "perf_counter", feature = "work_packet_stats"))]
+    fn test_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
@@ -478,7 +482,8 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_str_option_from_env_var() {
+    #[cfg(all(feature = "perf_counter", feature = "work_packet_stats"))]
+    fn test_invalid_work_perf_events_option_from_env_var() {
         serial_test(|| {
             with_cleanup(
                 || {
@@ -494,6 +499,29 @@ mod tests {
                 },
                 || {
                     std::env::remove_var("MMTK_WORK_PERF_EVENTS");
+                },
+            )
+        })
+    }
+
+    #[test]
+    #[cfg(not(feature = "perf_counter"))]
+    fn test_phase_perf_events_option_without_feature() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // We did not enable the perf_counter feature. The option will be invalid anyway, and will be set to empty.
+                    std::env::set_var("MMTK_PHASE_PERF_EVENTS", "PERF_COUNT_HW_CPU_CYCLES,0,-1");
+
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(
+                        &options.work_perf_events,
+                        &PerfEventOptions { events: vec![] }
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
                 },
             )
         })

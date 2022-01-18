@@ -1,5 +1,4 @@
 use super::global::PageProtect;
-use crate::plan::global::NoCopy;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::{Address, ObjectReference};
@@ -36,9 +35,7 @@ impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
         if self.plan.space.in_space(object) {
             self.plan.space.trace_object::<Self>(self, object)
         } else {
-            self.plan
-                .common
-                .trace_object::<Self, NoCopy<VM>>(self, object)
+            self.plan.common.trace_object::<Self>(self, object)
         }
     }
 }
@@ -62,6 +59,5 @@ pub struct PPGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for PPGCWorkContext<VM> {
     type VM = VM;
     type PlanType = PageProtect<VM>;
-    type CopyContextType = NoCopy<VM>;
     type ProcessEdgesWorkType = PPProcessEdges<VM>;
 }

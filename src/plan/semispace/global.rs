@@ -1,5 +1,4 @@
-use super::gc_work::{SSCopyContext, SSGCWorkContext};
-use crate::mmtk::MMTK;
+use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
@@ -10,6 +9,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -23,8 +23,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use enum_map::EnumMap;
-
-pub const ALLOC_SS: AllocationSemantics = AllocationSemantics::Default;
 
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
@@ -50,14 +48,19 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         &SS_CONSTRAINTS
     }
 
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        let mut c = SSCopyContext::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![
+                // // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &self.copyspace0),
+            ],
+            constraints: &SS_CONSTRAINTS,
+        }
     }
 
     fn gc_init(
@@ -91,6 +94,10 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+    }
+
+    fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

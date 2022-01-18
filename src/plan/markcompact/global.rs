@@ -3,11 +3,9 @@ use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::global::NoCopy;
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -50,18 +48,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &MARKCOMPACT_CONSTRAINTS
-    }
-
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        // mark compact does not use a threadlocal copy allocator
-        // therefore, NoCopy is used instead of CopyContext
-        let mut c = NoCopy::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(
@@ -151,9 +137,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::Unconstrained].add(GcHookWork);
         }
         #[cfg(feature = "sanity")]
-        scheduler.work_buckets[WorkBucketStage::Final].add(
-            crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self, NoCopy<VM>>::new(self),
-        );
+        scheduler.work_buckets[WorkBucketStage::Final]
+            .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
         scheduler.set_finalizer(Some(EndOfGC));
     }
 

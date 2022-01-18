@@ -1,6 +1,5 @@
 use super::gc_work::PPGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::mmtk::MMTK;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -17,8 +16,7 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
-    plan::global::{CommonPlan, NoCopy},
-    policy::largeobjectspace::LargeObjectSpace,
+    plan::global::CommonPlan, policy::largeobjectspace::LargeObjectSpace,
     util::opaque_pointer::VMWorkerThread,
 };
 use enum_map::EnumMap;
@@ -39,16 +37,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &CONSTRAINTS
-    }
-
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        let mut c = NoCopy::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
     }
 
     fn gc_init(

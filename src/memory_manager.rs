@@ -174,9 +174,7 @@ pub fn start_worker<VM: VMBinding>(
     worker: &mut GCWorker<VM>,
     mmtk: &'static MMTK<VM>,
 ) {
-    worker.init(tls);
-    worker.set_local(mmtk.plan.create_worker_local(tls, mmtk));
-    worker.run(mmtk);
+    worker.run(tls, mmtk);
 }
 
 /// Initialize the scheduler and GC workers that are required for doing garbage collections.
