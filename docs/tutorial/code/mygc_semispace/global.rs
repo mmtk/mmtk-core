@@ -1,5 +1,4 @@
 // ANCHOR: imports_no_gc_work
-use crate::mmtk::MMTK;
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
@@ -11,8 +10,8 @@ use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace; // Add
 use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
-use crate::scheduler::gc_work::*; // Add
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -27,17 +26,8 @@ use std::sync::atomic::{AtomicBool, Ordering}; // Add
 use std::sync::Arc;
 // ANCHOR_END: imports_no_gc_work
 
-// ANCHOR: imports_gc_work
-use super::gc_work::{MyGCCopyContext, MyGCProcessEdges}; // Add
-//ANCHOR_END: imports_gc_work
-
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
-
-
-pub type SelectedPlan<VM> = MyGC<VM>;
-
-pub const ALLOC_MyGC: AllocationSemantics = AllocationSemantics::Default; // Add
 
 // Modify
 // ANCHOR: plan_def
@@ -66,17 +56,22 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         &MYGC_CONSTRAINTS
     }
 
-    // ANCHOR: create_worker_local
-    fn create_worker_local(
-        &self,
-        tls: VMWorkerThread,
-        mmtk: &'static MMTK<Self::VM>,
-    ) -> GCWorkerLocalPtr {
-        let mut c = MyGCCopyContext::new(mmtk);
-        c.init(tls);
-        GCWorkerLocalPtr::new(c)
+    // ANCHOR: create_copy_config
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::CopySpace(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![
+                // The tospace argument doesn't matter, we will rebind before a GC anyway.
+                (CopySelector::CopySpace(0), &self.copyspace0)
+            ],
+            constraints: &MYGC_CONSTRAINTS,
+        }
     }
-    // ANCHOR_END: create_worker_local
+    // ANCHOR_END: create_copy_config
 
     // Modify
     // ANCHOR: gc_init
@@ -124,6 +119,13 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         self.copyspace1.prepare(!hi);
     }
     // ANCHOR_END: prepare
+
+    // Add
+    // ANCHOR: prepare_worker
+    fn prepare_worker(&self, worker: &mut GCWorker<VM>) {
+        unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
+    }
+    // ANCHOR_END: prepare_worker
 
     // Modify
     // ANCHOR: release

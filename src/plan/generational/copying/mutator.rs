@@ -1,5 +1,4 @@
 pub(super) use super::super::ALLOCATOR_MAPPING;
-use super::gc_work::GenCopyCopyContext;
 use super::GenCopy;
 use crate::plan::barriers::*;
 use crate::plan::generational::create_gen_space_mapping;
@@ -43,11 +42,10 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier:
-            box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM, GenCopyCopyContext<VM>>>::new(
-                mmtk,
-                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-            ),
+        barrier: box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
+            mmtk,
+            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+        ),
         mutator_tls,
         config,
         plan: gencopy,

@@ -1,13 +1,12 @@
+use crate::util::copy::*;
 use crate::util::metadata::{
     compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
 };
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, Address, ObjectReference};
 use crate::vm::ObjectModel;
-use std::sync::atomic::Ordering;
-
-use crate::plan::{AllocationSemantics, CopyContext};
 use crate::vm::VMBinding;
+use std::sync::atomic::Ordering;
 
 const FORWARDING_NOT_TRIGGERED_YET: usize = 0b00;
 const BEING_FORWARDED: usize = 0b10;
@@ -73,11 +72,10 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
     }
 }
 
-/// Copy the object, mark it as forwarded and return a reference to the new object (copy).
-pub fn forward_object<VM: VMBinding, CC: CopyContext>(
+pub fn forward_object<VM: VMBinding>(
     object: ObjectReference,
-    semantics: AllocationSemantics,
-    copy_context: &mut CC,
+    semantics: CopySemantics,
+    copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     #[cfg(feature = "global_alloc_bit")]
