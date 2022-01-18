@@ -264,7 +264,7 @@
             <span class="bool-val">true</span>,
             <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">cur_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>),
             <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">is_user_triggered_collection</span>(),
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>,
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>,
         );
 
         <span class="comment">// The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.</span>

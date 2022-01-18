@@ -603,7 +603,7 @@
         }
 
         <span class="comment">// Finalization</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
             <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor</span>::{<span class="ident">Finalization</span>, <span class="ident">ForwardFinalization</span>};
             <span class="comment">// finalization</span>
             <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]

@@ -345,7 +345,7 @@
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">nursery_full</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">reserved_pages</span>()
-            <span class="op">&gt;</span><span class="op">=</span> (<span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">max_nursery</span>));
+            <span class="op">&gt;</span><span class="op">=</span> (<span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">max_nursery</span>));
         <span class="kw">if</span> <span class="ident">nursery_full</span> {
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
@@ -381,7 +381,7 @@
             .<span class="ident">base</span>
             .<span class="ident">user_triggered_collection</span>
             .<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>
+            <span class="op">&amp;&amp;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">full_heap_system_gc</span>
         {
             <span class="comment">// User triggered collection, and we force full heap for user triggered collection</span>
             <span class="bool-val">true</span>
@@ -452,7 +452,7 @@
 
     <span class="doccomment">/// Check a plan to see if the next GC should be a full heap GC.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_next_gc_be_full_heap</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">plan</span>.<span class="ident">get_pages_avail</span>() <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">min_nursery</span>)
+        <span class="ident">plan</span>.<span class="ident">get_pages_avail</span>() <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">min_nursery</span>)
     }
 
     <span class="doccomment">/// Set next_gc_full_heap to the given value.</span>

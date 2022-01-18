@@ -975,7 +975,7 @@
     <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>,
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident">Box::new</span>(<span class="kw">match</span> <span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">plan</span> {
+    <span class="ident">Box::new</span>(<span class="kw">match</span> <span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">plan</span> {
         <span class="ident">PlanSelector::NoGC</span> =&gt; <span class="ident"><span class="kw">crate</span>::plan::nogc::mutator::create_nogc_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>),
         <span class="ident">PlanSelector::SemiSpace</span> =&gt; {
             <span class="ident"><span class="kw">crate</span>::plan::semispace::mutator::create_ss_mutator</span>(<span class="ident">tls</span>, <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>)
@@ -1389,7 +1389,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
                 <span class="ident">vm_map</span>,
                 <span class="ident">mmapper</span>,
                 <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">options</span>.<span class="ident">vm_space_size</span>,
+                <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">vm_space_size</span>,
                 <span class="ident">constraints</span>,
                 <span class="ident">global_side_metadata_specs</span>,
             ),
@@ -1453,7 +1453,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
     <span class="doccomment">/// The application code has requested a collection.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">force</span>: <span class="ident">bool</span>) {
-        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">ignore_system_g_c</span> {
+        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">ignore_system_g_c</span> {
             <span class="macro">info!</span>(<span class="string">&quot;User triggering collection&quot;</span>);
             <span class="self">self</span>.<span class="ident">user_triggered_collection</span>
                 .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
@@ -1680,21 +1680,21 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="doccomment">/// we should do stress GC.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_stress_test_gc_enabled</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
-        <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
-            <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
+            <span class="op">|</span><span class="op">|</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> <span class="op">!</span><span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>
     }
 
     <span class="doccomment">/// Check if we should do precise stress test. If so, we need to check for stress GCs for every allocation.</span>
     <span class="doccomment">/// Otherwise, we only check in the allocation slow path.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_precise_stress</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">precise_stress</span>
+        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">precise_stress</span>
     }
 
     <span class="doccomment">/// Check if we should do a stress GC now. If GC is initialized and the allocation bytes exceeds</span>
     <span class="doccomment">/// the stress factor, we should do a stress GC.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_do_stress_gc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">initialized</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-            <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>)
+            <span class="op">&amp;&amp;</span> (<span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>)
     }
 
     <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">collection_required</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(
@@ -1708,7 +1708,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="macro">debug!</span>(
                 <span class="string">&quot;Stress GC: allocation_bytes = {}, stress_factor = {}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>),
-                <span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
+                <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">stress_factor</span>
             );
             <span class="macro">debug!</span>(<span class="string">&quot;Doing stress GC&quot;</span>);
             <span class="self">self</span>.<span class="ident">allocation_bytes</span>.<span class="ident">store</span>(<span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);

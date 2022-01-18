@@ -331,7 +331,7 @@
             .<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="ident">MarkCompactGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
 
         <span class="comment">// Finalization</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
+        <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
             <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor</span>::{<span class="ident">Finalization</span>, <span class="ident">ForwardFinalization</span>};
             <span class="comment">// finalization</span>
             <span class="comment">// treat finalizable objects as roots and perform a closure (marking)</span>

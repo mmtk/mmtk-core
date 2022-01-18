@@ -416,6 +416,117 @@
 <span id="415">415</span>
 <span id="416">416</span>
 <span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
@@ -509,11 +620,44 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">o</span>: <span class="ident">Options</span>) -&gt; <span class="ident">UnsafeOptionsWrapper</span> {
         <span class="ident">UnsafeOptionsWrapper</span>(<span class="ident">UnsafeCell::new</span>(<span class="ident">o</span>))
     }
+
+    <span class="doccomment">/// Process option. Returns true if the key and the value are both valid.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `name`: the name of the option. See `options!` for all the valid options.</span>
+    <span class="doccomment">/// * `value`: the value of the option in string format.</span>
+    <span class="doccomment">///</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// This method is not thread safe, as internally it acquires a mutable reference to self.</span>
     <span class="doccomment">/// It is supposed to be used by one thread during boot time.</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">process</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">value</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        (<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>()).<span class="ident">set_from_camelcase_str</span>(<span class="ident">name</span>, <span class="ident">value</span>)
+        (<span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>.<span class="ident">get</span>()).<span class="ident">set_from_command_line</span>(<span class="ident">name</span>, <span class="ident">value</span>)
+    }
+
+    <span class="doccomment">/// Bulk process options. Returns true if all the options are processed successfully.</span>
+    <span class="doccomment">/// This method returns false if the option string is invalid, or if it includes any invalid option.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `options`: a string that is key value pairs separated by white spaces, e.g. &quot;threads=1 stress_factor=4096&quot;</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// This method is not thread safe, as internally it acquires a mutable reference to self.</span>
+    <span class="doccomment">/// It is supposed to be used by one thread during boot time.</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">process_bulk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">options</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">for</span> <span class="ident">opt</span> <span class="kw">in</span> <span class="ident">options</span>.<span class="ident">split_ascii_whitespace</span>() {
+            <span class="kw">let</span> <span class="ident">kv_pair</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">opt</span>.<span class="ident">split</span>(<span class="string">&#39;=&#39;</span>).<span class="ident">collect</span>();
+            <span class="kw">if</span> <span class="ident">kv_pair</span>.<span class="ident">len</span>() <span class="op">!</span><span class="op">=</span> <span class="number">2</span> {
+                <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+
+            <span class="kw">let</span> <span class="ident">key</span> <span class="op">=</span> <span class="ident">kv_pair</span>[<span class="number">0</span>];
+            <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">kv_pair</span>[<span class="number">1</span>];
+            <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">process</span>(<span class="ident">key</span>, <span class="ident">val</span>) {
+                <span class="kw">return</span> <span class="bool-val">false</span>;
+            }
+        }
+
+        <span class="bool-val">true</span>
     }
 }
 <span class="kw">impl</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">UnsafeOptionsWrapper</span> {
@@ -523,20 +667,120 @@
     }
 }
 
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">process_tests</span> {
+    <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::test_util::serial_test</span>;
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_process_valid</span>() {
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>());
+            <span class="kw">let</span> <span class="ident">success</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">options</span>.<span class="ident">process</span>(<span class="string">&quot;threads&quot;</span>, <span class="string">&quot;1&quot;</span>) };
+            <span class="macro">assert!</span>(<span class="ident">success</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">threads</span>, <span class="number">1</span>);
+        })
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_process_invalid</span>() {
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>());
+            <span class="kw">let</span> <span class="ident">default_threads</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">threads</span>;
+            <span class="kw">let</span> <span class="ident">success</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">options</span>.<span class="ident">process</span>(<span class="string">&quot;threads&quot;</span>, <span class="string">&quot;a&quot;</span>) };
+            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">success</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">default_threads</span>);
+        })
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_process_bulk_empty</span>() {
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>());
+            <span class="kw">let</span> <span class="ident">success</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">options</span>.<span class="ident">process_bulk</span>(<span class="string">&quot;&quot;</span>) };
+            <span class="macro">assert!</span>(<span class="ident">success</span>);
+        })
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_process_bulk_valid</span>() {
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>());
+            <span class="kw">let</span> <span class="ident">success</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">options</span>.<span class="ident">process_bulk</span>(<span class="string">&quot;threads=1 stress_factor=42&quot;</span>) };
+            <span class="macro">assert!</span>(<span class="ident">success</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">threads</span>, <span class="number">1</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">42</span>);
+        })
+    }
+
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_process_bulk_invalid</span>() {
+        <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
+            <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">UnsafeOptionsWrapper::new</span>(<span class="ident">Options::default</span>());
+            <span class="kw">let</span> <span class="ident">success</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">options</span>.<span class="ident">process_bulk</span>(<span class="string">&quot;threads=a stress_factor=42&quot;</span>) };
+            <span class="macro">assert!</span>(<span class="op">!</span><span class="ident">success</span>);
+        })
+    }
+}
+
 <span class="kw">fn</span> <span class="ident">always_valid</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="ident">T</span>) -&gt; <span class="ident">bool</span> {
     <span class="bool-val">true</span>
 }
 
+<span class="doccomment">/// An MMTk option of a given type.</span>
+<span class="doccomment">/// This type allows us to store some metadata for the option. To get the value of an option,</span>
+<span class="doccomment">/// you can simply dereference it (for example, *options.threads).</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>)]</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MMTKOption</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Clone</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">value</span>: <span class="ident">T</span>,
+
+    <span class="doccomment">/// Can we set this option through env vars?</span>
+    <span class="kw">pub</span> <span class="ident">from_env_var</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// Can we set this option through command line options/API?</span>
+    <span class="kw">pub</span> <span class="ident">from_command_line</span>: <span class="ident">bool</span>,
+}
+
+<span class="comment">// Dereference an option to get its value.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Clone</span><span class="op">&gt;</span> <span class="ident">std::ops::Deref</span> <span class="kw">for</span> <span class="ident">MMTKOption</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">T</span>;
+
+    <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">value</span>
+    }
+}
+
 <span class="macro">macro_rules!</span> <span class="ident">options</span> {
-    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>:<span class="ident">expr</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>,) =&gt; [
-        <span class="macro">options!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>),<span class="kw-2">*</span>);
+    <span class="comment">// Verify whether we can set an option through env var or command line.</span>
+    (@<span class="ident">verify_set_from</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">self</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">key</span>: <span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">verify_field</span>: <span class="ident">ident</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">ident</span>),<span class="kw-2">*</span>)) =&gt; {
+        <span class="kw">match</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">key</span> {
+            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>) =&gt; { <span class="macro">assert!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">self</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">verify_field</span>, <span class="string">&quot;cannot set option {} (not {})&quot;</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">key</span>, <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">verify_field</span>)) }),<span class="op">*</span>
+            <span class="kw">_</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Invalid Options key&quot;</span>)
+        }
+    };
+
+    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[<span class="ident">env_var</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">env_var</span>:<span class="ident">expr</span>, <span class="ident">command_line</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">command_line</span>:<span class="ident">expr</span>][<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>:<span class="ident">expr</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>,) =&gt; [
+        <span class="macro">options!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>[<span class="macro-nonterminal">env_var</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">env_var</span>, <span class="ident">command_line</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">command_line</span>, <span class="ident">mutable</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">mutable</span>][<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>),<span class="kw-2">*</span>);
     ];
-    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>:<span class="ident">expr</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>) =&gt; [
+    ($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>:<span class="ident">ident</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>[<span class="ident">env_var</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">env_var</span>:<span class="ident">expr</span>, <span class="ident">command_line</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">command_line</span>:<span class="ident">expr</span>][<span class="macro-nonterminal">$</span><span class="macro-nonterminal">validator</span>:<span class="ident">expr</span>] <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>) =&gt; [
         <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Options</span> {
-            $(<span class="kw">pub</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="kw">type</span>),<span class="op">*</span>
+            $(<span class="kw">pub</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">MMTKOption</span><span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="kw">type</span><span class="op">&gt;</span>),<span class="op">*</span>
         }
         <span class="kw">impl</span> <span class="macro-nonterminal">Options</span> {
-            <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_from_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>)-&gt;<span class="ident">bool</span> {
+            <span class="doccomment">/// Set an option from env var</span>
+            <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_from_env_var</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
+                <span class="macro">options!</span>(@<span class="ident">verify_set_from</span>(<span class="self">self</span>, <span class="ident">s</span>, <span class="ident">from_env_var</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),<span class="kw-2">*</span>));
+                <span class="self">self</span>.<span class="ident">set_inner</span>(<span class="ident">s</span>, <span class="ident">val</span>)
+            }
+
+            <span class="doccomment">/// Set an option from command line</span>
+            <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_from_command_line</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
+                <span class="macro">options!</span>(@<span class="ident">verify_set_from</span>(<span class="self">self</span>, <span class="ident">s</span>, <span class="ident">from_command_line</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>),<span class="kw-2">*</span>));
+                <span class="self">self</span>.<span class="ident">set_inner</span>(<span class="ident">s</span>, <span class="ident">val</span>)
+            }
+
+            <span class="doccomment">/// Set an option and run its validator for its value.</span>
+            <span class="kw">fn</span> <span class="ident">set_inner</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>)-&gt;<span class="ident">bool</span> {
                 <span class="kw">match</span> <span class="ident">s</span> {
                     <span class="comment">// Parse the given value from str (by env vars or by calling process()) to the right type</span>
                     $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>) =&gt; <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="kw-2">ref</span> <span class="ident">val</span>) <span class="op">=</span> <span class="ident">val</span>.<span class="ident">parse</span>::<span class="op">&lt;</span><span class="macro-nonterminal">$</span><span class="kw">type</span><span class="op">&gt;</span>() {
@@ -545,7 +789,7 @@
                         <span class="kw">let</span> <span class="ident">is_valid</span> <span class="op">=</span> <span class="ident">validate_fn</span>(<span class="ident">val</span>);
                         <span class="kw">if</span> <span class="ident">is_valid</span> {
                             <span class="comment">// Only set value if valid.</span>
-                            <span class="self">self</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span> <span class="op">=</span> <span class="ident">val</span>.<span class="ident">clone</span>();
+                            <span class="self">self</span>.<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>.<span class="ident">value</span> <span class="op">=</span> <span class="ident">val</span>.<span class="ident">clone</span>();
                         } <span class="kw">else</span> {
                             <span class="macro">eprintln!</span>(<span class="string">&quot;Warn: unable to set {}={:?}. Invalid value. Default value will be used.&quot;</span>, <span class="ident">s</span>, <span class="ident">val</span>);
                         }
@@ -561,7 +805,11 @@
         <span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">Options</span> {
             <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
                 <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options</span> {
-                    $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>),<span class="op">*</span>
+                    $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>: <span class="ident">MMTKOption</span> {
+                        <span class="ident">value</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">default</span>,
+                        <span class="ident">from_env_var</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">env_var</span>,
+                        <span class="ident">from_command_line</span>: <span class="macro-nonterminal">$</span><span class="macro-nonterminal">command_line</span>,
+                    }),<span class="op">*</span>
                 };
 
                 <span class="comment">// If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),</span>
@@ -572,7 +820,7 @@
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">rest_of_key</span>) <span class="op">=</span> <span class="ident">key</span>.<span class="ident">strip_prefix</span>(<span class="ident">PREFIX</span>) {
                         <span class="kw">let</span> <span class="ident">lowercase</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">rest_of_key</span>.<span class="ident">to_lowercase</span>();
                         <span class="kw">match</span> <span class="ident">lowercase</span> {
-                            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>) =&gt; { <span class="ident">options</span>.<span class="ident">set_from_str</span>(<span class="ident">lowercase</span>, <span class="kw-2">&amp;</span><span class="ident">val</span>); },)<span class="op">*</span>
+                            $(<span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">name</span>) =&gt; { <span class="ident">options</span>.<span class="ident">set_from_env_var</span>(<span class="ident">lowercase</span>, <span class="kw-2">&amp;</span><span class="ident">val</span>); },)<span class="op">*</span>
                             <span class="kw">_</span> =&gt; {}
                         }
                     }
@@ -582,47 +830,50 @@
         }
     ]
 }
+
+<span class="comment">// Currently we allow all the options to be set by env var for the sake of convenience.</span>
+<span class="comment">// At some point, we may disallow this and most options can only be set by command line.</span>
 <span class="macro">options!</span> {
     <span class="comment">// The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
-    <span class="ident">plan</span>:                  <span class="ident">PlanSelector</span>         [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">PlanSelector::NoGC</span>,
+    <span class="ident">plan</span>:                  <span class="ident">PlanSelector</span>         [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">false</span>] [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">PlanSelector::NoGC</span>,
     <span class="comment">// Number of GC threads.</span>
-    <span class="ident">threads</span>:               <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="ident">num_cpus::get</span>(),
+    <span class="ident">threads</span>:               <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="ident">num_cpus::get</span>(),
     <span class="comment">// Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)</span>
-    <span class="ident">use_short_stack_scans</span>: <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">use_short_stack_scans</span>: <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Enable a return barrier (not supported)</span>
-    <span class="ident">use_return_barrier</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">use_return_barrier</span>:    <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Should we eagerly finish sweeping at the start of a collection? (not supported)</span>
-    <span class="ident">eager_complete_sweep</span>:  <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">eager_complete_sweep</span>:  <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?</span>
-    <span class="ident">ignore_system_g_c</span>:     <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">ignore_system_g_c</span>:     <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
-    <span class="ident">max_nursery</span>:           <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span> ] <span class="op">=</span> <span class="ident">DEFAULT_MAX_NURSERY</span>,
+    <span class="ident">max_nursery</span>:           <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span> ] <span class="op">=</span> <span class="ident">DEFAULT_MAX_NURSERY</span>,
     <span class="comment">// The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
-    <span class="ident">min_nursery</span>:           <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span> ] <span class="op">=</span> <span class="ident">DEFAULT_MIN_NURSERY</span>,
+    <span class="ident">min_nursery</span>:           <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span> ] <span class="op">=</span> <span class="ident">DEFAULT_MIN_NURSERY</span>,
     <span class="comment">// Should a major GC be performed when a system GC is required?</span>
-    <span class="ident">full_heap_system_gc</span>:   <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">full_heap_system_gc</span>:   <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Should we shrink/grow the heap to adjust to application working set? (not supported)</span>
-    <span class="ident">variable_size_heap</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
+    <span class="ident">variable_size_heap</span>:    <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
     <span class="comment">// Should finalization be disabled?</span>
-    <span class="ident">no_finalizer</span>:          <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">no_finalizer</span>:          <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Should reference type processing be disabled?</span>
-    <span class="ident">no_reference_types</span>:    <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="ident">no_reference_types</span>:    <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)</span>
-    <span class="ident">nursery_zeroing</span>:       <span class="ident">NurseryZeroingOptions</span>[<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">NurseryZeroingOptions::Temporal</span>,
+    <span class="ident">nursery_zeroing</span>:       <span class="ident">NurseryZeroingOptions</span>[<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">NurseryZeroingOptions::Temporal</span>,
     <span class="comment">// How frequent (every X bytes) should we do a stress GC?</span>
-    <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
+    <span class="ident">stress_factor</span>:         <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
     <span class="comment">// How frequent (every X bytes) should we run analysis (a STW event that collects data)</span>
-    <span class="ident">analysis_factor</span>:       <span class="ident">usize</span>                [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
+    <span class="ident">analysis_factor</span>:       <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">DEFAULT_STRESS_FACTOR</span>,
     <span class="comment">// Precise stress test. Trigger stress GCs exactly at X bytes if this is true. This is usually used to test the GC correctness</span>
     <span class="comment">// and will significantly slow down the mutator performance. If this is false, stress GCs will only be triggered when an allocation reaches</span>
     <span class="comment">// the slow path. This means we may have allocated more than X bytes or fewer than X bytes when we actually trigger a stress GC.</span>
     <span class="comment">// But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress</span>
     <span class="comment">// factor (e.g. tens of metabytes).</span>
-    <span class="ident">precise_stress</span>:        <span class="ident">bool</span>                 [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
+    <span class="ident">precise_stress</span>:        <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
     <span class="comment">// The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)</span>
     <span class="comment">// FIXME: This value is set for JikesRVM. We need a proper way to set options.</span>
     <span class="comment">//   We need to set these values programmatically in VM specific code.</span>
-    <span class="ident">vm_space_size</span>:         <span class="ident">usize</span>                [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="number">0x7cc_cccc</span>,
+    <span class="ident">vm_space_size</span>:         <span class="ident">usize</span>                [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">false</span>] [<span class="op">|</span><span class="ident">v</span>: <span class="kw-2">&amp;</span><span class="ident">usize</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">v</span> <span class="op">&gt;</span> <span class="number">0</span>]    <span class="op">=</span> <span class="number">0x7cc_cccc</span>,
     <span class="comment">// Perf events to measure</span>
     <span class="comment">// Semicolons are used to separate events</span>
     <span class="comment">// Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).</span>
@@ -630,39 +881,10 @@
     <span class="comment">//</span>
     <span class="comment">// Measuring perf events for work packets. NOTE that be VERY CAREFUL when using this option, as this may greatly slowdown GC performance.</span>
     <span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; and &#39;work_packet_stats&#39; are enabled. The current macro does not allow us to do this.</span>
-    <span class="ident">work_perf_events</span>:       <span class="ident">PerfEventOptions</span>     [<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">cfg!</span>(<span class="ident">all</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>))] <span class="op">=</span> <span class="ident">PerfEventOptions</span> {<span class="ident">events</span>: <span class="macro">vec!</span>[]},
+    <span class="ident">work_perf_events</span>:       <span class="ident">PerfEventOptions</span>     [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>] [<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">cfg!</span>(<span class="ident">all</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>, <span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;work_packet_stats&quot;</span>))] <span class="op">=</span> <span class="ident">PerfEventOptions</span> {<span class="ident">events</span>: <span class="macro">vec!</span>[]},
     <span class="comment">// Measuring perf events for GC and mutators</span>
     <span class="comment">// TODO: Ideally this option should only be included when the features &#39;perf_counter&#39; are enabled. The current macro does not allow us to do this.</span>
-    <span class="ident">phase_perf_events</span>:      <span class="ident">PerfEventOptions</span>     [<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>)] <span class="op">=</span> <span class="ident">PerfEventOptions</span> {<span class="ident">events</span>: <span class="macro">vec!</span>[]}
-}
-
-<span class="kw">impl</span> <span class="ident">Options</span> {
-    <span class="kw">fn</span> <span class="ident">set_from_camelcase_str</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>, <span class="ident">val</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) -&gt; <span class="ident">bool</span> {
-        <span class="macro">trace!</span>(<span class="string">&quot;Trying to process option pair: ({}, {})&quot;</span>, <span class="ident">s</span>, <span class="ident">val</span>);
-
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sr</span> <span class="op">=</span> <span class="ident">String::with_capacity</span>(<span class="ident">s</span>.<span class="ident">len</span>());
-        <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">s</span>.<span class="ident">chars</span>() {
-            <span class="kw">if</span> <span class="ident">c</span>.<span class="ident">is_uppercase</span>() {
-                <span class="ident">sr</span>.<span class="ident">push</span>(<span class="string">&#39;_&#39;</span>);
-                <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="ident">c</span>.<span class="ident">to_lowercase</span>() {
-                    <span class="ident">sr</span>.<span class="ident">push</span>(<span class="ident">c</span>);
-                }
-            } <span class="kw">else</span> {
-                <span class="ident">sr</span>.<span class="ident">push</span>(<span class="ident">c</span>)
-            }
-        }
-
-        <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">set_from_str</span>(<span class="ident">sr</span>.<span class="ident">as_str</span>(), <span class="ident">val</span>);
-
-        <span class="macro">trace!</span>(<span class="string">&quot;Trying to process option pair: ({})&quot;</span>, <span class="ident">sr</span>);
-
-        <span class="kw">if</span> <span class="ident">result</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;Validation passed&quot;</span>);
-        } <span class="kw">else</span> {
-            <span class="macro">trace!</span>(<span class="string">&quot;Validation failed&quot;</span>)
-        }
-        <span class="ident">result</span>
-    }
+    <span class="ident">phase_perf_events</span>:      <span class="ident">PerfEventOptions</span>     [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>] [<span class="op">|</span><span class="kw">_</span><span class="op">|</span> <span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;perf_counter&quot;</span>)] <span class="op">=</span> <span class="ident">PerfEventOptions</span> {<span class="ident">events</span>: <span class="macro">vec!</span>[]}
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
@@ -676,7 +898,7 @@
     <span class="kw">fn</span> <span class="ident">no_env_var</span>() {
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
-            <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
+            <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
         })
     }
 
@@ -688,7 +910,7 @@
                     <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;4096&quot;</span>);
 
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
-                    <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">4096</span>);
+                    <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">4096</span>);
                 },
                 <span class="op">|</span><span class="op">|</span> {
                     <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
@@ -706,8 +928,8 @@
                     <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_NO_FINALIZER&quot;</span>, <span class="string">&quot;true&quot;</span>);
 
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
-                    <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">4096</span>);
-                    <span class="macro">assert!</span>(<span class="ident">options</span>.<span class="ident">no_finalizer</span>);
+                    <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="number">4096</span>);
+                    <span class="macro">assert!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">no_finalizer</span>);
                 },
                 <span class="op">|</span><span class="op">|</span> {
                     <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
@@ -726,7 +948,7 @@
                     <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>, <span class="string">&quot;abc&quot;</span>);
 
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
-                    <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
+                    <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
                 },
                 <span class="op">|</span><span class="op">|</span> {
                     <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_STRESS_FACTOR&quot;</span>);
@@ -744,7 +966,7 @@
                     <span class="ident">std::env::set_var</span>(<span class="string">&quot;MMTK_ABC&quot;</span>, <span class="string">&quot;42&quot;</span>);
 
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
-                    <span class="macro">assert_eq!</span>(<span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
+                    <span class="macro">assert_eq!</span>(<span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">stress_factor</span>, <span class="ident">DEFAULT_STRESS_FACTOR</span>);
                 },
                 <span class="op">|</span><span class="op">|</span> {
                     <span class="ident">std::env::remove_var</span>(<span class="string">&quot;MMTK_ABC&quot;</span>);
@@ -758,8 +980,8 @@
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
             <span class="macro">assert_eq!</span>(
-                <span class="kw-2">&amp;</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
-                <span class="kw-2">&amp;</span><span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
+                <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
+                <span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
             );
         })
     }
@@ -774,8 +996,8 @@
 
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
                     <span class="macro">assert_eq!</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
-                        <span class="kw-2">&amp;</span><span class="ident">PerfEventOptions</span> {
+                        <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
+                        <span class="ident">PerfEventOptions</span> {
                             <span class="ident">events</span>: <span class="macro">vec!</span>[(<span class="string">&quot;PERF_COUNT_HW_CPU_CYCLES&quot;</span>.<span class="ident">into</span>(), <span class="number">0</span>, <span class="op">-</span><span class="number">1</span>)]
                         }
                     );
@@ -799,8 +1021,8 @@
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
                     <span class="comment">// invalid value from env var, use default.</span>
                     <span class="macro">assert_eq!</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
-                        <span class="kw-2">&amp;</span><span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
+                        <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
+                        <span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
                     );
                 },
                 <span class="op">|</span><span class="op">|</span> {
@@ -822,8 +1044,8 @@
                     <span class="kw">let</span> <span class="ident">options</span> <span class="op">=</span> <span class="ident">Options::default</span>();
                     <span class="comment">// invalid value from env var, use default.</span>
                     <span class="macro">assert_eq!</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
-                        <span class="kw-2">&amp;</span><span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
+                        <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">work_perf_events</span>,
+                        <span class="ident">PerfEventOptions</span> { <span class="ident">events</span>: <span class="macro">vec!</span>[] }
                     );
                 },
                 <span class="op">|</span><span class="op">|</span> {

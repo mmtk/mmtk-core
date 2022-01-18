@@ -486,11 +486,11 @@
                     <span class="comment">// This is the allocation hook for the analysis trait. If you want to call</span>
                     <span class="comment">// an analysis counter specific allocation hook, then here is the place to do so</span>
                     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
-                    <span class="kw">if</span> <span class="ident">_allocation_bytes</span> <span class="op">&gt;</span> <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> {
+                    <span class="kw">if</span> <span class="ident">_allocation_bytes</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span> {
                         <span class="macro">trace!</span>(
                             <span class="string">&quot;Analysis: allocation_bytes = {} more than analysis_factor = {}&quot;</span>,
                             <span class="ident">_allocation_bytes</span>,
-                            <span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
+                            <span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
                         );
                         <span class="ident">plan</span>.<span class="ident">analysis_manager</span>.<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
                     }
