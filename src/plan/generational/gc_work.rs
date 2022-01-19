@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 /// Process edges for a nursery GC. A generatinoal plan should use this type for a nursery GC.
 pub struct GenNurseryProcessEdges<VM: VMBinding> {
     gen: &'static Gen<VM>,
-    base: ProcessEdgesBase<GenNurseryProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
@@ -37,7 +37,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for GenNurseryProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
