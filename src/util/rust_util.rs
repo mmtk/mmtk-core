@@ -61,3 +61,40 @@ impl<T> std::ops::Deref for InitializeOnce<T> {
 }
 
 unsafe impl<T> Sync for InitializeOnce<T> {}
+
+#[cfg(test)]
+mod initialize_once_tests {
+    use super::*;
+
+    #[test]
+    fn test_threads_compete_initialize() {
+        use std::sync::atomic::AtomicUsize;
+        use std::sync::atomic::Ordering;
+        use std::thread;
+
+        // Create multiple threads to initialize the same `InitializeOnce` value
+        const N_THREADS: usize = 1000;
+        // The test value
+        static I: InitializeOnce<usize> = InitializeOnce::new(&initialize_usize);
+        // Count how many times the function is called
+        static INITIALIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+        // The function to create initial value
+        fn initialize_usize() -> usize {
+            INITIALIZE_COUNT.fetch_add(1, Ordering::SeqCst);
+            42
+        }
+
+        let mut threads = vec![];
+        for _ in 1..N_THREADS {
+            threads.push(thread::spawn(|| {
+                I.initialize_once();
+                // Every thread should see the value correctly initialized.
+                assert_eq!(*I, 42);
+            }));
+        }
+        threads.into_iter().for_each(|t| t.join().unwrap());
+
+        // The initialize_usize should only be called once
+        assert_eq!(INITIALIZE_COUNT.load(Ordering::SeqCst), 1);
+    }
+}
