@@ -23,7 +23,7 @@ const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
 pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
 pub const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
-const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
+pub const MI_BIN_FULL: usize = MI_BIN_HUGE + 1;
 const ZERO_BLOCK: Block = Block::from(unsafe { Address::zero() });
 pub type BlockLists = [BlockList; MI_BIN_HUGE + 1];
 
@@ -202,8 +202,7 @@ impl BlockList {
         block.store_block_list::<VM>(self);
     }
     
-    fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
-        // eprintln!("append {:?}, lock={}, to {:?}, lock={}", list as *mut _, list.lock.load(Ordering::SeqCst), self as *mut _, self.lock.load(Ordering::SeqCst));
+    pub fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
         if !list.is_empty() {
             assert!(list.first.load_prev_block::<VM>().is_zero(), "{} -> {}", list.first.load_prev_block::<VM>().start(), list.first.start());
             if self.is_empty() {
@@ -217,7 +216,6 @@ impl BlockList {
             }
             let mut block = list.first;
             while !block.is_zero() {
-                // // eprintln!("appending {} to {:?}", block.start(), self as *mut _);
                 block.store_block_list::<VM>(self);
                 block = block.load_next_block::<VM>();
             }
@@ -225,21 +223,7 @@ impl BlockList {
         }
     }
 
-    // fn print<VM: VMBinding>(&self) {
-    //     if self.is_empty() {
-    //         // eprintln!("{{empty list}}");
-    //     } else {
-    //         let mut b = self.first;
-    //         while b != self.last {
-    //             eprint!("{} -> ", b.start());
-    //             b = b.load_next_block::<VM>();
-    //         }
-    //         // eprintln!("{}", b.start());
-    //     }
-    // }
-
     fn reset(&mut self) {
-        // eprintln!("reset list {:?}", self as *mut _);
         self.first = ZERO_BLOCK;
         self.last = ZERO_BLOCK;
     }
@@ -250,7 +234,7 @@ impl BlockList {
         while !success {
             success = self.lock.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok();
         }
-        // eprintln!("successsfully lock {:?}", self as *const _);
+        // eprintln!("lock {:?}", self as *const _);
     }
 
     pub fn unlock(&mut self) {
@@ -577,36 +561,45 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn acquire_fresh_block(&mut self, size: usize, stress_test: bool) -> Block {
         // fresh block
         let bin = mi_bin(size);
-        let mut block = loop {
-
-            let (block, abandoned) = self.space.acquire_block(self.tls, size);
-            let block = if abandoned {
-                eprintln!("{:?} recovered abandoned block {}", self.tls, block);
-                let block = Block::from(block);
-                block.store_tls::<VM>(self.tls);
-                self.sweep_block(block);
-                if block.has_free_cells::<VM>() {
+        loop {
+            match self.space.acquire_block(self.tls, size) {
+                crate::policy::marksweepspace::BlockAcquireResult::Fresh(block) => {
+                    if block.is_zero() {
+                        // GC
+                        return block;
+                    }
                     self.available_blocks[bin].push::<VM>(block);
-                    return block
-                } else {
-                    self.consumed_blocks[bin].push::<VM>(block);
-                    ZERO_BLOCK
-                }
-                
-            } else {
-                let block = Block::from(block);
-                if block.is_zero() {
-                    // GC
+                    self.init_block(block, self.available_blocks[bin].size);
+                    
                     return block;
-                }
-                self.available_blocks[bin].push::<VM>(block);
-                
-                block
-            };
-            if !block.is_zero() {
-                break {block}
+                },
+
+                crate::policy::marksweepspace::BlockAcquireResult::AbandonedAvailable(block) => {
+                    block.store_tls::<VM>(self.tls);
+                    if block.has_free_cells::<VM>() {
+                        self.available_blocks[bin].push::<VM>(block);
+                        return block
+                    } else {
+                        self.consumed_blocks[bin].push::<VM>(block);
+                    }
+
+                },
+
+                crate::policy::marksweepspace::BlockAcquireResult::AbandondedUnswept(block) => {
+                    block.store_tls::<VM>(self.tls);
+                    self.sweep_block(block);
+                    if block.has_free_cells::<VM>() {
+                        self.available_blocks[bin].push::<VM>(block);
+                        return block
+                    } else {
+                        self.consumed_blocks[bin].push::<VM>(block);
+                    }
+                },
             }
         };
+    }
+
+    pub fn init_block(&self, block: Block, cell_size: usize) {
 
         self.space.record_new_block(block);
 
@@ -614,25 +607,14 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let block_end = block.start() + BYTES_IN_BLOCK;
         let mut old_cell = unsafe { Address::zero() };
         let mut new_cell = block.start();
-        let block_list = if stress_test {
-            self.available_blocks_stress.get_mut(mi_bin(size) as usize).unwrap()
-        } else {
-            self.available_blocks.get_mut(mi_bin(size) as usize).unwrap()
-        };
-        trace!(
-            "Asked for size {}, construct free list with cells of size {}",
-            size,
-            block_list.size
-        );
-        assert!(size <= block_list.size);
 
         let final_cell = loop {
             unsafe {
                 new_cell.store::<Address>(old_cell);
             }
             old_cell = new_cell;
-            new_cell = new_cell + block_list.size;
-            if new_cell + block_list.size > block_end {
+            new_cell = new_cell + cell_size;
+            if new_cell + cell_size > block_end {
                 break old_cell;
             };
         };
@@ -640,11 +622,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_free_list::<VM>(final_cell);
         block.store_local_free_list::<VM>(unsafe { Address::zero() });
         block.store_thread_free_list::<VM>(unsafe { Address::zero() });
-        block.store_block_cell_size::<VM>(block_list.size);
+        block.store_block_cell_size::<VM>(cell_size);
 
         self.store_block_tls(block);
-        trace!("Acquired fresh block starting at {}", block.start());
-        block
+        
     }
 
     pub fn sweep_block(&self, block: Block) {
@@ -772,33 +753,31 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn abandon_blocks(&mut self) {
-        // assert!(false);
-        eprintln!("{:?} is dying, time to abandon blocks", self.tls);
-        let mut abandoned = self.space.abandoned.lock().unwrap();
+        let mut abandoned = self.space.abandoned_available.lock().unwrap();
+        let mut abandoned_consumed = self.space.abandoned_consumed.lock().unwrap();
         let mut i = 0;
         while i < MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {
-                (*abandoned)[i].append::<VM>(available);
+                abandoned[i].append::<VM>(available);
             }
             
             let available_stress = self.available_blocks_stress.get_mut(i).unwrap();
             if !available_stress.is_empty() {
-                (*abandoned)[i].append::<VM>(available_stress);
+                abandoned[i].append::<VM>(available_stress);
             }
 
             let consumed = self.consumed_blocks.get_mut(i).unwrap();
             if !consumed.is_empty() {
-                (*abandoned)[i].append::<VM>(consumed);
+                abandoned_consumed[i].append::<VM>(consumed);
             }
 
             let unswept = self.unswept_blocks.get_mut(i).unwrap();
             if !unswept.is_empty() {
-                (*abandoned)[i].append::<VM>(unswept);
+                abandoned[i].append::<VM>(unswept);
             }
             i = i + 1;
         }
-        eprintln!("end abandonment");
     }
 
 
