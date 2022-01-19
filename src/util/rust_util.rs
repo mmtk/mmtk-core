@@ -9,43 +9,45 @@ pub const fn min_of_usize(a: usize, b: usize) -> usize {
 
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use std::sync::Once;
 
-/// InitializeOnce creates an uninitialized value that needs to be initialized later. InitializeOnce
+/// InitializeOnce creates an uninitialized value that needs to be manually initialized later. InitializeOnce
 /// guarantees the value is only initialized once. This type is used to allow more efficient reads.
 /// Unlike the `lazy_static!` which checks whether the static is initialized
 /// in every read, InitializeOnce has no extra check for reads.
-pub struct InitializeOnce<T> {
+pub struct InitializeOnce<T: 'static> {
     v: UnsafeCell<MaybeUninit<T>>,
-    initialized: AtomicBool,
+    /// The function that is used to create the initialization value. This will be only called once.
+    init_fn: &'static dyn Fn() -> T,
+    /// This is used to guarantee `init_fn` is only called once.
+    once: Once,
 }
 
 impl<T> InitializeOnce<T> {
-    pub const fn new() -> Self {
+    pub const fn new(init_fn: &'static dyn Fn() -> T) -> Self {
         InitializeOnce {
             v: UnsafeCell::new(MaybeUninit::uninit()),
-            initialized: AtomicBool::new(false),
+            init_fn,
+            once: Once::new(),
         }
     }
 
     /// Initialize the value. This should be called before ever using the struct.
-    pub fn initialize(&self, val: T) {
-        if self
-            .initialized
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-        {
-            unsafe { &mut *self.v.get() }.write(val);
-        }
-        debug_assert!(self.initialized.load(Ordering::SeqCst));
+    /// If this method is called by multiple threads, the first thread will
+    /// initialize the value, and the other threads will be blocked until the
+    /// initialization is done (`Once` returns).
+    pub fn initialize_once(&self) {
+        self.once.call_once(|| {
+            unsafe { &mut *self.v.get() }.write((self.init_fn)());
+        });
+        debug_assert!(self.once.is_completed());
     }
 
-    /// Get the value. This should only be used after initialize()
+    /// Get the value. This should only be used after initialize_once()
     #[inline(always)]
     pub fn get_ref(&self) -> &T {
         // We only assert in debug builds.
-        debug_assert!(self.initialized.load(Ordering::SeqCst));
+        debug_assert!(self.once.is_completed());
         unsafe { (&*self.v.get()).assume_init_ref() }
     }
 }

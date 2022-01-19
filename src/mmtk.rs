@@ -36,7 +36,7 @@ lazy_static! {
 use crate::util::rust_util::InitializeOnce;
 
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
+pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new(&SFTMap::new);
 
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
@@ -62,7 +62,8 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
-        SFT_MAP.initialize(SFTMap::new());
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        SFT_MAP.initialize_once();
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),
