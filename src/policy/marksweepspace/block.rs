@@ -217,7 +217,6 @@ impl Block {
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
         assert!(!self.0.is_zero());
-        // let ptr: *mut BlockList = &mut block_list;
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -237,9 +236,7 @@ impl Block {
             None,
             Some(Ordering::SeqCst),
         );
-        let ptr = unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) };
-        eprintln!("load {}'s list={:?}", self.start(), ptr);
-        ptr
+        unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
     }
 
     pub fn load_block_cell_size<VM: VMBinding>(&self) -> usize {
@@ -324,20 +321,16 @@ impl Block {
                 unsafe {
                     let block_list = loop {
                         let list = self.load_block_list::<VM>();
-                        eprintln!("{} unmarked, list = {:?}", self.start(), list);
                         (*list).lock();
                         if list == self.load_block_list::<VM>() {
                             break list
                         }
-                        eprintln!("block {} was moved to a different list", self.start());
                         (*list).unlock();
                     };
-                    // (*block_list).lock(); 
                     (*block_list).remove::<VM>(self);
                     (*block_list).release_lock();
                 }
                 space.release_block(self);
-                eprintln!("done removing {}", self.start());
                 true
             }
             BlockState::Marked => {

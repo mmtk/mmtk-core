@@ -31,6 +31,7 @@ use crate::util::sanity::sanity_checker::ScheduleSanityGC;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
+use crate::Mutator;
 
 use super::gc_work::{MSProcessEdges};
 
@@ -139,6 +140,22 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &MS_CONSTRAINTS
+    }
+
+    fn create_worker_local(
+        &self,
+        tls: VMWorkerThread,
+        mmtk: &'static MMTK<Self::VM>,
+    ) -> GCWorkerLocalPtr {
+        let mut c = NoCopy::new(mmtk);
+        c.init(tls);
+        GCWorkerLocalPtr::new(c)
+    }
+
+    fn destroy_mutator(&self, mutator: &mut Mutator<VM>) {
+        unsafe { 
+            mutator.allocators.free_list[0].assume_init_mut().abandon_blocks();
+        }
     }
 }
 
