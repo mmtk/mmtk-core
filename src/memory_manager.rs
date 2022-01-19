@@ -93,8 +93,9 @@ pub fn bind_mutator<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM>>) {
-    drop(mutator);
+pub fn destroy_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
+    eprintln!("destroy mutator");
+    mutator.plan.destroy_mutator(mutator);
 }
 
 /// Flush the mutator's local states.

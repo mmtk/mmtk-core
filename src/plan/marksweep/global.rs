@@ -37,6 +37,7 @@ use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
+use crate::Mutator;
 
 #[cfg(feature="malloc")]
 use super::gc_work::MSSweepChunks;
@@ -141,6 +142,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         let mut c = NoCopy::new(mmtk);
         c.init(tls);
         GCWorkerLocalPtr::new(c)
+    }
+
+    fn destroy_mutator(&self, mutator: &mut Mutator<VM>) {
+        unsafe { 
+            mutator.allocators.free_list[0].assume_init_mut().abandon_blocks();
+        }
     }
 }
 

@@ -4,13 +4,18 @@ use std::{
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, heap::{
+use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions, mallocspace::metadata::is_alloced}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}}, vm::VMBinding, memory_manager::is_live_object};
+        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin}, vm::VMBinding, memory_manager::is_live_object};
 
 use super::{super::space::{CommonSpace, Space, SFT}, chunk::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
+use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
+use std::sync::Mutex;
+use crate::util::Address;
+use crate::util::VMThread;
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
@@ -19,6 +24,7 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
+    pub abandoned: Mutex<BlockLists>,
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -140,6 +146,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             common,
             chunk_map: ChunkMap::new(),
             scheduler,
+            abandoned: Mutex::from(BLOCK_LISTS_EMPTY),
         }
     }
 
@@ -176,10 +183,40 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
+    pub fn check_valid_blocklists(&self) {
+        use crate::util::alloc::free_list_allocator::MI_LARGE_OBJ_WSIZE_MAX;
+        use crate::vm::*;
+        for chunk in self.chunk_map.all_chunks() {
+            for block in chunk.blocks() {
+                if block.get_state() != BlockState::Unallocated {
+                    let block_list = block.load_block_list::<VM>();
+                    if !block_list.is_null() {
+                        unsafe {
+                            assert!((*block_list).size == block.load_block_cell_size::<VM>());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn block_has_no_objects(&self, block: Block) -> bool {
+        // for debugging, delete this later
+        // assumes block is allocated (has metadata)
+        let size = block.load_block_cell_size::<VM>();
+        let mut cell = block.start();
+        while cell < block.start() + Block::BYTES {
+            if is_alloced(unsafe { cell.to_object_reference() }) {
+                return false;
+            }
+            cell += size;
+        }
+        return true;
+    }
+
     pub fn record_new_block(&self, block: Block) {
         block.init();
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
-        eprintln!("b > {} {}", block.start(), block.load_block_cell_size::<VM>());
     }
 
     #[inline]
@@ -202,7 +239,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     /// Release a block.
     pub fn release_block(&self, block: Block) {
-        eprintln!("b < {}", block.start());
         self.block_clear_metadata(block);
 
         block.deinit();
@@ -220,5 +256,18 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             )
         }
         bzero_alloc_bit(block.start(), Block::BYTES);
+    }
+
+    pub fn acquire_block(&self, tls: VMThread, size: usize) -> (Address, bool) {
+        // returns true if block is abandoned and recycled, else false
+        //later, change this to return block and init metadata here
+        let bin = mi_bin(size);
+        let mut abandoned = self.abandoned.lock().unwrap();
+        if (abandoned)[bin].is_empty() {
+            (self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE), false)
+        } else {
+            (abandoned[bin].pop::<VM>().start(), true)
+        }
+
     }
 }
