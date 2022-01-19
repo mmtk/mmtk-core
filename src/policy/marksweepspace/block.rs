@@ -382,8 +382,6 @@ pub enum BlockState {
     Unmarked,
     /// the block is allocated and marked.
     Marked,
-    /// the block is marked as reusable.
-    UnmarkedAcknowledged,
 }
 
 impl BlockState {
@@ -393,8 +391,6 @@ impl BlockState {
     const MARK_UNMARKED: u8 = u8::MAX;
     /// Private constant
     const MARK_MARKED: u8 = u8::MAX - 1;
-    // Private constant
-    const MARK_UNMARKED_ACKNOWLEDGED: u8 = u8::MAX - 2;
 }
 
 impl From<u8> for BlockState {
@@ -404,7 +400,6 @@ impl From<u8> for BlockState {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
-            Self::MARK_UNMARKED_ACKNOWLEDGED => BlockState::UnmarkedAcknowledged,
             _ => unreachable!()
         }
     }
@@ -417,7 +412,6 @@ impl From<BlockState> for u8 {
             BlockState::Unallocated => BlockState::MARK_UNALLOCATED,
             BlockState::Unmarked => BlockState::MARK_UNMARKED,
             BlockState::Marked => BlockState::MARK_MARKED,
-            BlockState::UnmarkedAcknowledged => BlockState::MARK_UNMARKED_ACKNOWLEDGED,
         }
     }
 }
