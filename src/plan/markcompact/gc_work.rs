@@ -99,7 +99,7 @@ impl<VM: VMBinding> Compact<VM> {
 // Transitive closure to mark live objects
 pub struct MarkingProcessEdges<VM: VMBinding> {
     plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<MarkingProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> MarkingProcessEdges<VM> {
@@ -137,7 +137,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for MarkingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
@@ -154,7 +154,7 @@ impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
 /// Transitive closure to update object references
 pub struct ForwardingProcessEdges<VM: VMBinding> {
     plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<ForwardingProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> ForwardingProcessEdges<VM> {
@@ -192,7 +192,7 @@ impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for ForwardingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

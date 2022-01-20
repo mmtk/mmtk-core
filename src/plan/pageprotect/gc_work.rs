@@ -11,7 +11,7 @@ pub struct PPProcessEdges<VM: VMBinding> {
     /// Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     /// downcast for each traced object.
     plan: &'static PageProtect<VM>,
-    base: ProcessEdgesBase<PPProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
@@ -41,7 +41,7 @@ impl<VM: VMBinding> ProcessEdgesWork for PPProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for PPProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

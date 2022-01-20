@@ -12,7 +12,7 @@ use std::ops::{Deref, DerefMut};
 // ANCHOR: mygc_process_edges
 pub struct MyGCProcessEdges<VM: VMBinding> {
     plan: &'static MyGC<VM>,
-    base: ProcessEdgesBase<MyGCProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 // ANCHOR_END: mygc_process_edges
 
@@ -61,7 +61,7 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
 
 // ANCHOR: deref
 impl<VM: VMBinding> Deref for MyGCProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base

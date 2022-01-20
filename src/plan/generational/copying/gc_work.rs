@@ -10,7 +10,7 @@ use std::ops::{Deref, DerefMut};
 
 pub struct GenCopyMatureProcessEdges<VM: VMBinding> {
     plan: &'static GenCopy<VM>,
-    base: ProcessEdgesBase<GenCopyMatureProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> GenCopyMatureProcessEdges<VM> {
@@ -51,7 +51,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenCopyMatureProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for GenCopyMatureProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
