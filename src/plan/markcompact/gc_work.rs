@@ -52,6 +52,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
             use crate::plan::global::Plan;
             let plan: &MarkCompact<VM> = mmtk.plan.downcast_ref::<MarkCompact<VM>>().unwrap();
             // This should be the only packet that is executing at the point.
+            #[allow(clippy::cast_ref_to_mut)]
             let plan_mut: &mut MarkCompact<VM> = unsafe { &mut *(plan as *const _ as *mut _) };
             plan_mut.prepare(_worker.tls);
         }
