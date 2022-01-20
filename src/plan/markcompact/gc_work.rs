@@ -46,6 +46,18 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         #[cfg(feature = "extreme_assertions")]
         crate::util::edge_logger::reset();
 
+        // Prepare the plan again and get ready for a second trace. This needs to be done
+        // before any work for the second trace starts.
+        {
+            use crate::plan::global::Plan;
+            let plan: &MarkCompact<VM> = mmtk.plan.downcast_ref::<MarkCompact<VM>>().unwrap();
+            // This should be the only packet that is executing at the point.
+            let plan_mut: &mut MarkCompact<VM> = unsafe { &mut *(plan as *const _ as *mut _) };
+            plan_mut.prepare(_worker.tls);
+        }
+
+        // The following will push work for the second trace.
+
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
@@ -108,6 +120,11 @@ impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
+
+        // record that we have traced this object in trace1
+        #[cfg(debug_assertions)]
+        self.markcompact().trace1.lock().unwrap().insert(object);
+
         if self.markcompact().mc_space().in_space(object) {
             self.markcompact()
                 .mc_space()
@@ -158,6 +175,11 @@ impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
+
+        // record that we have traced this object in trace2
+        #[cfg(debug_assertions)]
+        self.markcompact().trace2.lock().unwrap().insert(object);
+
         if self.markcompact().mc_space().in_space(object) {
             self.markcompact()
                 .mc_space()

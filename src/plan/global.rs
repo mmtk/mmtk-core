@@ -194,8 +194,9 @@ pub trait Plan: 'static + Sync + Downcast {
             .load(Ordering::SeqCst)
     }
 
-    /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
-    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
+    /// Prepare the plan before a transitive closure. This is invoked in an initial step before a transitive closure.
+    /// This is invoked once for each transitive closure by one worker thread. If a plan does multiple traces,
+    /// this method is expected to be called before each trace. 'tls' is the worker thread that executes this method.
     fn prepare(&mut self, tls: VMWorkerThread);
 
     /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific

@@ -27,11 +27,25 @@ use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use std::sync::Arc;
+
+#[cfg(debug_assertions)]
+use std::{collections::HashSet, sync::{Arc, Mutex}};
+#[cfg(debug_assertions)]
+use crate::util::ObjectReference;
 
 pub struct MarkCompact<VM: VMBinding> {
     pub mc_space: MarkCompactSpace<VM>,
     pub common: CommonPlan<VM>,
+
+    // Used for debugging. We need to make sure we trace
+    // the identical object sets in the two traces
+
+    // First trace: marking
+    #[cfg(debug_assertions)]
+    pub trace1: Mutex<HashSet<ObjectReference>>,
+    // Second trace: forwarding
+    #[cfg(debug_assertions)]
+    pub trace2: Mutex<HashSet<ObjectReference>>,
 }
 
 pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -40,6 +54,8 @@ pub const MARKCOMPACT_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_words: 1,
     num_specialized_scans: 2,
     needs_forward_after_liveness: true,
+    max_non_los_default_alloc_bytes:
+        crate::plan::plan_constraints::MAX_NON_LOS_ALLOC_BYTES_COPYING_PLAN,
     ..PlanConstraints::default()
 };
 
@@ -76,6 +92,28 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     fn release(&mut self, _tls: VMWorkerThread) {
         self.common.release(_tls, true);
         self.mc_space.release();
+
+        // Check if the two traces include the same set of objects
+        #[cfg(debug_assertions)]
+        {
+            let trace1 = self.trace1.lock().unwrap();
+            let trace2 = self.trace2.lock().unwrap();
+
+            assert_eq!(
+                trace1.len(),
+                trace2.len(),
+                "We expect two traces have the same number of objects: trace1 = {} objects, trace2 = {} objects",
+                trace1.len(),
+                trace2.len(),
+            );
+            for obj in trace1.iter() {
+                assert!(
+                    trace2.get(obj).is_some(),
+                    "Object {} in trace1 but not in trace 2",
+                    obj
+                );
+            }
+        }
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -83,6 +121,13 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
+        // Before a GC happens, clear the object sets.
+        #[cfg(debug_assertions)]
+        {
+            self.trace1.lock().unwrap().clear();
+            self.trace2.lock().unwrap().clear();
+        }
+
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
 
@@ -192,6 +237,10 @@ impl<VM: VMBinding> MarkCompact<VM> {
                 &MARKCOMPACT_CONSTRAINTS,
                 global_metadata_specs,
             ),
+            #[cfg(debug_assertions)]
+            trace1: Mutex::new(HashSet::new()),
+            #[cfg(debug_assertions)]
+            trace2: Mutex::new(HashSet::new()),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
