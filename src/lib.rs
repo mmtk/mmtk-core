@@ -41,7 +41,7 @@
 //!   * [Work packets](scheduler/work/trait.GCWork.html): units of GC work scheduled by the MMTk's scheduler.
 //! * [GC plans](plan/global/trait.Plan.html): GC algorithms composed from components.
 //! * [Heap implementations](util/heap/index.html): the underlying implementations of memory resources that support spaces.
-//! * [Scheduler](scheduler/scheduler/struct.Scheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC work.
+//! * [Scheduler](scheduler/scheduler/struct.GCWorkScheduler.html): the MMTk scheduler to allow flexible and parallel execution of GC work.
 //! * Interfaces: bi-directional interfaces between MMTk and language implementations
 //!   i.e. [the memory manager API](memory_manager/index.html) that allows a language's memory manager to use MMTk
 //!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.
