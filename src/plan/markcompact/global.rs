@@ -27,11 +27,12 @@ use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
+use std::sync::Arc;
 
 #[cfg(debug_assertions)]
-use std::{collections::HashSet, sync::{Arc, Mutex}};
-#[cfg(debug_assertions)]
 use crate::util::ObjectReference;
+#[cfg(debug_assertions)]
+use std::{collections::HashSet, sync::Mutex};
 
 pub struct MarkCompact<VM: VMBinding> {
     pub mc_space: MarkCompactSpace<VM>,
