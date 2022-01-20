@@ -107,7 +107,7 @@ impl<VM: VMBinding> Gen<VM> {
         space: &dyn Space<VM>,
     ) -> bool {
         let nursery_full = self.nursery.reserved_pages()
-            >= (conversions::bytes_to_pages_up(self.common.base.options.max_nursery));
+            >= (conversions::bytes_to_pages_up(*self.common.base.options.max_nursery));
         if nursery_full {
             return true;
         }
@@ -143,7 +143,7 @@ impl<VM: VMBinding> Gen<VM> {
             .base
             .user_triggered_collection
             .load(Ordering::SeqCst)
-            && self.common.base.options.full_heap_system_gc
+            && *self.common.base.options.full_heap_system_gc
         {
             // User triggered collection, and we force full heap for user triggered collection
             true
@@ -214,7 +214,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check a plan to see if the next GC should be a full heap GC.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
-        plan.get_pages_avail() < conversions::bytes_to_pages_up(plan.base().options.min_nursery)
+        plan.get_pages_avail() < conversions::bytes_to_pages_up(*plan.base().options.min_nursery)
     }
 
     /// Set next_gc_full_heap to the given value.

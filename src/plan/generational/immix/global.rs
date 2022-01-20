@@ -123,7 +123,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
                 true,
                 self.base().cur_collection_attempts.load(Ordering::SeqCst),
                 self.base().is_user_triggered_collection(),
-                self.base().options.full_heap_system_gc,
+                *self.base().options.full_heap_system_gc,
             )
         } else {
             false

@@ -17,6 +17,8 @@ pub mod constants;
 pub mod conversions;
 /// The copy allocators for a GC worker.
 pub mod copy;
+/// Linear scan through a heap range
+pub mod linear_scan;
 /// Wrapper functions for memory syscalls such as mmap, mprotect, etc.
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.
