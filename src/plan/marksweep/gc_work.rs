@@ -17,7 +17,7 @@ use super::MarkSweep;
 
 pub struct MSProcessEdges<VM: VMBinding> {
     plan: &'static MarkSweep<VM>,
-    base: ProcessEdgesBase<MSProcessEdges<VM>>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
@@ -45,7 +45,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
 }
 
 impl<VM: VMBinding> Deref for MSProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.base
