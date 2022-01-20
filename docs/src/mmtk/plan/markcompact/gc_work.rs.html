@@ -278,7 +278,7 @@
 <span class="comment">// Transitive closure to mark live objects</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -311,7 +311,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">MarkingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>
@@ -328,7 +328,7 @@
 <span class="doccomment">/// Transitive closure to update object references</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -361,7 +361,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Deref</span> <span class="kw">for</span> <span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">Target</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">deref</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident"><span class="self">Self</span>::Target</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>

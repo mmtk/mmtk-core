@@ -209,7 +209,7 @@ use std::ops::{Deref, DerefMut};
 </span><span class="boring">fn main() {
 </span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
     plan: &amp;'static MyGC&lt;VM&gt;,
-    base: ProcessEdgesBase&lt;MyGCProcessEdges&lt;VM&gt;&gt;,
+    base: ProcessEdgesBase&lt;VM&gt;,
 }
 <span class="boring">}
 </span></code></pre></pre>
@@ -356,7 +356,7 @@ its spaces (e.g. immortal or large object space):</p>
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-    type Target = ProcessEdgesBase&lt;Self&gt;;
+    type Target = ProcessEdgesBase&lt;VM&gt;;
     #[inline]
     fn deref(&amp;self) -&gt; &amp;Self::Target {
         &amp;self.base
