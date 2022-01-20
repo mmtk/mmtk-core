@@ -53,6 +53,10 @@ pub struct MMTK<VM: VMBinding> {
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
+        // Initialize SFT first in case we need to use this in the constructor.
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        SFT_MAP.initialize_once();
+
         let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan = crate::plan::create_plan(
@@ -62,8 +66,6 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
-        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        SFT_MAP.initialize_once();
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),
