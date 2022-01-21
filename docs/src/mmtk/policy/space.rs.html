@@ -651,6 +651,7 @@
 <span id="650">650</span>
 <span id="651">651</span>
 <span id="652">652</span>
+<span id="653">653</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -788,7 +789,7 @@
 <span class="comment">// TODO: MMTK&lt;VM&gt; holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.</span>
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {}
 
-<span class="kw">static</span> <span class="ident">EMPTY_SPACE_SFT</span>: <span class="ident">EmptySpaceSFT</span> <span class="op">=</span> <span class="ident">EmptySpaceSFT</span> {};
+<span class="kw">const</span> <span class="ident">EMPTY_SPACE_SFT</span>: <span class="ident">EmptySpaceSFT</span> <span class="op">=</span> <span class="ident">EmptySpaceSFT</span> {};
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
@@ -806,7 +807,8 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw">dyn</span> <span class="ident">SFT</span> {
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">address</span>.<span class="ident">chunk_index</span>()];
+        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">chunk_index</span>() <span class="op">&lt;</span> <span class="ident">MAX_CHUNKS</span>);
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">get_unchecked</span>(<span class="ident">address</span>.<span class="ident">chunk_index</span>()) };
         <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
             <span class="macro">trace!</span>(
                 <span class="string">&quot;Get SFT for {} #{} = {}&quot;</span>,

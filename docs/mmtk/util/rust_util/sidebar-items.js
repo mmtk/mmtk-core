@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["min_of_usize","Const funciton for min value of two usize numbers."]]});
+initSidebarItems({"fn":[["min_of_usize","Const funciton for min value of two usize numbers."]],"struct":[["InitializeOnce","InitializeOnce creates an uninitialized value that needs to be manually initialized later. InitializeOnce guarantees the value is only initialized once. This type is used to allow more efficient reads. Unlike the `lazy_static!` which checks whether the static is initialized in every read, InitializeOnce has no extra check for reads."]]});
