@@ -135,7 +135,7 @@ pub struct SFTMap<'a> {
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
 unsafe impl<'a> Sync for SFTMap<'a> {}
 
-static EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
+const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
@@ -153,7 +153,8 @@ impl<'a> SFTMap<'a> {
     }
 
     pub fn get(&self, address: Address) -> &'a dyn SFT {
-        let res = self.sft[address.chunk_index()];
+        debug_assert!(address.chunk_index() < MAX_CHUNKS);
+        let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
