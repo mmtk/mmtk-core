@@ -517,7 +517,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
             // sft.sft_trace_object(trace, object, worker)
 
             // enum dispatch
-            let sft = unsafe { crate::mmtk::SFT_MAP.assume_init_ref() }.get_dispatch(object.to_address());
+            let sft = crate::mmtk::SFT_MAP.get_dispatch(object.to_address());
             sft.sft_trace_object::<VM>(trace, object, worker)
         }
     }

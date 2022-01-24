@@ -33,9 +33,10 @@ lazy_static! {
     pub static ref MMAPPER: Mmapper = Mmapper::new();
 }
 
-use std::mem::MaybeUninit;
+use crate::util::rust_util::InitializeOnce;
+
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-pub static mut SFT_MAP: MaybeUninit<SFTMap<'static>> = MaybeUninit::uninit();
+pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new(&SFTMap::new);
 
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
@@ -52,6 +53,10 @@ pub struct MMTK<VM: VMBinding> {
 
 impl<VM: VMBinding> MMTK<VM> {
     pub fn new() -> Self {
+        // Initialize SFT first in case we need to use this in the constructor.
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        SFT_MAP.initialize_once();
+
         let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
         let plan = crate::plan::create_plan(
@@ -61,7 +66,6 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
-        unsafe { SFT_MAP = MaybeUninit::new(SFTMap::new()) };
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),

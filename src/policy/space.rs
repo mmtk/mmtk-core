@@ -226,7 +226,7 @@ impl<'a> SFTMap<'a> {
 
     pub fn get(&self, address: Address) -> &'a dyn SFT {
         debug_assert!(address.chunk_index() < MAX_CHUNKS);
-        let res = unsafe { self.sft.get_unchecked(address.chunk_index()) };
+        let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
                 "Get SFT for {} #{} = {}",
@@ -235,7 +235,7 @@ impl<'a> SFTMap<'a> {
                 res.name()
             );
         }
-        *res
+        res
     }
 
     #[inline(always)]
@@ -463,7 +463,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.as_dispatch(), start, bytes);
+            SFT_MAP.update(self.as_sft(), self.as_dispatch(), start, bytes);
         }
     }
 
@@ -481,7 +481,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        unsafe { SFT_MAP.assume_init_ref() }.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
+        SFT_MAP.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -715,7 +715,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            unsafe { SFT_MAP.assume_init_ref() }.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
+            SFT_MAP.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
         }
     }
 

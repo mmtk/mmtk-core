@@ -141,12 +141,11 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
 
 // #[derive(Default)]
 pub struct SanityGCProcessEdges<VM: VMBinding> {
-    base: ProcessEdgesBase<SanityGCProcessEdges<VM>>,
-    // phantom: PhantomData<VM>,
+    base: ProcessEdgesBase<VM>,
 }
 
 impl<VM: VMBinding> Deref for SanityGCProcessEdges<VM> {
-    type Target = ProcessEdgesBase<Self>;
+    type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
