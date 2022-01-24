@@ -88,89 +88,89 @@ pub(in crate::plan) enum TraceKind {
 //     }
 // }
 
-pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
-    // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
-    // downcast for each traced object.
-    plan: &'static Immix<VM>,
-    base: ProcessEdgesBase<VM>,
-}
+// pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
+//     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
+//     // downcast for each traced object.
+//     plan: &'static Immix<VM>,
+//     base: ProcessEdgesBase<VM>,
+// }
 
-impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
-    fn immix(&self) -> &'static Immix<VM> {
-        self.plan
-    }
-}
+// impl<VM: VMBinding, const KIND: TraceKind> ImmixProcessEdges<VM, KIND> {
+//     fn immix(&self) -> &'static Immix<VM> {
+//         self.plan
+//     }
+// }
 
-impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdges<VM, KIND> {
-    type VM = VM;
+// impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdges<VM, KIND> {
+//     type VM = VM;
 
-    const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
+//     const OVERWRITE_REFERENCE: bool = crate::policy::immix::DEFRAG;
 
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
-        Self { plan, base }
-    }
+//     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+//         let base = ProcessEdgesBase::new(edges, roots, mmtk);
+//         let plan = base.plan().downcast_ref::<Immix<VM>>().unwrap();
+//         Self { plan, base }
+//     }
 
-    #[cold]
-    fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
-        let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
-            self.pop_nodes(),
-            false,
-            &self.immix().immix_space,
-        );
-        self.new_scan_work(box scan_objects_work);
-    }
+//     #[cold]
+//     fn flush(&mut self) {
+//         if self.nodes.is_empty() {
+//             return;
+//         }
+//         let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
+//             self.pop_nodes(),
+//             false,
+//             &self.immix().immix_space,
+//         );
+//         self.new_scan_work(box scan_objects_work);
+//     }
 
-    /// Trace  and evacuate objects.
-    #[inline(always)]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.immix().immix_space.in_space(object) {
-            if KIND == TraceKind::Fast {
-                self.immix().immix_space.fast_trace_object(self, object)
-            } else {
-                self.immix().immix_space.trace_object(
-                    self,
-                    object,
-                    CopySemantics::DefaultCopy,
-                    self.worker(),
-                )
-            }
-        } else {
-            self.immix().common.trace_object::<Self>(self, object)
-        }
-    }
+//     /// Trace  and evacuate objects.
+//     #[inline(always)]
+//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+//         if object.is_null() {
+//             return object;
+//         }
+//         if self.immix().immix_space.in_space(object) {
+//             if KIND == TraceKind::Fast {
+//                 self.immix().immix_space.fast_trace_object(self, object)
+//             } else {
+//                 self.immix().immix_space.trace_object(
+//                     self,
+//                     object,
+//                     CopySemantics::DefaultCopy,
+//                     self.worker(),
+//                 )
+//             }
+//         } else {
+//             self.immix().common.trace_object::<Self>(self, object)
+//         }
+//     }
 
-    #[inline]
-    fn process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
-        if KIND == TraceKind::Defrag && Self::OVERWRITE_REFERENCE {
-            unsafe { slot.store(new_object) };
-        }
-    }
-}
+//     #[inline]
+//     fn process_edge(&mut self, slot: Address) {
+//         let object = unsafe { slot.load::<ObjectReference>() };
+//         let new_object = self.trace_object(object);
+//         if KIND == TraceKind::Defrag && Self::OVERWRITE_REFERENCE {
+//             unsafe { slot.store(new_object) };
+//         }
+//     }
+// }
 
-impl<VM: VMBinding, const KIND: TraceKind> Deref for ImmixProcessEdges<VM, KIND> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+// impl<VM: VMBinding, const KIND: TraceKind> Deref for ImmixProcessEdges<VM, KIND> {
+//     type Target = ProcessEdgesBase<VM>;
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.base
+//     }
+// }
 
-impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KIND> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+// impl<VM: VMBinding, const KIND: TraceKind> DerefMut for ImmixProcessEdges<VM, KIND> {
+//     #[inline]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.base
+//     }
+// }
 
 use crate::scheduler::gc_work::MMTkProcessEdges;
 pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
@@ -181,5 +181,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type ProcessEdgesWorkType = ImmixProcessEdges<VM, KIND>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }
