@@ -89,8 +89,6 @@ pub trait SFT {
 use crate::util::erase_vm::define_erased_vm_mut_ref;
 define_erased_vm_mut_ref!(MMTkProcessEdgesMutRef = MMTkProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
-use crate::plan::semispace::gc_work::SSProcessEdges;
-define_erased_vm_mut_ref!(SSProcessEdgesMutRef = SSProcessEdges<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
