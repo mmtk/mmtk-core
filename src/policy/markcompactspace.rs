@@ -59,7 +59,9 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
 
     #[inline(always)]
     fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
-        unimplemented!()
+        // We should not use sft_trace_object for markcompact space.
+        // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
+        unreachable!()
     }
 }
 
@@ -94,7 +96,9 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     #[inline(always)]
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
-        unimplemented!()
+        // We should not use sft_trace_object for markcompact space.
+        // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
+        unreachable!()
     }
 }
 
