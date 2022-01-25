@@ -15,49 +15,49 @@ use std::sync::atomic::Ordering;
 
 use super::MarkSweep;
 
-pub struct MSProcessEdges<VM: VMBinding> {
-    plan: &'static MarkSweep<VM>,
-    base: ProcessEdgesBase<VM>,
-}
+// pub struct MSProcessEdges<VM: VMBinding> {
+//     plan: &'static MarkSweep<VM>,
+//     base: ProcessEdgesBase<VM>,
+// }
 
-impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
-    type VM = VM;
+// impl<VM: VMBinding> ProcessEdgesWork for MSProcessEdges<VM> {
+//     type VM = VM;
 
-    const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
-        Self { plan, base }
-    }
+//     const OVERWRITE_REFERENCE: bool = false;
+//     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+//         let base = ProcessEdgesBase::new(edges, roots, mmtk);
+//         let plan = base.plan().downcast_ref::<MarkSweep<VM>>().unwrap();
+//         Self { plan, base }
+//     }
 
-    #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        trace!("Tracing object {}", object);
-        if self.plan.ms_space().in_space(object) {
-            self.plan.ms_space().trace_object::<Self>(self, object)
-        } else {
-            self.plan.common().trace_object::<Self>(self, object)
-        }
-    }
-}
+//     #[inline]
+//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+//         if object.is_null() {
+//             return object;
+//         }
+//         trace!("Tracing object {}", object);
+//         if self.plan.ms_space().in_space(object) {
+//             self.plan.ms_space().trace_object::<Self>(self, object)
+//         } else {
+//             self.plan.common().trace_object::<Self>(self, object)
+//         }
+//     }
+// }
 
-impl<VM: VMBinding> Deref for MSProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+// impl<VM: VMBinding> Deref for MSProcessEdges<VM> {
+//     type Target = ProcessEdgesBase<VM>;
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.base
+//     }
+// }
 
-impl<VM: VMBinding> DerefMut for MSProcessEdges<VM> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+// impl<VM: VMBinding> DerefMut for MSProcessEdges<VM> {
+//     #[inline]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.base
+//     }
+// }
 
 /// Simple work packet that just sweeps a single chunk
 pub struct MSSweepChunk<VM: VMBinding> {
@@ -117,9 +117,11 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
     }
 }
 
+use crate::scheduler::gc_work::MMTkProcessEdges;
+
 pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
-    type ProcessEdgesWorkType = MSProcessEdges<VM>;
+    type ProcessEdgesWorkType = MMTkProcessEdges<VM>;
 }
