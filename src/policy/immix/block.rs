@@ -158,7 +158,7 @@ impl Block {
         let byte =
             side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
                 as u8;
-        debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
+        // debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
 

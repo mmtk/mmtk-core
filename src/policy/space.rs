@@ -502,6 +502,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference;
 
+    /// What copy semantic we should use for this space if we copy objects from this space
     fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
     }

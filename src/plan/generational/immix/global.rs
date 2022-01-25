@@ -161,9 +161,9 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
         self.gen.prepare(tls);
+        self.immix.set_copy_semantics(Some(CopySemantics::Mature));
         if full_heap {
             self.immix.prepare(full_heap);
-            self.immix.set_copy_semantics(Some(CopySemantics::Mature));
         }
     }
 
