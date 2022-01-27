@@ -14,7 +14,7 @@ use DummyVM;
 use SINGLETON;
 
 #[no_mangle]
-pub extern "C" fn gc_init(heap_size: usize) {
+pub extern "C" fn mmtk_gc_init(heap_size: usize) {
     // # Safety
     // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
     #[allow(clippy::cast_ref_to_mut)]
@@ -23,22 +23,22 @@ pub extern "C" fn gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn start_control_collector(tls: VMWorkerThread) {
+pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread) {
     memory_manager::start_control_collector(&SINGLETON, tls);
 }
 
 #[no_mangle]
-pub extern "C" fn bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyVM> {
+pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyVM> {
     Box::into_raw(memory_manager::bind_mutator(&SINGLETON, tls))
 }
 
 #[no_mangle]
-pub extern "C" fn destroy_mutator(mutator: *mut Mutator<DummyVM>) {
+pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
     memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
 }
 
 #[no_mangle]
-pub extern "C" fn alloc(mutator: *mut Mutator<DummyVM>, size: usize,
+pub extern "C" fn mmtk_alloc(mutator: *mut Mutator<DummyVM>, size: usize,
                     align: usize, offset: isize, mut semantics: AllocationSemantics) -> Address {
     if size >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
@@ -47,7 +47,7 @@ pub extern "C" fn alloc(mutator: *mut Mutator<DummyVM>, size: usize,
 }
 
 #[no_mangle]
-pub extern "C" fn post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectReference,
+pub extern "C" fn mmtk_post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectReference,
                                         bytes: usize, mut semantics: AllocationSemantics) {
     if bytes >= SINGLETON.get_plan().constraints().max_non_los_default_alloc_bytes {
         semantics = AllocationSemantics::Los;
@@ -56,108 +56,108 @@ pub extern "C" fn post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectRefere
 }
 
 #[no_mangle]
-pub extern "C" fn will_never_move(object: ObjectReference) -> bool {
+pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
     !object.is_movable()
 }
 
 #[no_mangle]
-pub extern "C" fn start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>, mmtk: &'static MMTK<DummyVM>) {
+pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>, mmtk: &'static MMTK<DummyVM>) {
     memory_manager::start_worker::<DummyVM>(tls, worker, mmtk)
 }
 
 #[no_mangle]
-pub extern "C" fn initialize_collection(tls: VMThread) {
+pub extern "C" fn mmtk_initialize_collection(tls: VMThread) {
     memory_manager::initialize_collection(&SINGLETON, tls)
 }
 
 #[no_mangle]
-pub extern "C" fn disable_collection() {
+pub extern "C" fn mmtk_disable_collection() {
     memory_manager::disable_collection(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn enable_collection() {
+pub extern "C" fn mmtk_enable_collection() {
     memory_manager::enable_collection(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn used_bytes() -> usize {
+pub extern "C" fn mmtk_used_bytes() -> usize {
     memory_manager::used_bytes(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn free_bytes() -> usize {
+pub extern "C" fn mmtk_free_bytes() -> usize {
     memory_manager::free_bytes(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn total_bytes() -> usize {
+pub extern "C" fn mmtk_total_bytes() -> usize {
     memory_manager::total_bytes(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn is_live_object(object: ObjectReference) -> bool{
+pub extern "C" fn mmtk_is_live_object(object: ObjectReference) -> bool{
     object.is_live()
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_object(object: ObjectReference) -> bool {
+pub extern "C" fn mmtk_is_mapped_object(object: ObjectReference) -> bool {
     object.is_mapped()
 }
 
 #[no_mangle]
-pub extern "C" fn is_mapped_address(address: Address) -> bool {
+pub extern "C" fn mmtk_is_mapped_address(address: Address) -> bool {
     address.is_mapped()
 }
 
 #[no_mangle]
-pub extern "C" fn modify_check(object: ObjectReference) {
+pub extern "C" fn mmtk_modify_check(object: ObjectReference) {
     memory_manager::modify_check(&SINGLETON, object)
 }
 
 #[no_mangle]
-pub extern "C" fn handle_user_collection_request(tls: VMMutatorThread) {
+pub extern "C" fn mmtk_handle_user_collection_request(tls: VMMutatorThread) {
     memory_manager::handle_user_collection_request::<DummyVM>(&SINGLETON, tls);
 }
 
 #[no_mangle]
-pub extern "C" fn add_weak_candidate(reff: ObjectReference, referent: ObjectReference) {
+pub extern "C" fn mmtk_add_weak_candidate(reff: ObjectReference, referent: ObjectReference) {
     memory_manager::add_weak_candidate(&SINGLETON, reff, referent)
 }
 
 #[no_mangle]
-pub extern "C" fn add_soft_candidate(reff: ObjectReference, referent: ObjectReference) {
+pub extern "C" fn mmtk_add_soft_candidate(reff: ObjectReference, referent: ObjectReference) {
     memory_manager::add_soft_candidate(&SINGLETON, reff, referent)
 }
 
 #[no_mangle]
-pub extern "C" fn add_phantom_candidate(reff: ObjectReference, referent: ObjectReference) {
+pub extern "C" fn mmtk_add_phantom_candidate(reff: ObjectReference, referent: ObjectReference) {
     memory_manager::add_phantom_candidate(&SINGLETON, reff, referent)
 }
 
 #[no_mangle]
-pub extern "C" fn harness_begin(tls: VMMutatorThread) {
+pub extern "C" fn mmtk_harness_begin(tls: VMMutatorThread) {
     memory_manager::harness_begin(&SINGLETON, tls)
 }
 
 #[no_mangle]
-pub extern "C" fn harness_end() {
+pub extern "C" fn mmtk_harness_end() {
     memory_manager::harness_end(&SINGLETON)
 }
 
 #[no_mangle]
-pub extern "C" fn process(name: *const c_char, value: *const c_char) -> bool {
+pub extern "C" fn mmtk_process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
     memory_manager::process(&SINGLETON, name_str.to_str().unwrap(), value_str.to_str().unwrap())
 }
 
 #[no_mangle]
-pub extern "C" fn starting_heap_address() -> Address {
+pub extern "C" fn mmtk_starting_heap_address() -> Address {
     memory_manager::starting_heap_address()
 }
 
 #[no_mangle]
-pub extern "C" fn last_heap_address() -> Address {
+pub extern "C" fn mmtk_last_heap_address() -> Address {
     memory_manager::last_heap_address()
 }
