@@ -9,9 +9,9 @@ use mmtk::AllocationSemantics;
 pub fn allocate_without_initialize_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
-    gc_init(MB);
-    let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+    mmtk_gc_init(MB);
+    let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
     // Attempt to allocate 2MB memory. This should trigger a GC, but as we never call initialize_collection(), we cannot do GC.
-    let addr = alloc(handle, 2 * MB, 8, 0, AllocationSemantics::Default);
+    let addr = mmtk_alloc(handle, 2 * MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
 }

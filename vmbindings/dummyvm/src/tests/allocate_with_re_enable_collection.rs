@@ -9,18 +9,18 @@ use mmtk::AllocationSemantics;
 pub fn allocate_with_re_enable_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
-    gc_init(MB);
-    initialize_collection(VMThread::UNINITIALIZED);
-    let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+    mmtk_gc_init(MB);
+    mmtk_initialize_collection(VMThread::UNINITIALIZED);
+    let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
     // Allocate 1MB. It should be fine.
-    let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
     // Disable GC. So we can keep allocate without triggering a GC.
-    disable_collection();
-    let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    mmtk_disable_collection();
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
     // Enable GC again. When we allocate, we should see a GC triggered immediately.
-    enable_collection();
-    let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    mmtk_enable_collection();
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
 }

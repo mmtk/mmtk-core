@@ -8,15 +8,15 @@ use mmtk::AllocationSemantics;
 pub fn allocate_with_disable_collection() {
     const MB: usize = 1024 * 1024;
     // 1MB heap
-    gc_init(MB);
-    initialize_collection(VMThread::UNINITIALIZED);
-    let handle = bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+    mmtk_gc_init(MB);
+    mmtk_initialize_collection(VMThread::UNINITIALIZED);
+    let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
     // Allocate 1MB. It should be fine.
-    let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
     // Disable GC
-    disable_collection();
+    mmtk_disable_collection();
     // Allocate another MB. This exceeds the heap size. But as we have disabled GC, MMTk will not trigger a GC, and allow this allocation.
-    let addr = alloc(handle, MB, 8, 0, AllocationSemantics::Default);
+    let addr = mmtk_alloc(handle, MB, 8, 0, AllocationSemantics::Default);
     assert!(!addr.is_zero());
 }
