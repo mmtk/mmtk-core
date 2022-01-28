@@ -415,6 +415,10 @@
 <span id="414">414</span>
 <span id="415">415</span>
 <span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">WorkerGroup</span>};
@@ -439,7 +443,7 @@
     <span class="doccomment">/// Work for the coordinator thread</span>
     <span class="kw">pub</span> <span class="ident">coordinator_work</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// workers</span>
-    <span class="ident">worker_group</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">worker_group</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Condition Variable for worker synchronization</span>
     <span class="kw">pub</span> <span class="ident">worker_monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>,
     <span class="ident">mmtk</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
@@ -521,16 +525,16 @@
         <span class="ident">self_mut</span>.<span class="ident">mmtk</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mmtk</span>);
         <span class="ident">self_mut</span>.<span class="ident">coordinator_worker</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">RwLock::new</span>(<span class="ident">GCWorker::new</span>(
             <span class="number">0</span>,
-            <span class="ident">Arc::downgrade</span>(<span class="self">self</span>),
+            <span class="self">self</span>.<span class="ident">clone</span>(),
             <span class="bool-val">true</span>,
             <span class="self">self</span>.<span class="ident">channel</span>.<span class="number">0</span>.<span class="ident">clone</span>(),
         )));
-        <span class="ident">self_mut</span>.<span class="ident">worker_group</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">WorkerGroup::new</span>(
-            <span class="ident">num_workers</span>,
-            <span class="ident">Arc::downgrade</span>(<span class="self">self</span>),
-            <span class="self">self</span>.<span class="ident">channel</span>.<span class="number">0</span>.<span class="ident">clone</span>(),
-        ));
-        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">spawn_workers</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
+        <span class="kw">let</span> (<span class="ident">worker_group</span>, <span class="ident">spawn_workers</span>) <span class="op">=</span>
+            <span class="ident">WorkerGroup::new</span>(<span class="ident">num_workers</span>, <span class="self">self</span>.<span class="ident">clone</span>(), <span class="self">self</span>.<span class="ident">channel</span>.<span class="number">0</span>.<span class="ident">clone</span>());
+        <span class="ident">self_mut</span>.<span class="ident">worker_group</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">worker_group</span>);
+        <span class="comment">// FIXME: because of the `Arc::get_mut_unchanged` above, we are now mutating the scheduler</span>
+        <span class="comment">// while the spawned workers already have access to the scheduler.</span>
+        <span class="ident">spawn_workers</span>(<span class="ident">tls</span>);
 
         {
             <span class="comment">// Unconstrained is always open. Prepare will be opened at the beginning of a GC.</span>
@@ -640,8 +644,8 @@
         <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>);
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_group</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">clone</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_group</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">all_buckets_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
@@ -747,8 +751,8 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">pop_scheduable_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">bool</span>)<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">local_work_bucket</span>.<span class="ident">poll</span>() {
-            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">worker</span>.<span class="ident">local_work_bucket</span>.<span class="ident">is_empty</span>()));
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">local_work_bucket</span>.<span class="ident">poll</span>() {
+            <span class="kw">return</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">local_work_bucket</span>.<span class="ident">is_empty</span>()));
         }
         <span class="kw">for</span> <span class="ident">work_bucket</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">values</span>() {
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="ident">work_bucket</span>.<span class="ident">poll</span>() {
@@ -777,10 +781,10 @@
 
     <span class="attribute">#[<span class="ident">cold</span>]</span>
     <span class="kw">fn</span> <span class="ident">poll_slow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">is_parked</span>());
+        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">is_parked</span>());
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">loop</span> {
-            <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">is_parked</span>());
+            <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">is_parked</span>());
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">work</span>, <span class="ident">bucket_is_empty</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">pop_scheduable_work</span>(<span class="ident">worker</span>) {
                 <span class="kw">if</span> <span class="ident">bucket_is_empty</span> {
                     <span class="ident">worker</span>
@@ -791,7 +795,7 @@
                 <span class="kw">return</span> <span class="ident">work</span>;
             }
             <span class="comment">// Park this worker</span>
-            <span class="ident">worker</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">all_parked</span>() {
                 <span class="ident">worker</span>
                     .<span class="ident">sender</span>
@@ -801,25 +805,29 @@
             <span class="comment">// Wait</span>
             <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">wait</span>(<span class="ident">guard</span>).<span class="ident">unwrap</span>();
             <span class="comment">// Unpark this worker</span>
-            <span class="ident">worker</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+            <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
         }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_stat</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">for</span> <span class="ident">worker</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">workers</span> {
-            <span class="ident">worker</span>.<span class="ident">stat</span>.<span class="ident">enable</span>();
+        <span class="kw">for</span> <span class="ident">worker</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">workers_shared</span> {
+            <span class="kw">let</span> <span class="ident">worker_stat</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">borrow_stat</span>();
+            <span class="ident">worker_stat</span>.<span class="ident">enable</span>();
         }
         <span class="kw">let</span> <span class="ident">coordinator_worker</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">coordinator_worker</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">read</span>().<span class="ident">unwrap</span>();
-        <span class="ident">coordinator_worker</span>.<span class="ident">stat</span>.<span class="ident">enable</span>();
+        <span class="kw">let</span> <span class="ident">coordinator_worker_stat</span> <span class="op">=</span> <span class="ident">coordinator_worker</span>.<span class="ident">shared</span>.<span class="ident">borrow_stat</span>();
+        <span class="ident">coordinator_worker_stat</span>.<span class="ident">enable</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">statistics</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">HashMap</span><span class="op">&lt;</span><span class="ident">String</span>, <span class="ident">String</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">summary</span> <span class="op">=</span> <span class="ident">SchedulerStat::default</span>();
-        <span class="kw">for</span> <span class="ident">worker</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">workers</span> {
-            <span class="ident">summary</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">worker</span>.<span class="ident">stat</span>);
+        <span class="kw">for</span> <span class="ident">worker</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">worker_group</span>().<span class="ident">workers_shared</span> {
+            <span class="kw">let</span> <span class="ident">worker_stat</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">borrow_stat</span>();
+            <span class="ident">summary</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">worker_stat</span>);
         }
         <span class="kw">let</span> <span class="ident">coordinator_worker</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">coordinator_worker</span>.<span class="ident">as_ref</span>().<span class="ident">unwrap</span>().<span class="ident">read</span>().<span class="ident">unwrap</span>();
-        <span class="ident">summary</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">coordinator_worker</span>.<span class="ident">stat</span>);
+        <span class="kw">let</span> <span class="ident">coordinator_worker_stat</span> <span class="op">=</span> <span class="ident">coordinator_worker</span>.<span class="ident">shared</span>.<span class="ident">borrow_stat</span>();
+        <span class="ident">summary</span>.<span class="ident">merge</span>(<span class="kw-2">&amp;</span><span class="ident">coordinator_worker_stat</span>);
         <span class="ident">summary</span>.<span class="ident">harness_stat</span>()
     }
 

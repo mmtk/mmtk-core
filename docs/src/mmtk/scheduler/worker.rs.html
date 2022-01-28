@@ -147,6 +147,44 @@
 <span id="146">146</span>
 <span id="147">147</span>
 <span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::WorkerLocalStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -154,50 +192,78 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::GCWorkerCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">Collection</span>, <span class="ident">VMBinding</span>};
+<span class="kw">use</span> <span class="ident">atomic_refcell</span>::{<span class="ident">AtomicRef</span>, <span class="ident">AtomicRefCell</span>, <span class="ident">AtomicRefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
 <span class="kw">use</span> <span class="ident">std::sync::mpsc::Sender</span>;
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Weak</span>};
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">const</span> <span class="ident">LOCALLY_CACHED_WORKS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
+<span class="doccomment">/// The part shared between a GCWorker and the scheduler.</span>
+<span class="doccomment">/// This structure is used for communication, e.g. adding new work packets.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">parked</span>: <span class="ident">AtomicBool</span>,
+    <span class="ident">stat</span>: <span class="ident">AtomicRefCell</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">local_work_bucket</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+}
+
+<span class="doccomment">/// A GC worker.  This part is privately owned by a worker thread.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="kw">pub</span> <span class="ident">ordinal</span>: <span class="ident">usize</span>,
-    <span class="kw">pub</span> <span class="ident">parked</span>: <span class="ident">AtomicBool</span>,
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">copy</span>: <span class="ident">GCWorkerCopyContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">local_work_bucket</span>: <span class="ident">WorkBucket</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">stat</span>: <span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">mmtk</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,
     <span class="ident">local_work_buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span>(<span class="ident">WorkBucketStage</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>)<span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">shared</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
-<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Send</span> <span class="kw">for</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
+
+<span class="comment">// Error message for borrowing `GCWorkerShared::stat`.</span>
+<span class="kw">const</span> <span class="ident">STAT_BORROWED_MSG</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="string">&quot;GCWorkerShared.stat is already borrowed.  This may happen if \
+    the mutator calls harness_begin or harness_end while the GC is running.&quot;</span>;
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">borrow_stat</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicRef</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">stat</span>.<span class="ident">try_borrow</span>().<span class="ident">expect</span>(<span class="ident">STAT_BORROWED_MSG</span>)
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">borrow_stat_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">AtomicRefMut</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">stat</span>.<span class="ident">try_borrow_mut</span>().<span class="ident">expect</span>(<span class="ident">STAT_BORROWED_MSG</span>)
+    }
+}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">ordinal</span>: <span class="ident">usize</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,
         <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">upgrade</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">worker_monitor</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">worker_monitor</span>.<span class="ident">clone</span>();
         <span class="self">Self</span> {
             <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread::UNINITIALIZED</span>),
             <span class="ident">ordinal</span>,
-            <span class="ident">parked</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>),
             <span class="comment">// We will set this later</span>
             <span class="ident">copy</span>: <span class="ident">GCWorkerCopyContext::new_non_copy</span>(),
-            <span class="ident">local_work_bucket</span>: <span class="ident">WorkBucket::new</span>(<span class="bool-val">true</span>, <span class="ident">scheduler</span>.<span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">sender</span>,
             <span class="ident">scheduler</span>,
-            <span class="ident">stat</span>: <span class="ident">Default::default</span>(),
             <span class="ident">mmtk</span>: <span class="prelude-val">None</span>,
             <span class="ident">is_coordinator</span>,
             <span class="ident">local_work_buffer</span>: <span class="ident">Vec::with_capacity</span>(<span class="ident">LOCALLY_CACHED_WORKS</span>),
+            <span class="ident">shared</span>: <span class="ident">Arc::new</span>(<span class="ident">GCWorkerShared</span> {
+                <span class="ident">parked</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>),
+                <span class="ident">stat</span>: <span class="ident">Default::default</span>(),
+                <span class="ident">local_work_bucket</span>: <span class="ident">WorkBucket::new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>),
+            }),
         }
     }
 
@@ -222,10 +288,6 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
-    }
-
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_coordinator</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">is_coordinator</span>
     }
@@ -246,53 +308,67 @@
         <span class="self">self</span>.<span class="ident">tls</span> <span class="op">=</span> <span class="ident">tls</span>;
         <span class="self">self</span>.<span class="ident">copy</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::create_gc_worker_context</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
         <span class="self">self</span>.<span class="ident">mmtk</span> <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">mmtk</span>);
-        <span class="self">self</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">parked</span>.<span class="ident">store</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="kw">loop</span> {
             <span class="kw">while</span> <span class="kw">let</span> <span class="prelude-val">Some</span>((<span class="ident">bucket</span>, <span class="kw-2">mut</span> <span class="ident">work</span>)) <span class="op">=</span> <span class="self">self</span>.<span class="ident">local_work_buffer</span>.<span class="ident">pop</span>() {
                 <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">bucket</span>].<span class="ident">is_activated</span>());
                 <span class="ident">work</span>.<span class="ident">do_work_with_stat</span>(<span class="self">self</span>, <span class="ident">mmtk</span>);
             }
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">poll</span>(<span class="self">self</span>);
-            <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">is_parked</span>());
+            <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">is_parked</span>());
             <span class="ident">work</span>.<span class="ident">do_work_with_stat</span>(<span class="self">self</span>, <span class="ident">mmtk</span>);
         }
     }
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="ident">workers</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">workers_shared</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">WorkerGroup</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">workers</span>: <span class="ident">usize</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Weak</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="ident">Arc::new</span>(<span class="self">Self</span> {
-            <span class="ident">workers</span>: (<span class="number">0</span>..<span class="ident">workers</span>)
-                .<span class="ident">map</span>(<span class="op">|</span><span class="ident">i</span><span class="op">|</span> <span class="ident">GCWorker::new</span>(<span class="ident">i</span>, <span class="ident">scheduler</span>.<span class="ident">clone</span>(), <span class="bool-val">false</span>, <span class="ident">sender</span>.<span class="ident">clone</span>()))
-                .<span class="ident">collect</span>(),
-        })
+    ) -&gt; (<span class="self">Self</span>, <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">FnOnce</span>(<span class="ident">VMThread</span>)<span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">workers_shared</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">workers_to_spawn</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
+
+        <span class="kw">for</span> <span class="ident">ordinal</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">workers</span> {
+            <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">GCWorker::new</span>(
+                <span class="ident">ordinal</span>,
+                <span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+                <span class="bool-val">false</span>,
+                <span class="ident">sender</span>.<span class="ident">clone</span>(),
+            ));
+            <span class="kw">let</span> <span class="ident">worker_shared</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">clone</span>();
+            <span class="ident">workers_shared</span>.<span class="ident">push</span>(<span class="ident">worker_shared</span>);
+            <span class="ident">workers_to_spawn</span>.<span class="ident">push</span>(<span class="ident">worker</span>);
+        }
+
+        <span class="comment">// NOTE: We cannot call spawn_worker_thread here,</span>
+        <span class="comment">// because the worker will access `Scheduler::worker_group` immediately after started,</span>
+        <span class="comment">// but that field will not be assigned to before this function returns.</span>
+        <span class="comment">// Therefore we defer the spawning operation later.</span>
+        <span class="kw">let</span> <span class="ident">deferred_spawn</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="kw">move</span> <span class="op">|</span><span class="ident">tls</span><span class="op">|</span> {
+            <span class="kw">for</span> <span class="ident">worker</span> <span class="kw">in</span> <span class="ident">workers_to_spawn</span>.<span class="ident">drain</span>(..) {
+                <span class="ident">VM::VMCollection::spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">Some</span>(<span class="ident">worker</span>));
+            }
+        });
+
+        (<span class="self">Self</span> { <span class="ident">workers_shared</span> }, <span class="ident">deferred_spawn</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">worker_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">len</span>()
+        <span class="self">self</span>.<span class="ident">workers_shared</span>.<span class="ident">len</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">parked_workers</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">workers</span>.<span class="ident">iter</span>().<span class="ident">filter</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">is_parked</span>()).<span class="ident">count</span>()
+        <span class="self">self</span>.<span class="ident">workers_shared</span>.<span class="ident">iter</span>().<span class="ident">filter</span>(<span class="op">|</span><span class="ident">w</span><span class="op">|</span> <span class="ident">w</span>.<span class="ident">is_parked</span>()).<span class="ident">count</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_parked</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">parked_workers</span>() <span class="op">==</span> <span class="self">self</span>.<span class="ident">worker_count</span>()
-    }
-
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spawn_workers</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> <span class="number">0</span>..<span class="self">self</span>.<span class="ident">worker_count</span>() {
-            <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">workers</span>[<span class="ident">i</span>];
-            <span class="ident">VM::VMCollection::spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">Some</span>(<span class="ident">worker</span>));
-        }
     }
 }
 </code></pre></div>

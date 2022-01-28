@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["LOCALLY_CACHED_WORKS",""]],"struct":[["GCWorker",""],["WorkerGroup",""]]});
+initSidebarItems({"constant":[["LOCALLY_CACHED_WORKS",""],["STAT_BORROWED_MSG",""]],"struct":[["GCWorker","A GC worker.  This part is privately owned by a worker thread."],["GCWorkerShared","The part shared between a GCWorker and the scheduler. This structure is used for communication, e.g. adding new work packets."],["WorkerGroup",""]]});
