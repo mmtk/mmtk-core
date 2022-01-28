@@ -28,16 +28,20 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
 
         #[cfg(feature = "work_packet_stats")]
         // Start collecting statistics
-        let stat = worker
-            .stat
-            .measure_work(TypeId::of::<Self>(), type_name::<Self>(), mmtk);
+        let stat = {
+            let mut worker_stat = worker.shared.borrow_stat_mut();
+            worker_stat.measure_work(TypeId::of::<Self>(), type_name::<Self>(), mmtk)
+        };
 
         // Do the actual work
         self.do_work(worker, mmtk);
 
         #[cfg(feature = "work_packet_stats")]
         // Finish collecting statistics
-        stat.end_of_work(&mut worker.stat);
+        {
+            let mut worker_stat = worker.shared.borrow_stat_mut();
+            stat.end_of_work(&mut worker_stat);
+        }
     }
 }
 
