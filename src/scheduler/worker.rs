@@ -27,7 +27,7 @@ pub struct GCWorker<VM: VMBinding> {
     scheduler: Arc<GCWorkScheduler<VM>>,
     copy: GCWorkerCopyContext<VM>,
     pub sender: Sender<CoordinatorMessage<VM>>,
-    mmtk: Option<&'static MMTK<VM>>,
+    mmtk: &'static MMTK<VM>,
     is_coordinator: bool,
     local_work_buffer: Vec<(WorkBucketStage, Box<dyn GCWork<VM>>)>,
     pub shared: Arc<GCWorkerShared<VM>>,
@@ -56,20 +56,21 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
 impl<VM: VMBinding> GCWorker<VM> {
     pub fn new(
+        mmtk: &'static MMTK<VM>,
         ordinal: usize,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
-    ) -> Self {
+    ) -> Box<Self> {
         let worker_monitor = scheduler.worker_monitor.clone();
-        Self {
+        Box::new(Self {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
             ordinal,
             // We will set this later
             copy: GCWorkerCopyContext::new_non_copy(),
             sender,
             scheduler,
-            mmtk: None,
+            mmtk,
             is_coordinator,
             local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
             shared: Arc::new(GCWorkerShared {
@@ -77,7 +78,7 @@ impl<VM: VMBinding> GCWorker<VM> {
                 stat: Default::default(),
                 local_work_bucket: WorkBucket::new(true, worker_monitor),
             }),
-        }
+        })
     }
 
     #[inline]
@@ -114,13 +115,12 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
-        work.do_work(self, self.mmtk.unwrap());
+        work.do_work(self, self.mmtk);
     }
 
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        self.mmtk = Some(mmtk);
         self.shared.parked.store(false, Ordering::SeqCst);
         loop {
             while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
@@ -140,6 +140,7 @@ pub struct WorkerGroup<VM: VMBinding> {
 
 impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn new(
+        mmtk: &'static MMTK<VM>,
         workers: usize,
         scheduler: Arc<GCWorkScheduler<VM>>,
         sender: Sender<CoordinatorMessage<VM>>,
@@ -148,12 +149,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         let mut workers_to_spawn = Vec::new();
 
         for ordinal in 0..workers {
-            let worker = Box::new(GCWorker::new(
-                ordinal,
-                scheduler.clone(),
-                false,
-                sender.clone(),
-            ));
+            let worker = GCWorker::new(mmtk, ordinal, scheduler.clone(), false, sender.clone());
             let worker_shared = worker.shared.clone();
             workers_shared.push(worker_shared);
             workers_to_spawn.push(worker);
