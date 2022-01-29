@@ -4,7 +4,7 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
-use crate::vm::{Collection, VMBinding};
+use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -165,7 +165,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         // Therefore we defer the spawning operation later.
         let deferred_spawn = Box::new(move |tls| {
             for worker in workers_to_spawn.drain(..) {
-                VM::VMCollection::spawn_worker_thread(tls, Some(worker));
+                VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
             }
         });
 

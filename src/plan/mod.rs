@@ -16,7 +16,7 @@
 mod barriers;
 pub use barriers::BarrierSelector;
 
-mod controller_collector_context;
+pub mod controller_collector_context;
 
 mod global;
 pub(crate) use global::create_gc_worker_context;

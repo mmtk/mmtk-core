@@ -1,10 +1,11 @@
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, WorkerGroup};
+use super::worker::{GCWorker, GCWorkerShared, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
-use crate::vm::VMBinding;
+use crate::vm::Collection;
+use crate::vm::{GCThreadContext, VMBinding};
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
@@ -26,7 +27,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
     mmtk: Option<&'static MMTK<VM>>,
-    coordinator_worker: Option<RwLock<GCWorker<VM>>>,
+    coordinator_worker_shared: Option<RwLock<Arc<GCWorkerShared<VM>>>>,
     /// A message channel to send new coordinator work and other actions to the coordinator thread
     channel: (
         Sender<CoordinatorMessage<VM>>,
@@ -72,7 +73,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_group: None,
             worker_monitor,
             mmtk: None,
-            coordinator_worker: None,
+            coordinator_worker_shared: None,
             channel: channel(),
             startup: Mutex::new(None),
             finalizer: Mutex::new(None),
@@ -102,18 +103,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
 
         self_mut.mmtk = Some(mmtk);
-        self_mut.coordinator_worker = Some(RwLock::new(GCWorker::new(
-            0,
-            self.clone(),
-            true,
-            self.channel.0.clone(),
-        )));
+        let coordinator_worker =
+            Box::new(GCWorker::new(0, self.clone(), true, self.channel.0.clone()));
+        self_mut.coordinator_worker_shared = Some(RwLock::new(coordinator_worker.shared.clone()));
         let (worker_group, spawn_workers) =
             WorkerGroup::new(num_workers, self.clone(), self.channel.0.clone());
         self_mut.worker_group = Some(worker_group);
-        // FIXME: because of the `Arc::get_mut_unchanged` above, we are now mutating the scheduler
-        // while the spawned workers already have access to the scheduler.
-        spawn_workers(tls);
 
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
@@ -147,6 +142,17 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             open_next(Release);
             open_next(Final);
         }
+
+        // Now that the scheduler is initialized, we spawn the worker threads and the controller thread.
+        spawn_workers(tls);
+
+        let gc_controller = GCController::new(
+            mmtk.plan.base().control_collector_context.clone(),
+            self.clone(),
+            coordinator_worker,
+        );
+
+        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
     }
 
     /// Schedule all the common work packets
@@ -206,11 +212,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
     }
 
-    pub fn initialize_coordinator_worker(self: &Arc<Self>, tls: VMWorkerThread) {
-        let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
-        coordinator_worker.tls = tls;
-    }
-
     pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
         *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
     }
@@ -248,23 +249,26 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     /// Execute coordinator work, in the controller thread
-    fn process_coordinator_work(&self, mut work: Box<dyn CoordinatorWork<VM>>) {
-        let mut coordinator_worker = self.coordinator_worker.as_ref().unwrap().write().unwrap();
+    fn process_coordinator_work(
+        &self,
+        mut work: Box<dyn CoordinatorWork<VM>>,
+        coordinator_worker: &mut GCWorker<VM>,
+    ) {
         let mmtk = self.mmtk.unwrap();
-        work.do_work_with_stat(&mut coordinator_worker, mmtk);
+        work.do_work_with_stat(coordinator_worker, mmtk);
     }
 
     /// Drain the message queue and execute coordinator work. Only the coordinator should call this.
-    pub fn wait_for_completion(&self) {
+    pub fn wait_for_completion(&self, coordinator_worker: &mut GCWorker<VM>) {
         // At the start of a GC, we probably already have received a `ScheduleCollection` work. Run it now.
         if let Some(initializer) = self.startup.lock().unwrap().take() {
-            self.process_coordinator_work(initializer);
+            self.process_coordinator_work(initializer, coordinator_worker);
         }
         loop {
             let message = self.channel.1.recv().unwrap();
             match message {
                 CoordinatorMessage::Work(work) => {
-                    self.process_coordinator_work(work);
+                    self.process_coordinator_work(work, coordinator_worker);
                 }
                 CoordinatorMessage::AllWorkerParked | CoordinatorMessage::BucketDrained => {
                     self.update_buckets();
@@ -277,7 +281,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
         for message in self.channel.1.try_iter() {
             if let CoordinatorMessage::Work(work) = message {
-                self.process_coordinator_work(work);
+                self.process_coordinator_work(work, coordinator_worker);
             }
         }
         self.deactivate_all();
@@ -287,7 +291,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
         if let Some(finalizer) = self.finalizer.lock().unwrap().take() {
-            self.process_coordinator_work(finalizer);
+            self.process_coordinator_work(finalizer, coordinator_worker);
         }
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
@@ -393,8 +397,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             worker_stat.enable();
         }
-        let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
-        let coordinator_worker_stat = coordinator_worker.shared.borrow_stat();
+        let coordinator_worker_shared = self
+            .coordinator_worker_shared
+            .as_ref()
+            .unwrap()
+            .read()
+            .unwrap();
+        let coordinator_worker_stat = coordinator_worker_shared.borrow_stat();
         coordinator_worker_stat.enable();
     }
 
@@ -404,8 +413,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let worker_stat = worker.borrow_stat();
             summary.merge(&worker_stat);
         }
-        let coordinator_worker = self.coordinator_worker.as_ref().unwrap().read().unwrap();
-        let coordinator_worker_stat = coordinator_worker.shared.borrow_stat();
+        let coordinator_worker_shared = self
+            .coordinator_worker_shared
+            .as_ref()
+            .unwrap()
+            .read()
+            .unwrap();
+        let coordinator_worker_stat = coordinator_worker_shared.borrow_stat();
         summary.merge(&coordinator_worker_stat);
         summary.harness_stat()
     }
