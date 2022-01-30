@@ -7,7 +7,7 @@ use mmtk::memory_manager;
 use mmtk::AllocationSemantics;
 use mmtk::util::{ObjectReference, Address};
 use mmtk::util::opaque_pointer::*;
-use mmtk::scheduler::GCWorker;
+use mmtk::scheduler::{GCController, GCWorker};
 use mmtk::Mutator;
 use mmtk::MMTK;
 use DummyVM;
@@ -23,8 +23,8 @@ pub extern "C" fn mmtk_gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread) {
-    memory_manager::start_control_collector(&SINGLETON, tls);
+pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread, controller: &'static mut GCController<DummyVM>) {
+    memory_manager::start_control_collector(tls, controller, &SINGLETON);
 }
 
 #[no_mangle]
@@ -61,8 +61,8 @@ pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>, mmtk: &'static MMTK<DummyVM>) {
-    memory_manager::start_worker::<DummyVM>(tls, worker, mmtk)
+pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>) {
+    memory_manager::start_worker::<DummyVM>(tls, worker, &SINGLETON)
 }
 
 #[no_mangle]

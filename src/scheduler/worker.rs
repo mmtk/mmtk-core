@@ -155,7 +155,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             workers_to_spawn.push(worker);
         }
 
-        // NOTE: We cannot call spawn_worker_thread here,
+        // NOTE: We cannot call spawn_gc_thread here,
         // because the worker will access `Scheduler::worker_group` immediately after started,
         // but that field will not be assigned to before this function returns.
         // Therefore we defer the spawning operation later.
