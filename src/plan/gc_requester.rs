@@ -8,7 +8,9 @@ struct RequestSync {
     last_request_count: isize,
 }
 
-pub struct ControllerCollectorContext<VM: VMBinding> {
+/// GC requester.  This object allows other threads to request (trigger) GC,
+/// and the GC coordinator thread waits for GC requests using this object.
+pub struct GCRequester<VM: VMBinding> {
     request_sync: Mutex<RequestSync>,
     request_condvar: Condvar,
     request_flag: AtomicBool,
@@ -16,15 +18,15 @@ pub struct ControllerCollectorContext<VM: VMBinding> {
 }
 
 // Clippy says we need this...
-impl<VM: VMBinding> Default for ControllerCollectorContext<VM> {
+impl<VM: VMBinding> Default for GCRequester<VM> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<VM: VMBinding> ControllerCollectorContext<VM> {
+impl<VM: VMBinding> GCRequester<VM> {
     pub fn new() -> Self {
-        ControllerCollectorContext {
+        GCRequester {
             request_sync: Mutex::new(RequestSync {
                 request_count: 0,
                 last_request_count: -1,

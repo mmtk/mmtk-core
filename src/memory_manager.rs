@@ -25,21 +25,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
-/// Run the main loop for the GC controller thread. This method does not return.
-///
-/// Arguments:
-/// * `tls`: The thread that will be used as the GC controller.
-/// * `gc_controller`: The execution context of the GC controller threa.
-///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
-/// * `mmtk`: A reference to an MMTk instance.
-pub fn start_control_collector<VM: VMBinding>(
-    tls: VMWorkerThread,
-    gc_controller: &mut GCController<VM>,
-    _mmtk: &'static MMTK<VM>,
-) {
-    gc_controller.run(tls);
-}
-
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
 /// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
 /// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
@@ -167,6 +152,21 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.plan.get_allocator_mapping()[semantics]
 }
 
+/// Run the main loop for the GC controller thread. This method does not return.
+///
+/// Arguments:
+/// * `tls`: The thread that will be used as the GC controller.
+/// * `gc_controller`: The execution context of the GC controller threa.
+///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn start_control_collector<VM: VMBinding>(
+    _mmtk: &'static MMTK<VM>,
+    tls: VMWorkerThread,
+    gc_controller: &mut GCController<VM>,
+) {
+    gc_controller.run(tls);
+}
+
 /// Run the main loop of a GC worker. This method does not return.
 ///
 /// Arguments:
@@ -175,9 +175,9 @@ pub fn get_allocator_mapping<VM: VMBinding>(
 ///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
     tls: VMWorkerThread,
     worker: &mut GCWorker<VM>,
-    mmtk: &'static MMTK<VM>,
 ) {
     worker.run(tls, mmtk);
 }

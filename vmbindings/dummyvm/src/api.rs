@@ -23,11 +23,6 @@ pub extern "C" fn mmtk_gc_init(heap_size: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread, controller: &'static mut GCController<DummyVM>) {
-    memory_manager::start_control_collector(tls, controller, &SINGLETON);
-}
-
-#[no_mangle]
 pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyVM> {
     Box::into_raw(memory_manager::bind_mutator(&SINGLETON, tls))
 }
@@ -61,8 +56,13 @@ pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
 }
 
 #[no_mangle]
+pub extern "C" fn mmtk_start_control_collector(tls: VMWorkerThread, controller: &'static mut GCController<DummyVM>) {
+    memory_manager::start_control_collector(&SINGLETON, tls, controller);
+}
+
+#[no_mangle]
 pub extern "C" fn mmtk_start_worker(tls: VMWorkerThread, worker: &'static mut GCWorker<DummyVM>) {
-    memory_manager::start_worker::<DummyVM>(tls, worker, &SINGLETON)
+    memory_manager::start_worker::<DummyVM>(&SINGLETON, tls, worker)
 }
 
 #[no_mangle]

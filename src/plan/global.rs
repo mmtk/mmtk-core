@@ -1,6 +1,6 @@
 //! The global part of a plan implementation.
 
-use super::controller_collector_context::ControllerCollectorContext;
+use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
 use crate::plan::generational::global::Gen;
@@ -214,7 +214,7 @@ pub trait Plan: 'static + Sync + Downcast {
                 return false;
             }*/
             self.log_poll(space, "Triggering collection");
-            self.base().control_collector_context.request();
+            self.base().gc_requester.request();
             return true;
         }
 
@@ -332,7 +332,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub max_collection_attempts: AtomicUsize,
     // Current collection attempt
     pub cur_collection_attempts: AtomicUsize,
-    pub control_collector_context: Arc<ControllerCollectorContext<VM>>,
+    pub gc_requester: Arc<GCRequester<VM>>,
     pub stats: Stats,
     mmapper: &'static Mmapper,
     pub vm_map: &'static VMMap,
@@ -463,7 +463,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_success: AtomicBool::new(false),
             max_collection_attempts: AtomicUsize::new(0),
             cur_collection_attempts: AtomicUsize::new(0),
-            control_collector_context: Arc::new(ControllerCollectorContext::new()),
+            gc_requester: Arc::new(GCRequester::new()),
             stats,
             mmapper,
             heap,
@@ -508,7 +508,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             info!("User triggering collection");
             self.user_triggered_collection
                 .store(true, Ordering::Relaxed);
-            self.control_collector_context.request();
+            self.gc_requester.request();
             VM::VMCollection::block_for_gc(tls);
         }
     }
@@ -521,7 +521,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             .store(true, Ordering::Relaxed);
         self.internal_triggered_collection
             .store(true, Ordering::Relaxed);
-        self.control_collector_context.request();
+        self.gc_requester.request();
     }
 
     /// Reset collection state information.

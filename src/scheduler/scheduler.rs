@@ -19,17 +19,16 @@ pub enum CoordinatorMessage<VM: VMBinding> {
 }
 
 pub struct GCWorkScheduler<VM: VMBinding> {
+    /// Work buckets
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Work for the coordinator thread
     pub coordinator_work: WorkBucket<VM>,
-    /// workers
+    /// The shared parts of GC workers
     worker_group: Option<WorkerGroup<VM>>,
+    /// The shared part of the GC worker object of the controller thread
+    coordinator_worker_shared: Option<RwLock<Arc<GCWorkerShared<VM>>>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
-    coordinator_worker_shared: Option<RwLock<Arc<GCWorkerShared<VM>>>>,
-    /// A message channel to send new coordinator work and other actions to the coordinator thread
-    pub startup: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
-    pub finalizer: Mutex<Option<Box<dyn CoordinatorWork<VM>>>>,
     /// A callback to be fired after the `Closure` bucket is drained.
     /// This callback should return `true` if it adds more work packets to the
     /// `Closure` bucket. `WorkBucket::can_open` then consult this return value
@@ -39,7 +38,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     /// We use this callback to process ephemeron objects. `closure_end` can re-enable
     /// the `Closure` bucket multiple times to iteratively discover and process
     /// more ephemeron objects.
-    pub closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
+    closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
 }
 
 // The 'channel' inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:
@@ -66,10 +65,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             },
             coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
             worker_group: None,
-            worker_monitor,
             coordinator_worker_shared: None,
-            startup: Mutex::new(None),
-            finalizer: Mutex::new(None),
+            worker_monitor,
             closure_end: Mutex::new(None),
         })
     }
@@ -142,7 +139,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         let gc_controller = GCController::new(
             mmtk,
-            mmtk.plan.base().control_collector_context.clone(),
+            mmtk.plan.base().gc_requester.clone(),
             self.clone(),
             receiver,
             coordinator_worker,
@@ -199,29 +196,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }
         }
-
-        // Set EndOfGC to run at the end
-        self.set_finalizer(Some(EndOfGC));
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
-    }
-
-    pub fn set_initializer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
-        *self.startup.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
-    }
-
-    pub fn take_initializer(&self) -> Option<Box<dyn CoordinatorWork<VM>>> {
-        self.startup.lock().unwrap().take()
-    }
-
-    pub fn set_finalizer<W: CoordinatorWork<VM>>(&self, w: Option<W>) {
-        *self.finalizer.lock().unwrap() = w.map(|w| box w as Box<dyn CoordinatorWork<VM>>);
-    }
-
-    pub fn take_finalizer(&self) -> Option<Box<dyn CoordinatorWork<VM>>> {
-        self.finalizer.lock().unwrap().take()
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
@@ -385,7 +363,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.plan.base().control_collector_context.clear_request();
+        mmtk.plan.base().gc_requester.clear_request();
         debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
         self.work_buckets[WorkBucketStage::Prepare].activate();
         let _guard = self.worker_monitor.0.lock().unwrap();

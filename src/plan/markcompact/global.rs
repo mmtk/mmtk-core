@@ -134,7 +134,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
