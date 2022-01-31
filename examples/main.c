@@ -2,13 +2,13 @@
 #include "mmtk.h"
 
 int main(int argc, char* argv[]){
-    gc_init(1024*1024);
+    mmtk_gc_init(1024*1024);
 
-    MMTk_Mutator handle = bind_mutator(0);
-    
+    MMTk_Mutator handle = mmtk_bind_mutator(0);
+
     for (int i=0;i<4;i++){
         int arr_size = 10000;
-        int* my_arr = alloc(handle, sizeof(int)*arr_size, 8, 0, 0);
+        int* my_arr = mmtk_alloc(handle, sizeof(int)*arr_size, 8, 0, 0);
         if (!my_arr){
             printf("OOM\n");
             break;
