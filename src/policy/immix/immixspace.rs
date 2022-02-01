@@ -355,6 +355,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             object
         );
         if Block::containing::<VM>(object).is_defrag_source() {
+            debug_assert!(self.in_defrag());
             self.trace_object_with_opportunistic_copy(trace, object, semantics, worker)
         } else {
             self.trace_object_without_moving(trace, object)
