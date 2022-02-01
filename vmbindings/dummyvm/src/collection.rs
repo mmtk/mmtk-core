@@ -19,7 +19,7 @@ impl Collection<DummyVM> for VMCollection {
         panic!("block_for_gc is not implemented")
     }
 
-    fn spawn_worker_thread(_tls: VMThread, _ctx: Option<&GCWorker<DummyVM>>) {
+    fn spawn_worker_thread(_tls: VMThread, _ctx: Option<Box<GCWorker<DummyVM>>>) {
 
     }
 

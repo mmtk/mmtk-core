@@ -50,7 +50,7 @@ pub trait Collection<VM: VMBinding> {
     ///   calls `initialize_collection()` and passes as an argument.
     /// * `ctx`: The GC worker context for the GC thread. If `None` is passed, it means spawning a GC thread for the GC controller,
     ///   which does not have a worker context.
-    fn spawn_worker_thread(tls: VMThread, ctx: Option<&GCWorker<VM>>);
+    fn spawn_worker_thread(tls: VMThread, ctx: Option<Box<GCWorker<VM>>>);
 
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
