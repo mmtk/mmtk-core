@@ -67,10 +67,11 @@ pub trait Collection<VM: VMBinding> {
     /// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
     /// routine for OOM. Note that there are two different categories of OOM:
     ///  * Critical OOM: This is the case where the OS is unable to mmap or acquire more memory.
-    ///    MMTk expects the VM to abort if such an error is thrown.
+    ///    MMTk expects the VM to abort immediately if such an error is thrown.
     ///  * Heap OOM: This is the case where the specified heap size is insufficient to execute the
     ///    application. MMTk expects the binding to notify the VM about this OOM and throw an OOM
-    ///    error *at a later point in time*.
+    ///    error *at some point later in time*. That is to say, MMTk does not expect the VM to
+    ///    abort immediately.
     ///
     /// See [`MmtkAllocationError`] for more information.
     ///
