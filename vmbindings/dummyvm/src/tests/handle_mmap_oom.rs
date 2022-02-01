@@ -18,6 +18,6 @@ pub fn test_handle_mmap_oom() {
 
     // The error should match the default implementation of Collection::out_of_memory()
     let err = panic_res.err().unwrap();
-    assert!(err.is::<&str>());
-    assert_eq!(err.downcast_ref::<&str>().unwrap(), &"Out of memory with MmapOutOfMemory!");
+    assert!(err.is::<String>());
+    assert_eq!(err.downcast_ref::<String>().unwrap(), &"Out of memory with MmapOutOfMemory!");
 }
