@@ -1,6 +1,7 @@
 use crate::plan::MutatorContext;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
+use crate::util::alloc::MmtkAllocationError;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -63,13 +64,21 @@ pub trait Collection<VM: VMBinding> {
         m: &T,
     );
 
-    /// Inform the VM for an out-of-memory error. The VM can implement its own error routine for OOM.
-    /// Note the VM needs to fail in this call. We do not expect the VM to resume in any way.
+    /// Inform the VM of an out-of-memory error. The binding should hook into the VM's error
+    /// routine for OOM. Note that there are two different categories of OOM:
+    ///  * Critical OOM: This is the case where the OS is unable to mmap or acquire more memory.
+    ///    MMTk expects the VM to abort if such an error is thrown.
+    ///  * Heap OOM: This is the case where the specified heap size is insufficient to complete the
+    ///    application. MMTk expects the binding to notify the VM about this OOM and throw an OOM
+    ///    error *at a later point in time*.
+    ///
+    /// See [`MmtkAllocationError`] for more information.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
-    fn out_of_memory(_tls: VMThread) {
-        panic!("Out of memory!");
+    /// * `err_kind`: The type of OOM error that was encountered.
+    fn out_of_memory(_tls: VMThread, err_kind: MmtkAllocationError) {
+        panic!("Out of memory with {:?}!", err_kind);
     }
 
     /// Inform the VM to schedule finalization threads.
