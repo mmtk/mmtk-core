@@ -68,7 +68,7 @@ pub trait Collection<VM: VMBinding> {
     /// routine for OOM. Note that there are two different categories of OOM:
     ///  * Critical OOM: This is the case where the OS is unable to mmap or acquire more memory.
     ///    MMTk expects the VM to abort if such an error is thrown.
-    ///  * Heap OOM: This is the case where the specified heap size is insufficient to complete the
+    ///  * Heap OOM: This is the case where the specified heap size is insufficient to execute the
     ///    application. MMTk expects the binding to notify the VM about this OOM and throw an OOM
     ///    error *at a later point in time*.
     ///
