@@ -253,30 +253,50 @@ pub trait Plan: 'static + Sync + Downcast {
      */
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
 
-    fn get_pages_reserved(&self) -> usize {
-        self.get_pages_used() + self.get_collection_reserve()
+    /// Get the number of pages that are reserved, including used pages and pages that will
+    /// be used (e.g. for copying).
+    fn get_reserved_pages(&self) -> usize {
+        self.get_used_pages() + self.get_collection_reserved_pages()
     }
 
+    /// Get the total number of pages for the heap.
     fn get_total_pages(&self) -> usize {
         self.base().heap.get_total_pages()
     }
 
-    fn get_pages_avail(&self) -> usize {
-        self.get_total_pages() - self.get_pages_reserved()
+    /// Get the number of pages that are still available for use. The available pages
+    /// should always be positive or 0.
+    fn get_available_pages(&self) -> usize {
+        // It is possible that the reserved pages is larger than the total pages so we are doing
+        // a saturating substraction to make sure we return a non-negative number.
+        // For example,
+        // 1. our GC trigger checks if reserved pages is more than total pages.
+        // 2. when the heap is almost full of live objects and we are doing a copying GC, it is possible
+        //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
+        //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
+        //    buffers for copy allocators).
+        self.get_total_pages()
+            .saturating_sub(self.get_reserved_pages())
     }
 
-    fn get_collection_reserve(&self) -> usize {
+    /// Get the number of pages that are reserved for collection. By default, we return 0.
+    /// For copying plans, they need to override this and calculate required pages to complete
+    /// a copying GC.
+    fn get_collection_reserved_pages(&self) -> usize {
         0
     }
 
-    fn get_pages_used(&self) -> usize;
+    /// Get the number of pages that are used.
+    fn get_used_pages(&self) -> usize;
+
+    /// Get the number of pages that are NOT used. This is clearly different from available pages.
+    /// Free pages are unused, but some of them may have been reserved for some reason.
+    fn get_free_pages(&self) -> usize {
+        self.get_total_pages() - self.get_used_pages()
+    }
 
     fn is_emergency_collection(&self) -> bool {
         self.base().emergency_collection.load(Ordering::Relaxed)
-    }
-
-    fn get_free_pages(&self) -> usize {
-        self.get_total_pages() - self.get_pages_used()
     }
 
     /// The application code has requested a collection.
@@ -548,7 +568,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     // Depends on what base spaces we use, unsync may be unused.
-    pub fn get_pages_used(&self) -> usize {
+    pub fn get_used_pages(&self) -> usize {
         // Depends on what base spaces we use, pages may be unchanged.
         #[allow(unused_mut)]
         let mut pages = 0;
@@ -777,11 +797,11 @@ impl<VM: VMBinding> BasePlan<VM> {
         }
 
         debug!(
-            "self.get_pages_reserved()={}, self.get_total_pages()={}",
-            plan.get_pages_reserved(),
+            "self.get_reserved_pages()={}, self.get_total_pages()={}",
+            plan.get_reserved_pages(),
             plan.get_total_pages()
         );
-        let heap_full = plan.get_pages_reserved() > plan.get_total_pages();
+        let heap_full = plan.get_reserved_pages() > plan.get_total_pages();
 
         space_full || stress_force_gc || heap_full
     }
@@ -865,8 +885,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.los.init(vm_map);
     }
 
-    pub fn get_pages_used(&self) -> usize {
-        self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_pages_used()
+    pub fn get_used_pages(&self) -> usize {
+        self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_used_pages()
     }
 
     pub fn trace_object<T: TransitiveClosure>(

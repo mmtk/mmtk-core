@@ -115,12 +115,12 @@ impl<VM: VMBinding> Plan for Immix<VM> {
             .store(self.immix_space.release(true), Ordering::Relaxed);
     }
 
-    fn get_collection_reserve(&self) -> usize {
+    fn get_collection_reserved_pages(&self) -> usize {
         self.immix_space.defrag_headroom_pages()
     }
 
-    fn get_pages_used(&self) -> usize {
-        self.immix_space.reserved_pages() + self.common.get_pages_used()
+    fn get_used_pages(&self) -> usize {
+        self.immix_space.reserved_pages() + self.common.get_used_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
