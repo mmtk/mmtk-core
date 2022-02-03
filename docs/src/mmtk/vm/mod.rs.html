@@ -63,6 +63,7 @@
 <span id="62">62</span>
 <span id="63">63</span>
 <span id="64">64</span>
+<span id="65">65</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
@@ -89,6 +90,7 @@
 <span class="kw">mod</span> <span class="ident">scanning</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::active_plan::ActivePlan</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::collection::Collection</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::collection::GCThreadContext</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::object_model::specs</span>::<span class="kw-2">*</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::object_model::ObjectModel</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_glue::ReferenceGlue</span>;

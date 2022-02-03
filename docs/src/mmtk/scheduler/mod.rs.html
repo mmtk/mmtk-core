@@ -26,6 +26,9 @@
 <span id="25">25</span>
 <span id="26">26</span>
 <span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.</span>
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::module_inception</span>)]</span>
@@ -46,6 +49,9 @@
 
 <span class="kw">mod</span> <span class="ident">worker</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker::GCWorker</span>;
+
+<span class="kw">mod</span> <span class="ident">controller</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">controller::GCController</span>;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_work</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">gc_work::ProcessEdgesWork</span>;

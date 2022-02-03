@@ -487,6 +487,10 @@
 <span id="486">486</span>
 <span id="487">487</span>
 <span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -504,25 +508,15 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::WorkBucketStage</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorker</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCController</span>, <span class="ident">GCWork</span>, <span class="ident">GCWorker</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::{<span class="ident">LOG_BYTES_IN_PAGE</span>, <span class="ident">MIN_OBJECT_SIZE</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::HEAP_END</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::HEAP_START</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::Collection</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
-
-<span class="doccomment">/// Run the main loop for the GC controller thread. This method does not return.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// Arguments:</span>
-<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
-<span class="doccomment">/// * `tls`: The thread that will be used as the GC controller.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_control_collector</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">control_collector_context</span>.<span class="ident">run</span>(<span class="ident">tls</span>);
-}
 
 <span class="doccomment">/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)</span>
 <span class="doccomment">/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a</span>
@@ -558,8 +552,7 @@
         }
     }
     <span class="macro">assert!</span>(<span class="ident">heap_size</span> <span class="op">&gt;</span> <span class="number">0</span>, <span class="string">&quot;Invalid heap size&quot;</span>);
-    <span class="ident">mmtk</span>.<span class="ident">plan</span>
-        .<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::VM_MAP</span>, <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>);
+    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="kw-2">&amp;</span><span class="ident"><span class="kw">crate</span>::VM_MAP</span>);
     <span class="macro">info!</span>(<span class="string">&quot;Initialized MMTk with {:?}&quot;</span>, <span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">plan</span>);
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
     <span class="macro">warn!</span>(<span class="string">&quot;The feature &#39;extreme_assertions&#39; is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.&quot;</span>);
@@ -652,36 +645,51 @@
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">semantics</span>]
 }
 
+<span class="doccomment">/// Run the main loop for the GC controller thread. This method does not return.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Arguments:</span>
+<span class="doccomment">/// * `tls`: The thread that will be used as the GC controller.</span>
+<span class="doccomment">/// * `gc_controller`: The execution context of the GC controller threa.</span>
+<span class="doccomment">///   It is the `GCController` passed to `Collection::spawn_gc_thread`.</span>
+<span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_control_collector</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
+    <span class="ident">gc_controller</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCController</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+) {
+    <span class="ident">gc_controller</span>.<span class="ident">run</span>(<span class="ident">tls</span>);
+}
+
 <span class="doccomment">/// Run the main loop of a GC worker. This method does not return.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `tls`: The thread that will be used as the GC worker.</span>
-<span class="doccomment">/// * `worker`: A reference to the GC worker.</span>
+<span class="doccomment">/// * `worker`: The execution context of the GC worker thread.</span>
+<span class="doccomment">///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_worker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
     <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 ) {
     <span class="ident">worker</span>.<span class="ident">run</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
 }
 
 <span class="doccomment">/// Initialize the scheduler and GC workers that are required for doing garbage collections.</span>
 <span class="doccomment">/// This is a mandatory call for a VM during its boot process once its thread system</span>
-<span class="doccomment">/// is ready. This should only be called once. This call will invoke Collection::spawn_worker_thread()</span>
+<span class="doccomment">/// is ready. This should only be called once. This call will invoke Collection::spawn_gc_thread()</span>
 <span class="doccomment">/// to create GC threads.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in</span>
-<span class="doccomment">///   Collection::spawn_worker_thread() so that the VM knows the context.</span>
+<span class="doccomment">///   Collection::spawn_gc_thread() so that the VM knows the context.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initialize_collection</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) {
     <span class="macro">assert!</span>(
         <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>(),
         <span class="string">&quot;MMTk collection has been initialized (was initialize_collection() already called before?)&quot;</span>
     );
     <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">initialize</span>(<span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">mmtk</span>, <span class="ident">tls</span>);
-    <span class="ident">VM::VMCollection::spawn_worker_thread</span>(<span class="ident">tls</span>, <span class="prelude-val">None</span>); <span class="comment">// spawn controller thread</span>
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">initialized</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 

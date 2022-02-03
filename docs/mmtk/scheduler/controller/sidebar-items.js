@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["GCController","The thread local struct for the GC controller, the counterpart of `GCWorker`."]]});

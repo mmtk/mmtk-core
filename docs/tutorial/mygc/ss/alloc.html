@@ -329,9 +329,8 @@ initializer calls are identical.</p>
         &amp;mut self,
         heap_size: usize,
         vm_map: &amp;'static VMMap,
-        scheduler: &amp;Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
     ) {
-        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map);
         self.copyspace0.init(&amp;vm_map);
         self.copyspace1.init(&amp;vm_map);
     }

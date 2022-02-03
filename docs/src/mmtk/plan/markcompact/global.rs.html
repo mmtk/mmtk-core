@@ -206,12 +206,6 @@
 <span id="205">205</span>
 <span id="206">206</span>
 <span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
     <span class="ident">CalculateForwardingAddress</span>, <span class="ident">Compact</span>, <span class="ident">ForwardingProcessEdges</span>, <span class="ident">MarkingProcessEdges</span>,
@@ -264,13 +258,8 @@
         <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">gc_init</span>(
-        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
-        <span class="ident">heap_size</span>: <span class="ident">usize</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>, <span class="ident">scheduler</span>);
+    <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>);
         <span class="self">self</span>.<span class="ident">mc_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
     }
 
@@ -353,7 +342,6 @@
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Final</span>]
             .<span class="ident">add</span>(<span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
-        <span class="ident">scheduler</span>.<span class="ident">set_finalizer</span>(<span class="prelude-val">Some</span>(<span class="ident">EndOfGC</span>));
     }
 
     <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
