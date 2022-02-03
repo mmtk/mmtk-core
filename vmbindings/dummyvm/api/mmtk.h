@@ -86,7 +86,7 @@ extern void mmtk_scan_region();
 extern void mmtk_handle_user_collection_request(void* tls);
 
 // Run the main loop for the GC controller thread. Does not return
-extern void mmtk_start_control_collector(void* tls);
+extern void mmtk_start_control_collector(void* tls, void* worker);
 
 // Run the main loop for a GC worker. Does not return
 extern void mmtk_start_worker(void* tls, void* worker);

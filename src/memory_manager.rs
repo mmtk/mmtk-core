@@ -15,25 +15,15 @@ use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
-use crate::scheduler::{GCWork, GCWorker};
+use crate::scheduler::{GCController, GCWork, GCWorker};
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::constants::{LOG_BYTES_IN_PAGE, MIN_OBJECT_SIZE};
 use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::Collection;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
-
-/// Run the main loop for the GC controller thread. This method does not return.
-///
-/// Arguments:
-/// * `mmtk`: A reference to an MMTk instance.
-/// * `tls`: The thread that will be used as the GC controller.
-pub fn start_control_collector<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMWorkerThread) {
-    mmtk.plan.base().control_collector_context.run(tls);
-}
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
 /// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
@@ -69,8 +59,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         }
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan
-        .gc_init(heap_size, &crate::VM_MAP, &mmtk.scheduler);
+    mmtk.plan.gc_init(heap_size, &crate::VM_MAP);
     info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
@@ -163,36 +152,51 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.plan.get_allocator_mapping()[semantics]
 }
 
+/// Run the main loop for the GC controller thread. This method does not return.
+///
+/// Arguments:
+/// * `tls`: The thread that will be used as the GC controller.
+/// * `gc_controller`: The execution context of the GC controller threa.
+///   It is the `GCController` passed to `Collection::spawn_gc_thread`.
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn start_control_collector<VM: VMBinding>(
+    _mmtk: &'static MMTK<VM>,
+    tls: VMWorkerThread,
+    gc_controller: &mut GCController<VM>,
+) {
+    gc_controller.run(tls);
+}
+
 /// Run the main loop of a GC worker. This method does not return.
 ///
 /// Arguments:
 /// * `tls`: The thread that will be used as the GC worker.
-/// * `worker`: A reference to the GC worker.
+/// * `worker`: The execution context of the GC worker thread.
+///   It is the `GCWorker` passed to `Collection::spawn_gc_thread`.
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn start_worker<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
     tls: VMWorkerThread,
     worker: &mut GCWorker<VM>,
-    mmtk: &'static MMTK<VM>,
 ) {
     worker.run(tls, mmtk);
 }
 
 /// Initialize the scheduler and GC workers that are required for doing garbage collections.
 /// This is a mandatory call for a VM during its boot process once its thread system
-/// is ready. This should only be called once. This call will invoke Collection::spawn_worker_thread()
+/// is ready. This should only be called once. This call will invoke Collection::spawn_gc_thread()
 /// to create GC threads.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that wants to enable the collection. This value will be passed back to the VM in
-///   Collection::spawn_worker_thread() so that the VM knows the context.
+///   Collection::spawn_gc_thread() so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     assert!(
         !mmtk.plan.is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.scheduler.initialize(*mmtk.options.threads, mmtk, tls);
-    VM::VMCollection::spawn_worker_thread(tls, None); // spawn controller thread
     mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
 }
 
