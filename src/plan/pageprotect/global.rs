@@ -84,10 +84,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         self.base().collection_required(self, space_full, space)
     }
 
-    fn get_collection_reserved_pages(&self) -> usize {
-        0
-    }
-
     fn get_used_pages(&self) -> usize {
         self.space.reserved_pages() + self.common.get_used_pages()
     }

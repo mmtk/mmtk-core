@@ -253,6 +253,10 @@ pub trait Plan: 'static + Sync + Downcast {
      */
     fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
 
+    // Note: The following methods are about page accounting. The default implementation should
+    // work fine for non-copying plans. For copying plans, the plan should override any of these methods
+    // if necessary.
+
     /// Get the number of pages that are reserved, including used pages and pages that will
     /// be used (e.g. for copying).
     fn get_reserved_pages(&self) -> usize {
@@ -271,7 +275,7 @@ pub trait Plan: 'static + Sync + Downcast {
         // a saturating substraction to make sure we return a non-negative number.
         // For example,
         // 1. our GC trigger checks if reserved pages is more than total pages.
-        // 2. when the heap is almost full of live objects and we are doing a copying GC, it is possible
+        // 2. when the heap is almost full of live objects (such as in the case of an OOM) and we are doing a copying GC, it is possible
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
@@ -801,6 +805,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             plan.get_reserved_pages(),
             plan.get_total_pages()
         );
+        // Check if we reserved more pages (including the collection copy reserve)
+        // than the heap's total pages. In that case, we will have to do a GC.
         let heap_full = plan.get_reserved_pages() > plan.get_total_pages();
 
         space_full || stress_force_gc || heap_full
