@@ -39,12 +39,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &CONSTRAINTS
     }
 
-    fn gc_init(
-        &mut self,
-        heap_size: usize,
-        vm_map: &'static VMMap,
-        scheduler: &Arc<GCWorkScheduler<VM>>,
-    ) {
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         // Warn users that the plan may fail due to maximum mapping allowed.
         warn!(
             "PageProtect uses a high volume of memory mappings. \
@@ -56,7 +51,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
                 ""
             }
         );
-        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map);
         self.space.init(vm_map);
     }
 

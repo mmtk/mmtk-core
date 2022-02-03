@@ -79,9 +79,8 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         &mut self,
         heap_size: usize,
         vm_map: &'static VMMap,
-        scheduler: &Arc<GCWorkScheduler<VM>>,
     ) {
-        self.common.gc_init(heap_size, vm_map, scheduler);
+        self.common.gc_init(heap_size, vm_map);
         self.copyspace0.init(&vm_map);
         self.copyspace1.init(&vm_map);
     }
