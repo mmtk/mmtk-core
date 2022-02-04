@@ -135,7 +135,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     pub fn do_work_boxed(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
-        work.do_work(self, self.mmtk.unwrap());
+        work.do_work(self, self.mmtk);
     }
 
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
