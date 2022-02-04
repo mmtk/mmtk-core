@@ -15,7 +15,8 @@ use downcast_rs::Downcast;
 pub enum MmtkAllocationError {
     /// The specified heap size is too small for the given program to continue.
     HeapOutOfMemory,
-    /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to abort if such an error is thrown.
+    /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
+    /// abort if such an error is thrown.
     MmapOutOfMemory,
 }
 
@@ -36,10 +37,6 @@ pub fn align_allocation<VM: VMBinding>(
     known_alignment: usize,
     fillalignmentgap: bool,
 ) -> Address {
-    if region.is_zero() {
-        return region;
-    }
-
     debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
@@ -145,8 +142,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// If an allocator supports thread local allocations, then the allocation will be serviced
     /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`].
     ///
-    /// Note that in the case where the VM is out of memory, we return a null pointer back to the
-    /// VM and expect that the OOM error is thrown by the binding.
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
+    /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
@@ -154,8 +152,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// * `offset` the required offset in bytes.
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
-    /// Slowpath allocation attempt. We break up the slowpath implementation into two parts
-    /// in order to improve efficiency of our code by reducing cache misses.
+    /// Slowpath allocation attempt. This function is explicitly not inlined for performance
+    /// considerations.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
@@ -172,9 +170,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// allocation bytes in order to support stress testing. In case precise stress testing is
     /// being used, the [`alloc_slow_once_precise_stress`] function is used instead.
     ///
-    /// Note that in the case where the VM is out of memory, we throw a [`HeapOutOfMemory`] error
-    /// and return a null pointer back to the VM with the expectation that the OOM error is thrown
-    /// by the binding (at a later point in time).
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] with a [`MmtkAllocationError::HeapOutOfMemory`] error to
+    /// inform the binding and then return a null pointer back to it. We have no assumptions on
+    /// whether the VM will continue executing or abort immediately on a
+    /// [`MmtkAllocationError::HeapOutOfMemory`] error.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
