@@ -1,7 +1,7 @@
 use crate::plan::MutatorContext;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::*;
-use crate::util::alloc::MmtkAllocationError;
+use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
@@ -82,12 +82,12 @@ pub trait Collection<VM: VMBinding> {
     ///    application. MMTk expects the binding to notify the VM about this OOM. MMTk makes no
     ///    assumptions about whether the VM will continue executing or abort immediately.
     ///
-    /// See [`MmtkAllocationError`] for more information.
+    /// See [`AllocationError`] for more information.
     ///
     /// Arguments:
     /// * `tls`: The thread pointer for the mutator which failed the allocation and triggered the OOM.
     /// * `err_kind`: The type of OOM error that was encountered.
-    fn out_of_memory(_tls: VMThread, err_kind: MmtkAllocationError) {
+    fn out_of_memory(_tls: VMThread, err_kind: AllocationError) {
         panic!("Out of memory with {:?}!", err_kind);
     }
 

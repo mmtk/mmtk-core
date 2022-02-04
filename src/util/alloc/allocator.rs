@@ -12,7 +12,7 @@ use downcast_rs::Downcast;
 #[repr(C)]
 #[derive(Debug)]
 /// A list of errors that MMTk can encounter during allocation.
-pub enum MmtkAllocationError {
+pub enum AllocationError {
     /// The specified heap size is too small for the given program to continue.
     HeapOutOfMemory,
     /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
@@ -171,10 +171,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// being used, the [`alloc_slow_once_precise_stress`] function is used instead.
     ///
     /// Note that in the case where the VM is out of memory, we invoke
-    /// [`Collection::out_of_memory`] with a [`MmtkAllocationError::HeapOutOfMemory`] error to
-    /// inform the binding and then return a null pointer back to it. We have no assumptions on
-    /// whether the VM will continue executing or abort immediately on a
-    /// [`MmtkAllocationError::HeapOutOfMemory`] error.
+    /// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
+    /// the binding and then return a null pointer back to it. We have no assumptions on whether
+    /// the VM will continue executing or abort immediately on a
+    /// [`AllocationError::HeapOutOfMemory`] error.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
@@ -274,7 +274,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, MmtkAllocationError::HeapOutOfMemory);
+                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     plan.allocation_success.swap(false, Ordering::SeqCst);
                     return result;
                 }

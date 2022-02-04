@@ -1,4 +1,4 @@
-use crate::util::alloc::MmtkAllocationError;
+use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
@@ -91,9 +91,9 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
-            // Throw `MmapOutOfMemory`. Expect the VM to abort immediately.
-            trace!("Throw MmapOutOfMemory!");
-            VM::VMCollection::out_of_memory(tls, MmtkAllocationError::MmapOutOfMemory);
+            // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+            trace!("Signal MmapOutOfMemory!");
+            VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
             unreachable!()
         }
         // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
@@ -103,9 +103,9 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
-                    // Throw `MmapOutOfMemory`. Expect the VM to abort immediately.
-                    trace!("Throw MmapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, MmtkAllocationError::MmapOutOfMemory);
+                    // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+                    trace!("Signal MmapOutOfMemory!");
+                    VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
                     unreachable!()
                 }
             }
