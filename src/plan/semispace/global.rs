@@ -63,13 +63,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         }
     }
 
-    fn gc_init(
-        &mut self,
-        heap_size: usize,
-        vm_map: &'static VMMap,
-        scheduler: &Arc<GCWorkScheduler<VM>>,
-    ) {
-        self.common.gc_init(heap_size, vm_map, scheduler);
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
+        self.common.gc_init(heap_size, vm_map);
 
         self.copyspace0.init(vm_map);
         self.copyspace1.init(vm_map);

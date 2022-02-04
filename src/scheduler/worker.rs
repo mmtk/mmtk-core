@@ -4,7 +4,7 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
-use crate::vm::{Collection, VMBinding};
+use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -15,21 +15,37 @@ const LOCALLY_CACHED_WORKS: usize = 1;
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
+    /// True if the GC worker is parked.
     pub parked: AtomicBool,
+    /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
+    /// Incoming work packets to be executed by the current worker.
     pub local_work_bucket: WorkBucket<VM>,
 }
 
 /// A GC worker.  This part is privately owned by a worker thread.
+/// The GC controller also has an embedded `GCWorker` because it may also execute work packets.
 pub struct GCWorker<VM: VMBinding> {
+    /// The VM-specific thread-local state of the GC thread.
     pub tls: VMWorkerThread,
+    /// The ordinal of the worker, numbered from 0 to the number of workers minus one.
+    /// 0 if it is the embedded worker of the GC controller thread.
     pub ordinal: usize,
+    /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
+    /// The copy context, used to implement copying GC.
     copy: GCWorkerCopyContext<VM>,
+    /// The sending end of the channel to send message to the controller thread.
     pub sender: Sender<CoordinatorMessage<VM>>,
-    mmtk: Option<&'static MMTK<VM>>,
+    /// The reference to the MMTk instance.
+    mmtk: &'static MMTK<VM>,
+    /// True if this struct is the embedded GCWorker of the controller thread.
+    /// False if this struct belongs to a standalone GCWorker thread.
     is_coordinator: bool,
+    /// Cache of work packets created by the current worker.
+    /// May be flushed to the global pool or executed locally.
     local_work_buffer: Vec<(WorkBucketStage, Box<dyn GCWork<VM>>)>,
+    /// Reference to the shared part of the GC worker.  It is used for synchronization.
     pub shared: Arc<GCWorkerShared<VM>>,
 }
 
@@ -56,6 +72,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 
 impl<VM: VMBinding> GCWorker<VM> {
     pub fn new(
+        mmtk: &'static MMTK<VM>,
         ordinal: usize,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
@@ -69,7 +86,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             copy: GCWorkerCopyContext::new_non_copy(),
             sender,
             scheduler,
-            mmtk: None,
+            mmtk,
             is_coordinator,
             local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
             shared: Arc::new(GCWorkerShared {
@@ -114,7 +131,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
-        work.do_work(self, self.mmtk.unwrap());
+        work.do_work(self, self.mmtk);
     }
 
     pub fn do_work_boxed(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
@@ -124,7 +141,6 @@ impl<VM: VMBinding> GCWorker<VM> {
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        self.mmtk = Some(mmtk);
         self.shared.parked.store(false, Ordering::SeqCst);
         loop {
             while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
@@ -144,6 +160,7 @@ pub struct WorkerGroup<VM: VMBinding> {
 
 impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn new(
+        mmtk: &'static MMTK<VM>,
         workers: usize,
         scheduler: Arc<GCWorkScheduler<VM>>,
         sender: Sender<CoordinatorMessage<VM>>,
@@ -153,6 +170,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
         for ordinal in 0..workers {
             let worker = Box::new(GCWorker::new(
+                mmtk,
                 ordinal,
                 scheduler.clone(),
                 false,
@@ -163,13 +181,13 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             workers_to_spawn.push(worker);
         }
 
-        // NOTE: We cannot call spawn_worker_thread here,
+        // NOTE: We cannot call spawn_gc_thread here,
         // because the worker will access `Scheduler::worker_group` immediately after started,
         // but that field will not be assigned to before this function returns.
         // Therefore we defer the spawning operation later.
         let deferred_spawn = Box::new(move |tls| {
             for worker in workers_to_spawn.drain(..) {
-                VM::VMCollection::spawn_worker_thread(tls, Some(worker));
+                VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
             }
         });
 
