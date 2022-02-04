@@ -50,13 +50,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &MARKCOMPACT_CONSTRAINTS
     }
 
-    fn gc_init(
-        &mut self,
-        heap_size: usize,
-        vm_map: &'static VMMap,
-        scheduler: &Arc<GCWorkScheduler<VM>>,
-    ) {
-        self.common.gc_init(heap_size, vm_map, scheduler);
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
+        self.common.gc_init(heap_size, vm_map);
         self.mc_space.init(vm_map);
     }
 
@@ -139,7 +134,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         #[cfg(feature = "sanity")]
         scheduler.work_buckets[WorkBucketStage::Final]
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
-        scheduler.set_finalizer(Some(EndOfGC));
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {

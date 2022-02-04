@@ -5,6 +5,12 @@ use crate::util::alloc::MmtkAllocationError;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 
+/// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
+pub enum GCThreadContext<VM: VMBinding> {
+    Controller(Box<GCController<VM>>),
+    Worker(Box<GCWorker<VM>>),
+}
+
 /// VM-specific methods for garbage collection.
 pub trait Collection<VM: VMBinding> {
     /// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
@@ -48,9 +54,13 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The thread pointer for the parent thread that we spawn new threads from. This is the same `tls` when the VM
     ///   calls `initialize_collection()` and passes as an argument.
-    /// * `ctx`: The GC worker context for the GC thread. If `None` is passed, it means spawning a GC thread for the GC controller,
-    ///   which does not have a worker context.
-    fn spawn_worker_thread(tls: VMThread, ctx: Option<Box<GCWorker<VM>>>);
+    /// * `ctx`: The context for the GC thread.
+    ///   * If `Controller` is passed, it means spawning a thread to run as the GC controller.
+    ///     The spawned thread shall call `memory_manager::start_control_collector`.
+    ///   * If `Worker` is passed, it means spawning a thread to run as a GC worker.
+    ///     The spawned thread shall call `memory_manager::start_worker`.
+    ///   In either case, the `Box` inside should be passed back to the called function.
+    fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
