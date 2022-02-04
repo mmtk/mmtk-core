@@ -83,7 +83,7 @@ pub trait SFT {
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference;
+    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference;
 }
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
@@ -135,9 +135,9 @@ impl SFT for EmptySpaceSFT {
         )
     }
 
-    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
         panic!(
-            "Call sft_trace_object() on {:x}, which maps to an empty space",
+            "Call trace_object() on {:x}, which maps to an empty space",
             _object
         )
     }
@@ -436,8 +436,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn common(&self) -> &CommonSpace<VM>;
 
     fn release_multiple_pages(&mut self, start: Address);
-
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, semantics: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference;
 
     /// What copy semantic we should use for this space if we copy objects from this space
     fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {

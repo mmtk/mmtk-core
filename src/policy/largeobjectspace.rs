@@ -84,7 +84,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object)
@@ -111,12 +111,6 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
-    }
-
-    #[inline(always)]
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
-        debug_assert!(_semantics.is_none());
-        self.trace_object(trace, object)
     }
 }
 

@@ -88,7 +88,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     #[inline(always)]
-    fn sft_trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object)
@@ -175,12 +175,6 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
-    }
-
-    #[inline(always)]
-    fn general_trace_object(&self, trace: &mut MMTkProcessEdges<VM>, object: ObjectReference, _semantics: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
-        debug_assert!(_semantics.is_none());
-        self.trace_object(trace, object)
     }
 }
 

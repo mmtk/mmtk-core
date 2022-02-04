@@ -61,7 +61,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
-    fn sft_trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
         unreachable!()
     }
 }
@@ -144,10 +144,6 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
-    }
-
-    fn general_trace_object(&self, _trace: &mut MMTkProcessEdges<VM>, _object: ObjectReference, _semantics: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
-        unreachable!()
     }
 }
 
