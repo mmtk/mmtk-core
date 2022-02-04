@@ -1,7 +1,7 @@
 pub(crate) mod allocator;
 pub use allocator::fill_alignment_gap;
-pub use allocator::Allocator;
 pub use allocator::AllocationError;
+pub use allocator::Allocator;
 
 pub(crate) mod allocators;
 pub use allocators::AllocatorSelector;
