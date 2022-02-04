@@ -32,7 +32,6 @@ use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use crate::util::Address;
 use crate::scheduler::gc_work::MMTkProcessEdges;
 
 pub fn create_mutator<VM: VMBinding>(

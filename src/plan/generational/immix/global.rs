@@ -22,7 +22,6 @@ use crate::util::VMWorkerThread;
 use crate::vm::*;
 use crate::util::ObjectReference;
 use crate::scheduler::GCWork;
-use crate::util::copy::*;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;

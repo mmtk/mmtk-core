@@ -1,16 +1,11 @@
-use crate::plan::global::Plan;
 use crate::policy::mallocspace::metadata::is_chunk_mapped;
 use crate::policy::mallocspace::metadata::is_chunk_marked_unsafe;
 use crate::policy::mallocspace::MallocSpace;
-use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
 use crate::scheduler::{GCWork, GCWorker, WorkBucketStage};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
-use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
 use super::MarkSweep;

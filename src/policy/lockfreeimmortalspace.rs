@@ -16,9 +16,6 @@ use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::scheduler::gc_work::MMTkProcessEdges;
-use crate::util::copy::CopySemantics;
-use crate::scheduler::GCWorker;
 use crate::policy::space::*;
 
 /// This type implements a lock free version of the immortal collection

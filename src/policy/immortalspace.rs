@@ -9,9 +9,6 @@ use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_meta
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::TransitiveClosure;
-use crate::scheduler::gc_work::MMTkProcessEdges;
-use crate::util::copy::CopySemantics;
-use crate::scheduler::GCWorker;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
@@ -81,9 +78,8 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
     }
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
-        let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object)
     }
 }

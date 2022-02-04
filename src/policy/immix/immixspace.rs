@@ -32,7 +32,6 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
-use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::policy::space::*;
 
 pub struct ImmixSpace<VM: VMBinding> {

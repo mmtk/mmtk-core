@@ -19,9 +19,6 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::scheduler::gc_work::MMTkProcessEdges;
-use crate::util::copy::CopySemantics;
-use crate::scheduler::GCWorker;
 use crate::policy::space::*;
 
 #[allow(unused)]
@@ -84,9 +81,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
-        let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object)
     }
 }

@@ -1,11 +1,6 @@
 use super::global::GenImmix;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
-use crate::util::{Address, ObjectReference};
 use crate::vm::*;
-use crate::MMTK;
-use std::ops::{Deref, DerefMut};
 
 use crate::plan::immix::gc_work::TraceKind;
 

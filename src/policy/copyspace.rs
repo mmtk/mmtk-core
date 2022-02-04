@@ -3,7 +3,6 @@ use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
-use crate::scheduler::gc_work::MMTkProcessEdges;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
