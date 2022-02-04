@@ -148,9 +148,9 @@ mod process_tests {
     fn test_process_valid() {
         serial_test(|| {
             let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process("threads", "1") };
+            let success = unsafe { options.process("no_finalizer", "true") };
             assert!(success);
-            assert_eq!(*options.threads, 1);
+            assert!(*options.no_finalizer);
         })
     }
 
@@ -158,10 +158,10 @@ mod process_tests {
     fn test_process_invalid() {
         serial_test(|| {
             let options = UnsafeOptionsWrapper::new(Options::default());
-            let default_threads = *options.threads;
-            let success = unsafe { options.process("threads", "a") };
+            let default_no_finalizer = *options.no_finalizer;
+            let success = unsafe { options.process("no_finalizer", "100") };
             assert!(!success);
-            assert_eq!(*options.threads, default_threads);
+            assert_eq!(*options.no_finalizer, default_no_finalizer);
         })
     }
 
@@ -178,9 +178,9 @@ mod process_tests {
     fn test_process_bulk_valid() {
         serial_test(|| {
             let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process_bulk("threads=1 stress_factor=42") };
+            let success = unsafe { options.process_bulk("no_finalizer=true stress_factor=42") };
             assert!(success);
-            assert_eq!(*options.threads, 1);
+            assert!(*options.no_finalizer);
             assert_eq!(*options.stress_factor, 42);
         })
     }
@@ -189,7 +189,7 @@ mod process_tests {
     fn test_process_bulk_invalid() {
         serial_test(|| {
             let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process_bulk("threads=a stress_factor=42") };
+            let success = unsafe { options.process_bulk("no_finalizer=true stress_factor=a") };
             assert!(!success);
         })
     }
@@ -307,8 +307,11 @@ macro_rules! options {
 options! {
     // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     plan:                  PlanSelector         [env_var: true, command_line: false] [always_valid] = PlanSelector::NoGC,
-    // Number of GC threads.
-    threads:               usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0]    = num_cpus::get(),
+    // Number of GC worker threads. (There is always one GC controller thread.)
+    // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
+    // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
+    // See: https://github.com/mmtk/mmtk-core/issues/532
+    threads:               usize                [env_var: true, command_line: false] [|v: &usize| *v > 0]    = num_cpus::get(),
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
