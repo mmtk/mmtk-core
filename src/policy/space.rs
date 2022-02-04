@@ -143,62 +143,8 @@ impl SFT for EmptySpaceSFT {
     }
 }
 
-use crate::util::erase_vm::define_erased_vm_ref;
-define_erased_vm_ref!(ImmortalSpaceRef = super::immortalspace::ImmortalSpace<VM>);
-define_erased_vm_ref!(CopySpaceRef = super::copyspace::CopySpace<VM>);
-define_erased_vm_ref!(LargeObjectSpaceRef = super::largeobjectspace::LargeObjectSpace<VM>);
-define_erased_vm_ref!(LockFreeImmortalSpaceRef = super::lockfreeimmortalspace::LockFreeImmortalSpace<VM>);
-define_erased_vm_ref!(MarkCompactSpaceRef = super::markcompactspace::MarkCompactSpace<VM>);
-define_erased_vm_ref!(MallocSpaceRef = super::mallocspace::MallocSpace<VM>);
-define_erased_vm_ref!(ImmixSpaceRef = super::immix::ImmixSpace<VM>);
-
-#[derive(Copy, Clone)]
-pub enum SFTDispatch<'a> {
-    ImmortalSpace(ImmortalSpaceRef<'a>),
-    CopySpace(CopySpaceRef<'a>),
-    LargeObjectSpace(LargeObjectSpaceRef<'a>),
-    LockFreeImmortalSpace(LockFreeImmortalSpaceRef<'a>),
-    MarkCompactSpace(MarkCompactSpaceRef<'a>),
-    MallocSpace(MallocSpaceRef<'a>),
-    ImmixSpace(ImmixSpaceRef<'a>),
-    Empty(&'a EmptySpaceSFT)
-}
-
-macro_rules! dispatch_sft_call {
-    ($fn: tt = ($($args: tt: $tys: ty),*) -> $ret_ty: ty) => {
-        #[inline(always)]
-        pub fn $fn<VM: VMBinding>(&self, $($args: $tys),*) -> $ret_ty {
-            match self {
-                SFTDispatch::ImmortalSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::CopySpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::LargeObjectSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::LockFreeImmortalSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::MarkCompactSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::MallocSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::ImmixSpace(r) => r.as_ref::<VM>().$fn($($args),*),
-                SFTDispatch::Empty(r) => r.$fn($($args),*),
-            }
-        }
-    }
-}
-
-impl<'a> SFTDispatch<'a> {
-    dispatch_sft_call!(name = () -> &str);
-    dispatch_sft_call!(get_forwarded_object = (object: ObjectReference) -> Option<ObjectReference>);
-    dispatch_sft_call!(is_live = (object: ObjectReference) -> bool);
-    dispatch_sft_call!(is_reachable = (object: ObjectReference) -> bool);
-    dispatch_sft_call!(is_movable = () -> bool);
-    #[cfg(feature = "sanity")]
-    dispatch_sft_call!(is_sane = () -> bool);
-    dispatch_sft_call!(is_mmtk_object = (object: ObjectReference) -> bool);
-    dispatch_sft_call!(initialize_object_metadata = (object: ObjectReference, alloc: bool) -> ());
-    dispatch_sft_call!(sft_trace_object = (trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference);
-}
-
 pub struct SFTMap<'a> {
     sft: Vec<&'a (dyn SFT + Sync + 'static)>,
-
-    sft_dispatch: Vec<SFTDispatch<'a>>,
 }
 
 // TODO: MMTK<VM> holds a reference to SFTMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
@@ -210,7 +156,6 @@ impl<'a> SFTMap<'a> {
     pub fn new() -> Self {
         SFTMap {
             sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
-            sft_dispatch: vec![SFTDispatch::Empty(&EMPTY_SPACE_SFT); MAX_CHUNKS]
         }
     }
     // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
@@ -234,12 +179,6 @@ impl<'a> SFTMap<'a> {
             );
         }
         res
-    }
-
-    #[inline(always)]
-    pub fn get_dispatch(&self, address: Address) -> SFTDispatch {
-        debug_assert!(address.chunk_index() < MAX_CHUNKS);
-        unsafe { *self.sft_dispatch.get_unchecked(address.chunk_index()) }
     }
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
@@ -280,14 +219,14 @@ impl<'a> SFTMap<'a> {
     /// Update SFT map for the given address range.
     /// It should be used when we acquire new memory and use it as part of a space. For example, the cases include:
     /// 1. when a space grows, 2. when initializing a contiguous space, 3. when ensure_mapped() is called on a space.
-    pub fn update(&self, space: &(dyn SFT + Sync + 'static), dispatch: SFTDispatch, start: Address, bytes: usize) {
+    pub fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         if DEBUG_SFT {
             self.log_update(space, start, bytes);
         }
         let first = start.chunk_index();
         let last = conversions::chunk_align_up(start + bytes).chunk_index();
         for chunk in first..last {
-            self.set(chunk, space, dispatch);
+            self.set(chunk, space);
         }
         if DEBUG_SFT {
             self.trace_sft_map();
@@ -299,16 +238,16 @@ impl<'a> SFTMap<'a> {
     pub fn clear(&self, chunk_start: Address) {
         assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
         let chunk_idx = chunk_start.chunk_index();
-        self.set(chunk_idx, &EMPTY_SPACE_SFT, SFTDispatch::Empty(&EMPTY_SPACE_SFT));
+        self.set(chunk_idx, &EMPTY_SPACE_SFT);
     }
 
     // Currently only used by 32 bits vm map
     #[allow(dead_code)]
     pub fn clear_by_index(&self, chunk_idx: usize) {
-        self.set(chunk_idx, &EMPTY_SPACE_SFT, SFTDispatch::Empty(&EMPTY_SPACE_SFT))
+        self.set(chunk_idx, &EMPTY_SPACE_SFT)
     }
 
-    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static), dispatch: SFTDispatch) {
+    fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
         /*
          * This is safe (only) because a) this is only called during the
          * allocation and deallocation of chunks, which happens under a global
@@ -334,7 +273,6 @@ impl<'a> SFTMap<'a> {
             );
         }
         self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
-        self_mut.sft_dispatch[chunk] = unsafe { std::mem::transmute(dispatch) };
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -348,7 +286,6 @@ impl<'a> SFTMap<'a> {
 pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
-    fn as_dispatch(&self) -> SFTDispatch { unimplemented!() }
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
     fn init(&mut self, vm_map: &'static VMMap);
 
@@ -461,7 +398,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
         if new_chunk {
-            SFT_MAP.update(self.as_sft(), self.as_dispatch(), start, bytes);
+            SFT_MAP.update(self.as_sft(), start, bytes);
         }
     }
 
@@ -479,7 +416,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.as_dispatch(), self.common().start, self.common().extent);
+        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -714,7 +651,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), space.as_dispatch(), self.start, self.extent);
+            SFT_MAP.update(space.as_sft(), self.start, self.extent);
         }
     }
 
