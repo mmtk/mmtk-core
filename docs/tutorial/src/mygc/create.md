@@ -69,7 +69,6 @@ files.
             vm_map: &'static VMMap,
             mmapper: &'static Mmapper,
             options: Arc<UnsafeOptionsWrapper>,
-            scheduler: Arc<GCWorkScheduler<VM>>,
         ) -> Box<dyn Plan<VM = VM>> {
             match plan {
                 PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -81,7 +80,7 @@ files.
 
                 // Create MyGC plan based on selector
                 PlanSelector::MyGC => Box::new(crate::plan::mygc::MyGC::new(
-                    vm_map, mmapper, options, scheduler,
+                    vm_map, mmapper, options,
                 ))
             }
         }       
