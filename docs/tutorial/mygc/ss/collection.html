@@ -158,7 +158,7 @@ for copying plans, you would have to provide a proper copy configuration.</p>
 in the preparation step of a GC (which will be discussed later when we talk about preparing for collections).</p>
 <p>We use <code>CopySemantics::DefaultCopy</code> for our copy
 operation, and bind it with the first <code>CopySpaceCopyContext</code> (<code>CopySemantics::DefaultCopy =&gt; CopySelector::CopySpace(0)</code>).
-And for the rest copy semantics, they are unused for this plan. We also provide an initial space
+Other copy semantics are unused in this plan. We also provide an initial space
 binding for <code>CopySpaceCopyContext</code>. However, we will flip tospace in every GC, and rebind the
 copy context to the new tospace in each GC, so it does not matter which space we use as the initial
 space here.</p>
@@ -248,11 +248,13 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = MyGCProcessEdges&lt;VM&gt;;
 }
-
-Then we implement `schedule_collection()` using `MyGCWorkContext` and `schedule_common_work()`.
-
-```rust
-    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
+<span class="boring">}
+</span></code></pre></pre>
+<p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
+<pre><pre class="playground"><code class="language-rust">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
         self.base().set_collection_kind::&lt;Self&gt;(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
@@ -287,7 +289,7 @@ call, and add the following code:</p>
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.</p>
 <h3 id="prepare-worker"><a class="header" href="#prepare-worker">Prepare worker</a></h3>
-<p>As we flip tospac for the plan, we also need to rebind the copy context
+<p>As we flip tospace for the plan, we also need to rebind the copy context
 to the new tospace. We will override <code>prepare_worker()</code> in our <code>Plan</code> implementation.
 <code>Plan.prepare_worker()</code> is executed by each GC worker in the preparation phase of a GC. The code
 is straightforward -- we get the first <code>CopySpaceCopyContext</code>, and call <code>rebind()</code> on it with
@@ -317,7 +319,7 @@ This method should return an ObjectReference, and use the
 inline attribute.
 Check if the object passed into the function is null 
 (<code>object.is_null()</code>). If it is, return the object.
-Check if which space the object is in, and forward the call to the 
+Otherwise, check which space the object is in, and forward the call to the 
 policy-specific object tracing code. If it is in neither space, forward the 
 call to the common space and let the common space to handle object tracing in 
 its spaces (e.g. immortal or large object space):</p>
@@ -370,26 +372,6 @@ impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
     }
 }
 <span class="boring">}
-</span></code></pre></pre>
-<h2 id="copying-objects"><a class="header" href="#copying-objects">Copying objects</a></h2>
-<p>Go back to the <code>MyGCopyContext</code> in <code>gc_work.rs</code>. 
-In <code>alloc_copy()</code>, call the allocator's <code>alloc</code> function. Above the function, 
-use an inline attribute (<code>#[inline(always)]</code>) to tell the Rust compiler 
-to always inline the function.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span>
-<span class="boring">fn main() {
-</span><span class="boring">}
-</span></code></pre></pre>
-<p>To <code>post_copy()</code>, in the <code>CopyContext</code> implementations block, add 
-<code>forwarding_word::clear_forwarding_bits::&lt;VM&gt;(obj);</code>. Also, add an 
-inline attribute.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span>
-<span class="boring">fn main() {
-</span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="release"><a class="header" href="#release">Release</a></h2>
 <p>Finally, we need to fill out the functions that are, roughly speaking, 

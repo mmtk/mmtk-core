@@ -224,7 +224,6 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
     vm_map: &amp;'static VMMap,
     mmapper: &amp;'static Mmapper,
     options: Arc&lt;UnsafeOptionsWrapper&gt;,
-    scheduler: Arc&lt;GCWorkScheduler&lt;VM&gt;&gt;,
 ) -&gt; Box&lt;dyn Plan&lt;VM = VM&gt;&gt; {
     match plan {
         PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
@@ -236,7 +235,7 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
 
         // Create MyGC plan based on selector
         PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(
-            vm_map, mmapper, options, scheduler,
+            vm_map, mmapper, options,
         ))
     }
 }       
