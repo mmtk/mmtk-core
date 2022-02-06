@@ -170,11 +170,10 @@ impl<VM: VMBinding> MyGC<VM> {
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         options: Arc<UnsafeOptionsWrapper>,
-        _scheduler: &'static GCWorkScheduler<VM>,
     ) -> Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_specs = SideMetadataContext::new_global_specs(&[]);
 
         let res = MyGC {
             hi: AtomicBool::new(false),
@@ -184,7 +183,7 @@ impl<VM: VMBinding> MyGC<VM> {
                 false,
                 true,
                 VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
+                global_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -195,12 +194,12 @@ impl<VM: VMBinding> MyGC<VM> {
                 true,
                 true,
                 VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
+                global_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
             ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
+            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_specs.clone()),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
