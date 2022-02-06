@@ -20,7 +20,7 @@ in the preparation step of a GC (which will be discussed later when we talk abou
 
 We use `CopySemantics::DefaultCopy` for our copy
 operation, and bind it with the first `CopySpaceCopyContext` (`CopySemantics::DefaultCopy => CopySelector::CopySpace(0)`).
-And for the rest copy semantics, they are unused for this plan. We also provide an initial space
+Other copy semantics are unused in this plan. We also provide an initial space
 binding for `CopySpaceCopyContext`. However, we will flip tospace in every GC, and rebind the
 copy context to the new tospace in each GC, so it does not matter which space we use as the initial
 space here.
@@ -77,6 +77,7 @@ and implement the trait `GCWorkContext` for it. We create this type in `gc_work.
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:workcontext}}
+```
 
 Then we implement `schedule_collection()` using `MyGCWorkContext` and `schedule_common_work()`.
 
@@ -108,7 +109,7 @@ and which is 'from', then prepares the copyspaces with the new definition.
 
 ### Prepare worker
 
-As we flip tospac for the plan, we also need to rebind the copy context
+As we flip tospace for the plan, we also need to rebind the copy context
 to the new tospace. We will override `prepare_worker()` in our `Plan` implementation.
 `Plan.prepare_worker()` is executed by each GC worker in the preparation phase of a GC. The code
 is straightforward -- we get the first `CopySpaceCopyContext`, and call `rebind()` on it with
@@ -140,7 +141,7 @@ This method should return an ObjectReference, and use the
 inline attribute.
 Check if the object passed into the function is null 
 (`object.is_null()`). If it is, return the object.
-Check if which space the object is in, and forward the call to the 
+Otherwise, check which space the object is in, and forward the call to the 
 policy-specific object tracing code. If it is in neither space, forward the 
 call to the common space and let the common space to handle object tracing in 
 its spaces (e.g. immortal or large object space):
@@ -155,25 +156,6 @@ Add two new implementation blocks, `Deref` and `DerefMut` for
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:deref}}
-```
-
-## Copying objects
-
-Go back to the `MyGCopyContext` in `gc_work.rs`. 
-In `alloc_copy()`, call the allocator's `alloc` function. Above the function, 
-   use an inline attribute (`#[inline(always)]`) to tell the Rust compiler 
-   to always inline the function.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_alloc_copy}}
-```
-
-To `post_copy()`, in the `CopyContext` implementations block, add 
-`forwarding_word::clear_forwarding_bits::<VM>(obj);`. Also, add an 
-inline attribute.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:copycontext_post_copy}}
 ```
 
 ## Release
