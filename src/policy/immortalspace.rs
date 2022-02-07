@@ -12,11 +12,11 @@ use crate::plan::TransitiveClosure;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
-use crate::policy::space::*;
 
 /// This type implements a simple immortal collection
 /// policy. Under this policy all that is required is for the
@@ -78,7 +78,12 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
     }
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         self.trace_object(trace, object)
     }

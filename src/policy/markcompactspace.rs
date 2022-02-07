@@ -1,4 +1,5 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::policy::space::*;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -9,7 +10,6 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
-use crate::policy::space::*;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -54,7 +54,12 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[inline(always)]
-    fn trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        _trace: MMTkProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         // We should not use trace_object for markcompact space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
         unreachable!()

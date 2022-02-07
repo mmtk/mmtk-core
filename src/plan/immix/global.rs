@@ -22,7 +22,6 @@ use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use crate::util::ObjectReference;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -56,12 +55,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &IMMIX_CONSTRAINTS
-    }
-
-    fn create_scan_work(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
-        use crate::policy::immix::ScanObjectsAndMarkLines;
-        use crate::scheduler::gc_work::MMTkProcessEdges;
-        box ScanObjectsAndMarkLines::<MMTkProcessEdges<Self::VM>>::new(nodes, false, &self.immix_space)
     }
 
     fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
@@ -108,7 +101,8 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
         self.immix_space.prepare(true);
-        self.immix_space.set_copy_semantics(Some(CopySemantics::DefaultCopy));
+        self.immix_space
+            .set_copy_semantics(Some(CopySemantics::DefaultCopy));
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

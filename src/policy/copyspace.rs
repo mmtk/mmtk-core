@@ -1,6 +1,7 @@
 use crate::plan::TransitiveClosure;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
@@ -18,7 +19,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::policy::space::*;
 
 const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
@@ -66,7 +66,12 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object, self.common.copy.unwrap(), worker)

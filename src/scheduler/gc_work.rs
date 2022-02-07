@@ -418,16 +418,16 @@ pub trait ProcessEdgesWork:
     /// Create a new scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
     #[inline]
-    fn new_scan_work(&mut self, work_packet: Box<dyn GCWork<Self::VM>>) {
+    fn new_scan_work(&mut self, work_packet: impl GCWork<Self::VM>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
             // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
-            self.worker().do_work_boxed(work_packet);
+            self.worker().do_work(work_packet);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add_boxed(work_packet);
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
         }
     }
 
@@ -439,7 +439,7 @@ pub trait ProcessEdgesWork:
             return;
         }
         let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
-        self.new_scan_work(box scan_objects_work);
+        self.new_scan_work(scan_objects_work);
     }
 
     #[inline]
@@ -488,15 +488,6 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
         Self { base }
     }
 
-    #[cold]
-    fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
-        let work = self.base.mmtk.plan.create_scan_work(self.pop_nodes());
-        self.new_scan_work(work);
-    }
-
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
@@ -531,11 +522,6 @@ impl<VM: VMBinding> DerefMut for MMTkProcessEdges<VM> {
     }
 }
 
-use crate::policy::space::Space;
-pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> {
-    fn new(buffer: Vec<ObjectReference>, concurrent: bool, space: &'static dyn Space<VM>) -> Self;
-}
-
 /// Scan & update a list of object slots
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -559,12 +545,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
         trace!("ScanObjects");
         <E::VM as VMBinding>::VMScanning::scan_objects::<E>(&self.buffer, worker);
         trace!("ScanObjects End");
-    }
-}
-
-impl<E: ProcessEdgesWork> ScanObjectsWork<E::VM> for ScanObjects<E> {
-    fn new(buffer: Vec<ObjectReference>, concurrent: bool, _space: &'static dyn Space<E::VM>) -> Self {
-        Self::new(buffer, concurrent)
     }
 }
 

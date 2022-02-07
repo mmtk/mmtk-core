@@ -83,7 +83,12 @@ pub trait SFT {
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
 
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference;
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference;
 }
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
@@ -135,7 +140,12 @@ impl SFT for EmptySpaceSFT {
         )
     }
 
-    fn trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        _trace: MMTkProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         panic!(
             "Call trace_object() on {:x}, which maps to an empty space",
             _object

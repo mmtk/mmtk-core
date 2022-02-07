@@ -9,6 +9,7 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -20,7 +21,6 @@ use crate::util::options::UnsafeOptionsWrapper;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use crate::util::copy::*;
 
 use enum_map::EnumMap;
 
@@ -89,7 +89,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
-        self.fromspace_mut().set_copy_semantics(Some(CopySemantics::DefaultCopy));
+        self.fromspace_mut()
+            .set_copy_semantics(Some(CopySemantics::DefaultCopy));
         self.tospace_mut().set_copy_semantics(None);
     }
 

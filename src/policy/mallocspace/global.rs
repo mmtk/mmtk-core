@@ -22,11 +22,11 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
+use crate::policy::space::*;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
-use crate::policy::space::*;
 
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
@@ -85,7 +85,12 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         self.trace_object(trace, object)
     }

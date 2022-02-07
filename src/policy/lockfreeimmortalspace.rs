@@ -4,6 +4,7 @@ use crate::util::address::Address;
 use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
+use crate::policy::space::*;
 use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
@@ -16,7 +17,6 @@ use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::policy::space::*;
 
 /// This type implements a lock free version of the immortal collection
 /// policy. This is close to the OpenJDK's epsilon GC.
@@ -58,7 +58,12 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
-    fn trace_object(&self, _trace: MMTkProcessEdgesMutRef, _object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        _trace: MMTkProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         unreachable!()
     }
 }

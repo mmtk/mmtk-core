@@ -3,6 +3,7 @@ use atomic::Ordering;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -19,7 +20,6 @@ use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use crate::policy::space::*;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
@@ -81,7 +81,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, _worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         self.trace_object(trace, object)
     }

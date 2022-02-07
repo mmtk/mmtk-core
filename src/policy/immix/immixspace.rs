@@ -6,6 +6,7 @@ use super::{
 };
 use crate::plan::ObjectsClosure;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -32,7 +33,6 @@ use std::{
     ops::Range,
     sync::{atomic::AtomicU8, Arc},
 };
-use crate::policy::space::*;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -79,7 +79,12 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
     #[inline(always)]
-    fn trace_object(&self, trace: MMTkProcessEdgesMutRef, object: ObjectReference, worker: GCWorkerMutRef) -> ObjectReference {
+    fn trace_object(
+        &self,
+        trace: MMTkProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference {
         let trace = trace.as_mut::<VM>();
         let worker = worker.as_mut::<VM>();
         self.trace_object(trace, object, self.common.copy.unwrap(), worker)
@@ -568,8 +573,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
-use crate::scheduler::gc_work::ScanObjectsWork;
-
 /// A work packet to scan the fields of each objects and mark lines.
 pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
@@ -608,16 +611,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
             {
                 self.immix_space.mark_lines(*object);
             }
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> ScanObjectsWork<E::VM> for ScanObjectsAndMarkLines<E> {
-    fn new(buffer: Vec<ObjectReference>, concurrent: bool, space: &'static dyn Space<E::VM>) -> Self {
-        Self {
-            buffer,
-            concurrent,
-            immix_space: space.downcast_ref::<ImmixSpace<E::VM>>().unwrap(),
         }
     }
 }
