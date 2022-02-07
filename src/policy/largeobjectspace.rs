@@ -83,7 +83,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     #[inline(always)]
     fn trace_object(
         &self,
-        trace: MMTkProcessEdgesMutRef,
+        trace: SFTProcessEdgesMutRef,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

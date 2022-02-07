@@ -13,7 +13,7 @@ use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
-use crate::scheduler::gc_work::MMTkProcessEdges;
+use crate::scheduler::gc_work::SFTProcessEdges;
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -85,14 +85,14 @@ pub trait SFT {
 
     fn trace_object(
         &self,
-        trace: MMTkProcessEdgesMutRef,
+        trace: SFTProcessEdgesMutRef,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
 }
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
-define_erased_vm_mut_ref!(MMTkProcessEdgesMutRef = MMTkProcessEdges<VM>);
+define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
@@ -142,7 +142,7 @@ impl SFT for EmptySpaceSFT {
 
     fn trace_object(
         &self,
-        _trace: MMTkProcessEdgesMutRef,
+        _trace: SFTProcessEdgesMutRef,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -447,8 +447,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn release_multiple_pages(&mut self, start: Address);
 
-    /// What copy semantic we should use for this space if we copy objects from this space
-    fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
+    /// What copy semantic we should use for this space if we copy objects from this space.
+    /// This is only needed for plans that use SFTProcessEdges
+    fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
     }
 

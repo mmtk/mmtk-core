@@ -60,7 +60,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn trace_object(
         &self,
-        _trace: MMTkProcessEdgesMutRef,
+        _trace: SFTProcessEdgesMutRef,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

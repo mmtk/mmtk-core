@@ -90,8 +90,8 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
         self.fromspace_mut()
-            .set_copy_semantics(Some(CopySemantics::DefaultCopy));
-        self.tospace_mut().set_copy_semantics(None);
+            .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
+        self.tospace_mut().set_copy_for_sft_trace(None);
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<VM>) {

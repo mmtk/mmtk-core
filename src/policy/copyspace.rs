@@ -68,7 +68,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     #[inline(always)]
     fn trace_object(
         &self,
-        trace: MMTkProcessEdgesMutRef,
+        trace: SFTProcessEdgesMutRef,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -103,7 +103,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         panic!("copyspace only releases pages enmasse")
     }
 
-    fn set_copy_semantics(&mut self, semantics: Option<CopySemantics>) {
+    fn set_copy_for_sft_trace(&mut self, semantics: Option<CopySemantics>) {
         self.common.copy = semantics;
     }
 }

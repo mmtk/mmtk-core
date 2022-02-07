@@ -81,7 +81,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     #[inline(always)]
     fn trace_object(
         &self,
-        trace: MMTkProcessEdgesMutRef,
+        trace: SFTProcessEdgesMutRef,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -111,7 +111,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
     }
-    fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
+    fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("We do not expect using SFT to trace objects for Immix. set_copy_context() is not necessary.")
     }
 }

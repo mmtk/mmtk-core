@@ -85,7 +85,7 @@ impl<VM: VMBinding> Gen<VM> {
         self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
         self.nursery
-            .set_copy_semantics(Some(CopySemantics::PromoteMature));
+            .set_copy_for_sft_trace(Some(CopySemantics::PromoteMature));
     }
 
     /// Release Gen. This should be called by a single thread in GC release work.

@@ -476,12 +476,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
-pub struct MMTkProcessEdges<VM: VMBinding> {
+pub struct SFTProcessEdges<VM: VMBinding> {
     pub base: ProcessEdgesBase<VM>,
 }
 
 // FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
-impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
+impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
@@ -498,7 +498,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
             use crate::policy::space::*;
 
             let worker = GCWorkerMutRef::new(self.worker());
-            let trace = MMTkProcessEdgesMutRef::new(self);
+            let trace = SFTProcessEdgesMutRef::new(self);
 
             // SFT
             let sft = crate::mmtk::SFT_MAP.get(object.to_address());
@@ -507,7 +507,7 @@ impl<VM: VMBinding> ProcessEdgesWork for MMTkProcessEdges<VM> {
     }
 }
 
-impl<VM: VMBinding> Deref for MMTkProcessEdges<VM> {
+impl<VM: VMBinding> Deref for SFTProcessEdges<VM> {
     type Target = ProcessEdgesBase<VM>;
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -515,7 +515,7 @@ impl<VM: VMBinding> Deref for MMTkProcessEdges<VM> {
     }
 }
 
-impl<VM: VMBinding> DerefMut for MMTkProcessEdges<VM> {
+impl<VM: VMBinding> DerefMut for SFTProcessEdges<VM> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
