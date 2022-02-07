@@ -507,7 +507,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
             // SFT
             let sft = crate::mmtk::SFT_MAP.get(object.to_address());
-            sft.trace_object(trace, object, worker)
+            sft.sft_trace_object(trace, object, worker)
         }
     }
 }

@@ -21,7 +21,7 @@ macro_rules! define_erased_vm_mut_ref {
                 Self(unsafe { std::mem::transmute(r) }, PhantomData)
             }
             #[inline(always)]
-            pub fn as_mut<VM: VMBinding>(self) -> &'a mut $orig_type {
+            pub fn into_mut<VM: VMBinding>(self) -> &'a mut $orig_type {
                 unsafe { std::mem::transmute(self.0) }
             }
         }

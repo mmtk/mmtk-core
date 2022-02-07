@@ -72,8 +72,8 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.as_mut::<VM>();
-        let worker = worker.as_mut::<VM>();
+        let trace = trace.into_mut::<VM>();
+        let worker = worker.into_mut::<VM>();
         self.trace_object(trace, object, self.common.copy.unwrap(), worker)
     }
 }

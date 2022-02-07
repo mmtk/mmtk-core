@@ -84,7 +84,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.as_mut::<VM>();
+        let trace = trace.into_mut::<VM>();
         self.trace_object(trace, object)
     }
 }

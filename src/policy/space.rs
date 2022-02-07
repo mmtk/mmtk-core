@@ -147,7 +147,7 @@ impl SFT for EmptySpaceSFT {
         )
     }
 
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         _trace: SFTProcessEdgesMutRef,
         _object: ObjectReference,
@@ -289,7 +289,8 @@ impl<'a> SFTMap<'a> {
                 new
             );
         }
-        self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
+        // self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
+        self_mut.sft[chunk] = sft;
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
