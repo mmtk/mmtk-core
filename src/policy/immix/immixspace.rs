@@ -111,8 +111,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
     }
-    fn set_copy_semantics(&mut self, semantics: Option<CopySemantics>) {
-        self.common.copy = semantics;
+    fn set_copy_semantics(&mut self, _semantics: Option<CopySemantics>) {
+        panic!("We do not expect using SFT to trace objects for Immix. set_copy_context() is not necessary.")
     }
 }
 

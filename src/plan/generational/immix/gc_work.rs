@@ -1,13 +1,14 @@
 use super::global::GenImmix;
-use crate::plan::immix::gc_work::TraceKind;
+use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::*;
 use crate::MMTK;
-
 use std::ops::{Deref, DerefMut};
+
+use crate::plan::immix::gc_work::TraceKind;
 
 /// ProcessEdges for a full heap GC for generational immix. The const type parameter
 /// defines whether there is copying in the GC.
@@ -84,8 +85,6 @@ impl<VM: VMBinding, const KIND: TraceKind> DerefMut for GenImmixMatureProcessEdg
         &mut self.base
     }
 }
-
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 
 pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenImmixNurseryGCWorkContext<VM> {
