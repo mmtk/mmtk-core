@@ -495,20 +495,19 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        use crate::policy::space::*;
+
         if object.is_null() {
             return object;
         }
 
-        {
-            use crate::policy::space::*;
+        // Erase <VM> type parameter
+        let worker = GCWorkerMutRef::new(self.worker());
+        let trace = SFTProcessEdgesMutRef::new(self);
 
-            let worker = GCWorkerMutRef::new(self.worker());
-            let trace = SFTProcessEdgesMutRef::new(self);
-
-            // SFT
-            let sft = crate::mmtk::SFT_MAP.get(object.to_address());
-            sft.sft_trace_object(trace, object, worker)
-        }
+        // Invoke trace object on sft
+        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        sft.sft_trace_object(trace, object, worker)
     }
 }
 

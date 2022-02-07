@@ -289,7 +289,6 @@ impl<'a> SFTMap<'a> {
                 new
             );
         }
-        // self_mut.sft[chunk] = unsafe { &*(sft as *const _) };
         self_mut.sft[chunk] = sft;
     }
 
