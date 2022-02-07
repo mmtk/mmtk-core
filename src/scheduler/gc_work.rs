@@ -476,11 +476,16 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
+/// A general process edges implementation using SFT. A plan can always implement their own process edges. However,
+/// Most plans can use this work packet for tracing amd they do not need to provide a plan-specific trace object work packet.
+/// If they choose to use this type, they need to provide a correct implementation for some related methods
+/// (such as `Space.set_copy_for_sft_trace()`, `SFT.sft_trace_object()`).
+/// Some plans are not using this type, mostly due to more complex tracing. Either it is impossible to use this type, or
+/// there is performance overheads for using this general trace type. In such cases, they implement their specific process edges.
 pub struct SFTProcessEdges<VM: VMBinding> {
     pub base: ProcessEdgesBase<VM>,
 }
 
-// FIXME: flush() may create a different scan object packet. For example Immix use ScanObjectAndMarklines.
 impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     type VM = VM;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {

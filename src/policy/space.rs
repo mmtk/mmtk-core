@@ -95,6 +95,9 @@ pub trait SFT {
     ) -> ObjectReference;
 }
 
+// Create erased VM refs for these types that will be used in `sft_trace_object()`.
+// In this way, we can store the refs with <VM> in SFT (which cannot have parameters with generic type parameters)
+
 use crate::util::erase_vm::define_erased_vm_mut_ref;
 define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
@@ -103,7 +106,7 @@ define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
-pub struct EmptySpaceSFT {}
+struct EmptySpaceSFT {}
 
 const EMPTY_SFT_NAME: &str = "empty";
 
@@ -524,7 +527,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub descriptor: SpaceDescriptor,
     pub vmrequest: VMRequest,
 
-    /// For a copying space, this should be set before each GC, and it is only used in GC.
+    /// For a copying space that allows sft_trace_object(), this should be set before each GC so we know
+    // the copy semantics for the space.
     pub copy: Option<CopySemantics>,
 
     immortal: bool,
