@@ -66,7 +66,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     #[inline(always)]
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         trace: SFTProcessEdgesMutRef,
         object: ObjectReference,

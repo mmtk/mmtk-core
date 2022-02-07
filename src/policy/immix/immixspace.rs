@@ -79,15 +79,13 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
     #[inline(always)]
-    fn trace_object(
+    fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
-        object: ObjectReference,
-        worker: GCWorkerMutRef,
+        _trace: SFTProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.as_mut::<VM>();
-        let worker = worker.as_mut::<VM>();
-        self.trace_object(trace, object, self.common.copy.unwrap(), worker)
+        panic!("We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.")
     }
 }
 
@@ -112,7 +110,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
         panic!("immixspace only releases pages enmasse")
     }
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
-        panic!("We do not expect using SFT to trace objects for Immix. set_copy_context() is not necessary.")
+        panic!("We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.")
     }
 }
 

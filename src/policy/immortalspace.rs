@@ -78,7 +78,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
     }
     #[inline(always)]
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         trace: SFTProcessEdgesMutRef,
         object: ObjectReference,

@@ -82,8 +82,12 @@ pub trait SFT {
     }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
-
-    fn trace_object(
+    /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
+    /// code. However, tracing objects for some policies are more complicated, and they do not provide an
+    /// implementation of this method. For example, mark compact space requires trace twice in each GC.
+    /// Immix has defrag trace and fast trace.
+    fn sft_trace_object(
         &self,
         trace: SFTProcessEdgesMutRef,
         object: ObjectReference,

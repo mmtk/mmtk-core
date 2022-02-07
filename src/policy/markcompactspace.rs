@@ -54,7 +54,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     #[inline(always)]
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         _trace: SFTProcessEdgesMutRef,
         _object: ObjectReference,
@@ -62,7 +62,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     ) -> ObjectReference {
         // We should not use trace_object for markcompact space.
         // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
-        unreachable!()
+        panic!("sft_trace_object() cannot be used with mark compact space")
     }
 }
 

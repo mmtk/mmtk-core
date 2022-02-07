@@ -81,7 +81,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         trace: SFTProcessEdgesMutRef,
         object: ObjectReference,

@@ -58,7 +58,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
-    fn trace_object(
+    fn sft_trace_object(
         &self,
         _trace: SFTProcessEdgesMutRef,
         _object: ObjectReference,
