@@ -74,7 +74,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     ) -> ObjectReference {
         let trace = trace.into_mut::<VM>();
         let worker = worker.into_mut::<VM>();
-        self.trace_object(trace, object, self.common.copy.unwrap(), worker)
+        self.trace_object(trace, object, self.common.copy, worker)
     }
 }
 
@@ -205,15 +205,20 @@ impl<VM: VMBinding> CopySpace<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
-        semantics: CopySemantics,
+        semantics: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        debug_assert!(
-            self.from_space(),
-            "Trace object called for object ({:?}) in to-space",
-            object
-        );
+
+        // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
+        if !self.from_space() {
+            // The copy semantics for tospace should be none.
+            debug_assert!(semantics.is_none());
+            return object;
+        }
+
+        // This object is in from space, we will copy. Make sure we have a valid copy semantic.
+        debug_assert!(semantics.is_some());
 
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
@@ -236,7 +241,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("... no it isn't. Copying");
             let new_object = object_forwarding::forward_object::<VM>(
                 object,
-                semantics,
+                semantics.unwrap(),
                 worker.get_copy_context_mut(),
             );
             trace!("Forwarding pointer");

@@ -174,7 +174,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                CopySemantics::PromoteMature,
+                Some(CopySemantics::PromoteMature),
                 worker,
             );
         }
@@ -193,7 +193,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                CopySemantics::PromoteMature,
+                Some(CopySemantics::PromoteMature),
                 worker,
             );
         }
