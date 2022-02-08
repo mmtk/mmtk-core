@@ -17,6 +17,7 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
     }
+
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
@@ -32,11 +33,12 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let cell: Address = self.alloc_slow(size, align, offset);
-        allocator::align_allocation::<VM>(cell, align, offset, VM::MIN_ALIGNMENT, true)
-    }
-
-    fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        self.alloc_slow_inline(size, align, offset)
+        // We may get a null ptr from alloc due to the VM being OOM
+        if !cell.is_zero() {
+            allocator::align_allocation::<VM>(cell, align, offset, VM::MIN_ALIGNMENT, true)
+        } else {
+            cell
+        }
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, _offset: isize) -> Address {

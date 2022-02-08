@@ -9,6 +9,17 @@ use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection};
 use downcast_rs::Downcast;
 
+#[repr(C)]
+#[derive(Debug)]
+/// A list of errors that MMTk can encounter during allocation.
+pub enum AllocationError {
+    /// The specified heap size is too small for the given program to continue.
+    HeapOutOfMemory,
+    /// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to
+    /// abort if such an error is thrown.
+    MmapOutOfMemory,
+}
+
 #[inline(always)]
 pub fn align_allocation_no_fill<VM: VMBinding>(
     region: Address,
@@ -102,32 +113,73 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
     }
 }
 
+/// A trait which implements allocation routines. Every allocator needs to implements this trait.
 pub trait Allocator<VM: VMBinding>: Downcast {
+    /// Return the [`VMThread`] associated with this allocator instance.
     fn get_tls(&self) -> VMThread;
 
+    /// Return the [`Space`] instance associated with this allocator instance.
     fn get_space(&self) -> &'static dyn Space<VM>;
+
+    /// Return the [`Plan`] instance that this allocator instance is associated with.
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
 
-    /// Does this allocator do thread local allocation? If an allocator does not do thread local allocation,
-    /// each allocation will go to slowpath and will have a check for GC polls.
+    /// Return if this allocator can do thread local allocation. If an allocator does not do thread
+    /// local allocation, each allocation will go to slowpath and will have a check for GC polls.
     fn does_thread_local_allocation(&self) -> bool;
 
-    /// At which granularity the allocator acquires memory from the global space and use them as thread local buffer.
-    /// For example, bump pointer allocator acquire memory at 32KB blocks. Depending on the actual size for the current object,
-    /// they always acquire memory of N*32KB (N>=1). Thus bump pointer allocator returns 32KB for this method.
-    /// Only allocators that do thread local allocation need to implement this method.
+    /// Return at which granularity the allocator acquires memory from the global space and use
+    /// them as thread local buffer. For example, the [`BumpAllocator`] acquires memory at 32KB
+    /// blocks. Depending on the actual size for the current object, they always acquire memory of
+    /// N*32KB (N>=1). Thus the [`BumpAllocator`] returns 32KB for this method.  Only allocators
+    /// that do thread local allocation need to implement this method.
     fn get_thread_local_buffer_granularity(&self) -> usize {
         assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
         unimplemented!()
     }
 
+    /// An allocation attempt. The implementation of this function depends on the allocator used.
+    /// If an allocator supports thread local allocations, then the allocation will be serviced
+    /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`].
+    ///
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
+    /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address;
 
+    /// Slowpath allocation attempt. This function is explicitly not inlined for performance
+    /// considerations.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
     #[inline(never)]
     fn alloc_slow(&mut self, size: usize, align: usize, offset: isize) -> Address {
         self.alloc_slow_inline(size, align, offset)
     }
 
+    /// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A
+    /// slowpath allocation in MMTk attempts to allocate the object using the per-allocator
+    /// definition of [`alloc_slow_once`]. This function also accounts for increasing the
+    /// allocation bytes in order to support stress testing. In case precise stress testing is
+    /// being used, the [`alloc_slow_once_precise_stress`] function is used instead.
+    ///
+    /// Note that in the case where the VM is out of memory, we invoke
+    /// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
+    /// the binding and then return a null pointer back to it. We have no assumptions on whether
+    /// the VM will continue executing or abort immediately on a
+    /// [`AllocationError::HeapOutOfMemory`] error.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
     #[inline(always)]
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
@@ -207,10 +259,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             }
 
             // It is possible to have cases where a thread is blocked for another GC (non emergency)
-            // immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying the thread does not
-            // leave this loop between the two GCs. The local var 'emergency_collection' was set to true
-            // after the first GC. But when we execute this check below, we just finished the second GC,
-            // which is not emergency. In such case, we will give a false OOM.
+            // immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying
+            // the thread does not leave this loop between the two GCs. The local var 'emergency_collection'
+            // was set to true after the first GC. But when we execute this check below, we just finished
+            // the second GC, which is not emergency. In such case, we will give a false OOM.
             // We cannot just rely on the local var. Instead, we get the emergency collection value again,
             // and check both.
             if emergency_collection && self.get_plan().is_emergency_collection() {
@@ -220,8 +272,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 let fail_with_oom = !plan.allocation_success.swap(true, Ordering::SeqCst);
                 trace!("fail with oom={}", fail_with_oom);
                 if fail_with_oom {
-                    VM::VMCollection::out_of_memory(tls);
-                    trace!("Not reached");
+                    // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
+                    trace!("Throw HeapOutOfMemory!");
+                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    plan.allocation_success.swap(false, Ordering::SeqCst);
+                    return result;
                 }
             }
 
@@ -235,44 +290,54 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             //    VMActivePlan::mutator(tls).get_allocator_from_space(space)
             //};
 
-            /*
-             * Record whether last collection was an Emergency collection.
-             * If so, we make one more attempt to allocate before we signal
-             * an OOM.
-             */
+            // Record whether last collection was an Emergency collection. If so, we make one more
+            // attempt to allocate before we signal an OOM.
             emergency_collection = self.get_plan().is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
             previous_result_zero = true;
         }
     }
 
-    /// Single slow path allocation attempt. This is called by allocSlow.
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
-
-    /// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to N),
-    /// we would expect for every N bytes allocated, we will trigger a stress GC.
-    /// However, for allocators that do thread local allocation, they may allocate from their thread local buffer
-    /// which does not have a GC poll check, and they may even allocate with the JIT generated allocation
-    /// fastpath which is unaware of stress test GC. For both cases, we are not able to guarantee
-    /// a stress GC is triggered every N bytes. To solve this, when the stress factor is set, we
-    /// will call this method instead of the normal alloc_slow_once(). We expect the implementation of this slow allocation
-    /// will trick the fastpath so every allocation will fail in the fastpath, jump to the slow path and eventually
-    /// call this method again for the actual allocation.
-    ///
-    /// The actual implementation about how to trick the fastpath may vary. For example, our bump pointer allocator will
-    /// set the thread local buffer limit to the buffer size instead of the buffer end address. In this case, every fastpath
-    /// check (cursor + size < limit) will fail, and jump to this slowpath. In the slowpath, we still allocate from the thread
-    /// local buffer, and recompute the limit (remaining buffer size).
-    ///
-    /// If an allocator does not do thread local allocation (which returns false for does_thread_local_allocation()), it does
-    /// not need to override this method. The default implementation will simply call allow_slow_once() and it will work fine
-    /// for allocators that do not have thread local allocation.
+    /// Single slow path allocation attempt. This is called by [`alloc_slow_inline`]. The
+    /// implementation of this function depends on the allocator used. Generally, if an allocator
+    /// supports thread local allocations, it will try to allocate more TLAB space here. If it
+    /// doesn't, then (generally) the allocator simply allocates enough space for the current
+    /// object.
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.
     /// * `offset` the required offset in bytes.
-    /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address;
+
+    /// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to
+    /// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for
+    /// allocators that do thread local allocation, they may allocate from their thread local
+    /// buffer which does not have a GC poll check, and they may even allocate with the JIT
+    /// generated allocation fastpath which is unaware of stress test GC. For both cases, we are
+    /// not able to guarantee a stress GC is triggered every N bytes. To solve this, when the
+    /// stress factor is set, we will call this method instead of the normal alloc_slow_once(). We
+    /// expect the implementation of this slow allocation will trick the fastpath so every
+    /// allocation will fail in the fastpath, jump to the slow path and eventually call this method
+    /// again for the actual allocation.
+    ///
+    /// The actual implementation about how to trick the fastpath may vary. For example, our bump
+    /// pointer allocator will set the thread local buffer limit to the buffer size instead of the
+    /// buffer end address. In this case, every fastpath check (cursor + size < limit) will fail,
+    /// and jump to this slowpath. In the slowpath, we still allocate from the thread local buffer,
+    /// and recompute the limit (remaining buffer size).
+    ///
+    /// If an allocator does not do thread local allocation (which returns false for
+    /// does_thread_local_allocation()), it does not need to override this method. The default
+    /// implementation will simply call allow_slow_once() and it will work fine for allocators that
+    /// do not have thread local allocation.
+    ///
+    /// Arguments:
+    /// * `size`: the allocation size in bytes.
+    /// * `align`: the required alignment in bytes.
+    /// * `offset` the required offset in bytes.
+    /// * `need_poll`: if this is true, the implementation must poll for a GC, rather than
+    ///   attempting to allocate from the local buffer.
     fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
@@ -280,8 +345,8 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         offset: isize,
         need_poll: bool,
     ) -> Address {
-        // If an allocator does thread local allocation but does not override this method to provide a correct implementation,
-        // we will log a warning.
+        // If an allocator does thread local allocation but does not override this method to
+        // provide a correct implementation, we will log a warning.
         if self.does_thread_local_allocation() && need_poll {
             warn!("{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).", std::any::type_name::<Self>());
         }
