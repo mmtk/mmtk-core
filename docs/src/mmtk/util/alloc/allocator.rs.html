@@ -291,6 +291,71 @@
 <span id="290">290</span>
 <span id="291">291</span>
 <span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
@@ -301,6 +366,17 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>};
 <span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
+
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
+<span class="doccomment">/// A list of errors that MMTk can encounter during allocation.</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AllocationError</span> {
+    <span class="doccomment">/// The specified heap size is too small for the given program to continue.</span>
+    <span class="ident">HeapOutOfMemory</span>,
+    <span class="doccomment">/// The OS is unable to mmap or acquire more memory. Critical error. MMTk expects the VM to</span>
+    <span class="doccomment">/// abort if such an error is thrown.</span>
+    <span class="ident">MmapOutOfMemory</span>,
+}
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation_no_fill</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
@@ -395,32 +471,73 @@
     }
 }
 
+<span class="doccomment">/// A trait which implements allocation routines. Every allocator needs to implements this trait.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Allocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Downcast</span> {
+    <span class="doccomment">/// Return the [`VMThread`] associated with this allocator instance.</span>
     <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMThread</span>;
 
+    <span class="doccomment">/// Return the [`Space`] instance associated with this allocator instance.</span>
     <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// Return the [`Plan`] instance that this allocator instance is associated with.</span>
     <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>;
 
-    <span class="doccomment">/// Does this allocator do thread local allocation? If an allocator does not do thread local allocation,</span>
-    <span class="doccomment">/// each allocation will go to slowpath and will have a check for GC polls.</span>
+    <span class="doccomment">/// Return if this allocator can do thread local allocation. If an allocator does not do thread</span>
+    <span class="doccomment">/// local allocation, each allocation will go to slowpath and will have a check for GC polls.</span>
     <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
 
-    <span class="doccomment">/// At which granularity the allocator acquires memory from the global space and use them as thread local buffer.</span>
-    <span class="doccomment">/// For example, bump pointer allocator acquire memory at 32KB blocks. Depending on the actual size for the current object,</span>
-    <span class="doccomment">/// they always acquire memory of N*32KB (N&gt;=1). Thus bump pointer allocator returns 32KB for this method.</span>
-    <span class="doccomment">/// Only allocators that do thread local allocation need to implement this method.</span>
+    <span class="doccomment">/// Return at which granularity the allocator acquires memory from the global space and use</span>
+    <span class="doccomment">/// them as thread local buffer. For example, the [`BumpAllocator`] acquires memory at 32KB</span>
+    <span class="doccomment">/// blocks. Depending on the actual size for the current object, they always acquire memory of</span>
+    <span class="doccomment">/// N*32KB (N&gt;=1). Thus the [`BumpAllocator`] returns 32KB for this method.  Only allocators</span>
+    <span class="doccomment">/// that do thread local allocation need to implement this method.</span>
     <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>(), <span class="string">&quot;An allocator that does not thread local allocation does not have a buffer granularity.&quot;</span>);
         <span class="macro">unimplemented!</span>()
     }
 
+    <span class="doccomment">/// An allocation attempt. The implementation of this function depends on the allocator used.</span>
+    <span class="doccomment">/// If an allocator supports thread local allocations, then the allocation will be serviced</span>
+    <span class="doccomment">/// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`].</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
+    <span class="doccomment">/// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to</span>
+    <span class="doccomment">/// it. We have no assumptions on whether the VM will continue executing or abort immediately.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
+    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
+    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
     <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span>;
 
+    <span class="doccomment">/// Slowpath allocation attempt. This function is explicitly not inlined for performance</span>
+    <span class="doccomment">/// considerations.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
+    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
+    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="self">self</span>.<span class="ident">alloc_slow_inline</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
     }
 
+    <span class="doccomment">/// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A</span>
+    <span class="doccomment">/// slowpath allocation in MMTk attempts to allocate the object using the per-allocator</span>
+    <span class="doccomment">/// definition of [`alloc_slow_once`]. This function also accounts for increasing the</span>
+    <span class="doccomment">/// allocation bytes in order to support stress testing. In case precise stress testing is</span>
+    <span class="doccomment">/// being used, the [`alloc_slow_once_precise_stress`] function is used instead.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
+    <span class="doccomment">/// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform</span>
+    <span class="doccomment">/// the binding and then return a null pointer back to it. We have no assumptions on whether</span>
+    <span class="doccomment">/// the VM will continue executing or abort immediately on a</span>
+    <span class="doccomment">/// [`AllocationError::HeapOutOfMemory`] error.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
+    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
+    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow_inline</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_tls</span>();
@@ -500,10 +617,10 @@
             }
 
             <span class="comment">// It is possible to have cases where a thread is blocked for another GC (non emergency)</span>
-            <span class="comment">// immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying the thread does not</span>
-            <span class="comment">// leave this loop between the two GCs. The local var &#39;emergency_collection&#39; was set to true</span>
-            <span class="comment">// after the first GC. But when we execute this check below, we just finished the second GC,</span>
-            <span class="comment">// which is not emergency. In such case, we will give a false OOM.</span>
+            <span class="comment">// immediately after being blocked for a GC (emergency) (e.g. in stress test), that is saying</span>
+            <span class="comment">// the thread does not leave this loop between the two GCs. The local var &#39;emergency_collection&#39;</span>
+            <span class="comment">// was set to true after the first GC. But when we execute this check below, we just finished</span>
+            <span class="comment">// the second GC, which is not emergency. In such case, we will give a false OOM.</span>
             <span class="comment">// We cannot just rely on the local var. Instead, we get the emergency collection value again,</span>
             <span class="comment">// and check both.</span>
             <span class="kw">if</span> <span class="ident">emergency_collection</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>() {
@@ -513,8 +630,11 @@
                 <span class="kw">let</span> <span class="ident">fail_with_oom</span> <span class="op">=</span> <span class="op">!</span><span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">swap</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
                 <span class="macro">trace!</span>(<span class="string">&quot;fail with oom={}&quot;</span>, <span class="ident">fail_with_oom</span>);
                 <span class="kw">if</span> <span class="ident">fail_with_oom</span> {
-                    <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>);
-                    <span class="macro">trace!</span>(<span class="string">&quot;Not reached&quot;</span>);
+                    <span class="comment">// Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM</span>
+                    <span class="macro">trace!</span>(<span class="string">&quot;Throw HeapOutOfMemory!&quot;</span>);
+                    <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>, <span class="ident">AllocationError::HeapOutOfMemory</span>);
+                    <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">swap</span>(<span class="bool-val">false</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">return</span> <span class="ident">result</span>;
                 }
             }
 
@@ -528,44 +648,54 @@
             <span class="comment">//    VMActivePlan::mutator(tls).get_allocator_from_space(space)</span>
             <span class="comment">//};</span>
 
-            <span class="comment">/*
-             * Record whether last collection was an Emergency collection.
-             * If so, we make one more attempt to allocate before we signal
-             * an OOM.
-             */</span>
+            <span class="comment">// Record whether last collection was an Emergency collection. If so, we make one more</span>
+            <span class="comment">// attempt to allocate before we signal an OOM.</span>
             <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_emergency_collection</span>();
             <span class="macro">trace!</span>(<span class="string">&quot;Got emergency collection as {}&quot;</span>, <span class="ident">emergency_collection</span>);
             <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">true</span>;
         }
     }
 
-    <span class="doccomment">/// Single slow path allocation attempt. This is called by allocSlow.</span>
-    <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span>;
-
-    <span class="doccomment">/// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to N),</span>
-    <span class="doccomment">/// we would expect for every N bytes allocated, we will trigger a stress GC.</span>
-    <span class="doccomment">/// However, for allocators that do thread local allocation, they may allocate from their thread local buffer</span>
-    <span class="doccomment">/// which does not have a GC poll check, and they may even allocate with the JIT generated allocation</span>
-    <span class="doccomment">/// fastpath which is unaware of stress test GC. For both cases, we are not able to guarantee</span>
-    <span class="doccomment">/// a stress GC is triggered every N bytes. To solve this, when the stress factor is set, we</span>
-    <span class="doccomment">/// will call this method instead of the normal alloc_slow_once(). We expect the implementation of this slow allocation</span>
-    <span class="doccomment">/// will trick the fastpath so every allocation will fail in the fastpath, jump to the slow path and eventually</span>
-    <span class="doccomment">/// call this method again for the actual allocation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// The actual implementation about how to trick the fastpath may vary. For example, our bump pointer allocator will</span>
-    <span class="doccomment">/// set the thread local buffer limit to the buffer size instead of the buffer end address. In this case, every fastpath</span>
-    <span class="doccomment">/// check (cursor + size &lt; limit) will fail, and jump to this slowpath. In the slowpath, we still allocate from the thread</span>
-    <span class="doccomment">/// local buffer, and recompute the limit (remaining buffer size).</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// If an allocator does not do thread local allocation (which returns false for does_thread_local_allocation()), it does</span>
-    <span class="doccomment">/// not need to override this method. The default implementation will simply call allow_slow_once() and it will work fine</span>
-    <span class="doccomment">/// for allocators that do not have thread local allocation.</span>
+    <span class="doccomment">/// Single slow path allocation attempt. This is called by [`alloc_slow_inline`]. The</span>
+    <span class="doccomment">/// implementation of this function depends on the allocator used. Generally, if an allocator</span>
+    <span class="doccomment">/// supports thread local allocations, it will try to allocate more TLAB space here. If it</span>
+    <span class="doccomment">/// doesn&#39;t, then (generally) the allocator simply allocates enough space for the current</span>
+    <span class="doccomment">/// object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
     <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
     <span class="doccomment">/// * `offset` the required offset in bytes.</span>
-    <span class="doccomment">/// * `need_poll`: if this is true, the implementation must poll for a GC, rather than attempting to allocate from the local buffer.</span>
+    <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span>;
+
+    <span class="doccomment">/// Single slowpath allocation attempt for stress test. When the stress factor is set (e.g. to</span>
+    <span class="doccomment">/// N), we would expect for every N bytes allocated, we will trigger a stress GC.  However, for</span>
+    <span class="doccomment">/// allocators that do thread local allocation, they may allocate from their thread local</span>
+    <span class="doccomment">/// buffer which does not have a GC poll check, and they may even allocate with the JIT</span>
+    <span class="doccomment">/// generated allocation fastpath which is unaware of stress test GC. For both cases, we are</span>
+    <span class="doccomment">/// not able to guarantee a stress GC is triggered every N bytes. To solve this, when the</span>
+    <span class="doccomment">/// stress factor is set, we will call this method instead of the normal alloc_slow_once(). We</span>
+    <span class="doccomment">/// expect the implementation of this slow allocation will trick the fastpath so every</span>
+    <span class="doccomment">/// allocation will fail in the fastpath, jump to the slow path and eventually call this method</span>
+    <span class="doccomment">/// again for the actual allocation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The actual implementation about how to trick the fastpath may vary. For example, our bump</span>
+    <span class="doccomment">/// pointer allocator will set the thread local buffer limit to the buffer size instead of the</span>
+    <span class="doccomment">/// buffer end address. In this case, every fastpath check (cursor + size &lt; limit) will fail,</span>
+    <span class="doccomment">/// and jump to this slowpath. In the slowpath, we still allocate from the thread local buffer,</span>
+    <span class="doccomment">/// and recompute the limit (remaining buffer size).</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If an allocator does not do thread local allocation (which returns false for</span>
+    <span class="doccomment">/// does_thread_local_allocation()), it does not need to override this method. The default</span>
+    <span class="doccomment">/// implementation will simply call allow_slow_once() and it will work fine for allocators that</span>
+    <span class="doccomment">/// do not have thread local allocation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
+    <span class="doccomment">/// * `align`: the required alignment in bytes.</span>
+    <span class="doccomment">/// * `offset` the required offset in bytes.</span>
+    <span class="doccomment">/// * `need_poll`: if this is true, the implementation must poll for a GC, rather than</span>
+    <span class="doccomment">///   attempting to allocate from the local buffer.</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow_once_precise_stress</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,
@@ -573,8 +703,8 @@
         <span class="ident">offset</span>: <span class="ident">isize</span>,
         <span class="ident">need_poll</span>: <span class="ident">bool</span>,
     ) -&gt; <span class="ident">Address</span> {
-        <span class="comment">// If an allocator does thread local allocation but does not override this method to provide a correct implementation,</span>
-        <span class="comment">// we will log a warning.</span>
+        <span class="comment">// If an allocator does thread local allocation but does not override this method to</span>
+        <span class="comment">// provide a correct implementation, we will log a warning.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>() <span class="op">&amp;&amp;</span> <span class="ident">need_poll</span> {
             <span class="macro">warn!</span>(<span class="string">&quot;{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).&quot;</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
         }

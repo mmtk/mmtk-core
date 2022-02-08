@@ -57,9 +57,6 @@
 <span id="56">56</span>
 <span id="57">57</span>
 <span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
-<span id="61">61</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::MallocSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
@@ -95,9 +92,6 @@
     }
 
     <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
-        <span class="comment">// TODO: We currently ignore the offset field. This is wrong.</span>
-        <span class="comment">// assert!(offset == 0);</span>
-        <span class="comment">// assert!(align &lt;= 16);</span>
         <span class="macro">assert!</span>(<span class="ident">offset</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span>);
 
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">alloc</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);

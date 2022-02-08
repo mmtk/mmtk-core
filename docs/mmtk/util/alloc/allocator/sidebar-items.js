@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["align_allocation",""],["align_allocation_no_fill",""],["fill_alignment_gap",""],["get_maximum_aligned_size",""]],"trait":[["Allocator",""]]});
+initSidebarItems({"enum":[["AllocationError","A list of errors that MMTk can encounter during allocation."]],"fn":[["align_allocation",""],["align_allocation_no_fill",""],["fill_alignment_gap",""],["get_maximum_aligned_size",""]],"trait":[["Allocator","A trait which implements allocation routines. Every allocator needs to implements this trait."]]});

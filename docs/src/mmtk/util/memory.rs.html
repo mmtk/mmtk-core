@@ -322,7 +322,14 @@
 <span id="321">321</span>
 <span id="322">322</span>
 <span id="323">323</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::AllocationError</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">Collection</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="ident">libc</span>::{<span class="ident">PROT_EXEC</span>, <span class="ident">PROT_NONE</span>, <span class="ident">PROT_READ</span>, <span class="ident">PROT_WRITE</span>};
@@ -406,14 +413,17 @@
     <span class="ident">wrap_libc_call</span>(<span class="kw-2">&amp;</span><span class="op">|</span><span class="op">|</span> <span class="kw">unsafe</span> { <span class="ident">libc::munmap</span>(<span class="ident">start</span>.<span class="ident">to_mut_ptr</span>(), <span class="ident">size</span>) }, <span class="number">0</span>)
 }
 
-<span class="doccomment">/// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.</span>
+<span class="doccomment">/// Properly handle errors from a mmap Result, including invoking the binding code in the case of</span>
+<span class="doccomment">/// an OOM error.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_mmap_error</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">error</span>: <span class="ident">Error</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>) -&gt; <span class="op">!</span> {
     <span class="kw">use</span> <span class="ident">std::io::ErrorKind</span>;
 
     <span class="kw">match</span> <span class="ident">error</span>.<span class="ident">kind</span>() {
         <span class="comment">// From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.</span>
         <span class="ident">ErrorKind::OutOfMemory</span> =&gt; {
-            <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>);
+            <span class="comment">// Signal `MmapOutOfMemory`. Expect the VM to abort immediately.</span>
+            <span class="macro">trace!</span>(<span class="string">&quot;Signal MmapOutOfMemory!&quot;</span>);
+            <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>, <span class="ident">AllocationError::MmapOutOfMemory</span>);
             <span class="macro">unreachable!</span>()
         }
         <span class="comment">// Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.</span>
@@ -423,7 +433,9 @@
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">os_errno</span>) <span class="op">=</span> <span class="ident">error</span>.<span class="ident">raw_os_error</span>() {
                 <span class="comment">// If it is OOM, we invoke out_of_memory() through the VM interface.</span>
                 <span class="kw">if</span> <span class="ident">os_errno</span> <span class="op">==</span> <span class="ident">libc::ENOMEM</span> {
-                    <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>);
+                    <span class="comment">// Signal `MmapOutOfMemory`. Expect the VM to abort immediately.</span>
+                    <span class="macro">trace!</span>(<span class="string">&quot;Signal MmapOutOfMemory!&quot;</span>);
+                    <span class="ident">VM::VMCollection::out_of_memory</span>(<span class="ident">tls</span>, <span class="ident">AllocationError::MmapOutOfMemory</span>);
                     <span class="macro">unreachable!</span>()
                 }
             }

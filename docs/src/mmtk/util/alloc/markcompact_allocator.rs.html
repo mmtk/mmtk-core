@@ -92,6 +92,11 @@
 <span id="91">91</span>
 <span id="92">92</span>
 <span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
+<span id="98">98</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::BumpAllocator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
@@ -146,8 +151,13 @@
         <span class="kw">let</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="self">self</span>
             .<span class="ident">bump_allocator</span>
             .<span class="ident">alloc</span>(<span class="ident">size</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-        <span class="comment">// return the actual object start address</span>
-        <span class="ident">rtn</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>
+        <span class="comment">// Check if the result is valid and return the actual object start address</span>
+        <span class="comment">// Note that `rtn` can be null in the case of OOM</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">rtn</span>.<span class="ident">is_zero</span>() {
+            <span class="ident">rtn</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>
+        } <span class="kw">else</span> {
+            <span class="ident">rtn</span>
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
