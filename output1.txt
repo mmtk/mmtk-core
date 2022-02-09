@@ -1,0 +1,10 @@
+[2022-02-09T06:25:23Z INFO  mmtk::memory_manager] Initialized MMTk with MarkSweep
+alloc slow inline OpaquePointer(0x7fffec031000), size=24
+alloc slow inline OpaquePointer(0x7fffec031000) result=0x200ffc0ffd8
+alloc slow inline OpaquePointer(0x7fffec031000) stress_test=false, plan init=false, !prev res zero=true
+alloc slow inline OpaquePointer(0x7fffec031000), size=184
+alloc slow inline OpaquePointer(0x7fffec031000) result=0x200ffc1ff00
+alloc slow inline OpaquePointer(0x7fffec031000) stress_test=false, plan init=false, !prev res zero=true
+thread '<unnamed>' panicked at 'assertion failed: false', /home/paiger/mmtk-core/src/util/alloc/free_list_allocator.rs:276:9
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+fatal runtime error: failed to initiate panic, error 5
