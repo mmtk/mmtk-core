@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
+use super::gc_work::GenCopyGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -79,16 +79,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        let is_full_heap = self.request_full_heap_collection();
+        let _ = self.request_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        if !is_full_heap {
-            debug!("Nursery GC");
-            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
-        } else {
-            debug!("Full heap GC");
-            scheduler.schedule_common_work::<GenCopyMatureGCWorkContext<VM>>(self);
-        }
+        scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

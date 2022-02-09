@@ -43,7 +43,8 @@ method `schedule_common_work()` that will add common work packets for you.
 
 To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext`
 and implement the trait `GCWorkContext` for it. We create `gc_work.rs` and add the
-following implementation. Note that for the `ProcessEdgesWorkType`, we use `SFTProcessEdges`,
+following implementation. Note that we do not set a specific `ProcessEdgesWorkType`
+and we will use the default [`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
 which is a general work packet that a plan can use to trace objects. For plans
 like semispace, `SFTProcessEdges` is sufficient. For more complex GC plans,
 one can create and write their own work packet that implements the `ProcessEdgesWork` trait.

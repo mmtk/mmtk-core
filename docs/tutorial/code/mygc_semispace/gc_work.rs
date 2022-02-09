@@ -10,6 +10,5 @@ pub struct MyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MyGC<VM>;
-    type ProcessEdgesWorkType = SFTProcessEdges<VM>;
 }
 // ANCHOR_END: workcontext
