@@ -13,6 +13,7 @@ use crate::util::alloc::Allocator;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
+use crate::vm::ActivePlan;
 use crate::Plan;
 
 const MI_BIN_HUGE: usize = 73;
@@ -139,7 +140,6 @@ impl BlockList {
     }
 
     pub fn remove<VM: VMBinding>(&mut self, block: Block) {
-        // eprintln!("r {} from {:?}, lock={}", block.start(), self as *mut _, self.lock.load(Ordering::SeqCst));
         let prev = block.load_prev_block::<VM>();
         let next = block.load_next_block::<VM>();
         if prev.is_zero() {
@@ -165,7 +165,6 @@ impl BlockList {
     }
 
     pub fn pop<VM: VMBinding>(&mut self) -> Block {
-        // eprintln!("pop from {:?}, lock={}", self as *mut _, self.lock.load(Ordering::SeqCst));
         let rtn = self.first;
         if rtn.is_zero() {
             return rtn;
@@ -185,7 +184,6 @@ impl BlockList {
     }
 
     fn push<VM: VMBinding>(&mut self, block: Block) {
-        // eprintln!("push {} to {:?}, lock={}", block.start(), self as *mut _, self.lock.load(Ordering::SeqCst));
         if self.is_empty() {
             block.store_next_block::<VM>(ZERO_BLOCK);
             block.store_prev_block::<VM>(ZERO_BLOCK);
@@ -232,12 +230,10 @@ impl BlockList {
         while !success {
             success = self.lock.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok();
         }
-        // eprintln!("lock {:?}", self as *const _);
     }
 
     pub fn unlock(&mut self) {
         self.lock.store(false, Ordering::SeqCst);
-        // eprintln!("unlock {:?}", self as *const _);
     }
 }
 
@@ -284,7 +280,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             return self.alloc_from_available(size);
         }
 
-        let block = self.acquire_block_for_size(size);
+        let block = self.acquire_block_for_size(size, false);
         if block.is_zero() {
             // gc
             return unsafe {Address::zero()};
@@ -320,14 +316,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn alloc_slow_once_precise_stress(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
         trace!("allow slow precise stress s={}", size);
         let bin = mi_bin(size) as usize;
+        assert!(self.available_blocks[bin].is_empty());
         if need_poll {
-            let block = self.acquire_fresh_block(size, true);
-            if block.is_zero() {
-                return unsafe { Address::zero() };
-            }
-            let free_list = block.load_free_list::<VM>();
-            block.store_free_list::<VM>(unsafe { free_list.load::<Address>() });
-            return free_list;
+            VM::VMActivePlan::global().poll(false, self.space);
         }
         let available = self.available_blocks_stress.get_mut(bin as usize).unwrap();
         if !available.is_empty() {
@@ -340,9 +331,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                     let next_cell = unsafe { free_list.load::<Address>() };
                     block.store_free_list::<VM>(next_cell);
                     debug_assert!(block.load_free_list::<VM>() == next_cell);
-                    // set allocation bit
-                    set_alloc_bit(unsafe { free_list.to_object_reference() });
-                    debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
     
                     return free_list;
                 }
@@ -353,8 +341,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     
             }
         }
-
-        let block = self.acquire_block_for_size(size);
+        let block = self.acquire_block_for_size(size, true);
         if block.is_zero() {
             return unsafe {Address::zero()};
         }
@@ -492,7 +479,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
 
 
-    pub fn acquire_block_for_size(&mut self, size: usize) -> Block {
+    pub fn acquire_block_for_size(&mut self, size: usize, stress_test: bool) -> Block {
 
         let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
@@ -508,16 +495,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             self.sweep_block(block);
             if block.has_free_cells::<VM>() {
                 // recyclable block
-                self.available_blocks.get_mut(bin).unwrap().push::<VM>(block);
-                // eprintln!("push {} to available list, list = {:?}, list.lock = {}", block.start(), &self.available_blocks[bin] as *const _, &self.available_blocks[bin].lock.load(Ordering::SeqCst));
+                if stress_test {
+                    self.available_blocks_stress.get_mut(bin).unwrap().push::<VM>(block);
+                } else {
+                    self.available_blocks.get_mut(bin).unwrap().push::<VM>(block);
+                }
                 return block;
             } else {
                 // nothing was freed from this block
                 self.consumed_blocks.get_mut(bin).unwrap().push::<VM>(block);
-                // eprintln!("push {} to consumed list, list = {:?}, list.lock = {}", block.start(), &self.consumed_blocks[bin] as *const _, &self.consumed_blocks[bin].lock.load(Ordering::SeqCst));
             }
         }
-        self.acquire_fresh_block(size, false)
+        self.acquire_fresh_block(size, stress_test)
     }
 
     pub fn acquire_fresh_block(&mut self, size: usize, stress_test: bool) -> Block {
@@ -530,7 +519,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         // GC
                         return block;
                     }
-                    self.available_blocks[bin].push::<VM>(block);
+                    if stress_test {
+                        self.available_blocks_stress[bin].push::<VM>(block);
+                    } else {
+                        self.available_blocks[bin].push::<VM>(block);
+                    }
                     self.init_block(block, self.available_blocks[bin].size);
                     
                     return block;
@@ -539,7 +532,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 crate::policy::marksweepspace::BlockAcquireResult::AbandonedAvailable(block) => {
                     block.store_tls::<VM>(self.tls);
                     if block.has_free_cells::<VM>() {
-                        self.available_blocks[bin].push::<VM>(block);
+                        if stress_test {
+                            self.available_blocks_stress[bin].push::<VM>(block);
+                        } else {
+                            self.available_blocks[bin].push::<VM>(block);
+                        }
                         return block
                     } else {
                         self.consumed_blocks[bin].push::<VM>(block);
@@ -551,7 +548,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     block.store_tls::<VM>(self.tls);
                     self.sweep_block(block);
                     if block.has_free_cells::<VM>() {
-                        self.available_blocks[bin].push::<VM>(block);
+                        if stress_test {
+                            self.available_blocks_stress[bin].push::<VM>(block);
+                        } else {
+                            self.available_blocks[bin].push::<VM>(block);
+                        }
                         return block
                     } else {
                         self.consumed_blocks[bin].push::<VM>(block);
@@ -591,9 +592,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn sweep_block(&self, block: Block) {
-        // eprintln!("s {}", block.start());
         let cell_size = block.load_block_cell_size::<VM>();
-        // assert!(cell_size != 0, "b = {}, tls = {:?}, list = {:?}", block.start(), block.load_tls::<VM>(), block.load_block_list::<VM>() as *mut _);
         assert!(cell_size != 0);
         let mut cell = block.start();
         while cell < block.start() + Block::BYTES {
