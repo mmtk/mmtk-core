@@ -46,7 +46,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         CopyConfig {
             copy_mapping: enum_map! {
                 CopySemantics::Mature => CopySelector::CopySpace(0),
-                CopySemantics::PromoteMature => CopySelector::CopySpace(0),
+                CopySemantics::PromoteToMature => CopySelector::CopySpace(0),
                 _ => CopySelector::Unused,
             },
             space_mapping: vec![

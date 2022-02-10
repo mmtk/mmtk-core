@@ -204,7 +204,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
 
 /// CopySemantics describes the copying operation. It depends on
 /// the kinds of GC, and the space. For example, in a mature/major GC in
-/// a generational plan, the nursery should have `PromoteMature` while
+/// a generational plan, the nursery should have `PromoteToMature` while
 /// the mature space should have `Mature`.
 /// This enum may be expanded in the future to describe more semantics.
 #[derive(Clone, Copy, Enum, Debug)]
@@ -214,14 +214,14 @@ pub enum CopySemantics {
     /// Copy in nursery generation.
     Nursery,
     /// Promote an object from nursery to mature spaces.
-    PromoteMature,
+    PromoteToMature,
     /// Copy in mature generation.
     Mature,
 }
 
 impl CopySemantics {
     pub fn is_mature(&self) -> bool {
-        matches!(self, CopySemantics::PromoteMature | CopySemantics::Mature)
+        matches!(self, CopySemantics::PromoteToMature | CopySemantics::Mature)
     }
 }
 
