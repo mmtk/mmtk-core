@@ -1,3 +1,4 @@
+use crate::util::alloc::AllocationError;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::{Collection, VMBinding};
@@ -82,14 +83,17 @@ pub fn munmap(start: Address, size: usize) -> Result<()> {
     wrap_libc_call(&|| unsafe { libc::munmap(start.to_mut_ptr(), size) }, 0)
 }
 
-/// Properly handle errors from a mmap Result, including invoking the binding code for an OOM error.
+/// Properly handle errors from a mmap Result, including invoking the binding code in the case of
+/// an OOM error.
 pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
     use std::io::ErrorKind;
 
     match error.kind() {
         // From Rust nightly 2021-05-12, we started to see Rust added this ErrorKind.
         ErrorKind::OutOfMemory => {
-            VM::VMCollection::out_of_memory(tls);
+            // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+            trace!("Signal MmapOutOfMemory!");
+            VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
             unreachable!()
         }
         // Before Rust had ErrorKind::OutOfMemory, this is how we capture OOM from OS calls.
@@ -99,7 +103,9 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
             if let Some(os_errno) = error.raw_os_error() {
                 // If it is OOM, we invoke out_of_memory() through the VM interface.
                 if os_errno == libc::ENOMEM {
-                    VM::VMCollection::out_of_memory(tls);
+                    // Signal `MmapOutOfMemory`. Expect the VM to abort immediately.
+                    trace!("Signal MmapOutOfMemory!");
+                    VM::VMCollection::out_of_memory(tls, AllocationError::MmapOutOfMemory);
                     unreachable!()
                 }
             }
