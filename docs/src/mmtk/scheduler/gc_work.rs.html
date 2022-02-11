@@ -589,7 +589,7 @@
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
                 .<span class="ident">add</span>(<span class="ident">PrepareMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
-        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>().<span class="ident">workers_shared</span> {
+        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">workers_shared</span> {
             <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">PrepareCollector</span>);
         }
     }
@@ -657,7 +657,7 @@
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
                 .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
-        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>().<span class="ident">workers_shared</span> {
+        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">workers_shared</span> {
             <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">ReleaseCollector</span>);
         }
         <span class="comment">// TODO: Process weak references properly</span>

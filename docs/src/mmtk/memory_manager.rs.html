@@ -689,7 +689,7 @@
         <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_initialized</span>(),
         <span class="string">&quot;MMTk collection has been initialized (was initialize_collection() already called before?)&quot;</span>
     );
-    <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">initialize</span>(<span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">options</span>.<span class="ident">threads</span>, <span class="ident">mmtk</span>, <span class="ident">tls</span>);
+    <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">spawn_gc_threads</span>(<span class="ident">mmtk</span>, <span class="ident">tls</span>);
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">initialized</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
