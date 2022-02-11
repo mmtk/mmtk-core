@@ -52,8 +52,13 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         let rtn = self
             .bump_allocator
             .alloc(size + Self::HEADER_RESERVED_IN_BYTES, align, offset);
-        // return the actual object start address
-        rtn + Self::HEADER_RESERVED_IN_BYTES
+        // Check if the result is valid and return the actual object start address
+        // Note that `rtn` can be null in the case of OOM
+        if !rtn.is_zero() {
+            rtn + Self::HEADER_RESERVED_IN_BYTES
+        } else {
+            rtn
+        }
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {

@@ -1,6 +1,7 @@
 use super::stat::SchedulerStat;
+use super::work_bucket::WorkBucketStage::*;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, WorkerGroup};
+use super::worker::{GCWorker, GCWorkerShared};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
@@ -10,7 +11,7 @@ use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::channel;
-use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::sync::{Arc, Condvar, Mutex};
 
 pub enum CoordinatorMessage<VM: VMBinding> {
     Work(Box<dyn CoordinatorWork<VM>>),
@@ -18,15 +19,16 @@ pub enum CoordinatorMessage<VM: VMBinding> {
     BucketDrained,
 }
 
+/// The shared data structure for distributing work packets between worker threads and the coordinator thread.
 pub struct GCWorkScheduler<VM: VMBinding> {
-    /// Work buckets
+    /// Work buckets for worker threads
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
     /// Work for the coordinator thread
     pub coordinator_work: WorkBucket<VM>,
     /// The shared parts of GC workers
-    worker_group: Option<WorkerGroup<VM>>,
+    pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
     /// The shared part of the GC worker object of the controller thread
-    coordinator_worker_shared: Option<RwLock<Arc<GCWorkerShared<VM>>>>,
+    coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
     /// Condition Variable for worker synchronization
     pub worker_monitor: Arc<(Mutex<()>, Condvar)>,
     /// A callback to be fired after the `Closure` bucket is drained.
@@ -41,66 +43,29 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
 }
 
-// The 'channel' inside Scheduler disallows Sync for Scheduler. We have to make sure we use channel properly:
-// 1. We should never directly use Sender. We clone the sender and let each worker have their own copy.
-// 2. Only the coordinator can use Receiver.
-// TODO: We should remove channel from Scheduler, and directly send Sender/Receiver when creating the coordinator and
-// the workers.
+// FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
+// Some subtle interaction between ObjectRememberingBarrier, Mutator and some GCWork instances
+// makes the compiler think WorkBucket is not Sync.
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new() -> Arc<Self> {
+    pub fn new(num_workers: usize) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
-        Arc::new(Self {
-            work_buckets: enum_map! {
-                WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-                WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
-                WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
-            },
-            coordinator_work: WorkBucket::new(true, worker_monitor.clone()),
-            worker_group: None,
-            coordinator_worker_shared: None,
-            worker_monitor,
-            closure_end: Mutex::new(None),
-        })
-    }
 
-    #[inline]
-    pub fn num_workers(&self) -> usize {
-        self.worker_group.as_ref().unwrap().worker_count()
-    }
-
-    pub fn initialize(
-        self: &'static Arc<Self>,
-        num_workers: usize,
-        mmtk: &'static MMTK<VM>,
-        tls: VMThread,
-    ) {
-        use crate::scheduler::work_bucket::WorkBucketStage::*;
-        let num_workers = if cfg!(feature = "single_worker") {
-            1
-        } else {
-            num_workers
+        // Create work buckets for workers.
+        let mut work_buckets = enum_map! {
+            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
+            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
         };
 
-        let (sender, receiver) = channel::<CoordinatorMessage<VM>>();
-
-        let mut self_mut = self.clone();
-        let self_mut = unsafe { Arc::get_mut_unchecked(&mut self_mut) };
-
-        let coordinator_worker = GCWorker::new(mmtk, 0, self.clone(), true, sender.clone());
-        self_mut.coordinator_worker_shared = Some(RwLock::new(coordinator_worker.shared.clone()));
-
-        let (worker_group, spawn_workers) =
-            WorkerGroup::new(mmtk, num_workers, self.clone(), sender);
-        self_mut.worker_group = Some(worker_group);
-
+        // Set the open condition of each bucket.
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
             // This vec will grow for each stage we call with open_next()
@@ -108,12 +73,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // The rest will open after the previous stage is done.
             let mut open_next = |s: WorkBucketStage| {
                 let cur_stages = open_stages.clone();
-                self_mut.work_buckets[s].set_open_condition(move || {
-                    let should_open =
-                        self.are_buckets_drained(&cur_stages) && self.worker_group().all_parked();
+                work_buckets[s].set_open_condition(move |scheduler: &GCWorkScheduler<VM>| {
+                    let should_open = scheduler.are_buckets_drained(&cur_stages)
+                        && scheduler.all_workers_parked();
                     // Additional check before the `RefClosure` bucket opens.
                     if should_open && s == WorkBucketStage::RefClosure {
-                        if let Some(closure_end) = self.closure_end.lock().unwrap().as_ref() {
+                        if let Some(closure_end) = scheduler.closure_end.lock().unwrap().as_ref() {
                             if closure_end() {
                                 // Don't open `RefClosure` if `closure_end` added more works to `Closure`.
                                 return false;
@@ -134,9 +99,51 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             open_next(Final);
         }
 
-        // Now that the scheduler is initialized, we spawn the worker threads and the controller thread.
-        spawn_workers(tls);
+        // Create the work bucket for the controller.
+        let coordinator_work = WorkBucket::new(true, worker_monitor.clone());
 
+        // We prepare the shared part of workers, but do not create the actual workers now.
+        // The shared parts of workers are communication hubs between controller and workers.
+        let workers_shared = (0..num_workers)
+            .map(|_| Arc::new(GCWorkerShared::<VM>::new(worker_monitor.clone())))
+            .collect::<Vec<_>>();
+
+        // Similarly, we create the shared part of the work of the controller, but not the controller itself.
+        let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new(worker_monitor.clone()));
+
+        Arc::new(Self {
+            work_buckets,
+            coordinator_work,
+            workers_shared,
+            coordinator_worker_shared,
+            worker_monitor,
+            closure_end: Mutex::new(None),
+        })
+    }
+
+    #[inline]
+    pub fn num_workers(&self) -> usize {
+        self.workers_shared.len()
+    }
+
+    pub fn all_workers_parked(&self) -> bool {
+        self.workers_shared.iter().all(|w| w.is_parked())
+    }
+
+    /// Create GC threads, including the controller thread and all workers.
+    pub fn spawn_gc_threads(self: &Arc<Self>, mmtk: &'static MMTK<VM>, tls: VMThread) {
+        // Create the communication channel.
+        let (sender, receiver) = channel::<CoordinatorMessage<VM>>();
+
+        // Spawn the controller thread.
+        let coordinator_worker = GCWorker::new(
+            mmtk,
+            0,
+            self.clone(),
+            true,
+            sender.clone(),
+            self.coordinator_worker_shared.clone(),
+        );
         let gc_controller = GCController::new(
             mmtk,
             mmtk.plan.base().gc_requester.clone(),
@@ -144,8 +151,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             receiver,
             coordinator_worker,
         );
-
         VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
+
+        // Spawn each worker thread.
+        for (ordinal, shared) in self.workers_shared.iter().enumerate() {
+            let worker = Box::new(GCWorker::new(
+                mmtk,
+                ordinal,
+                self.clone(),
+                false,
+                sender.clone(),
+                shared.clone(),
+            ));
+            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
+        }
     }
 
     /// Schedule all the common work packets
@@ -206,10 +225,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         *self.closure_end.lock().unwrap() = Some(f);
     }
 
-    pub fn worker_group(&self) -> &WorkerGroup<VM> {
-        self.worker_group.as_ref().unwrap()
-    }
-
     pub fn all_buckets_empty(&self) -> bool {
         self.work_buckets.values().all(|bucket| bucket.is_empty())
     }
@@ -221,7 +236,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
-            buckets_updated |= bucket.update();
+            buckets_updated |= bucket.update(self);
         }
         if buckets_updated {
             // Notify the workers for new work
@@ -317,7 +332,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
             // Park this worker
             worker.shared.parked.store(true, Ordering::SeqCst);
-            if self.worker_group().all_parked() {
+            if self.all_workers_parked() {
                 worker
                     .sender
                     .send(CoordinatorMessage::AllWorkerParked)
@@ -331,33 +346,21 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn enable_stat(&self) {
-        for worker in &self.worker_group().workers_shared {
+        for worker in &self.workers_shared {
             let worker_stat = worker.borrow_stat();
             worker_stat.enable();
         }
-        let coordinator_worker_shared = self
-            .coordinator_worker_shared
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap();
-        let coordinator_worker_stat = coordinator_worker_shared.borrow_stat();
+        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
         coordinator_worker_stat.enable();
     }
 
     pub fn statistics(&self) -> HashMap<String, String> {
         let mut summary = SchedulerStat::default();
-        for worker in &self.worker_group().workers_shared {
+        for worker in &self.workers_shared {
             let worker_stat = worker.borrow_stat();
             summary.merge(&worker_stat);
         }
-        let coordinator_worker_shared = self
-            .coordinator_worker_shared
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap();
-        let coordinator_worker_stat = coordinator_worker_shared.borrow_stat();
+        let coordinator_worker_stat = self.coordinator_worker_shared.borrow_stat();
         summary.merge(&coordinator_worker_stat);
         summary.harness_stat()
     }

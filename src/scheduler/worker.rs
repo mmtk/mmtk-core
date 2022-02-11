@@ -4,11 +4,11 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
-use crate::vm::{Collection, GCThreadContext, VMBinding};
+use crate::vm::VMBinding;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 
 const LOCALLY_CACHED_WORKS: usize = 1;
 
@@ -21,6 +21,16 @@ pub struct GCWorkerShared<VM: VMBinding> {
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
     /// Incoming work packets to be executed by the current worker.
     pub local_work_bucket: WorkBucket<VM>,
+}
+
+impl<VM: VMBinding> GCWorkerShared<VM> {
+    pub fn new(worker_monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+        Self {
+            parked: AtomicBool::new(true),
+            stat: Default::default(),
+            local_work_bucket: WorkBucket::new(true, worker_monitor),
+        }
+    }
 }
 
 /// A GC worker.  This part is privately owned by a worker thread.
@@ -77,8 +87,8 @@ impl<VM: VMBinding> GCWorker<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
+        shared: Arc<GCWorkerShared<VM>>,
     ) -> Self {
-        let worker_monitor = scheduler.worker_monitor.clone();
         Self {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
             ordinal,
@@ -89,11 +99,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             mmtk,
             is_coordinator,
             local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
-            shared: Arc::new(GCWorkerShared {
-                parked: AtomicBool::new(true),
-                stat: Default::default(),
-                local_work_bucket: WorkBucket::new(true, worker_monitor),
-            }),
+            shared,
         }
     }
 
@@ -147,58 +153,5 @@ impl<VM: VMBinding> GCWorker<VM> {
             debug_assert!(!self.shared.is_parked());
             work.do_work_with_stat(self, mmtk);
         }
-    }
-}
-
-pub struct WorkerGroup<VM: VMBinding> {
-    pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-}
-
-impl<VM: VMBinding> WorkerGroup<VM> {
-    pub fn new(
-        mmtk: &'static MMTK<VM>,
-        workers: usize,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-        sender: Sender<CoordinatorMessage<VM>>,
-    ) -> (Self, Box<dyn FnOnce(VMThread)>) {
-        let mut workers_shared = Vec::new();
-        let mut workers_to_spawn = Vec::new();
-
-        for ordinal in 0..workers {
-            let worker = Box::new(GCWorker::new(
-                mmtk,
-                ordinal,
-                scheduler.clone(),
-                false,
-                sender.clone(),
-            ));
-            let worker_shared = worker.shared.clone();
-            workers_shared.push(worker_shared);
-            workers_to_spawn.push(worker);
-        }
-
-        // NOTE: We cannot call spawn_gc_thread here,
-        // because the worker will access `Scheduler::worker_group` immediately after started,
-        // but that field will not be assigned to before this function returns.
-        // Therefore we defer the spawning operation later.
-        let deferred_spawn = Box::new(move |tls| {
-            for worker in workers_to_spawn.drain(..) {
-                VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
-            }
-        });
-
-        (Self { workers_shared }, deferred_spawn)
-    }
-
-    pub fn worker_count(&self) -> usize {
-        self.workers_shared.len()
-    }
-
-    pub fn parked_workers(&self) -> usize {
-        self.workers_shared.iter().filter(|w| w.is_parked()).count()
-    }
-
-    pub fn all_parked(&self) -> bool {
-        self.parked_workers() == self.worker_count()
     }
 }
