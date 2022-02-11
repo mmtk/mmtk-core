@@ -315,7 +315,7 @@
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">available_clean_pages_for_defrag</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">get_total_pages</span>()
             <span class="kw">as</span> <span class="ident">isize</span>
-            <span class="op">-</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">get_pages_reserved</span>() <span class="kw">as</span> <span class="ident">isize</span>
+            <span class="op">-</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">get_reserved_pages</span>() <span class="kw">as</span> <span class="ident">isize</span>
             <span class="op">+</span> <span class="self">self</span>.<span class="ident">defrag_headroom_pages</span>(<span class="ident">space</span>) <span class="kw">as</span> <span class="ident">isize</span>;
         <span class="kw">if</span> <span class="ident">available_clean_pages_for_defrag</span> <span class="op">&lt;</span> <span class="number">0</span> {
             <span class="ident">available_clean_pages_for_defrag</span> <span class="op">=</span> <span class="number">0</span>
@@ -330,7 +330,7 @@
 
         <span class="self">self</span>.<span class="ident">available_clean_pages_for_defrag</span>.<span class="ident">store</span>(
             <span class="ident">available_clean_pages_for_defrag</span> <span class="kw">as</span> <span class="ident">usize</span>
-                <span class="op">+</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">get_collection_reserve</span>(),
+                <span class="op">+</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">get_collection_reserved_pages</span>(),
             <span class="ident">Ordering::Release</span>,
         );
     }

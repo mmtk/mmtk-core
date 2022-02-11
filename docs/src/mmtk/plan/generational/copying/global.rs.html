@@ -236,6 +236,9 @@
 <span id="235">235</span>
 <span id="236">236</span>
 <span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{<span class="ident">GenCopyMatureGCWorkContext</span>, <span class="ident">GenCopyNurseryGCWorkContext</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
@@ -360,18 +363,21 @@
             .<span class="ident">set_next_gc_full_heap</span>(<span class="ident">Gen::should_next_gc_be_full_heap</span>(<span class="self">self</span>));
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_collection_reserve</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
+    <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_collection_reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_pages_used</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_pages_used</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
+    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_used_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
     }
 
     <span class="doccomment">/// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.</span>
-    <span class="kw">fn</span> <span class="ident">get_pages_avail</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="comment">// super.get_pages_avail() / 2 to reserve pages for copying</span>
-        (<span class="self">self</span>.<span class="ident">get_total_pages</span>() <span class="op">-</span> <span class="self">self</span>.<span class="ident">get_pages_reserved</span>()) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>
+        (<span class="self">self</span>
+            .<span class="ident">get_total_pages</span>()
+            .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>()))
+            <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>
     }
 
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -454,7 +460,7 @@
 
     <span class="kw">fn</span> <span class="ident">request_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">gen</span>
-            .<span class="ident">request_full_heap_collection</span>(<span class="self">self</span>.<span class="ident">get_total_pages</span>(), <span class="self">self</span>.<span class="ident">get_pages_reserved</span>())
+            .<span class="ident">request_full_heap_collection</span>(<span class="self">self</span>.<span class="ident">get_total_pages</span>(), <span class="self">self</span>.<span class="ident">get_reserved_pages</span>())
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {

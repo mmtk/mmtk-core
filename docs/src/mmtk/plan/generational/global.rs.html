@@ -231,6 +231,7 @@
 <span id="230">230</span>
 <span id="231">231</span>
 <span id="232">232</span>
+<span id="233">233</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
@@ -442,7 +443,8 @@
 
     <span class="doccomment">/// Check a plan to see if the next GC should be a full heap GC.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_next_gc_be_full_heap</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">plan</span>.<span class="ident">get_pages_avail</span>() <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">min_nursery</span>)
+        <span class="ident">plan</span>.<span class="ident">get_available_pages</span>()
+            <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">min_nursery</span>)
     }
 
     <span class="doccomment">/// Set next_gc_full_heap to the given value.</span>
@@ -453,14 +455,14 @@
 
     <span class="doccomment">/// Get pages reserved for the collection by a generational plan. A generational plan should</span>
     <span class="doccomment">/// add their own reservatioin with the value returned by this method.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">reserved_pages</span>()
     }
 
     <span class="doccomment">/// Get pages used by a generational plan. A generational plan should add their own used pages</span>
     <span class="doccomment">/// with the value returned by this method.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_pages_used</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_pages_used</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>()
     }
 }
 </code></pre></div>

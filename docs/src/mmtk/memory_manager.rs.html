@@ -757,7 +757,7 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">used_bytes</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_pages_used</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
+    <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_used_pages</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>
 }
 
 <span class="doccomment">/// Return free memory in bytes.</span>

@@ -233,11 +233,11 @@
         <span class="macro">unreachable!</span>(<span class="string">&quot;GC triggered in nogc&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_pages_used</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">nogc_space</span>.<span class="ident">reserved_pages</span>()
             <span class="op">+</span> <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">reserved_pages</span>()
             <span class="op">+</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">reserved_pages</span>()
-            <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_pages_used</span>()
+            <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_used_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">_force</span>: <span class="ident">bool</span>) {

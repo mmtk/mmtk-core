@@ -138,10 +138,6 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
@@ -215,12 +211,8 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="number">0</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">get_pages_used</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_pages_used</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">ms</span>.<span class="ident">reserved_pages</span>()
+    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">ms</span>.<span class="ident">reserved_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {

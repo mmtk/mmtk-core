@@ -302,12 +302,12 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">get_collection_reserve</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">get_pages_used</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_pages_used</span>()
+    <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
