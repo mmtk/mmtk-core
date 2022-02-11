@@ -57,8 +57,15 @@ impl<VM: VMBinding> MMTK<VM> {
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         SFT_MAP.initialize_once();
 
-        let scheduler = GCWorkScheduler::new();
         let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
+
+        let num_workers = if cfg!(feature = "single_worker") {
+            1
+        } else {
+            *options.threads
+        };
+
+        let scheduler = GCWorkScheduler::new(num_workers);
         let plan = crate::plan::create_plan(
             *options.plan,
             &VM_MAP,
