@@ -140,11 +140,11 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         self.base().collection_required(self, space_full, space)
     }
 
-    fn get_pages_used(&self) -> usize {
-        self.mc_space.reserved_pages() + self.common.get_pages_used()
+    fn get_used_pages(&self) -> usize {
+        self.mc_space.reserved_pages() + self.common.get_used_pages()
     }
 
-    fn get_collection_reserve(&self) -> usize {
+    fn get_collection_reserved_pages(&self) -> usize {
         0
     }
 }

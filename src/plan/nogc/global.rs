@@ -72,11 +72,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!("GC triggered in nogc")
     }
 
-    fn get_pages_used(&self) -> usize {
+    fn get_used_pages(&self) -> usize {
         self.nogc_space.reserved_pages()
             + self.immortal.reserved_pages()
             + self.los.reserved_pages()
-            + self.base.get_pages_used()
+            + self.base.get_used_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {

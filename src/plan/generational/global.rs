@@ -209,7 +209,8 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check a plan to see if the next GC should be a full heap GC.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
-        plan.get_pages_avail() < conversions::bytes_to_pages_up(*plan.base().options.min_nursery)
+        plan.get_available_pages()
+            < conversions::bytes_to_pages_up(*plan.base().options.min_nursery)
     }
 
     /// Set next_gc_full_heap to the given value.
@@ -220,13 +221,13 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Get pages reserved for the collection by a generational plan. A generational plan should
     /// add their own reservatioin with the value returned by this method.
-    pub fn get_collection_reserve(&self) -> usize {
+    pub fn get_collection_reserved_pages(&self) -> usize {
         self.nursery.reserved_pages()
     }
 
     /// Get pages used by a generational plan. A generational plan should add their own used pages
     /// with the value returned by this method.
-    pub fn get_pages_used(&self) -> usize {
-        self.nursery.reserved_pages() + self.common.get_pages_used()
+    pub fn get_used_pages(&self) -> usize {
+        self.nursery.reserved_pages() + self.common.get_used_pages()
     }
 }
