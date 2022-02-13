@@ -153,7 +153,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            debug_assert!(self.treadmill.from_space_empty());
+            debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
@@ -162,7 +162,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn release(&mut self, full_heap: bool) {
         self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.nursery_empty());
+        debug_assert!(self.treadmill.is_nursery_empty());
         if full_heap {
             self.sweep_large_pages(false);
         }

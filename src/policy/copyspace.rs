@@ -34,7 +34,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        !self.from_space() || object_forwarding::is_forwarded::<VM>(object)
+        !self.is_from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
 
     fn is_movable(&self) -> bool {
@@ -43,7 +43,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
-        !self.from_space()
+        !self.is_from_space()
     }
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
@@ -53,7 +53,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
-        if !self.from_space() {
+        if !self.is_from_space() {
             return None;
         }
 
@@ -179,7 +179,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
     }
 
-    fn from_space(&self) -> bool {
+    fn is_from_space(&self) -> bool {
         self.from_space.load(Ordering::SeqCst)
     }
 
@@ -193,7 +193,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
         debug_assert!(
-            self.from_space(),
+            self.is_from_space(),
             "Trace object called for object ({:?}) in to-space",
             object
         );
