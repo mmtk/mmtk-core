@@ -30,6 +30,8 @@ API
   GC controller.
 * `Collection::out_of_memory()` now takes `AllocationError` as a parameter which hints the binding
   on how to handle the OOM error.
+* `Collection::out_of_memory()` now allows a binding to return from the method. If a binding returns,
+  `alloc()` will return a zero address.
 
 Misc
 ---
