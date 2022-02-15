@@ -90,15 +90,36 @@ jobs:
   #         ./.github/scripts/ci-test.sh
   #         ./.github/scripts/ci-style.sh
 
+  binding-refs:
+    runs-on: ubuntu-18.04
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    outputs:
+      openjdk: ${{ steps.print.outputs.openjdk_binding_ref }}
+      jikesrvm: ${{ steps.print.outputs.jikesrvm_binding_ref }}
+      v8: ${{ steps.print.outputs.v8_binding_ref }}
+    steps:
+      - name: Check binding revisions
+        uses: qinsoon/comment-env-vars@1.0.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          default_env: 'OPENJDK_BINDING_REF=master, JIKESRVM_BINDING_REF=master, V8_BINDING_REF=master'
+      - id: print
+        run: |
+          echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
+          echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
+          echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
+
   # OpenJDK
   openjdk-binding-test:
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
+    needs: binding-refs
     with:
       test_normal: true
       test_alloc_bit: true
       test_assertions: true
       style_check: true
+      binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
       # - name: Checkout MMTk Core
       #   uses: actions/checkout@v2
       #   with:
