@@ -112,13 +112,11 @@ jobs:
   # OpenJDK
   openjdk-binding-test:
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    # We have to use the workflow from a specific branch. We should always use 'master'
     uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
     needs: binding-refs
     with:
-      test_normal: true
-      test_alloc_bit: true
-      test_assertions: true
-      style_check: true
+      run_all: true
       binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
       # - name: Checkout MMTk Core
       #   uses: actions/checkout@v2
