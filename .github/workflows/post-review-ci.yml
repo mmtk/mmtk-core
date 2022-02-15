@@ -7,125 +7,128 @@ on:
       - master
 
 jobs:
-  v8-binding-test:
-    runs-on: [self-hosted, linux, freq-scaling-off]
-    timeout-minutes: 60
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'V8_BINDING_REF=master'
-      - name: Checkout V8 Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-v8
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: mmtk-v8
-          ref: ${{ env.V8_BINDING_REF }}
-      - name: Overwrite MMTk core in V8 binding
-        run: |
-          rm -rf mmtk-v8/repos/*
-          mkdir -p mmtk-v8/repos/mmtk-core
-          cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
-      - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      - name: Setup
-        run: |
-          cd mmtk-v8
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-v8
-          export RUST_BACKTRACE=1
-          export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
-          .github/scripts/ci-test.sh
-          .github/scripts/ci-style.sh
+  # v8-binding-test:
+  #   runs-on: [self-hosted, linux, freq-scaling-off]
+  #   timeout-minutes: 60
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Check Binding Revision
+  #       uses: qinsoon/comment-env-vars@1.0.3
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         default_env: 'V8_BINDING_REF=master'
+  #     - name: Checkout V8 Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-v8
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         path: mmtk-v8
+  #         ref: ${{ env.V8_BINDING_REF }}
+  #     - name: Overwrite MMTk core in V8 binding
+  #       run: |
+  #         rm -rf mmtk-v8/repos/*
+  #         mkdir -p mmtk-v8/repos/mmtk-core
+  #         cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+  #     - name: Setup Rust Toolchain
+  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-v8
+  #         ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-v8
+  #         export RUST_BACKTRACE=1
+  #         export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
+  #         .github/scripts/ci-test.sh
+  #         .github/scripts/ci-style.sh
 
   # JikesRVM
-  jikesrvm-binding-test:
-    runs-on: ubuntu-18.04
-    timeout-minutes: 90
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'JIKESRVM_BINDING_REF=master'
-      - name: Checkout JikesRVM Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-jikesrvm
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: mmtk-jikesrvm
-          submodules: true
-          ref: ${{ env.JIKESRVM_BINDING_REF }}
-      - name: Overwrite MMTk core in JikesRVM binding
-        run: |
-          cp -r mmtk-core mmtk-jikesrvm/repos
-      - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      - name: Setup
-        run: |
-          cd mmtk-jikesrvm
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-jikesrvm
-          export RUST_BACKTRACE=1
-          ./.github/scripts/ci-test.sh
-          ./.github/scripts/ci-style.sh
+  # jikesrvm-binding-test:
+  #   runs-on: ubuntu-18.04
+  #   timeout-minutes: 90
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+  #   steps:
+  #     - name: Checkout MMTk Core
+  #       uses: actions/checkout@v2
+  #       with:
+  #         path: mmtk-core
+  #     - name: Check Binding Revision
+  #       uses: qinsoon/comment-env-vars@1.0.3
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         default_env: 'JIKESRVM_BINDING_REF=master'
+  #     - name: Checkout JikesRVM Binding
+  #       uses: actions/checkout@v2
+  #       with:
+  #         repository: mmtk/mmtk-jikesrvm
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         path: mmtk-jikesrvm
+  #         submodules: true
+  #         ref: ${{ env.JIKESRVM_BINDING_REF }}
+  #     - name: Overwrite MMTk core in JikesRVM binding
+  #       run: |
+  #         cp -r mmtk-core mmtk-jikesrvm/repos
+  #     - name: Setup Rust Toolchain
+  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+  #     - name: Setup
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         ./.github/scripts/ci-setup.sh
+  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+  #     - name: Test
+  #       run: |
+  #         cd mmtk-jikesrvm
+  #         export RUST_BACKTRACE=1
+  #         ./.github/scripts/ci-test.sh
+  #         ./.github/scripts/ci-style.sh
 
   # OpenJDK
   openjdk-binding-test:
-    runs-on: ubuntu-18.04
-    timeout-minutes: 240
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    steps:
-      - name: Checkout MMTk Core
-        uses: actions/checkout@v2
-        with:
-          path: mmtk-core
-      - name: Check Binding Revision
-        uses: qinsoon/comment-env-vars@1.0.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'OPENJDK_BINDING_REF=master'
-      - name: Checkout OpenJDK Binding
-        uses: actions/checkout@v2
-        with:
-          repository: mmtk/mmtk-openjdk
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: mmtk-openjdk
-          submodules: true
-          ref: ${{ env.OPENJDK_BINDING_REF }}
-      - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
-      - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      - name: Setup
-        run: |
-          cd mmtk-openjdk
-          ./.github/scripts/ci-setup.sh
-          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      - name: Test
-        run: |
-          cd mmtk-openjdk
-          export RUST_BACKTRACE=1
-          ./.github/scripts/ci-test.sh
-          ./.github/scripts/ci-style.sh
+    uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
+    with:
+      test_normal: true
+      test_alloc_bit: true
+      test_assertions: true
+      style_check: true
+      # - name: Checkout MMTk Core
+      #   uses: actions/checkout@v2
+      #   with:
+      #     path: mmtk-core
+      # - name: Check Binding Revision
+      #   uses: qinsoon/comment-env-vars@1.0.3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     default_env: 'OPENJDK_BINDING_REF=master'
+      # - name: Checkout OpenJDK Binding
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: mmtk/mmtk-openjdk
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     path: mmtk-openjdk
+      #     submodules: true
+      #     ref: ${{ env.OPENJDK_BINDING_REF }}
+      # - name: Overwrite MMTk core in openjdk binding
+      #   run: cp -r mmtk-core mmtk-openjdk/repos/
+      # - name: Setup Rust Toolchain
+      #   run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      # - name: Setup
+      #   run: |
+      #     cd mmtk-openjdk
+      #     ./.github/scripts/ci-setup.sh
+      #     sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+      #     sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      # - name: Test
+      #   run: |
+      #     cd mmtk-openjdk
+      #     export RUST_BACKTRACE=1
+      #     ./.github/scripts/ci-test.sh
+      #     ./.github/scripts/ci-style.sh
