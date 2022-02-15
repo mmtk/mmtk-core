@@ -7,7 +7,7 @@ GC Plans
   `GCWorkerCopyContext` (similar to how they config `Mutator`).
 * Fixed a bug that `needs_log_bit` was always set to `true` for generational plans, no matter
   their barrier used the log bit or not.
-* Fixed a bug that we may overflow when calculating `get_avaiable_pages()`.
+* Fixed a bug that we may overflow when calculating `get_available_pages()`.
 
 Policies
 ---
@@ -18,7 +18,7 @@ Scheduler
 ---
 * Introduced `GCController`, a counterpart of `GCWorker`, for the controller thread.
 * Refactored `GCWorker`. Now `GCWorker` is seperated into two parts, a thread local part `GCWorker`
-  which is owned by GC threads, and s shared part `GCWorkerShared` that is shared between GC threads
+  which is owned by GC threads, and a shared part `GCWorkerShared` that is shared between GC threads
   and the scheduler.
 * Refactored the creation of the scheduler and the workers to remove some unnecessary `Option<T>` and `RwLock<T>`.
 
@@ -30,8 +30,8 @@ API
   GC controller.
 * `Collection::out_of_memory()` now takes `AllocationError` as a parameter which hints the binding
   on how to handle the OOM error.
-* `Collection::out_of_memory()` now allows a binding to return from the method. If a binding returns,
-  `alloc()` will return a zero address.
+* `Collection::out_of_memory()` now allows a binding to return from the method in the case of a non-critical OOM.
+  If a binding returns, `alloc()` will return a zero address.
 
 Misc
 ---
