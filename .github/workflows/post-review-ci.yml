@@ -118,36 +118,13 @@ jobs:
     with:
       run_all: true
       binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
-      # - name: Checkout MMTk Core
-      #   uses: actions/checkout@v2
-      #   with:
-      #     path: mmtk-core
-      # - name: Check Binding Revision
-      #   uses: qinsoon/comment-env-vars@1.0.3
-      #   with:
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     default_env: 'OPENJDK_BINDING_REF=master'
-      # - name: Checkout OpenJDK Binding
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: mmtk/mmtk-openjdk
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     path: mmtk-openjdk
-      #     submodules: true
-      #     ref: ${{ env.OPENJDK_BINDING_REF }}
-      # - name: Overwrite MMTk core in openjdk binding
-      #   run: cp -r mmtk-core mmtk-openjdk/repos/
-      # - name: Setup Rust Toolchain
-      #   run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-      # - name: Setup
-      #   run: |
-      #     cd mmtk-openjdk
-      #     ./.github/scripts/ci-setup.sh
-      #     sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-      #     sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-      # - name: Test
-      #   run: |
-      #     cd mmtk-openjdk
-      #     export RUST_BACKTRACE=1
-      #     ./.github/scripts/ci-test.sh
-      #     ./.github/scripts/ci-style.sh
+
+  # JikesRVM
+  jikesrvm-binding-test:
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    # We have to use the workflow from a specific branch. We should always use 'master'
+    uses: mmtk/mmtk-jikesrvm/.github/workflows/tests.yml@remove-vm-submodule
+    needs: binding-refs
+    with:
+      run_all: true
+      binding_ref: ${{ needs.binding-refs.outputs.jikesrvm }}
