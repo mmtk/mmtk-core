@@ -48,7 +48,7 @@ impl<T> InitializeOnce<T> {
     pub fn get_ref(&self) -> &T {
         // We only assert in debug builds.
         debug_assert!(self.once.is_completed());
-        unsafe { (&*self.v.get()).assume_init_ref() }
+        unsafe { (*self.v.get()).assume_init_ref() }
     }
 }
 

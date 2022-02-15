@@ -271,11 +271,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             self.free_list.set_uncoalescable(region_start as _);
             self.free_list.set_uncoalescable(region_end as i32 + 1);
             for p in (region_start..region_end).step_by(PAGES_IN_CHUNK) {
-                let liberated;
                 if p != region_start {
                     self.free_list.clear_uncoalescable(p as _);
                 }
-                liberated = self.free_list.free(p as _, true); // add chunk to our free list
+                let liberated = self.free_list.free(p as _, true); // add chunk to our free list
                 debug_assert!(liberated as usize == PAGES_IN_CHUNK + (p - region_start));
                 if self.meta_data_pages_per_region > 1 {
                     let meta_data_pages_per_region = self.meta_data_pages_per_region;
