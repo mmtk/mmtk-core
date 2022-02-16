@@ -211,7 +211,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
 
         // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
-        if !self.from_space() {
+        if !self.is_from_space() {
             // The copy semantics for tospace should be none.
             debug_assert!(semantics.is_none());
             return object;
