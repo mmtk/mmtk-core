@@ -140,17 +140,17 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 
     // Modify
     // ANCHOR: plan_get_collection_reserve
-    fn get_collection_reserve(&self) -> usize {
+    fn get_collection_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
     }
     // ANCHOR_END: plan_get_collection_reserve
 
     // Modify
-    // ANCHOR: plan_get_pages_used
-    fn get_pages_used(&self) -> usize {
-        self.tospace().reserved_pages() + self.common.get_pages_used()
+    // ANCHOR: plan_get_used_pages
+    fn get_used_pages(&self) -> usize {
+        self.tospace().reserved_pages() + self.common.get_used_pages()
     }
-    // ANCHOR_END: plan_get_pages_used
+    // ANCHOR_END: plan_get_used_pages
 
     // Modify
     // ANCHOR: plan_base

@@ -621,14 +621,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
             extent
         );
 
-        let start: Address;
-        if let VMRequest::Fixed { start: _start, .. } = vmrequest {
-            start = _start;
+        let start = if let VMRequest::Fixed { start: _start, .. } = vmrequest {
+            _start
         } else {
             // FIXME
             //if (HeapLayout.vmMap.isFinalized()) VM.assertions.fail("heap is narrowed after regionMap is finalized: " + name);
-            start = heap.reserve(extent, top);
-        }
+            heap.reserve(extent, top)
+        };
         assert!(
             start == chunk_align_up(start),
             "{} starting on non-aligned boundary: {}",

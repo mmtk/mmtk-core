@@ -151,7 +151,7 @@ correctly count the pages contained in the tospace and the common plan
 spaces (which will be explained later).
 
 ```rust
-{{#include ../../../code/mygc_semispace/global.rs:plan_get_pages_used}}
+{{#include ../../../code/mygc_semispace/global.rs:plan_get_used_pages}}
 ```
 
 Add and override the following helper function:

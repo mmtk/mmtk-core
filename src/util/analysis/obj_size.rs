@@ -58,7 +58,7 @@ impl<VM: VMBinding> RtAnalysis<VM> for PerSizeClassObjectCounter {
         match c {
             None => {
                 // Create (and increment) the counter associated with the size class if it doesn't exist
-                let ctr = new_ctr!(stats, size_classes, &size_class);
+                let ctr = new_ctr!(stats, size_classes, size_class);
                 ctr.lock().unwrap().inc();
             }
             Some(ctr) => {

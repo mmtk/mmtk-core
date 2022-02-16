@@ -120,18 +120,21 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
     }
 
-    fn get_collection_reserve(&self) -> usize {
-        self.gen.get_collection_reserve() + self.tospace().reserved_pages()
+    fn get_collection_reserved_pages(&self) -> usize {
+        self.gen.get_collection_reserved_pages() + self.tospace().reserved_pages()
     }
 
-    fn get_pages_used(&self) -> usize {
-        self.gen.get_pages_used() + self.tospace().reserved_pages()
+    fn get_used_pages(&self) -> usize {
+        self.gen.get_used_pages() + self.tospace().reserved_pages()
     }
 
     /// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.
-    fn get_pages_avail(&self) -> usize {
+    fn get_available_pages(&self) -> usize {
         // super.get_pages_avail() / 2 to reserve pages for copying
-        (self.get_total_pages() - self.get_pages_reserved()) >> 1
+        (self
+            .get_total_pages()
+            .saturating_sub(self.get_reserved_pages()))
+            >> 1
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -214,7 +217,7 @@ impl<VM: VMBinding> GenCopy<VM> {
 
     fn request_full_heap_collection(&self) -> bool {
         self.gen
-            .request_full_heap_collection(self.get_total_pages(), self.get_pages_reserved())
+            .request_full_heap_collection(self.get_total_pages(), self.get_reserved_pages())
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {
