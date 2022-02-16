@@ -128,3 +128,13 @@ jobs:
     with:
       run_all: true
       binding_ref: ${{ needs.binding-refs.outputs.jikesrvm }}
+
+  # V8
+  v8-binding-test:
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    # We have to use the workflow from a specific branch. We should always use 'master'
+    uses: mmtk/mmtk-v8/.github/workflows/tests.yml@reusable-workflow
+    needs: binding-refs
+    with:
+      run_all: true
+      binding_ref: ${{ needs.binding-refs.outputs.v8 }}
