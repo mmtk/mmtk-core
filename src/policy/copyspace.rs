@@ -1,6 +1,7 @@
 use crate::plan::TransitiveClosure;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::scheduler::GCWorker;
 use crate::util::constants::CARD_META_PAGES_PER_REGION;
@@ -63,6 +64,18 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
             None
         }
     }
+
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        let trace = trace.into_mut::<VM>();
+        let worker = worker.into_mut::<VM>();
+        self.trace_object(trace, object, self.common.copy, worker)
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
@@ -88,6 +101,10 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("copyspace only releases pages enmasse")
+    }
+
+    fn set_copy_for_sft_trace(&mut self, semantics: Option<CopySemantics>) {
+        self.common.copy = semantics;
     }
 }
 
@@ -188,15 +205,20 @@ impl<VM: VMBinding> CopySpace<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
-        semantics: CopySemantics,
+        semantics: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         trace!("copyspace.trace_object(, {:?}, {:?})", object, semantics,);
-        debug_assert!(
-            self.is_from_space(),
-            "Trace object called for object ({:?}) in to-space",
-            object
-        );
+
+        // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
+        if !self.is_from_space() {
+            // The copy semantics for tospace should be none.
+            debug_assert!(semantics.is_none());
+            return object;
+        }
+
+        // This object is in from space, we will copy. Make sure we have a valid copy semantic.
+        debug_assert!(semantics.is_some());
 
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
@@ -219,7 +241,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("... no it isn't. Copying");
             let new_object = object_forwarding::forward_object::<VM>(
                 object,
-                semantics,
+                semantics.unwrap(),
                 worker.get_copy_context_mut(),
             );
             trace!("Forwarding pointer");

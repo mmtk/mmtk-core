@@ -12,6 +12,7 @@ use crate::plan::TransitiveClosure;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
@@ -75,6 +76,16 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         }
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(object);
+    }
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        let trace = trace.into_mut::<VM>();
+        self.trace_object(trace, object)
     }
 }
 

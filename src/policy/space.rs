@@ -13,6 +13,9 @@ use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
+use crate::scheduler::gc_work::SFTProcessEdges;
+use crate::scheduler::GCWorker;
+use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -79,7 +82,25 @@ pub trait SFT {
     }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
+    /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
+    /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
+    /// code. However, tracing objects for some policies are more complicated, and they do not provide an
+    /// implementation of this method. For example, mark compact space requires trace twice in each GC.
+    /// Immix has defrag trace and fast trace.
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference;
 }
+
+// Create erased VM refs for these types that will be used in `sft_trace_object()`.
+// In this way, we can store the refs with <VM> in SFT (which cannot have parameters with generic type parameters)
+
+use crate::util::erase_vm::define_erased_vm_mut_ref;
+define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
+define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
 const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
@@ -125,9 +146,20 @@ impl SFT for EmptySpaceSFT {
             object
         )
     }
+
+    fn sft_trace_object(
+        &self,
+        _trace: SFTProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        panic!(
+            "Call trace_object() on {:x}, which maps to an empty space",
+            _object
+        )
+    }
 }
 
-#[derive(Default)]
 pub struct SFTMap<'a> {
     sft: Vec<&'a (dyn SFT + Sync + 'static)>,
 }
@@ -422,6 +454,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
     fn release_multiple_pages(&mut self, start: Address);
 
+    /// What copy semantic we should use for this space if we copy objects from this space.
+    /// This is only needed for plans that use SFTProcessEdges
+    fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
+        panic!("A copying space should override this method")
+    }
+
     fn print_vm_map(&self) {
         let common = self.common();
         print!("{} ", common.name);
@@ -489,6 +527,10 @@ pub struct CommonSpace<VM: VMBinding> {
     pub descriptor: SpaceDescriptor,
     pub vmrequest: VMRequest,
 
+    /// For a copying space that allows sft_trace_object(), this should be set before each GC so we know
+    // the copy semantics for the space.
+    pub copy: Option<CopySemantics>,
+
     immortal: bool,
     movable: bool,
     pub contiguous: bool,
@@ -534,6 +576,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             name: opt.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,
             vmrequest: opt.vmrequest,
+            copy: None,
             immortal: opt.immortal,
             movable: opt.movable,
             contiguous: true,

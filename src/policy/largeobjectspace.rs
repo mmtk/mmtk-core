@@ -3,6 +3,7 @@ use atomic::Ordering;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -78,6 +79,16 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         crate::util::alloc_bit::set_alloc_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
+    }
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        let trace = trace.into_mut::<VM>();
+        self.trace_object(trace, object)
     }
 }
 

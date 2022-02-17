@@ -29,37 +29,6 @@ space here.
 {{#include ../../../code/mygc_semispace/global.rs:create_copy_config}}
 ```
 
-## MyGCProcessEdges
-
-We will create the tracing work packet for our GC.
-At the moment, none of the files in the plan are suited for implementing this
-GC packet. So, we need to add a new file to hold the `MyGCProcessEdges`.
-
-Make a new file under `mygc`, called `gc_work.rs`. 
-In `mod.rs`, import `gc_work` as a module by adding the line `mod gc_work`.
-In `gc_work.rs`, add the following import statements:
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:imports}}
-```
-
-Add a new public structure, `MyGCProcessEdges`, with the type parameter 
-`<VM:VMBinding>`. It will hold an instance of `ProcessEdgesBase` and 
-`MyGC`. This is the core part for tracing objects in the `MyGC` plan.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges}}
-```
-
-Add a new implementations block 
-`impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM>`.
-Similarly to before, set `ProcessEdgesWork`'s associate type `VM` to 
-the type parameter of `MyGCProcessEdges`, `VM`: `type VM:VM`.
-Add a new constructor, `new()`.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges_new}}
-```
-
 ## Introduce collection to MyGC plan
 
 Add a new method to `Plan for MyGC`, `schedule_collection()`. This function 
@@ -73,7 +42,12 @@ Though you can add those work packets by yourself, `GCWorkScheduler` provides a
 method `schedule_common_work()` that will add common work packets for you.
 
 To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext`
-and implement the trait `GCWorkContext` for it. We create this type in `gc_work.rs`.
+and implement the trait `GCWorkContext` for it. We create `gc_work.rs` and add the
+following implementation. Note that we do not set a specific `ProcessEdgesWorkType`
+and we will use the default [`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
+which is a general work packet that a plan can use to trace objects. For plans
+like semispace, `SFTProcessEdges` is sufficient. For more complex GC plans,
+one can create and write their own work packet that implements the `ProcessEdgesWork` trait.
 
 ```rust
 {{#include ../../../code/mygc_semispace/gc_work.rs:workcontext}}
@@ -106,6 +80,14 @@ call, and add the following code:
 This function is called at the start of a collection. It prepares the two 
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.
+
+Note that we call `set_copy_for_sft_trace()` for both spaces. This step is required
+when using `SFTProcessEdges` to tell the spaces which copy semantic to use for copying.
+For fromspace, we use the `DefaultCopy` semantic, which we have defined earlier in our `CopyConfig`.
+So for objects in fromspace that need to be copied, the policy will use the copy context that binds with
+`DefaultCopy` (which allocates to the tospace) in the GC worker. For tospace, we set its
+copy semantics to `None`, as we do not expect to copy objects from tospace, and if that ever happens,
+we will simply panic.
 
 ### Prepare worker
 

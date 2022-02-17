@@ -116,6 +116,10 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+
+        self.fromspace_mut()
+            .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
+        self.tospace_mut().set_copy_for_sft_trace(None);
     }
     // ANCHOR_END: prepare
 
@@ -227,6 +231,22 @@ impl<VM: VMBinding> MyGC<VM> {
             &self.copyspace0
         } else {
             &self.copyspace1
+        }
+    }
+
+    pub fn tospace_mut(&mut self) -> &mut CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &mut self.copyspace1
+        } else {
+            &mut self.copyspace0
+        }
+    }
+
+    pub fn fromspace_mut(&mut self) -> &mut CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &mut self.copyspace0
+        } else {
+            &mut self.copyspace1
         }
     }
     // ANCHOR_END: plan_space_access

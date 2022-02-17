@@ -476,6 +476,56 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     }
 }
 
+/// A general process edges implementation using SFT. A plan can always implement their own process edges. However,
+/// Most plans can use this work packet for tracing amd they do not need to provide a plan-specific trace object work packet.
+/// If they choose to use this type, they need to provide a correct implementation for some related methods
+/// (such as `Space.set_copy_for_sft_trace()`, `SFT.sft_trace_object()`).
+/// Some plans are not using this type, mostly due to more complex tracing. Either it is impossible to use this type, or
+/// there is performance overheads for using this general trace type. In such cases, they implement their specific process edges.
+pub struct SFTProcessEdges<VM: VMBinding> {
+    pub base: ProcessEdgesBase<VM>,
+}
+
+impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
+    type VM = VM;
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+        Self { base }
+    }
+
+    #[inline]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        use crate::policy::space::*;
+
+        if object.is_null() {
+            return object;
+        }
+
+        // Erase <VM> type parameter
+        let worker = GCWorkerMutRef::new(self.worker());
+        let trace = SFTProcessEdgesMutRef::new(self);
+
+        // Invoke trace object on sft
+        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        sft.sft_trace_object(trace, object, worker)
+    }
+}
+
+impl<VM: VMBinding> Deref for SFTProcessEdges<VM> {
+    type Target = ProcessEdgesBase<VM>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<VM: VMBinding> DerefMut for SFTProcessEdges<VM> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
+}
+
 /// Scan & update a list of object slots
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,

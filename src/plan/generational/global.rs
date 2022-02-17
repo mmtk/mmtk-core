@@ -84,6 +84,8 @@ impl<VM: VMBinding> Gen<VM> {
         let full_heap = !self.is_current_gc_nursery();
         self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
+        self.nursery
+            .set_copy_for_sft_trace(Some(CopySemantics::PromoteToMature));
     }
 
     /// Release Gen. This should be called by a single thread in GC release work.
@@ -172,7 +174,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                CopySemantics::PromoteMature,
+                Some(CopySemantics::PromoteToMature),
                 worker,
             );
         }
@@ -191,7 +193,7 @@ impl<VM: VMBinding> Gen<VM> {
             return self.nursery.trace_object::<T>(
                 trace,
                 object,
-                CopySemantics::PromoteMature,
+                Some(CopySemantics::PromoteToMature),
                 worker,
             );
         }
