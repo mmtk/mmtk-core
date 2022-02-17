@@ -127,13 +127,16 @@ jobs:
   openjdk-binding-test:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    needs: binding-refs
     steps:
       - name: Set paths
         run: |
           echo "OPENJDK_PATH=$PWD/openjdk" >> $GITHUB_ENV
           echo "BINDING_PATH=$PWD/mmtk-openjdk" >> $GITHUB_ENV
+          echo "DACAPO_PATH=$PWD/dacapo" >> $GITHUB_ENV
           echo "MMTK_REPO=${{ github.repository }}" >> $GITHUB_ENV
           echo "MMTK_REF=${{ github.sha }}" >> $GITHUB_ENV
+          echo "${{ needs.binding-refs.outputs.openjdk_binding_repo }}"
       - name: Checkout binding
         uses: actions/checkout@v2
         with:
