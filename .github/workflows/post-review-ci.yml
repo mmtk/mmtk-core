@@ -139,8 +139,6 @@ jobs:
           repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
           path: mmtk-openjdk
           ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
-      - name: Overwrite MMTk core in openjdk binding
-        run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup
         run: |
           cd mmtk-openjdk
@@ -148,6 +146,8 @@ jobs:
           ./.github/scripts/ci-setup.sh
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Test
         run: |
           cd mmtk-openjdk
