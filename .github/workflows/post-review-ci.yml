@@ -94,47 +94,82 @@ jobs:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     outputs:
-      openjdk: ${{ steps.print.outputs.openjdk_binding_ref }}
-      jikesrvm: ${{ steps.print.outputs.jikesrvm_binding_ref }}
-      v8: ${{ steps.print.outputs.v8_binding_ref }}
+      openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
+      openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
+      jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
+      jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
+      v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
+      v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
     steps:
       - name: Check binding revisions
         uses: qinsoon/comment-env-vars@1.0.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'OPENJDK_BINDING_REF=master, JIKESRVM_BINDING_REF=master, V8_BINDING_REF=master'
+          default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master'
       - id: print
         run: |
+          echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
           echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
+          echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
           echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
+          echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
           echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
 
   # OpenJDK
+  # openjdk-binding-test:
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+  #   # We have to use the workflow from a specific branch. We should always use 'master'
+  #   uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
+  #   needs: binding-refs
+  #   with:
+  #     run_all: true
+  #     binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
   openjdk-binding-test:
+    runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    # We have to use the workflow from a specific branch. We should always use 'master'
-    uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
-    needs: binding-refs
-    with:
-      run_all: true
-      binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
+    steps:
+      - name: Set paths
+        run: |
+          echo "OPENJDK_PATH=$PWD/openjdk" >> $GITHUB_ENV
+          echo "BINDING_PATH=$PWD/mmtk-openjdk" >> $GITHUB_ENV
+          echo "MMTK_REPO=${{ github.repository }}" >> $GITHUB_ENV
+          echo "MMTK_REF=${{ github.sha }}" >> $GITHUB_ENV
+      - name: Checkout binding
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+          ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
+          path: ${{ env.BINDING_PATH }}
+      - name: Setup binding
+        working-directory: ${{ env.BINDING_PATH }}
+        run: |
+          .github/scripts/ci-checkout.sh
+          .github/scripts/ci-setup.sh
+      - name: Test
+        working-directory: ${{ env.BINDING_PATH }}
+        run: |
+          .github/scripts/ci-test.sh
+      - name: Style check
+        working-directory: ${{ env.BINDING_PATH }}
+        run: |
+          .github/scripts/ci-style.sh
 
   # JikesRVM
-  jikesrvm-binding-test:
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    # We have to use the workflow from a specific branch. We should always use 'master'
-    uses: mmtk/mmtk-jikesrvm/.github/workflows/tests.yml@remove-vm-submodule
-    needs: binding-refs
-    with:
-      run_all: true
-      binding_ref: ${{ needs.binding-refs.outputs.jikesrvm }}
+  # jikesrvm-binding-test:
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+  #   # We have to use the workflow from a specific branch. We should always use 'master'
+  #   uses: mmtk/mmtk-jikesrvm/.github/workflows/tests.yml@remove-vm-submodule
+  #   needs: binding-refs
+  #   with:
+  #     run_all: true
+  #     binding_ref: ${{ needs.binding-refs.outputs.jikesrvm }}
 
   # V8
-  v8-binding-test:
-    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    # We have to use the workflow from a specific branch. We should always use 'master'
-    uses: mmtk/mmtk-v8/.github/workflows/tests.yml@reusable-workflow
-    needs: binding-refs
-    with:
-      run_all: true
-      binding_ref: ${{ needs.binding-refs.outputs.v8 }}
+  # v8-binding-test:
+  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+  #   # We have to use the workflow from a specific branch. We should always use 'master'
+  #   uses: mmtk/mmtk-v8/.github/workflows/tests.yml@reusable-workflow
+  #   needs: binding-refs
+  #   with:
+  #     run_all: true
+  #     binding_ref: ${{ needs.binding-refs.outputs.v8 }}
