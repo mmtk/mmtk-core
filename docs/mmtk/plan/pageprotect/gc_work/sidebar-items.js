@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["PPGCWorkContext",""],["PPProcessEdges","Edge scanning work packet."]]});
+initSidebarItems({"struct":[["PPGCWorkContext",""]]});

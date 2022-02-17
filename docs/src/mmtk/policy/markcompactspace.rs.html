@@ -314,7 +314,21 @@
 <span id="309">309</span>
 <span id="310">310</span>
 <span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SpaceOptions</span>, <span class="ident">SFT</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_WORD</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
@@ -366,6 +380,18 @@
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="comment">// We should not use trace_object for markcompact space.</span>
+        <span class="comment">// Depending on which trace it is, we should manually call either trace_mark or trace_forward.</span>
+        <span class="macro">panic!</span>(<span class="string">&quot;sft_trace_object() cannot be used with mark compact space&quot;</span>)
     }
 }
 

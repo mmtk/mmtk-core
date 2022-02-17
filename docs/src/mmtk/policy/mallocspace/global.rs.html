@@ -597,6 +597,18 @@
 <span id="592">592</span>
 <span id="593">593</span>
 <span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
@@ -621,6 +633,7 @@
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicU32</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="comment">// only used for debugging</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -680,6 +693,17 @@
         <span class="kw">let</span> <span class="ident">page_addr</span> <span class="op">=</span> <span class="ident">conversions::page_align_down</span>(<span class="ident">object</span>.<span class="ident">to_address</span>());
         <span class="ident">set_page_mark</span>(<span class="ident">page_addr</span>);
         <span class="ident">set_alloc_bit</span>(<span class="ident">object</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw">let</span> <span class="ident">trace</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
     }
 }
 

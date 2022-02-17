@@ -655,6 +655,49 @@
 <span id="650">650</span>
 <span id="651">651</span>
 <span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
+<span id="671">671</span>
+<span id="672">672</span>
+<span id="673">673</span>
+<span id="674">674</span>
+<span id="675">675</span>
+<span id="676">676</span>
+<span id="677">677</span>
+<span id="678">678</span>
+<span id="679">679</span>
+<span id="680">680</span>
+<span id="681">681</span>
+<span id="682">682</span>
+<span id="683">683</span>
+<span id="684">684</span>
+<span id="685">685</span>
+<span id="686">686</span>
+<span id="687">687</span>
+<span id="688">688</span>
+<span id="689">689</span>
+<span id="690">690</span>
+<span id="691">691</span>
+<span id="692">692</span>
+<span id="693">693</span>
+<span id="694">694</span>
+<span id="695">695</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -670,6 +713,9 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::SFTProcessEdges</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::map::Map</span>;
@@ -736,7 +782,25 @@
     }
     <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).</span>
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
+    <span class="doccomment">/// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)</span>
+    <span class="doccomment">/// provides an easy way for most plans to trace objects without the need to implement any plan-specific</span>
+    <span class="doccomment">/// code. However, tracing objects for some policies are more complicated, and they do not provide an</span>
+    <span class="doccomment">/// implementation of this method. For example, mark compact space requires trace twice in each GC.</span>
+    <span class="doccomment">/// Immix has defrag trace and fast trace.</span>
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span>;
 }
+
+<span class="comment">// Create erased VM refs for these types that will be used in `sft_trace_object()`.</span>
+<span class="comment">// In this way, we can store the refs with &lt;VM&gt; in SFT (which cannot have parameters with generic type parameters)</span>
+
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::erase_vm::define_erased_vm_mut_ref</span>;
+<span class="macro">define_erased_vm_mut_ref!</span>(<span class="ident">SFTProcessEdgesMutRef</span> <span class="op">=</span> <span class="ident">SFTProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
+<span class="macro">define_erased_vm_mut_ref!</span>(<span class="ident">GCWorkerMutRef</span> <span class="op">=</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
 <span class="kw">const</span> <span class="ident">DEBUG_SFT</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
@@ -782,9 +846,20 @@
             <span class="ident">object</span>
         )
     }
+
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="macro">panic!</span>(
+            <span class="string">&quot;Call trace_object() on {:x}, which maps to an empty space&quot;</span>,
+            <span class="ident">_object</span>
+        )
+    }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SFTMap</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="ident">sft</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> (<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)<span class="op">&gt;</span>,
 }
@@ -1079,6 +1154,12 @@
 
     <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>);
 
+    <span class="doccomment">/// What copy semantic we should use for this space if we copy objects from this space.</span>
+    <span class="doccomment">/// This is only needed for plans that use SFTProcessEdges</span>
+    <span class="kw">fn</span> <span class="ident">set_copy_for_sft_trace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_semantics</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>) {
+        <span class="macro">panic!</span>(<span class="string">&quot;A copying space should override this method&quot;</span>)
+    }
+
     <span class="kw">fn</span> <span class="ident">print_vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>();
         <span class="macro">print!</span>(<span class="string">&quot;{} &quot;</span>, <span class="ident">common</span>.<span class="ident">name</span>);
@@ -1146,6 +1227,10 @@
     <span class="kw">pub</span> <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor</span>,
     <span class="kw">pub</span> <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
 
+    <span class="doccomment">/// For a copying space that allows sft_trace_object(), this should be set before each GC so we know</span>
+    <span class="comment">// the copy semantics for the space.</span>
+    <span class="kw">pub</span> <span class="ident">copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
+
     <span class="ident">immortal</span>: <span class="ident">bool</span>,
     <span class="ident">movable</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">contiguous</span>: <span class="ident">bool</span>,
@@ -1191,6 +1276,7 @@
             <span class="ident">name</span>: <span class="ident">opt</span>.<span class="ident">name</span>,
             <span class="ident">descriptor</span>: <span class="ident">SpaceDescriptor::UNINITIALIZED</span>,
             <span class="ident">vmrequest</span>: <span class="ident">opt</span>.<span class="ident">vmrequest</span>,
+            <span class="ident">copy</span>: <span class="prelude-val">None</span>,
             <span class="ident">immortal</span>: <span class="ident">opt</span>.<span class="ident">immortal</span>,
             <span class="ident">movable</span>: <span class="ident">opt</span>.<span class="ident">movable</span>,
             <span class="ident">contiguous</span>: <span class="bool-val">true</span>,

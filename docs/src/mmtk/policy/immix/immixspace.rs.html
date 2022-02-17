@@ -654,6 +654,20 @@
 <span id="649">649</span>
 <span id="650">650</span>
 <span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -662,6 +676,7 @@
 };
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectsClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
@@ -733,6 +748,15 @@
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">_object</span>);
     }
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.&quot;</span>)
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -754,6 +778,9 @@
     }
     <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
         <span class="macro">panic!</span>(<span class="string">&quot;immixspace only releases pages enmasse&quot;</span>)
+    }
+    <span class="kw">fn</span> <span class="ident">set_copy_for_sft_trace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_semantics</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>) {
+        <span class="macro">panic!</span>(<span class="string">&quot;We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.&quot;</span>)
     }
 }
 
@@ -992,6 +1019,7 @@
             <span class="ident">object</span>
         );
         <span class="kw">if</span> <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">is_defrag_source</span>() {
+            <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">in_defrag</span>());
             <span class="self">self</span>.<span class="ident">trace_object_with_opportunistic_copy</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">worker</span>)
         } <span class="kw">else</span> {
             <span class="self">self</span>.<span class="ident">trace_object_without_moving</span>(<span class="ident">trace</span>, <span class="ident">object</span>)

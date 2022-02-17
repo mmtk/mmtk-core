@@ -199,6 +199,25 @@
 <span id="194">194</span>
 <span id="195">195</span>
 <span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::SSGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
@@ -290,6 +309,9 @@
         <span class="kw">let</span> <span class="ident">hi</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>);
         <span class="self">self</span>.<span class="ident">copyspace0</span>.<span class="ident">prepare</span>(<span class="ident">hi</span>);
         <span class="self">self</span>.<span class="ident">copyspace1</span>.<span class="ident">prepare</span>(<span class="op">!</span><span class="ident">hi</span>);
+        <span class="self">self</span>.<span class="ident">fromspace_mut</span>()
+            .<span class="ident">set_copy_for_sft_trace</span>(<span class="prelude-val">Some</span>(<span class="ident">CopySemantics::DefaultCopy</span>));
+        <span class="self">self</span>.<span class="ident">tospace_mut</span>().<span class="ident">set_copy_for_sft_trace</span>(<span class="prelude-val">None</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">prepare_worker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
@@ -387,11 +409,27 @@
         }
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace1</span>
+        } <span class="kw">else</span> {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace0</span>
+        }
+    }
+
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fromspace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace0</span>
         } <span class="kw">else</span> {
             <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">copyspace1</span>
+        }
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fromspace_mut</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">hi</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace0</span>
+        } <span class="kw">else</span> {
+            <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">copyspace1</span>
         }
     }
 }

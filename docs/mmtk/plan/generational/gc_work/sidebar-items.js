@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GenNurseryProcessEdges","Process edges for a nursery GC. A generatinoal plan should use this type for a nursery GC."]]});
+initSidebarItems({"struct":[["GenNurseryProcessEdges","Process edges for a nursery GC. This type is provided if a generational plan does not use [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`, it does not need to use this type."]]});

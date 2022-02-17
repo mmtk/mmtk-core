@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GenCopyMatureGCWorkContext",""],["GenCopyMatureProcessEdges",""],["GenCopyNurseryGCWorkContext",""]]});
+initSidebarItems({"struct":[["GenCopyGCWorkContext",""]]});

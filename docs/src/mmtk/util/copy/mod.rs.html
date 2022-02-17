@@ -449,7 +449,7 @@
 
 <span class="doccomment">/// CopySemantics describes the copying operation. It depends on</span>
 <span class="doccomment">/// the kinds of GC, and the space. For example, in a mature/major GC in</span>
-<span class="doccomment">/// a generational plan, the nursery should have `PromoteMature` while</span>
+<span class="doccomment">/// a generational plan, the nursery should have `PromoteToMature` while</span>
 <span class="doccomment">/// the mature space should have `Mature`.</span>
 <span class="doccomment">/// This enum may be expanded in the future to describe more semantics.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Enum</span>, <span class="ident">Debug</span>)]</span>
@@ -459,14 +459,14 @@
     <span class="doccomment">/// Copy in nursery generation.</span>
     <span class="ident">Nursery</span>,
     <span class="doccomment">/// Promote an object from nursery to mature spaces.</span>
-    <span class="ident">PromoteMature</span>,
+    <span class="ident">PromoteToMature</span>,
     <span class="doccomment">/// Copy in mature generation.</span>
     <span class="ident">Mature</span>,
 }
 
 <span class="kw">impl</span> <span class="ident">CopySemantics</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mature</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">CopySemantics::PromoteMature</span> <span class="op">|</span> <span class="ident">CopySemantics::Mature</span>)
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="ident">CopySemantics::PromoteToMature</span> <span class="op">|</span> <span class="ident">CopySemantics::Mature</span>)
     }
 }
 

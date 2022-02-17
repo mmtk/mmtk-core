@@ -112,6 +112,11 @@
 <span id="107">107</span>
 <span id="108">108</span>
 <span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::Immix</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
@@ -127,6 +132,11 @@
     <span class="ident">Defrag</span>,
 }
 
+<span class="doccomment">/// Object tracing for Immix.</span>
+<span class="doccomment">/// Note that it is possible to use [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges) for immix.</span>
+<span class="doccomment">/// We need to: 1. add a plan-specific method to create scan work packets, as most plans use `ScanObjects` while</span>
+<span class="doccomment">/// immix uses `ScanObjectsAndMarkLines`, 2. use `ImmixSpace.trace_object()` which has an overhead of checking</span>
+<span class="doccomment">/// which trace method to use (with ImmixProcessEdges, we can know which trace method to use by statically checking `TraceKind`).</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">struct</span> <span class="ident">ImmixProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span> {
     <span class="comment">// Use a static ref to the specific plan to avoid overhead from dynamic dispatch or</span>
     <span class="comment">// downcast for each traced object.</span>

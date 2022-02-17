@@ -541,6 +541,7 @@
 <span id="536">536</span>
 <span id="537">537</span>
 <span id="538">538</span>
+<span id="539">539</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
@@ -864,6 +865,7 @@
     }
 
     <span class="doccomment">/// returns the chunk index for this address</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk_index</span>(<span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
         <span class="ident">conversions::address_to_chunk_index</span>(<span class="self">self</span>)

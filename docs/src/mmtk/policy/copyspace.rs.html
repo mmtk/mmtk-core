@@ -316,9 +316,32 @@
 <span id="311">311</span>
 <span id="312">312</span>
 <span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::CARD_META_PAGES_PER_REGION</span>;
@@ -381,6 +404,18 @@
             <span class="prelude-val">None</span>
         }
     }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">worker</span>: <span class="ident">GCWorkerMutRef</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw">let</span> <span class="ident">trace</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
+        <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">copy</span>, <span class="ident">worker</span>)
+    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -406,6 +441,10 @@
 
     <span class="kw">fn</span> <span class="ident">release_multiple_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) {
         <span class="macro">panic!</span>(<span class="string">&quot;copyspace only releases pages enmasse&quot;</span>)
+    }
+
+    <span class="kw">fn</span> <span class="ident">set_copy_for_sft_trace</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">semantics</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">copy</span> <span class="op">=</span> <span class="ident">semantics</span>;
     }
 }
 
@@ -506,15 +545,20 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
+        <span class="ident">semantics</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;copyspace.trace_object(, {:?}, {:?})&quot;</span>, <span class="ident">object</span>, <span class="ident">semantics</span>,);
-        <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.<span class="ident">is_from_space</span>(),
-            <span class="string">&quot;Trace object called for object ({:?}) in to-space&quot;</span>,
-            <span class="ident">object</span>
-        );
+
+        <span class="comment">// If this is not from space, we do not need to trace it (the object has been copied to the tosapce)</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_from_space</span>() {
+            <span class="comment">// The copy semantics for tospace should be none.</span>
+            <span class="macro">debug_assert!</span>(<span class="ident">semantics</span>.<span class="ident">is_none</span>());
+            <span class="kw">return</span> <span class="ident">object</span>;
+        }
+
+        <span class="comment">// This object is in from space, we will copy. Make sure we have a valid copy semantic.</span>
+        <span class="macro">debug_assert!</span>(<span class="ident">semantics</span>.<span class="ident">is_some</span>());
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="macro">debug_assert!</span>(
@@ -537,7 +581,7 @@
             <span class="macro">trace!</span>(<span class="string">&quot;... no it isn&#39;t. Copying&quot;</span>);
             <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">object_forwarding::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
                 <span class="ident">object</span>,
-                <span class="ident">semantics</span>,
+                <span class="ident">semantics</span>.<span class="ident">unwrap</span>(),
                 <span class="ident">worker</span>.<span class="ident">get_copy_context_mut</span>(),
             );
             <span class="macro">trace!</span>(<span class="string">&quot;Forwarding pointer&quot;</span>);

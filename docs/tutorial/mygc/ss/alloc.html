@@ -349,6 +349,9 @@ and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;Cop
 and return a reference to the tospace and fromspace respectively. 
 <code>tospace()</code> (see below) returns a reference to the tospace, 
 and <code>fromspace()</code> returns a reference to the fromspace.</p>
+<p>We also add another two helper methods to get <code>tospace_mut(&amp;mut self)</code>
+and <code>fromspace_mut(&amp;mut self)</code>. Those will be used later when we implement
+collection for our GC plan.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -365,6 +368,22 @@ and <code>fromspace()</code> returns a reference to the fromspace.</p>
             &amp;self.copyspace0
         } else {
             &amp;self.copyspace1
+        }
+    }
+
+    pub fn tospace_mut(&amp;mut self) -&gt; &amp;mut CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;mut self.copyspace1
+        } else {
+            &amp;mut self.copyspace0
+        }
+    }
+
+    pub fn fromspace_mut(&amp;mut self) -&gt; &amp;mut CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;mut self.copyspace0
+        } else {
+            &amp;mut self.copyspace1
         }
     }
 <span class="boring">}

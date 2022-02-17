@@ -748,6 +748,9 @@ and <code>fromspace(&amp;self)</code>. They both have return type <code>&amp;Cop
 and return a reference to the tospace and fromspace respectively. 
 <code>tospace()</code> (see below) returns a reference to the tospace, 
 and <code>fromspace()</code> returns a reference to the fromspace.</p>
+<p>We also add another two helper methods to get <code>tospace_mut(&amp;mut self)</code>
+and <code>fromspace_mut(&amp;mut self)</code>. Those will be used later when we implement
+collection for our GC plan.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -764,6 +767,22 @@ and <code>fromspace()</code> returns a reference to the fromspace.</p>
             &amp;self.copyspace0
         } else {
             &amp;self.copyspace1
+        }
+    }
+
+    pub fn tospace_mut(&amp;mut self) -&gt; &amp;mut CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;mut self.copyspace1
+        } else {
+            &amp;mut self.copyspace0
+        }
+    }
+
+    pub fn fromspace_mut(&amp;mut self) -&gt; &amp;mut CopySpace&lt;VM&gt; {
+        if self.hi.load(Ordering::SeqCst) {
+            &amp;mut self.copyspace0
+        } else {
+            &amp;mut self.copyspace1
         }
     }
 <span class="boring">}
@@ -965,53 +984,6 @@ space here.</p>
     }
 <span class="boring">}
 </span></code></pre></pre>
-<h2 id="mygcprocessedges"><a class="header" href="#mygcprocessedges">MyGCProcessEdges</a></h2>
-<p>We will create the tracing work packet for our GC.
-At the moment, none of the files in the plan are suited for implementing this
-GC packet. So, we need to add a new file to hold the <code>MyGCProcessEdges</code>.</p>
-<p>Make a new file under <code>mygc</code>, called <code>gc_work.rs</code>. 
-In <code>mod.rs</code>, import <code>gc_work</code> as a module by adding the line <code>mod gc_work</code>.
-In <code>gc_work.rs</code>, add the following import statements:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>use super::global::MyGC;
-use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
-use crate::util::copy::CopySemantics;
-use crate::util::{Address, ObjectReference};
-use crate::vm::VMBinding;
-use crate::MMTK;
-use std::ops::{Deref, DerefMut};
-<span class="boring">}
-</span></code></pre></pre>
-<p>Add a new public structure, <code>MyGCProcessEdges</code>, with the type parameter 
-<code>&lt;VM:VMBinding&gt;</code>. It will hold an instance of <code>ProcessEdgesBase</code> and 
-<code>MyGC</code>. This is the core part for tracing objects in the <code>MyGC</code> plan.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
-    plan: &amp;'static MyGC&lt;VM&gt;,
-    base: ProcessEdgesBase&lt;VM&gt;,
-}
-<span class="boring">}
-</span></code></pre></pre>
-<p>Add a new implementations block 
-<code>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt;</code>.
-Similarly to before, set <code>ProcessEdgesWork</code>'s associate type <code>VM</code> to 
-the type parameter of <code>MyGCProcessEdges</code>, <code>VM</code>: <code>type VM:VM</code>.
-Add a new constructor, <code>new()</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    fn new(edges: Vec&lt;Address&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
-        Self { base, plan }
-    }
-<span class="boring">}
-</span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
 <p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
@@ -1022,7 +994,12 @@ scanning work will further push work for a transitive closure.</p>
 <p>Though you can add those work packets by yourself, <code>GCWorkScheduler</code> provides a
 method <code>schedule_common_work()</code> that will add common work packets for you.</p>
 <p>To use <code>schedule_common_work()</code>, first we need to create a type <code>MyGCWorkContext</code>
-and implement the trait <code>GCWorkContext</code> for it. We create this type in <code>gc_work.rs</code>.</p>
+and implement the trait <code>GCWorkContext</code> for it. We create <code>gc_work.rs</code> and add the
+following implementation. Note that we do not set a specific <code>ProcessEdgesWorkType</code>
+and we will use the default <a href="https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html"><code>SFTProcessEdges</code></a>,
+which is a general work packet that a plan can use to trace objects. For plans
+like semispace, <code>SFTProcessEdges</code> is sufficient. For more complex GC plans,
+one can create and write their own work packet that implements the <code>ProcessEdgesWork</code> trait.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -1030,7 +1007,6 @@ and implement the trait <code>GCWorkContext</code> for it. We create this type i
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
-    type ProcessEdgesWorkType = MyGCProcessEdges&lt;VM&gt;;
 }
 <span class="boring">}
 </span></code></pre></pre>
@@ -1066,12 +1042,23 @@ call, and add the following code:</p>
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+
+        self.fromspace_mut()
+            .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
+        self.tospace_mut().set_copy_for_sft_trace(None);
     }
 <span class="boring">}
 </span></code></pre></pre>
 <p>This function is called at the start of a collection. It prepares the two 
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.</p>
+<p>Note that we call <code>set_copy_for_sft_trace()</code> for both spaces. This step is required
+when using <code>SFTProcessEdges</code> to tell the spaces which copy semantic to use for copying.
+For fromspace, we use the <code>DefaultCopy</code> semantic, which we have defined earlier in our <code>CopyConfig</code>.
+So for objects in fromspace that need to be copied, the policy will use the copy context that binds with
+<code>DefaultCopy</code> (which allocates to the tospace) in the GC worker. For tospace, we set its
+copy semantics to <code>None</code>, as we do not expect to copy objects from tospace, and if that ever happens,
+we will simply panic.</p>
 <h3 id="prepare-worker"><a class="header" href="#prepare-worker">Prepare worker</a></h3>
 <p>As we flip tospace for the plan, we also need to rebind the copy context
 to the new tospace. We will override <code>prepare_worker()</code> in our <code>Plan</code> implementation.
@@ -1109,53 +1096,18 @@ call to the common space and let the common space to handle object tracing in
 its spaces (e.g. immortal or large object space):</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    #[inline]
-    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.mygc().tospace().in_space(object) {
-            self.mygc().tospace().trace_object::&lt;Self&gt;(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                self.worker(),
-            )
-        } else if self.mygc().fromspace().in_space(object) {
-            self.mygc().fromspace().trace_object::&lt;Self&gt;(
-                self,
-                object,
-                CopySemantics::DefaultCopy,
-                self.worker(),
-            )
-        } else {
-            self.mygc().common.trace_object::&lt;Self&gt;(self, object)
-        }
-    }
-<span class="boring">}
+</span>
+<span class="boring">fn main() {
+</span><span class="boring">}
 </span></code></pre></pre>
 <p>Add two new implementation blocks, <code>Deref</code> and <code>DerefMut</code> for 
 <code>MyGCProcessEdges</code>. These allow <code>MyGCProcessEdges</code> to be dereferenced to 
 <code>ProcessEdgesBase</code>, and allows easy access to fields in <code>ProcessEdgesBase</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
-    type Target = ProcessEdgesBase&lt;VM&gt;;
-    #[inline]
-    fn deref(&amp;self) -&gt; &amp;Self::Target {
-        &amp;self.base
-    }
-}
-
-impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
-    #[inline]
-    fn deref_mut(&amp;mut self) -&gt; &amp;mut Self::Target {
-        &amp;mut self.base
-    }
-}
-<span class="boring">}
+</span>
+<span class="boring">fn main() {
+</span><span class="boring">}
 </span></code></pre></pre>
 <h2 id="release"><a class="header" href="#release">Release</a></h2>
 <p>Finally, we need to fill out the functions that are, roughly speaking, 
