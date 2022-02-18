@@ -7,89 +7,6 @@ on:
       - master
 
 jobs:
-  # v8-binding-test:
-  #   runs-on: [self-hosted, linux, freq-scaling-off]
-  #   timeout-minutes: 60
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-  #   steps:
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core
-  #     - name: Check Binding Revision
-  #       uses: qinsoon/comment-env-vars@1.0.3
-  #       with:
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         default_env: 'V8_BINDING_REF=master'
-  #     - name: Checkout V8 Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-v8
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         path: mmtk-v8
-  #         ref: ${{ env.V8_BINDING_REF }}
-  #     - name: Overwrite MMTk core in V8 binding
-  #       run: |
-  #         rm -rf mmtk-v8/repos/*
-  #         mkdir -p mmtk-v8/repos/mmtk-core
-  #         cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
-  #     - name: Setup Rust Toolchain
-  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-  #     - name: Setup
-  #       run: |
-  #         cd mmtk-v8
-  #         ./.github/scripts/ci-setup.sh
-  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-  #     - name: Test
-  #       run: |
-  #         cd mmtk-v8
-  #         export RUST_BACKTRACE=1
-  #         export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
-  #         .github/scripts/ci-test.sh
-  #         .github/scripts/ci-style.sh
-
-  # JikesRVM
-  # jikesrvm-binding-test:
-  #   runs-on: ubuntu-18.04
-  #   timeout-minutes: 90
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-  #   steps:
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core
-  #     - name: Check Binding Revision
-  #       uses: qinsoon/comment-env-vars@1.0.3
-  #       with:
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         default_env: 'JIKESRVM_BINDING_REF=master'
-  #     - name: Checkout JikesRVM Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-jikesrvm
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         path: mmtk-jikesrvm
-  #         submodules: true
-  #         ref: ${{ env.JIKESRVM_BINDING_REF }}
-  #     - name: Overwrite MMTk core in JikesRVM binding
-  #       run: |
-  #         cp -r mmtk-core mmtk-jikesrvm/repos
-  #     - name: Setup Rust Toolchain
-  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
-  #     - name: Setup
-  #       run: |
-  #         cd mmtk-jikesrvm
-  #         ./.github/scripts/ci-setup.sh
-  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
-  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
-  #     - name: Test
-  #       run: |
-  #         cd mmtk-jikesrvm
-  #         export RUST_BACKTRACE=1
-  #         ./.github/scripts/ci-test.sh
-  #         ./.github/scripts/ci-style.sh
-
   binding-refs:
     runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
@@ -115,15 +32,6 @@ jobs:
           echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
           echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
 
-  # OpenJDK
-  # openjdk-binding-test:
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-  #   # We have to use the workflow from a specific branch. We should always use 'master'
-  #   uses: mmtk/mmtk-openjdk/.github/workflows/tests.yml@remove-vm-submodule
-  #   needs: binding-refs
-  #   with:
-  #     run_all: true
-  #     binding_ref: ${{ needs.binding-refs.outputs.openjdk }}
   openjdk-binding-test:
     runs-on: ubuntu-18.04
     needs: binding-refs
@@ -155,22 +63,68 @@ jobs:
           ./.github/scripts/ci-test.sh
           ./.github/scripts/ci-style.sh
 
-  # JikesRVM
-  # jikesrvm-binding-test:
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-  #   # We have to use the workflow from a specific branch. We should always use 'master'
-  #   uses: mmtk/mmtk-jikesrvm/.github/workflows/tests.yml@remove-vm-submodule
-  #   needs: binding-refs
-  #   with:
-  #     run_all: true
-  #     binding_ref: ${{ needs.binding-refs.outputs.jikesrvm }}
+  jikesrvm-binding-test:
+    runs-on: ubuntu-18.04
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
+          path: mmtk-jikesrvm
+          ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
+      - name: Setup
+        run: |
+          cd mmtk-jikesrvm
+          ./.github/scripts/ci-checkout.sh
+          ./.github/scripts/ci-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: |
+          cp -r mmtk-core mmtk-jikesrvm/repos
+      - name: Test
+        run: |
+          cd mmtk-jikesrvm
+          export RUST_BACKTRACE=1
+          ./.github/scripts/ci-test.sh
+          ./.github/scripts/ci-style.sh
 
-  # V8
-  # v8-binding-test:
-  #   if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-  #   # We have to use the workflow from a specific branch. We should always use 'master'
-  #   uses: mmtk/mmtk-v8/.github/workflows/tests.yml@reusable-workflow
-  #   needs: binding-refs
-  #   with:
-  #     run_all: true
-  #     binding_ref: ${{ needs.binding-refs.outputs.v8 }}
+  v8-binding-test:
+    runs-on: [self-hosted, linux, freq-scaling-off]
+    needs: binding-refs
+    if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout V8 Binding
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ needs.binding-refs.outputs.v8_binding_repo }}
+          path: mmtk-v8
+          ref: ${{ needs.binding-refs.outputs.v8_binding_ref }}
+      - name: Overwrite MMTk core in V8 binding
+        run: |
+          rm -rf mmtk-v8/repos/*
+          mkdir -p mmtk-v8/repos/mmtk-core
+          cp -r mmtk-core/* mmtk-v8/repos/mmtk-core
+      - name: Setup
+        run: |
+          cd mmtk-v8
+          ./.github/scripts/ci-setup.sh
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
+      - name: Test
+        run: |
+          cd mmtk-v8
+          export RUST_BACKTRACE=1
+          export V8_ROOT=$GITHUB_WORKSPACE/v8_deps
+          .github/scripts/ci-test.sh
+          .github/scripts/ci-style.sh
