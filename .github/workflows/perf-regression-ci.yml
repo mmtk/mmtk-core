@@ -20,63 +20,66 @@ env:
 
 jobs:
   # JikesRVM
-  # jikesrvm-perf-regression:
-  #   runs-on: [self-hosted, Linux, freq-scaling-off]
-  #   steps:
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core
-  #     - name: Checkout JikesRVM Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-jikesrvm
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         path: mmtk-jikesrvm
-  #         submodules: true
-  #     # checkout perf-kit
-  #     - name: Checkout Perf Kit
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/ci-perf-kit
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         ref: "0.6.5"
-  #         path: ci-perf-kit
-  #         submodules: true
-  #     # setup
-  #     - name: Overwrite MMTk core in JikesRVM binding
-  #       run: cp -r mmtk-core mmtk-jikesrvm/repos/
-  #     - name: Setup Rust Toolchain
-  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
-  #     - name: Setup
-  #       run: |
-  #         ./ci-perf-kit/scripts/history-run-setup.sh
-  #         mkdir -p ci-perf-kit/running/benchmarks/dacapo
-  #         cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
-  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
-  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
-  #     - id: branch
-  #       # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-  #       run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
-  #     # run
-  #     - name: Performance Run
-  #       run: |
-  #         export RESULT_REPO=mmtk/ci-perf-result
-  #         export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
-  #         export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-  #         export FROM_DATE=2020-07-10
-  #         JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
-  #     # deploy
-  #     - name: Deploy to Github Page
-  #       if: ${{ env.DEPLOY == 'true' }}
-  #       uses: peaceiris/actions-gh-pages@v3
-  #       with:
-  #         personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         external_repository: mmtk/ci-perf-result
-  #         publish_dir: ./reports
-  #         publish_branch: gh-pages
-  #         keep_files: true
-    
+  jikesrvm-perf-regression:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout JikesRVM Binding
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/mmtk-jikesrvm
+          path: mmtk-jikesrvm
+          # Do not commit this
+          ref: remove-vm-submodule
+      - name: Checkout JikesRVM
+        working-directory: mmtk-jikesrvm
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: "0.6.5"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in JikesRVM binding
+        run: cp -r mmtk-core mmtk-jikesrvm/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-jikesrvm/mmtk/Cargo.toml
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+      # run
+      - name: Performance Run
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-07-10
+          JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./ci-perf-kit/scripts/jikesrvm-history-run.sh ./mmtk-jikesrvm ./reports/${{ steps.branch.outputs.branch_name }}
+      # deploy
+      - name: Deploy to Github Page
+        if: ${{ env.DEPLOY == 'true' }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
+
   # OpenJDK
   openjdk-perf-regression:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -109,7 +112,7 @@ jobs:
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       # cleanup previosu build
       - name: Cleanup previous build
         run: |
@@ -124,7 +127,7 @@ jobs:
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
       - id: branch
         # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"  
+        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
       # run
       - name: Performance Run
         run: |
@@ -144,65 +147,69 @@ jobs:
           publish_branch: gh-pages
           keep_files: true
 
-  # openjdk-mutator-perf:
-  #   runs-on: [self-hosted, Linux, freq-scaling-off]
-  #   steps:
-  #     - name: Checkout MMTk Core
-  #       uses: actions/checkout@v2
-  #       with:
-  #         path: mmtk-core
-  #     - name: Checkout OpenJDK Binding
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/mmtk-openjdk
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         path: mmtk-openjdk
-  #         submodules: true
-  #     # checkout perf-kit
-  #     - name: Checkout Perf Kit
-  #       uses: actions/checkout@v2
-  #       with:
-  #         repository: mmtk/ci-perf-kit
-  #         token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         ref: "0.6.5"
-  #         path: ci-perf-kit
-  #         submodules: true
-  #     # setup
-  #     - name: Overwrite MMTk core in openjdk binding
-  #       run: cp -r mmtk-core mmtk-openjdk/repos/
-  #     - name: Setup Rust Toolchain
-  #       run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
-  #     # cleanup previosu build
-  #     - name: Cleanup previous build
-  #       run: |
-  #         rm -rf mmtk-openjdk/repos/openjdk/scratch
-  #         rm -rf mmtk-openjdk/repos/openjdk/build        
-  #     - id: branch
-  #       # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
-  #       run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"          
-  #     - name: Setup
-  #       run: |
-  #         ./ci-perf-kit/scripts/history-run-setup.sh
-  #         mkdir -p ci-perf-kit/running/benchmarks/dacapo
-  #         cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
-  #         sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
-  #         sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
-  #     # run
-  #     - name: Performance Run
-  #       run: |
-  #         export RESULT_REPO=mmtk/ci-perf-result
-  #         export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
-  #         export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
-  #         export FROM_DATE=2020-08-03
-  #         export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
-  #         ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
-  #     # deploy
-  #     - name: Deploy to Github Page
-  #       if: ${{ env.DEPLOY == 'true' }}
-  #       uses: peaceiris/actions-gh-pages@v3
-  #       with:
-  #         personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
-  #         external_repository: mmtk/ci-perf-result
-  #         publish_dir: ./reports
-  #         publish_branch: gh-pages
-  #         keep_files: true
+  openjdk-mutator-perf:
+    runs-on: [self-hosted, Linux, freq-scaling-off]
+    steps:
+      - name: Checkout MMTk Core
+        uses: actions/checkout@v2
+        with:
+          path: mmtk-core
+      - name: Checkout OpenJDK Binding
+        uses: actions/checkout@v2
+        with:
+          # Do not commit this
+          repository: qinsoon/mmtk-openjdk
+          # Do not commit htis
+          ref: remove-vm-submodule
+          path: mmtk-openjdk
+      - name: Checkout OpenJDK
+        working-directory: mmtk-openjdk
+        run: |
+          ./.github/scripts/ci-checkout.sh
+      # checkout perf-kit
+      - name: Checkout Perf Kit
+        uses: actions/checkout@v2
+        with:
+          repository: mmtk/ci-perf-kit
+          ref: "0.6.5"
+          path: ci-perf-kit
+          submodules: true
+      # setup
+      - name: Overwrite MMTk core in openjdk binding
+        run: cp -r mmtk-core mmtk-openjdk/repos/
+      - name: Setup Rust Toolchain
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
+      # cleanup previosu build
+      - name: Cleanup previous build
+        run: |
+          rm -rf mmtk-openjdk/repos/openjdk/scratch
+          rm -rf mmtk-openjdk/repos/openjdk/build
+      - id: branch
+        # we cannot use env vars in action input (the deploy step). So put the env var to this step's outputs.
+        run: echo "::set-output name=branch_name::$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//_/g')"
+      - name: Setup
+        run: |
+          ./ci-perf-kit/scripts/history-run-setup.sh
+          mkdir -p ci-perf-kit/running/benchmarks/dacapo
+          cp /usr/share/benchmarks/dacapo/dacapo-2006-10-MR2.jar ci-perf-kit/running/benchmarks/dacapo
+          sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml
+          sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk-openjdk/mmtk/Cargo.toml
+      # run
+      - name: Performance Run
+        run: |
+          export RESULT_REPO=mmtk/ci-perf-result
+          export RESULT_REPO_BRANCH=${{ env.RESULT_REPO_BRANCH }}
+          export RESULT_REPO_ACCESS_TOKEN=${{ secrets.CI_ACCESS_TOKEN }}
+          export FROM_DATE=2020-08-03
+          export JAVA_HOME=/usr/lib/jvm/java-1.6.0-openjdk-amd64
+          ./ci-perf-kit/scripts/mutator-history-run.sh ./mmtk-openjdk ./reports/${{ steps.branch.outputs.branch_name }}
+      # deploy
+      - name: Deploy to Github Page
+        if: ${{ env.DEPLOY == 'true' }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          personal_token: ${{ secrets.CI_ACCESS_TOKEN }}
+          external_repository: mmtk/ci-perf-result
+          publish_dir: ./reports
+          publish_branch: gh-pages
+          keep_files: true
