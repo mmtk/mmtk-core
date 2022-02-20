@@ -113,6 +113,10 @@ and return a reference to the tospace and fromspace respectively.
 `tospace()` (see below) returns a reference to the tospace, 
 and `fromspace()` returns a reference to the fromspace.
 
+We also add another two helper methods to get `tospace_mut(&mut self)`
+and `fromspace_mut(&mut self)`. Those will be used later when we implement
+collection for our GC plan.
+
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:plan_space_access}}
 ```

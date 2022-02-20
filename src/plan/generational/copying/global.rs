@@ -1,4 +1,4 @@
-use super::gc_work::{GenCopyMatureGCWorkContext, GenCopyNurseryGCWorkContext};
+use super::gc_work::GenCopyGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -46,7 +46,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         CopyConfig {
             copy_mapping: enum_map! {
                 CopySemantics::Mature => CopySelector::CopySpace(0),
-                CopySemantics::PromoteMature => CopySelector::CopySpace(0),
+                CopySemantics::PromoteToMature => CopySelector::CopySpace(0),
                 _ => CopySelector::Unused,
             },
             space_mapping: vec![
@@ -79,16 +79,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        let is_full_heap = self.request_full_heap_collection();
+        let _ = self.request_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        if !is_full_heap {
-            debug!("Nursery GC");
-            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
-        } else {
-            debug!("Full heap GC");
-            scheduler.schedule_common_work::<GenCopyMatureGCWorkContext<VM>>(self);
-        }
+        scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -105,6 +99,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+
+        self.fromspace_mut()
+            .set_copy_for_sft_trace(Some(CopySemantics::Mature));
+        self.tospace_mut().set_copy_for_sft_trace(None);
     }
 
     fn prepare_worker(&self, worker: &mut GCWorker<Self::VM>) {
@@ -230,11 +228,27 @@ impl<VM: VMBinding> GenCopy<VM> {
         }
     }
 
+    pub fn tospace_mut(&mut self) -> &mut CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &mut self.copyspace1
+        } else {
+            &mut self.copyspace0
+        }
+    }
+
     pub fn fromspace(&self) -> &CopySpace<VM> {
         if self.hi.load(Ordering::SeqCst) {
             &self.copyspace0
         } else {
             &self.copyspace1
+        }
+    }
+
+    pub fn fromspace_mut(&mut self) -> &mut CopySpace<VM> {
+        if self.hi.load(Ordering::SeqCst) {
+            &mut self.copyspace0
+        } else {
+            &mut self.copyspace1
         }
     }
 }

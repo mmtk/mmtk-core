@@ -81,15 +81,15 @@ impl TreadMill {
         self.to_space.lock().unwrap().insert(cell);
     }
 
-    pub fn to_space_empty(&self) -> bool {
+    pub fn is_to_space_empty(&self) -> bool {
         self.to_space.lock().unwrap().is_empty()
     }
 
-    pub fn from_space_empty(&self) -> bool {
+    pub fn is_from_space_empty(&self) -> bool {
         self.from_space.lock().unwrap().is_empty()
     }
 
-    pub fn nursery_empty(&self) -> bool {
+    pub fn is_nursery_empty(&self) -> bool {
         self.collect_nursery.lock().unwrap().is_empty()
     }
 

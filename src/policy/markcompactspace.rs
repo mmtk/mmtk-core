@@ -1,4 +1,5 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::policy::space::*;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -50,6 +51,18 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
         true
+    }
+
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        _trace: SFTProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        // We should not use trace_object for markcompact space.
+        // Depending on which trace it is, we should manually call either trace_mark or trace_forward.
+        panic!("sft_trace_object() cannot be used with mark compact space")
     }
 }
 

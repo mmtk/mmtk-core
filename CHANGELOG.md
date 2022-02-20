@@ -1,3 +1,48 @@
+0.10.0 (2022-02-14)
+===
+
+GC Plans
+---
+* Removed plan-specific copy contexts. Now each plan needs to provide a configuration for
+  `GCWorkerCopyContext` (similar to how they config `Mutator`).
+* Fixed a bug that `needs_log_bit` was always set to `true` for generational plans, no matter
+  their barrier used the log bit or not.
+* Fixed a bug that we may overflow when calculating `get_available_pages()`.
+
+Policies
+---
+* Refactored copy context. Now a copying policy provides its copy context.
+* Mark sweep and mark compact now uses `ObjectIterator` for linear scan.
+
+Scheduler
+---
+* Introduced `GCController`, a counterpart of `GCWorker`, for the controller thread.
+* Refactored `GCWorker`. Now `GCWorker` is seperated into two parts, a thread local part `GCWorker`
+  which is owned by GC threads, and a shared part `GCWorkerShared` that is shared between GC threads
+  and the scheduler.
+* Refactored the creation of the scheduler and the workers to remove some unnecessary `Option<T>` and `RwLock<T>`.
+
+API
+---
+* Added `process_bulk()` that allows bindings to pass options as a string of key-value pairs.
+* `ObjectModel::copy()` now takes `CopySemantics` as a parameter.
+* Renamed `Collection::spawn_worker_thread()` to `spawn_gc_thread()`, which is now used to spawn both GC worker and
+  GC controller.
+* `Collection::out_of_memory()` now takes `AllocationError` as a parameter which hints the binding
+  on how to handle the OOM error.
+* `Collection::out_of_memory()` now allows a binding to return from the method in the case of a non-critical OOM.
+  If a binding returns, `alloc()` will return a zero address.
+
+Misc
+---
+* Added `ObjectIterator` that provides linear scanning through a region to iterate
+  objects using the alloc bit.
+* Added a feature `work_packet_stats` to optionally collect work packet statistics. Note that
+  MMTk used to always collect work packet statistics.
+* Optimized the access to the SFT map.
+* Fixed a few issues with documentation.
+* The example header file `mmtk.h` now uses the prefix `mmtk_` for all the functions.
+
 0.9.0 (2021-12-16)
 ===
 

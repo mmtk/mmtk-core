@@ -66,7 +66,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         use enum_map::enum_map;
         CopyConfig {
             copy_mapping: enum_map! {
-                CopySemantics::PromoteMature => CopySelector::Immix(0),
+                CopySemantics::PromoteToMature => CopySelector::Immix(0),
                 CopySemantics::Mature => CopySelector::Immix(0),
                 _ => CopySelector::Unused,
             },

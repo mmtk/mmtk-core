@@ -34,7 +34,7 @@ impl SchedulerStat {
     /// Extract the work-packet name from the full type name.
     /// i.e. simplifies `crate::scheduler::gc_work::SomeWorkPacket<Semispace>` to `SomeWorkPacket`.
     fn work_name(&self, name: &str) -> String {
-        let end_index = name.find('<').unwrap_or_else(|| name.len());
+        let end_index = name.find('<').unwrap_or(name.len());
         let name = name[..end_index].to_owned();
         match name.rfind(':') {
             Some(start_index) => name[(start_index + 1)..end_index].to_owned(),

@@ -22,6 +22,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
+use crate::policy::space::*;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
@@ -81,6 +82,17 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         let page_addr = conversions::page_align_down(object.to_address());
         set_page_mark(page_addr);
         set_alloc_bit(object);
+    }
+
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        let trace = trace.into_mut::<VM>();
+        self.trace_object(trace, object)
     }
 }
 

@@ -46,6 +46,7 @@ pub trait GCWork<VM: VMBinding>: 'static + Send {
 }
 
 use super::gc_work::ProcessEdgesWork;
+use super::gc_work::SFTProcessEdges;
 use crate::plan::Plan;
 
 /// This trait provides a group of associated types that are needed to
@@ -56,5 +57,5 @@ use crate::plan::Plan;
 pub trait GCWorkContext {
     type VM: VMBinding;
     type PlanType: Plan<VM = Self::VM>;
-    type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
+    type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM> = SFTProcessEdges<Self::VM>;
 }

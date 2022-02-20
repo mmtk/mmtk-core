@@ -321,6 +321,7 @@ impl Address {
     }
 
     /// returns the chunk index for this address
+    #[inline(always)]
     pub fn chunk_index(self) -> usize {
         use crate::util::conversions;
         conversions::address_to_chunk_index(self)

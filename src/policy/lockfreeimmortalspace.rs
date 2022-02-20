@@ -2,9 +2,9 @@ use crate::mmtk::SFT_MAP;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
-
 use crate::util::ObjectReference;
 
+use crate::policy::space::*;
 use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{
@@ -57,6 +57,14 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
+    }
+    fn sft_trace_object(
+        &self,
+        _trace: SFTProcessEdgesMutRef,
+        _object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        unreachable!()
     }
 }
 

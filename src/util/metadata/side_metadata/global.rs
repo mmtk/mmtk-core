@@ -580,13 +580,13 @@ pub fn fetch_add_atomic(
 
         (old_val & mask) as usize
     } else if bits_num_log == 3 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU8>()).fetch_add(val as u8, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_add(val as u8, order) as usize }
     } else if bits_num_log == 4 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU16>()).fetch_add(val as u16, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_add(val as u16, order) as usize }
     } else if bits_num_log == 5 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, order) as usize }
     } else if bits_num_log == 6 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicUsize>()).fetch_add(val, order) }
+        unsafe { (*meta_addr.to_ptr::<AtomicUsize>()).fetch_add(val, order) }
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -639,13 +639,13 @@ pub fn fetch_sub_atomic(
 
         (old_val & mask) as usize
     } else if bits_num_log == 3 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU8>()).fetch_sub(val as u8, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_sub(val as u8, order) as usize }
     } else if bits_num_log == 4 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU16>()).fetch_sub(val as u16, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_sub(val as u16, order) as usize }
     } else if bits_num_log == 5 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, order) as usize }
+        unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, order) as usize }
     } else if bits_num_log == 6 {
-        unsafe { (&*meta_addr.to_ptr::<AtomicUsize>()).fetch_sub(val, order) }
+        unsafe { (*meta_addr.to_ptr::<AtomicUsize>()).fetch_sub(val, order) }
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",

@@ -13,6 +13,11 @@ pub(in crate::plan) enum TraceKind {
     Defrag,
 }
 
+/// Object tracing for Immix.
+/// Note that it is possible to use [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges) for immix.
+/// We need to: 1. add a plan-specific method to create scan work packets, as most plans use `ScanObjects` while
+/// immix uses `ScanObjectsAndMarkLines`, 2. use `ImmixSpace.trace_object()` which has an overhead of checking
+/// which trace method to use (with ImmixProcessEdges, we can know which trace method to use by statically checking `TraceKind`).
 pub(super) struct ImmixProcessEdges<VM: VMBinding, const KIND: TraceKind> {
     // Use a static ref to the specific plan to avoid overhead from dynamic dispatch or
     // downcast for each traced object.

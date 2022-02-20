@@ -3,6 +3,7 @@ use atomic::Ordering;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
 use crate::policy::space::SpaceOptions;
+use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
@@ -79,6 +80,16 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
+    #[inline(always)]
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        _worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        let trace = trace.into_mut::<VM>();
+        self.trace_object(trace, object)
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
@@ -153,7 +164,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn prepare(&mut self, full_heap: bool) {
         if full_heap {
-            debug_assert!(self.treadmill.from_space_empty());
+            debug_assert!(self.treadmill.is_from_space_empty());
             self.mark_state = MARK_BIT - self.mark_state;
         }
         self.treadmill.flip(full_heap);
@@ -162,7 +173,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     pub fn release(&mut self, full_heap: bool) {
         self.sweep_large_pages(true);
-        debug_assert!(self.treadmill.nursery_empty());
+        debug_assert!(self.treadmill.is_nursery_empty());
         if full_heap {
             self.sweep_large_pages(false);
         }
