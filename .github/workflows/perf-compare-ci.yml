@@ -10,7 +10,6 @@ on:
 jobs:
     binding-refs:
       runs-on: ubuntu-18.04
-      if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
       outputs:
         openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
         openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
@@ -31,22 +30,24 @@ jobs:
           with:
             result-encoding: string
             script: |
-              return (await github.rest.pulls.get({
-                owner: mmtk,
-                repo: mmtk-core,
+              var res = (await github.rest.pulls.get({
+                owner: "mmtk",
+                repo: "mmtk-core",
                 pull_number: ${{ github.event.inputs.pull_request }}
-              })).head.repo.full_name
+              }))
+              return res.data.head.repo.full_name
         - name: Get mmtk-core refs from pull_request
           uses: actions/github-script@v6
           id: core-ref
           with:
             result-encoding: string
             script: |
-              return (await github.rest.pulls.get({
-                owner: mmtk,
-                repo: mmtk-core,
+              var res = (await github.rest.pulls.get({
+                owner: "mmtk",
+                repo: "mmtk-core",
                 pull_number: ${{ github.event.inputs.pull_request }}
-              })).head.sha
+              }))
+              return res.data.head.sha
         - id: print
           run: |
             echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
@@ -74,7 +75,9 @@ jobs:
             uses: actions/checkout@v2
             with:
               repository: mmtk/mmtk-jikesrvm
-              ref: master
+              # Do not commit this
+              ref: remove-vm-submodule
+              # ref: master
               path: mmtk-jikesrvm-trunk
           - name: Checkout JikesRVM for Trunk
             working-directory: mmtk-jikesrvm-trunk
@@ -109,6 +112,7 @@ jobs:
             uses: actions/checkout@v2
             with:
               repository: mmtk/ci-perf-kit
+              token: ${{ secrets.CI_ACCESS_TOKEN }}
               ref: "0.6.6"
               path: ci-perf-kit
               submodules: true
@@ -167,52 +171,60 @@ jobs:
 
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
+        needs: binding-refs
         steps:
-            - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
-            - name: Check Revisions
-              uses: qinsoon/comment-env-vars@1.1.0
-              with:
-                token: ${{ secrets.GITHUB_TOKEN }}
-                pull_request: ${{ env.PERF_PR }}
-                default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
+            # - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
+            # - name: Check Revisions
+            #   uses: qinsoon/comment-env-vars@1.1.0
+            #   with:
+            #     token: ${{ secrets.GITHUB_TOKEN }}
+            #     pull_request: ${{ env.PERF_PR }}
+            #     default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
             # Trunk
             # - binding
             - name: Checkout OpenJDK Binding Trunk
               uses: actions/checkout@v2
               with:
-                repository: mmtk/mmtk-openjdk
-                token: ${{ secrets.GITHUB_TOKEN }}
+                # Do not commit this
+                repository: qinsoon/mmtk-openjdk
+                ref: remove-vm-submodule
+                # repository: mmtk/mmtk-openjdk
+                # ref: master
                 path: mmtk-openjdk-trunk
-                submodules: true
-                ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
+            - name: Checkout OpenJDK for Trunk
+              working-directory: mmtk-openjdk-trunk
+              run: ./.github/scripts/ci-checkout.sh
             # -core
             - name: Checkout MMTk Core
               uses: actions/checkout@v2
               with:
-                ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+                repository: mmtk/mmtk-core
+                ref: master
                 path: mmtk-core-trunk
             # Branch
             # - binding
             - name: Checkout OpenJDK Binding Branch
               uses: actions/checkout@v2
               with:
-                repository: mmtk/mmtk-openjdk
-                token: ${{ secrets.GITHUB_TOKEN }}
+                repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+                ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
                 path: mmtk-openjdk-branch
-                submodules: true
-                ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
+            - name: Checkout OpenJDK for Branch
+              working-directory: mmtk-openjdk-branch
+              run: ./.github/scripts/ci-checkout.sh
             # - core
             - name: Checkout MMTk Core
               uses: actions/checkout@v2
               with:
-                ref: ${{ env.MMTK_CORE_BRANCH_REF }}
+                repository: ${{ needs.binding-refs.outputs.mmtk_repo }}
+                ref: ${{ needs.binding-refs.outputs.mmtk_ref }}
                 path: mmtk-core-branch
             # checkout perf-kit
             - name: Checkout Perf Kit
               uses: actions/checkout@v2
               with:
                 repository: mmtk/ci-perf-kit
-                token: ${{ secrets.GITHUB_TOKEN }}
+                token: ${{ secrets.CI_ACCESS_TOKEN }}
                 ref: "0.6.6"
                 path: ci-perf-kit
                 submodules: true
@@ -229,7 +241,7 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: openjdk-perf-compare-comment
                 message: 'Running benchmarks for OpenJDK...'
                 recreate: true
@@ -257,7 +269,7 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: openjdk-perf-compare-comment
                 message: ${{ steps.cat.outputs.text }}
                 append: true
