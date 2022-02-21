@@ -45,6 +45,7 @@ jobs:
           repository: mmtk/ci-perf-kit
           ref: "0.6.6"
           path: ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
       # setup
       - name: Overwrite MMTk core in JikesRVM binding
@@ -107,6 +108,7 @@ jobs:
           repository: mmtk/ci-perf-kit
           ref: "0.6.6"
           path: ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
       # setup
       - name: Overwrite MMTk core in openjdk binding
@@ -173,6 +175,7 @@ jobs:
           repository: mmtk/ci-perf-kit
           ref: "0.6.6"
           path: ci-perf-kit
+          token: ${{ secrets.CI_ACCESS_TOKEN }}
           submodules: true
       # setup
       - name: Overwrite MMTk core in openjdk binding
