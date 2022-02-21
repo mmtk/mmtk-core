@@ -25,7 +25,7 @@ jobs:
         with:
           token: ${{ secrets.CI_ACCESS_TOKEN }}
           repository: mmtk/ci-perf-kit
-          ref: "0.6.5"
+          ref: "0.6.6"
           path: ci-perf-kit
           submodules: true
       # setup
