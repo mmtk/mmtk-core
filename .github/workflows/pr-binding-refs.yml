@@ -1,3 +1,27 @@
+# This workflow is used to figure out binding pull requests related with
+# the given MMTk core pull request.
+#
+# To make sure that our maintained bindings always work with the latest MMTk core,
+# we may run binding tests for a core PR. By default, we run with the master of
+# each binding repo in our mmtk organisation. However, if the core PR has changes
+# that requires bindings to update, we can no longer run with the master of the binding repos.
+# In such a case, we need to specify the binding PRs so our mmtk-core CI knows how to run the
+# correct version of the bindings for the tests.
+#
+# In the cases that we need to update bindings, we expect the core PR to have a comment like the following
+# to specify the binding pull requests. Note if any of the following values are omitted, the default values
+# will be used (run with the master in mmtk's binding repos).
+# Repo is in the format of user/repo. Ref could be sha or branch name.
+# ```
+# binding-refs
+# OPENJDK_BINDING_REPO=xx/xx
+# OPENJDK_BINDING_REF=xxxxxx
+# JIKESRVM_BINDING_REPO=xx/xx
+# JIKESRVM_BINDING_REF=xxxxxx
+# V8_BINDING_REPO=xx/xx
+# V8_BINDING_REF=xxxxxx
+# ```
+
 name: Fetch Binding PR Info
 
 on:

@@ -1,3 +1,7 @@
+# This workflow is used to run benchmarks to compare a pull request (specified by the input 'pull_request')
+# and the current master. This workflow assumes the pull requests (mmtk-core PRs and the binding PRs are based on
+# their corresponding master). Otherwise the workflow may fail or return unexpected results.
+
 name: Binding Perf Tests
 
 on:
@@ -8,11 +12,13 @@ on:
         required: true
 
 jobs:
+    # Figure out binding PRs.
     binding-refs:
       uses: ./.github/workflows/pr-binding-refs.yml
       with:
         pull_request: ${{ github.event.inputs.pull_request }}
 
+    # Figure out the core PR. We need to get the specific commit and repo from a pull request number.
     mmtk-refs:
       runs-on: ubuntu-18.04
       outputs:
@@ -48,25 +54,18 @@ jobs:
             echo "::set-output name=mmtk_repo::${{ steps.core-repo.outputs.result }}"
             echo "::set-output name=mmtk_ref::${{ steps.core-ref.outputs.result }}"
 
+    # Run perf compare for JikesRVM
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         needs: [binding-refs, mmtk-refs]
         steps:
-          # - name: Check Revisions
-          #   uses: qinsoon/comment-env-vars@1.1.0
-          #   with:
-          #     token: ${{ secrets.GITHUB_TOKEN }}
-          #     pull_request: ${{ env.PERF_PR }}
-          #     default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
-          # Trunk
+          # Trunk - we always use master from the mmtk org
           # - binding
           - name: Checkout JikesRVM Binding Trunk
             uses: actions/checkout@v2
             with:
               repository: mmtk/mmtk-jikesrvm
-              # Do not commit this
-              ref: remove-vm-submodule
-              # ref: master
+              ref: master
               path: mmtk-jikesrvm-trunk
           - name: Checkout JikesRVM for Trunk
             working-directory: mmtk-jikesrvm-trunk
@@ -162,23 +161,13 @@ jobs:
         runs-on: [self-hosted, Linux, freq-scaling-off]
         needs: [binding-refs, mmtk-refs]
         steps:
-            # - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
-            # - name: Check Revisions
-            #   uses: qinsoon/comment-env-vars@1.1.0
-            #   with:
-            #     token: ${{ secrets.GITHUB_TOKEN }}
-            #     pull_request: ${{ env.PERF_PR }}
-            #     default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
-            # Trunk
+            # Trunk - we always use master from the mmtk org
             # - binding
             - name: Checkout OpenJDK Binding Trunk
               uses: actions/checkout@v2
               with:
-                # Do not commit this
-                repository: qinsoon/mmtk-openjdk
-                ref: remove-vm-submodule
-                # repository: mmtk/mmtk-openjdk
-                # ref: master
+                repository: mmtk/mmtk-openjdk
+                ref: master
                 path: mmtk-openjdk-trunk
             - name: Checkout OpenJDK for Trunk
               working-directory: mmtk-openjdk-trunk

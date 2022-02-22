@@ -14,9 +14,9 @@ on:
 
 env:
   # The branch to save run data and plot graph from. Use 'self-hosted' for master, use 'test' or anything else for testing in a branch.
-  RESULT_REPO_BRANCH: 'test'
+  RESULT_REPO_BRANCH: 'self-hosted'
   # Whether we deploy the generated page. Set to true for master.
-  DEPLOY: false
+  DEPLOY: true
 
 jobs:
   # JikesRVM
@@ -32,8 +32,6 @@ jobs:
         with:
           repository: mmtk/mmtk-jikesrvm
           path: mmtk-jikesrvm
-          # Do not commit this
-          ref: remove-vm-submodule
       - name: Checkout JikesRVM
         working-directory: mmtk-jikesrvm
         run: |
@@ -92,10 +90,7 @@ jobs:
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
         with:
-          # Do not commit this
-          repository: qinsoon/mmtk-openjdk
-          # Do not commit this
-          ref: remove-vm-submodule
+          repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
       - name: Checkout OpenJDK
         working-directory: mmtk-openjdk
@@ -159,10 +154,7 @@ jobs:
       - name: Checkout OpenJDK Binding
         uses: actions/checkout@v2
         with:
-          # Do not commit this
-          repository: qinsoon/mmtk-openjdk
-          # Do not commit htis
-          ref: remove-vm-submodule
+          repository: mmtk/mmtk-openjdk
           path: mmtk-openjdk
       - name: Checkout OpenJDK
         working-directory: mmtk-openjdk
