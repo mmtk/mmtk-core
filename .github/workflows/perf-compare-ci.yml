@@ -9,21 +9,16 @@ on:
 
 jobs:
     binding-refs:
+      uses: ./.github/workflows/pr-binding-refs.yml
+      with:
+        pull_request: ${{ github.event.inputs.pull_request }}
+
+    mmtk-refs:
       runs-on: ubuntu-18.04
       outputs:
-        openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
-        openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
-        jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
-        jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
-        v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
-        v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
+        mmtk_repo: ${{ steps.print.outputs.mmtk_repo }}
+        mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}
       steps:
-        - name: Check binding revisions
-          uses: qinsoon/comment-env-vars@1.1.0
-          with:
-            token: ${{ secrets.GITHUB_TOKEN }}
-            pull_request: ${{ github.event.inputs.pull_request }}
-            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master'
         - name: Get mmtk-core repo from pull_request
           uses: actions/github-script@v6
           id: core-repo
@@ -50,18 +45,12 @@ jobs:
               return res.data.head.sha
         - id: print
           run: |
-            echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
-            echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
-            echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
-            echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
-            echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
-            echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
-            echo "::set-output name=mmtk-repo::${{ steps.core-repo.outputs.result }}"
-            echo "::set-output name=mmtk-ref::${{ steps.core-ref.outputs.result }}"
+            echo "::set-output name=mmtk_repo::${{ steps.core-repo.outputs.result }}"
+            echo "::set-output name=mmtk_ref::${{ steps.core-ref.outputs.result }}"
 
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
-        needs: binding-refs
+        needs: [binding-refs, mmtk-refs]
         steps:
           # - name: Check Revisions
           #   uses: qinsoon/comment-env-vars@1.1.0
@@ -101,8 +90,8 @@ jobs:
           - name: Checkout MMTk Core
             uses: actions/checkout@v2
             with:
-              repository: ${{ needs.binding-refs.outputs.mmtk_repo }}
-              ref: ${{ needs.binding-refs.outputs.mmtk_ref }}
+              repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
+              ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
               path: mmtk-core-branch
           - name: Checkout JikesRVM for Branch
             working-directory: mmtk-jikesrvm-branch
@@ -171,7 +160,7 @@ jobs:
 
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
-        needs: binding-refs
+        needs: [binding-refs, mmtk-refs]
         steps:
             # - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
             # - name: Check Revisions
@@ -216,8 +205,8 @@ jobs:
             - name: Checkout MMTk Core
               uses: actions/checkout@v2
               with:
-                repository: ${{ needs.binding-refs.outputs.mmtk_repo }}
-                ref: ${{ needs.binding-refs.outputs.mmtk_ref }}
+                repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
+                ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
                 path: mmtk-core-branch
             # checkout perf-kit
             - name: Checkout Perf Kit

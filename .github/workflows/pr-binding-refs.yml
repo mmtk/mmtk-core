@@ -1,0 +1,53 @@
+name: Fetch Binding PR Info
+
+on:
+  workflow_call:
+    inputs:
+      pull_request:
+        type: string
+        required: true
+    outputs:
+      openjdk_binding_repo:
+        description: "The repository of OpenJDK binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo}}
+      openjdk_binding_ref:
+        description: "The git ref of OpenJDK binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref}}
+      jikesrvm_binding_repo:
+        description: "The repository of JikesRVM binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_repo}}
+      jikesrvm_binding_ref:
+        description: "The git ref of JikesRVM binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_ref}}
+      v8_binding_repo:
+        description: "The repository of V8 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_repo}}
+      v8_binding_ref:
+        description: "The git ref of V8 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_ref}}
+
+jobs:
+  binding-refs:
+    runs-on: ubuntu-18.04
+    outputs:
+        openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
+        openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
+        jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
+        jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
+        v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
+        v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
+    steps:
+        - name: Check binding revisions
+          uses: qinsoon/comment-env-vars@1.1.0
+          with:
+            pull_request: ${{ inputs.pull_request }}
+            token: ${{ secrets.GITHUB_TOKEN }}
+            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master'
+        - id: print
+          run: |
+            echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
+            echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
+            echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
+            echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
+            echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
+            echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"

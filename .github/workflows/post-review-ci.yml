@@ -8,29 +8,10 @@ on:
 
 jobs:
   binding-refs:
-    runs-on: ubuntu-18.04
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
-    outputs:
-      openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
-      openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
-      jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
-      jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
-      v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
-      v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
-    steps:
-      - name: Check binding revisions
-        uses: qinsoon/comment-env-vars@1.0.3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master'
-      - id: print
-        run: |
-          echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
-          echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
-          echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
-          echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
-          echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
-          echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
+    uses: ./.github/workflows/pr-binding-refs.yml
+    with:
+      pull_request: ${{ github.event.pull_request.number }}
 
   openjdk-binding-test:
     runs-on: ubuntu-18.04
