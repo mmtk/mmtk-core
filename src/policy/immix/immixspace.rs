@@ -14,7 +14,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
-use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec};
+use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec, store_metadata};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -86,6 +86,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         panic!("We do not use SFT to trace objects for Immix. sft_trace_object() cannot be used.")
+    }
+    #[inline(always)]
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        debug_assert!(!object.is_null());
+        if ForwardingWord::is_forwarded::<VM>(object) {
+            Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
+        } else {
+            None
+        }
     }
 }
 
@@ -648,6 +657,16 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         } else {
             self.copy_allocator.alloc(bytes, align, offset)
         }
+    }
+    #[inline(always)]
+    fn post_copy(&mut self, object: ObjectReference, _bytes: usize) {
+        store_metadata::<VM>(
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            object,
+            self.defrag_allocator.immix_space().mark_state as _,
+            None,
+            None,
+        );
     }
 }
 
