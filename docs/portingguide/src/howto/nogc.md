@@ -13,11 +13,20 @@ You may want to take the following steps.
 1. Set up the binding repository/directory structure:
     - `/mmtk` - the MMTk side of the binding. To start, this can be an almost direct copy of the [Dummy VM binding](https://github.com/mmtk/mmtk-core/tree/master/vmbindings/dummyvm).
     - `/vm` (rename this to your VM name) - VM-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the VM and the MMTk side of the binding.
-    - `/repos` - clone your VM code here. Optionally also clone a copy of mmtk-core if you plan on modifying MMTk itself 
+    - You can place your VM repository at any path. For clarity, we assume you will place the VM repo as a sibling of the binding repo. You can also clone `mmtk-core` to a local path, and using
+      a local repo of `mmtk-core` will help a lot in your development. So your working directory would look like this (assuming your VM is named as `X`):
+      ```
+      Your working directory/
+      ├─ mmtk-X/
+      │  ├─ X/
+      │  ├─ mmtk/
+      ├─ X/
+      ├─ mmtk-core/ (optional)
+      ```
     - You may also find it helpful to take inspiration from the OpenJDK binding, particularly for a more complete example of the relevant `Cargo.toml` files (note: the use of submodules is no longer recommended): https://github.com/mmtk/mmtk-openjdk 
 2. Change the VM build process to build and/or link MMTk
     - It may be easier to simply build a static and/or dynamic binary for MMTk and link it to the language directly, manually building new binaries as necessary. 
-        1. `cd binding_repo/mmtk`
+        1. `cd mmtk-X/mmtk`
         2. `cargo build` to build in debug mode or add `--release` for release mode
         3. Copy the shared or static library from `target/debug` or `target/release` to your desired location
     - Later, you can edit the language build process to build MMTk at the same time automatically.
