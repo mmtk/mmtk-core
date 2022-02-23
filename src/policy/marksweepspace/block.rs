@@ -24,65 +24,32 @@ impl Block {
     }
 
     /// Block mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: MARKSWEEP_LOCAL_SIDE_METADATA_BASE_OFFSET,
-        log_num_of_bits: 3,
-        log_min_obj_size: free_list_allocator::LOG_BYTES_IN_BLOCK,
-    };
+    pub const MARK_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK;
 
-    pub const NEXT_BLOCK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::MARK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const NEXT_BLOCK_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_NEXT;
 
-    pub const PREV_BLOCK_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::NEXT_BLOCK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const PREV_BLOCK_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_PREV;
 
-    pub const FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::PREV_BLOCK_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const SIZE_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::SIZE_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
-    pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::LOCAL_FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const FREE_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_FREE;
+        
+    // pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = 
+    //     crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
-    pub const BLOCK_LIST_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::THREAD_FREE_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    // pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec = 
+    //     crate::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
 
-    pub const TLS_TABLE: SideMetadataSpec = SideMetadataSpec {
-        is_global: false,
-        offset: SideMetadataOffset::layout_after(&Block::BLOCK_LIST_TABLE),
-        log_num_of_bits: 6,
-        log_min_obj_size: 16,
-    };
+    pub const SIZE_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE;
+
+    pub const BLOCK_LIST_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_LIST;
+
+    pub const TLS_TABLE: SideMetadataSpec = 
+        crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
     #[inline]
     pub fn load_free_list<VM: VMBinding>(&self) -> Address {
@@ -107,51 +74,51 @@ impl Block {
         );
     }
 
-    #[inline]
-    pub fn load_local_free_list<VM: VMBinding>(&self) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-                self.0.to_object_reference(),
-                None,
-                None,
-            ))
-        }
-    }
+    // #[inline]
+    // pub fn load_local_free_list<VM: VMBinding>(&self) -> Address {
+    //     unsafe {
+    //         Address::from_usize(load_metadata::<VM>(
+    //             &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
+    //             self.0.to_object_reference(),
+    //             None,
+    //             None,
+    //         ))
+    //     }
+    // }
 
-    #[inline]
-    pub fn store_local_free_list<VM: VMBinding>(&self, local_free: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-            unsafe { self.0.to_object_reference() },
-            local_free.as_usize(),
-            None,
-            None,
-        );
-    }
+    // #[inline]
+    // pub fn store_local_free_list<VM: VMBinding>(&self, local_free: Address) {
+    //     store_metadata::<VM>(
+    //         &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
+    //         unsafe { self.0.to_object_reference() },
+    //         local_free.as_usize(),
+    //         None,
+    //         None,
+    //     );
+    // }
 
-    #[inline]
-    pub fn load_thread_free_list<VM: VMBinding>(&self) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-                self.0.to_object_reference(),
-                None,
-                Some(Ordering::SeqCst),
-            ))
-        }
-    }
+    // #[inline]
+    // pub fn load_thread_free_list<VM: VMBinding>(&self) -> Address {
+    //     unsafe {
+    //         Address::from_usize(load_metadata::<VM>(
+    //             &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+    //             self.0.to_object_reference(),
+    //             None,
+    //             Some(Ordering::SeqCst),
+    //         ))
+    //     }
+    // }
 
-    #[inline]
-    pub fn store_thread_free_list<VM: VMBinding>(&self, thread_free: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-            unsafe { self.0.to_object_reference() },
-            thread_free.as_usize(),
-            None,
-            None,
-        );
-    }
+    // #[inline]
+    // pub fn store_thread_free_list<VM: VMBinding>(&self, thread_free: Address) {
+    //     store_metadata::<VM>(
+    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+    //         unsafe { self.0.to_object_reference() },
+    //         thread_free.as_usize(),
+    //         None,
+    //         None,
+    //     );
+    // }
 
     // #[inline]
     // pub fn cas_thread_free_list(
@@ -172,7 +139,7 @@ impl Block {
     // }
 
     pub fn load_prev_block<VM: VMBinding>(&self) -> Block {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         let prev = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -183,7 +150,7 @@ impl Block {
     }
 
     pub fn load_next_block<VM: VMBinding>(&self) -> Block {
-        assert!(!self.is_zero());
+        debug_assert!(!self.is_zero());
         let next = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -194,7 +161,7 @@ impl Block {
     }
 
     pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -205,7 +172,7 @@ impl Block {
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -216,7 +183,7 @@ impl Block {
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -224,12 +191,10 @@ impl Block {
             None,
             None,
         );
-        let loaded = self.load_block_list::<VM>();
-        unsafe{assert!((*loaded).first == block_list.first);}
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         let block_list = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },

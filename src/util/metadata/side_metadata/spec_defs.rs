@@ -75,6 +75,32 @@ define_side_metadata_specs!(
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark chunks by immix
     IX_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::chunk::Chunk::LOG_BYTES),
+    // Mark chunks by (native mimalloc) marksweep
+    MS_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::chunk::Chunk::LOG_BYTES),
+    // Mark blocks by (native mimalloc) marksweep
+    MS_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Next block in list for native mimalloc
+    MS_BLOCK_NEXT   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Previous block in list for native mimalloc
+    MS_BLOCK_PREV   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Pointer to owning list for blocks for native mimalloc
+    MS_BLOCK_LIST   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Size of cells in block for native mimalloc
+    MS_BLOCK_SIZE         = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // TLS of owning mutator of block for native mimalloc
+    MS_BLOCK_TLS    = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // First cell of free list in block for native mimalloc
+    MS_FREE         = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // First cell of local free list in block for native mimalloc
+    // MS_LOCAL_FREE   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // First cell of thread free list in block for native mimalloc
+    // MS_THREAD_FREE  = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Next cell in free list in block for native mimalloc
+    MS_CELL_NEXT    = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // Previous cell in free list in block for native mimalloc
+    MS_CELL_PREV    = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+
+
 );
 
 #[cfg(test)]

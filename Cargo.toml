@@ -42,7 +42,7 @@ crossbeam = "0.7.3"
 rand = "0.7.3"
 
 [features]
-default = ["malloc", "malloc_mimalloc"]
+default = []
 
 # This feature is only supported on x86-64 for now
 # It's manually added to CI scripts
