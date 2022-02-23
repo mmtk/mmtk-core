@@ -91,9 +91,9 @@ define_side_metadata_specs!(
     // First cell of free list in block for native mimalloc
     MS_FREE         = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
     // First cell of local free list in block for native mimalloc
-    MS_LOCAL_FREE   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // MS_LOCAL_FREE   = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
     // First cell of thread free list in block for native mimalloc
-    MS_THREAD_FREE  = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
+    // MS_THREAD_FREE  = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
     // Next cell in free list in block for native mimalloc
     MS_CELL_NEXT    = (global: false, log_num_of_bits: 6, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
     // Previous cell in free list in block for native mimalloc
