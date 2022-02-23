@@ -240,40 +240,26 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align >= VM::MIN_ALIGNMENT);
         debug_assert!(offset == 0);
 
-        let addr = self.alloc_from_available(size);
+        let block = self.find_free_block(size);
+        let addr = self.block_alloc(block, size, align, offset);
         if addr.is_zero() {
-            debug_assert!(self.available_blocks[mi_bin(size) as usize].is_empty());
-            return self.alloc_slow(size, align, offset)
+            self.alloc_slow(size, align, offset)
+        } else {
+            addr
         }
-        addr
+
+
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // try to find an existing block with free cells
-        let bin = mi_bin(size);
-        if !self.available_blocks[bin as usize].is_empty() {
-            // we've just had GC, which has made some blocks available
-            return self.alloc_from_available(size);
-        }
 
-        let block = self.acquire_block_for_size(size, false);
+        let block = self.find_free_block(size);
         if block.is_zero() {
-            // gc
             return unsafe {Address::zero()};
         }
+    
+        self.block_alloc(block, size, align, offset)
 
-        debug_assert!(!block.is_zero());
-
-        // _mi_page_malloc
-        let free_list = block.load_free_list::<VM>();
-        debug_assert!(!free_list.is_zero());
-
-        // update free list
-        let next_cell = unsafe { free_list.load::<Address>() };
-        block.store_free_list::<VM>(next_cell);
-        debug_assert!(block.load_free_list::<VM>() == next_cell);
-
-        free_list
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -353,40 +339,40 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
     }
 
-    fn alloc_from_available(&mut self, size: usize) -> Address {
-        trace!("alloc from available s={}", size);
+    pub fn block_alloc(&mut self, block: Block, size: usize, align: usize, offset: isize) -> Address {
+        if block.is_zero() {
+            return unsafe { Address::zero() }
+        }
+        let cell = block.load_free_list::<VM>();
+        if cell.is_zero() {
+            return self.alloc_slow(size, align, offset);
+        }
+        block.store_free_list::<VM>(unsafe { cell.load::<Address>() });
+        cell
+    }
+
+    fn find_free_block(&mut self, size: usize) -> Block {
         let bin = mi_bin(size);
         debug_assert!(bin <= MAX_BIN);
 
         let available_blocks = &mut self.available_blocks[bin as usize];
-        // eprintln!("put size {} onto list with size {}", size, available_blocks.size);
         debug_assert!(available_blocks.size >= size);
 
         let mut block = available_blocks.first;
 
         while !block.is_zero() {
-            trace!("try block {}", block.start());
-            let free_list = block.load_free_list::<VM>();
-            if !free_list.is_zero() {
-                trace!("block {} has free list at {}", block.start(), free_list);
-                // update free list
-                let next_cell = unsafe { free_list.load::<Address>() };
-                block.store_free_list::<VM>(next_cell);
-                debug_assert!(block.load_free_list::<VM>() == next_cell);
-                // set allocation bit
-                // set_alloc_bit(unsafe { free_list.to_object_reference() });
-                // debug_assert!(is_alloced(unsafe { free_list.to_object_reference() }));
-                trace!("alloc to {}", free_list);
-                return free_list;
+            if block.has_free_cells::<VM>() {
+                return block;
             }
-            trace!("block {} exhausted, try next", block.start());
             available_blocks.pop::<VM>();
             self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
 
             block = available_blocks.first;
 
         }
-        unsafe { Address::zero() }
+        
+        self.acquire_block_for_size(size, false)
+
     }
 
 
@@ -498,7 +484,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         self.available_blocks[bin].push::<VM>(block);
                     }
                     self.init_block(block, self.available_blocks[bin].size);
-                    
+
                     return block;
                 },
 
