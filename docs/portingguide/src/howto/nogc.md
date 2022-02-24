@@ -19,9 +19,9 @@ You may want to take the following steps.
       Your working directory/
       ├─ mmtk-X/
       │  ├─ X/
-      │  ├─ mmtk/
+      │  └─ mmtk/
       ├─ X/
-      ├─ mmtk-core/ (optional)
+      └─ mmtk-core/ (optional)
       ```
     - You may also find it helpful to take inspiration from the OpenJDK binding, particularly for a more complete example of the relevant `Cargo.toml` files (note: the use of submodules is no longer recommended): https://github.com/mmtk/mmtk-openjdk 
 2. Change the VM build process to build and/or link MMTk
