@@ -1,3 +1,5 @@
+#![feature(const_fn_trait_bound)] // for static fixtures
+
 extern crate mmtk;
 extern crate libc;
 #[macro_use]

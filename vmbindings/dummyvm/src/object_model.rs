@@ -3,9 +3,13 @@ use mmtk::util::metadata::header_metadata::HeaderMetadataSpec;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::*;
 use std::sync::atomic::Ordering;
-use DummyVM;
+use crate::DummyVM;
 
 pub struct VMObjectModel {}
+
+// This is intentionally set to a non-zero value to see if it breaks.
+// Change this if you want to test other values.
+pub const OBJECT_REF_OFFSET: usize = 6;
 
 impl ObjectModel<DummyVM> for VMObjectModel {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
@@ -20,7 +24,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         _mask: Option<usize>,
         _atomic_ordering: Option<Ordering>,
     ) -> usize {
-        unimplemented!()
+        // Do nothing at this moment.
+        0
     }
 
     fn store_metadata(
@@ -30,7 +35,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         _mask: Option<usize>,
         _atomic_ordering: Option<Ordering>,
     ) {
-        unimplemented!()
+        // Do nothing at this moment.
     }
 
     fn compare_exchange_metadata(
@@ -99,8 +104,8 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn object_start_ref(_object: ObjectReference) -> Address {
-        unimplemented!()
+    fn object_start_ref(object: ObjectReference) -> Address {
+        object.to_address().sub(OBJECT_REF_OFFSET)
     }
 
     fn ref_to_address(_object: ObjectReference) -> Address {

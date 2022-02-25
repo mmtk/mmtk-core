@@ -2,7 +2,7 @@ use mmtk::vm::ReferenceGlue;
 use mmtk::util::ObjectReference;
 use mmtk::TraceLocal;
 use mmtk::util::opaque_pointer::*;
-use DummyVM;
+use crate::DummyVM;
 
 pub struct VMReferenceGlue {}
 
