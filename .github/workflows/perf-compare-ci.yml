@@ -1,3 +1,7 @@
+# This workflow is used to run benchmarks to compare a pull request (specified by the input 'pull_request')
+# and the current master. This workflow assumes the pull requests (mmtk-core PRs and the binding PRs are based on
+# their corresponding master). Otherwise the workflow may fail or return unexpected results.
+
 name: Binding Perf Tests
 
 on:
@@ -8,55 +12,96 @@ on:
         required: true
 
 jobs:
+    # Figure out binding PRs.
+    binding-refs:
+      uses: ./.github/workflows/pr-binding-refs.yml
+      with:
+        pull_request: ${{ github.event.inputs.pull_request }}
+
+    # Figure out the core PR. We need to get the specific commit and repo from a pull request number.
+    mmtk-refs:
+      runs-on: ubuntu-18.04
+      outputs:
+        mmtk_repo: ${{ steps.print.outputs.mmtk_repo }}
+        mmtk-ref: ${{ steps.print.outputs.mmtk_ref }}
+      steps:
+        - name: Get mmtk-core repo from pull_request
+          uses: actions/github-script@v6
+          id: core-repo
+          with:
+            result-encoding: string
+            script: |
+              var res = (await github.rest.pulls.get({
+                owner: "mmtk",
+                repo: "mmtk-core",
+                pull_number: ${{ github.event.inputs.pull_request }}
+              }))
+              return res.data.head.repo.full_name
+        - name: Get mmtk-core refs from pull_request
+          uses: actions/github-script@v6
+          id: core-ref
+          with:
+            result-encoding: string
+            script: |
+              var res = (await github.rest.pulls.get({
+                owner: "mmtk",
+                repo: "mmtk-core",
+                pull_number: ${{ github.event.inputs.pull_request }}
+              }))
+              return res.data.head.sha
+        - id: print
+          run: |
+            echo "::set-output name=mmtk_repo::${{ steps.core-repo.outputs.result }}"
+            echo "::set-output name=mmtk_ref::${{ steps.core-ref.outputs.result }}"
+
+    # Run perf compare for JikesRVM
     jikesrvm-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
+        needs: [binding-refs, mmtk-refs]
         steps:
-          - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
-          - name: Check Revisions
-            uses: qinsoon/comment-env-vars@1.1.0
-            with:
-              token: ${{ secrets.GITHUB_TOKEN }}
-              pull_request: ${{ env.PERF_PR }}
-              default_env: 'JIKESRVM_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,JIKESRVM_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
-          # Trunk
+          # Trunk - we always use master from the mmtk org
           # - binding
           - name: Checkout JikesRVM Binding Trunk
             uses: actions/checkout@v2
             with:
               repository: mmtk/mmtk-jikesrvm
-              token: ${{ secrets.GITHUB_TOKEN }}
+              ref: master
               path: mmtk-jikesrvm-trunk
-              submodules: true
-              ref: ${{ env.JIKESRVM_BINDING_TRUNK_REF }}
+          - name: Checkout JikesRVM for Trunk
+            working-directory: mmtk-jikesrvm-trunk
+            run: ./.github/scripts/ci-checkout.sh
           # - core
           - name: Checkout MMTk Core
             uses: actions/checkout@v2
             with:
-              ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+              repository: mmtk/mmtk-core
+              ref: master
               path: mmtk-core-trunk
           # Branch
           # - binding
           - name: Checkout JikesRVM Binding Branch
             uses: actions/checkout@v2
             with:
-              repository: mmtk/mmtk-jikesrvm
-              token: ${{ secrets.GITHUB_TOKEN }}
+              repository: ${{ needs.binding-refs.outputs.jikesrvm_binding_repo }}
+              ref: ${{ needs.binding-refs.outputs.jikesrvm_binding_ref }}
               path: mmtk-jikesrvm-branch
-              submodules: true
-              ref: ${{ env.JIKESRVM_BINDING_BRANCH_REF }}
           # - core
           - name: Checkout MMTk Core
             uses: actions/checkout@v2
             with:
-              ref: ${{ env.MMTK_CORE_BRANCH_REF }}
+              repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
+              ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
               path: mmtk-core-branch
+          - name: Checkout JikesRVM for Branch
+            working-directory: mmtk-jikesrvm-branch
+            run: ./.github/scripts/ci-checkout.sh
           # Checkout perf-kit
           - name: Checkout Perf Kit
             uses: actions/checkout@v2
             with:
               repository: mmtk/ci-perf-kit
-              token: ${{ secrets.GITHUB_TOKEN }}
-              ref: "0.6.5"
+              token: ${{ secrets.CI_ACCESS_TOKEN }}
+              ref: "0.6.6"
               path: ci-perf-kit
               submodules: true
           # setup
@@ -72,7 +117,7 @@ jobs:
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: jikesrvm-perf-compare-comment
                 message: 'Running benchmarks for JikesRVM...'
                 recreate: true
@@ -100,7 +145,7 @@ jobs:
             with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: jikesrvm-perf-compare-comment
                 message: ${{ steps.cat.outputs.text }}
                 append: true
@@ -114,53 +159,51 @@ jobs:
 
     openjdk-perf-compare:
         runs-on: [self-hosted, Linux, freq-scaling-off]
+        needs: [binding-refs, mmtk-refs]
         steps:
-            - run: echo "PERF_PR=${{ github.event.inputs.pull_request }}" >> $GITHUB_ENV
-            - name: Check Revisions
-              uses: qinsoon/comment-env-vars@1.1.0
-              with:
-                token: ${{ secrets.GITHUB_TOKEN }}
-                pull_request: ${{ env.PERF_PR }}
-                default_env: 'OPENJDK_BINDING_TRUNK_REF=master,MMTK_CORE_TRUNK_REF=master,OPENJDK_BINDING_BRANCH_REF=master,MMTK_CORE_BRANCH_REF=${{ github.event.pull_request.head.sha }}'
-            # Trunk
+            # Trunk - we always use master from the mmtk org
             # - binding
             - name: Checkout OpenJDK Binding Trunk
               uses: actions/checkout@v2
               with:
                 repository: mmtk/mmtk-openjdk
-                token: ${{ secrets.GITHUB_TOKEN }}
+                ref: master
                 path: mmtk-openjdk-trunk
-                submodules: true
-                ref: ${{ env.OPENJDK_BINDING_TRUNK_REF }}
+            - name: Checkout OpenJDK for Trunk
+              working-directory: mmtk-openjdk-trunk
+              run: ./.github/scripts/ci-checkout.sh
             # -core
             - name: Checkout MMTk Core
               uses: actions/checkout@v2
               with:
-                ref: ${{ env.MMTK_CORE_TRUNK_REF }}
+                repository: mmtk/mmtk-core
+                ref: master
                 path: mmtk-core-trunk
             # Branch
             # - binding
             - name: Checkout OpenJDK Binding Branch
               uses: actions/checkout@v2
               with:
-                repository: mmtk/mmtk-openjdk
-                token: ${{ secrets.GITHUB_TOKEN }}
+                repository: ${{ needs.binding-refs.outputs.openjdk_binding_repo }}
+                ref: ${{ needs.binding-refs.outputs.openjdk_binding_ref }}
                 path: mmtk-openjdk-branch
-                submodules: true
-                ref: ${{ env.OPENJDK_BINDING_BRANCH_REF }}
+            - name: Checkout OpenJDK for Branch
+              working-directory: mmtk-openjdk-branch
+              run: ./.github/scripts/ci-checkout.sh
             # - core
             - name: Checkout MMTk Core
               uses: actions/checkout@v2
               with:
-                ref: ${{ env.MMTK_CORE_BRANCH_REF }}
+                repository: ${{ needs.mmtk-refs.outputs.mmtk_repo }}
+                ref: ${{ needs.mmtk-refs.outputs.mmtk_ref }}
                 path: mmtk-core-branch
             # checkout perf-kit
             - name: Checkout Perf Kit
               uses: actions/checkout@v2
               with:
                 repository: mmtk/ci-perf-kit
-                token: ${{ secrets.GITHUB_TOKEN }}
-                ref: "0.6.5"
+                token: ${{ secrets.CI_ACCESS_TOKEN }}
+                ref: "0.6.6"
                 path: ci-perf-kit
                 submodules: true
             # setup
@@ -176,7 +219,7 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: openjdk-perf-compare-comment
                 message: 'Running benchmarks for OpenJDK...'
                 recreate: true
@@ -204,7 +247,7 @@ jobs:
               with:
                 github-token: ${{ secrets.CI_ACCESS_TOKEN }}
                 repository: 'mmtk/mmtk-core'
-                number: ${{ env.PERF_PR }}
+                number: ${{ github.event.inputs.pull_request }}
                 id: openjdk-perf-compare-comment
                 message: ${{ steps.cat.outputs.text }}
                 append: true

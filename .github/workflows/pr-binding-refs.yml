@@ -1,0 +1,77 @@
+# This workflow is used to figure out binding pull requests related with
+# the given MMTk core pull request.
+#
+# To make sure that our maintained bindings always work with the latest MMTk core,
+# we may run binding tests for a core PR. By default, we run with the master of
+# each binding repo in our mmtk organisation. However, if the core PR has changes
+# that requires bindings to update, we can no longer run with the master of the binding repos.
+# In such a case, we need to specify the binding PRs so our mmtk-core CI knows how to run the
+# correct version of the bindings for the tests.
+#
+# In the cases that we need to update bindings, we expect the core PR to have a comment like the following
+# to specify the binding pull requests. Note if any of the following values are omitted, the default values
+# will be used (run with the master in mmtk's binding repos).
+# Repo is in the format of user/repo. Ref could be sha or branch name.
+# ```
+# binding-refs
+# OPENJDK_BINDING_REPO=xx/xx
+# OPENJDK_BINDING_REF=xxxxxx
+# JIKESRVM_BINDING_REPO=xx/xx
+# JIKESRVM_BINDING_REF=xxxxxx
+# V8_BINDING_REPO=xx/xx
+# V8_BINDING_REF=xxxxxx
+# ```
+
+name: Fetch Binding PR Info
+
+on:
+  workflow_call:
+    inputs:
+      pull_request:
+        type: string
+        required: true
+    outputs:
+      openjdk_binding_repo:
+        description: "The repository of OpenJDK binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_repo}}
+      openjdk_binding_ref:
+        description: "The git ref of OpenJDK binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.openjdk_binding_ref}}
+      jikesrvm_binding_repo:
+        description: "The repository of JikesRVM binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_repo}}
+      jikesrvm_binding_ref:
+        description: "The git ref of JikesRVM binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.jikesrvm_binding_ref}}
+      v8_binding_repo:
+        description: "The repository of V8 binding, such as {user}/{repo}"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_repo}}
+      v8_binding_ref:
+        description: "The git ref of V8 binding, such as sha and branch name"
+        value: ${{ jobs.binding-refs.outputs.v8_binding_ref}}
+
+jobs:
+  binding-refs:
+    runs-on: ubuntu-18.04
+    outputs:
+        openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
+        openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}
+        jikesrvm_binding_repo: ${{ steps.print.outputs.jikesrvm_binding_repo }}
+        jikesrvm_binding_ref: ${{ steps.print.outputs.jikesrvm_binding_ref }}
+        v8_binding_repo: ${{ steps.print.outputs.v8_binding_repo }}
+        v8_binding_ref: ${{ steps.print.outputs.v8_binding_ref }}
+    steps:
+        - name: Check binding revisions
+          uses: qinsoon/comment-env-vars@1.1.0
+          with:
+            pull_request: ${{ inputs.pull_request }}
+            token: ${{ secrets.GITHUB_TOKEN }}
+            default_env: 'OPENJDK_BINDING_REPO=mmtk/mmtk-openjdk,OPENJDK_BINDING_REF=master,JIKESRVM_BINDING_REPO=mmtk/mmtk-jikesrvm,JIKESRVM_BINDING_REF=master,V8_BINDING_REPO=mmtk/mmtk-v8,V8_BINDING_REF=master'
+        - id: print
+          run: |
+            echo "::set-output name=openjdk_binding_repo::${{ env.OPENJDK_BINDING_REPO }}"
+            echo "::set-output name=openjdk_binding_ref::${{ env.OPENJDK_BINDING_REF }}"
+            echo "::set-output name=jikesrvm_binding_repo::${{ env.JIKESRVM_BINDING_REPO }}"
+            echo "::set-output name=jikesrvm_binding_ref::${{ env.JIKESRVM_BINDING_REF }}"
+            echo "::set-output name=v8_binding_repo::${{ env.V8_BINDING_REPO }}"
+            echo "::set-output name=v8_binding_ref::${{ env.V8_BINDING_REF }}"
