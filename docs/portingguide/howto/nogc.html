@@ -155,7 +155,16 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 <ul>
 <li><code>/mmtk</code> - the MMTk side of the binding. To start, this can be an almost direct copy of the <a href="https://github.com/mmtk/mmtk-core/tree/master/vmbindings/dummyvm">Dummy VM binding</a>.</li>
 <li><code>/vm</code> (rename this to your VM name) - VM-specific code for integrating with MMTk. This should act as a bridge between the generic GC interface offered by the VM and the MMTk side of the binding.</li>
-<li><code>/repos</code> - clone your VM code here. Optionally also clone a copy of mmtk-core if you plan on modifying MMTk itself </li>
+<li>You can place your VM repository at any path. For clarity, we assume you will place the VM repo as a sibling of the binding repo. You can also clone <code>mmtk-core</code> to a local path, and using
+a local repo of <code>mmtk-core</code> will help a lot in your development. So your working directory would look like this (assuming your VM is named as <code>X</code>):
+<pre><code>Your working directory/
+├─ mmtk-X/
+│  ├─ X/
+│  └─ mmtk/
+├─ X/
+└─ mmtk-core/ (optional)
+</code></pre>
+</li>
 <li>You may also find it helpful to take inspiration from the OpenJDK binding, particularly for a more complete example of the relevant <code>Cargo.toml</code> files (note: the use of submodules is no longer recommended): https://github.com/mmtk/mmtk-openjdk </li>
 </ul>
 </li>
@@ -163,7 +172,7 @@ So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
 <ul>
 <li>It may be easier to simply build a static and/or dynamic binary for MMTk and link it to the language directly, manually building new binaries as necessary. 
 <ol>
-<li><code>cd binding_repo/mmtk</code></li>
+<li><code>cd mmtk-X/mmtk</code></li>
 <li><code>cargo build</code> to build in debug mode or add <code>--release</code> for release mode</li>
 <li>Copy the shared or static library from <code>target/debug</code> or <code>target/release</code> to your desired location</li>
 </ol>
