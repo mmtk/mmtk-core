@@ -28,6 +28,7 @@ use crate::util::memory;
 
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
+use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
@@ -103,7 +104,7 @@ define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
-const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
+const DEBUG_SFT: bool = cfg!(debug_assertions) && true;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
@@ -154,8 +155,9 @@ impl SFT for EmptySpaceSFT {
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         panic!(
-            "Call trace_object() on {:x}, which maps to an empty space",
-            _object
+            "Call trace_object() on {} (chunk {}), which maps to an empty space",
+            _object,
+            conversions::chunk_align_down(_object.to_address()),
         )
     }
 }
@@ -189,7 +191,7 @@ impl<'a> SFTMap<'a> {
         let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
-                "Get SFT for {} #{} = {}",
+                "Get SFT for {} #{} = {}", 
                 address,
                 address.chunk_index(),
                 res.name()
@@ -200,10 +202,11 @@ impl<'a> SFTMap<'a> {
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         debug!(
-            "Update SFT for [{}, {}) as {}",
+            "Update SFT for [{}, {}) as {} (thread: {:?})",
             start,
             start + bytes,
-            space.name()
+            space.name(),
+            unsafe {libc::pthread_self()}
         );
         let first = start.chunk_index();
         let last = conversions::chunk_align_up(start + bytes).chunk_index();
@@ -218,19 +221,28 @@ impl<'a> SFTMap<'a> {
     fn trace_sft_map(&self) {
         // For large heaps, it takes long to iterate each chunk. So check log level first.
         if log::log_enabled!(log::Level::Trace) {
-            // print the entire SFT map
-            const SPACE_PER_LINE: usize = 10;
-            for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
-                let max = if i + SPACE_PER_LINE > self.sft.len() {
-                    self.sft.len()
-                } else {
-                    i + SPACE_PER_LINE
-                };
-                let chunks: Vec<usize> = (i..max).collect();
-                let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
-                trace!("Chunk {}: {}", i, space_names.join(","));
-            }
+            trace!("{}", self.print_sft_map());
         }
+    }
+
+    pub(crate) fn print_sft_map(&self) -> String {
+        // print the entire SFT map
+        let mut res = String::new();
+
+        const SPACE_PER_LINE: usize = 10;
+        for i in (0..self.sft.len()).step_by(SPACE_PER_LINE) {
+            let max = if i + SPACE_PER_LINE > self.sft.len() {
+                self.sft.len()
+            } else {
+                i + SPACE_PER_LINE
+            };
+            let chunks: Vec<usize> = (i..max).collect();
+            let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
+            res.push_str(&format!("{}: {}", chunk_index_to_address(i), space_names.join(",")));
+            res.push('\n');
+        }
+
+        res
     }
 
     /// Update SFT map for the given address range.
@@ -253,6 +265,9 @@ impl<'a> SFTMap<'a> {
     // TODO: We should clear a SFT entry when a space releases a chunk.
     #[allow(dead_code)]
     pub fn clear(&self, chunk_start: Address) {
+        if DEBUG_SFT {
+            debug!("Clear SFT for chunk {} (was {})", chunk_start, self.get(chunk_start).name());
+        }
         assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
         let chunk_idx = chunk_start.chunk_index();
         self.set(chunk_idx, &EMPTY_SPACE_SFT);
@@ -261,6 +276,10 @@ impl<'a> SFTMap<'a> {
     // Currently only used by 32 bits vm map
     #[allow(dead_code)]
     pub fn clear_by_index(&self, chunk_idx: usize) {
+        if DEBUG_SFT {
+            let chunk_start = chunk_index_to_address(chunk_idx);
+            debug!("Clear SFT for chunk {} by index (was {})", chunk_start, self.get(chunk_start).name());
+        }
         self.set(chunk_idx, &EMPTY_SPACE_SFT)
     }
 
@@ -317,6 +336,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // initialize_collection() has to be called so we know GC is initialized.
         let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
 
+        // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
+        // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
+        // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
+        // its SFT is properly set.
+        let _lock = self.common().acquire_lock.lock().unwrap();
+
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
@@ -324,16 +349,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Polling ..");
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
-            debug!("Collection required");
+            // debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
-            debug!("Collection not required");
+            // debug!("Collection not required");
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
+                    // debug!("Got new pages for {} in chunk {}, new_chunk? {}", self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
                     // The following code was guarded by a page resource lock in Java MMTk.
                     // I think they are thread safe and we do not need a lock. So they
                     // are no longer guarded by a lock. If we see any issue here, considering
@@ -360,7 +386,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         memory::zero(res.start, bytes);
                     }
 
-                    debug!("Space.acquire(), returned = {}", res.start);
+                    debug_assert!(crate::mmtk::SFT_MAP.get(res.start).name() != "empty", "Newly allocated address {} has its SFT as empty (chunk {} #{}, pthread {})", res.start, conversions::chunk_align_down(res.start), conversions::chunk_align_down(res.start).chunk_index(), unsafe {libc::pthread_self()});
+                    debug_assert_eq!(crate::mmtk::SFT_MAP.get(res.start).name(), self.get_name());
+                    debug_assert!(self.address_in_space(res.start));
+                    debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start), self.common().descriptor);
+
+                    // debug!("Space.acquire(), returned = {}", res.start);
                     res.start
                 }
                 Err(_) => {
@@ -549,6 +580,8 @@ pub struct CommonSpace<VM: VMBinding> {
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
 
+    pub acquire_lock: Mutex<()>,
+
     p: PhantomData<VM>,
 }
 
@@ -589,6 +622,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             needs_log_bit: opt.needs_log_bit,
             metadata: opt.side_metadata_specs,
             p: PhantomData,
+            acquire_lock: Mutex::new(()),
         };
 
         let vmrequest = opt.vmrequest;
@@ -668,6 +702,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 panic!("failed to mmap meta memory");
             }
             SFT_MAP.update(space.as_sft(), self.start, self.extent);
+            info!("Init SFT for {} from {} to {}", self.name, self.start, self.start + self.extent);
         }
     }
 

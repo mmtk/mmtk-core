@@ -196,7 +196,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
     }
 
-    fn is_from_space(&self) -> bool {
+    pub fn is_from_space(&self) -> bool {
         self.from_space.load(Ordering::SeqCst)
     }
 
@@ -231,12 +231,12 @@ impl<VM: VMBinding> CopySpace<VM> {
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
 
         trace!("checking if object is being forwarded");
-        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        let (forwarded, new_object) = if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
             let new_object =
                 object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
-            new_object
+            (true, new_object)
         } else {
             trace!("... no it isn't. Copying");
             let new_object = object_forwarding::forward_object::<VM>(
@@ -247,8 +247,10 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
-            new_object
-        }
+            (false, new_object)
+        };
+        debug_assert!(crate::mmtk::SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (forwarded? {}) has empty SFT", new_object, forwarded);
+        new_object
     }
 
     #[allow(dead_code)] // Only used with certain features (such as sanity)

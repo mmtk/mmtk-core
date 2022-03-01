@@ -1,6 +1,5 @@
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
-use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
 
@@ -47,13 +46,13 @@ pub trait Map: Sized {
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
-    fn get_chunk_index(&self, address: Address) -> usize {
-        address >> LOG_BYTES_IN_CHUNK
-    }
+    // fn get_chunk_index(&self, address: Address) -> usize {
+    //     address >> LOG_BYTES_IN_CHUNK
+    // }
 
-    fn address_for_chunk_index(&self, chunk: usize) -> Address {
-        unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
-    }
+    // fn address_for_chunk_index(&self, chunk: usize) -> Address {
+    //     unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
+    // }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);
 }

@@ -501,11 +501,33 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
             return object;
         }
 
+        // assert object in space
+        if crate::mmtk::SFT_MAP.get(object.to_address()).name() == "empty" {
+            let ss = self.mmtk.plan.downcast_ref::<crate::plan::semispace::SemiSpace<VM>>().unwrap();
+            info!("Object {} has SFT as empty, but it is in", object);
+            info!("copyspace0? {} (fromspace? {}, descriptor: {:?})", ss.copyspace0.in_space(object), ss.copyspace0.is_from_space(), ss.copyspace0.common().descriptor);
+            info!("copyspace1? {} (fromspace? {}, descriptor: {:?})", ss.copyspace1.in_space(object), ss.copyspace1.is_from_space(), ss.copyspace1.common().descriptor);
+            info!("immortal? {}", ss.common.immortal.in_space(object));
+            info!("los? {}", ss.common.los.in_space(object));
+            #[cfg(feature = "code_space")]
+            {
+                info!("code? {}", ss.common.base.code_space.in_space(object));
+                info!("lg code? {}", ss.common.base.code_lo_space.in_space(object));
+            }
+            #[cfg(feature = "vm_space")]
+            {
+                info!("vm space? {}", ss.common.base.vm_space.in_space(object))
+            }
+            info!("vm map for copyspace0");
+            ss.copyspace0.print_vm_map();
+            info!("vm map for copyspace1");
+            ss.copyspace1.print_vm_map();
+        }
+
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
         let trace = SFTProcessEdgesMutRef::new(self);
 
-        // Invoke trace object on sft
         let sft = crate::mmtk::SFT_MAP.get(object.to_address());
         sft.sft_trace_object(trace, object, worker)
     }
@@ -585,5 +607,14 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         } else {
             // Do nothing
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn print_alignment() {
+        let addr = unsafe { crate::util::Address::from_usize(0x68528390) };
+        println!("{}", crate::util::conversions::chunk_align_down(addr));
     }
 }
