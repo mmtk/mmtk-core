@@ -1,5 +1,7 @@
 fn mmtk_panic() {
     use crate::mmtk::SFT_MAP;
+    use crate::mmtk::VM_MAP;
+    use crate::util::heap::layout::map::Map;
 
     println!("===== Internal Error in MMTk =====");
     println!("Something went wrong with MMTk.");
@@ -7,6 +9,9 @@ fn mmtk_panic() {
 
     println!("Dumping space function table (SFT)...");
     println!("{}", SFT_MAP.print_sft_map());
+
+    println!("Dumping VM map...");
+    println!("{}", VM_MAP.dump());
 }
 
 pub(crate) fn set_mmtk_panic_hook() {

@@ -60,6 +60,7 @@ impl Map for Map32 {
                 self.descriptor_map[index].is_empty(),
                 "Conflicting virtual address request"
             );
+            debug!("Set descriptor {:?} for Chunk {}", descriptor, conversions::chunk_index_to_address(index));
             self_mut.descriptor_map[index] = descriptor;
             //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
             e += BYTES_IN_CHUNK;
@@ -129,6 +130,7 @@ impl Map for Map32 {
     }
 
     fn free_all_chunks(&self, any_chunk: Address) {
+        debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
@@ -146,6 +148,7 @@ impl Map for Map32 {
     }
 
     fn free_contiguous_chunks(&self, start: Address) -> usize {
+        debug!("free_contiguous_chunks: {}", start);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
         let chunk = (start).chunk_index();
@@ -235,6 +238,26 @@ impl Map for Map32 {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
     }
+
+    fn dump(&self) -> String {
+        let mut ret = String::new();
+        let mut i = 0;
+        const PER_LINE: usize = 10;
+        while i < self.descriptor_map.len() {
+            let this_len = if self.descriptor_map.len() > i + PER_LINE {
+                PER_LINE
+            } else {
+                self.descriptor_map.len() - i
+            };
+            ret.push_str(&format!("Chunk {} - {}: ", conversions::chunk_index_to_address(i), conversions::chunk_index_to_address(i + this_len)));
+            for j in 0..this_len {
+                ret.push_str(&format!("{:?},", self.descriptor_map[i + j]))
+            }
+            ret.push('\n');
+            i += PER_LINE;
+        }
+        ret
+    }
 }
 
 impl Map32 {
@@ -268,8 +291,10 @@ impl Map32 {
         self.prev_link[chunk as usize] = 0;
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
-            self.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
-            SFT_MAP.clear_by_index((chunk + offset) as usize);
+            let index = (chunk + offset) as usize;
+            debug!("Clear descriptor for Chunk {}", conversions::chunk_index_to_address(index));
+            self.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
+            SFT_MAP.clear_by_index(index);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }
         chunks as _

@@ -231,7 +231,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
 
         trace!("checking if object is being forwarded");
-        let (forwarded, new_object) = if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        let (wait_for_forward, new_object) = if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
             let new_object =
                 object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
@@ -249,7 +249,7 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("Copied [{:?} -> {:?}]", object, new_object);
             (false, new_object)
         };
-        debug_assert!(crate::mmtk::SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (forwarded? {}) has empty SFT", new_object, forwarded);
+        debug_assert!(crate::mmtk::SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (original? {}. wait for forward? {}) has empty SFT", new_object, object, wait_for_forward);
         new_object
     }
 

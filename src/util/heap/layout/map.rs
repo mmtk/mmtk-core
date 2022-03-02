@@ -55,4 +55,8 @@ pub trait Map: Sized {
     // }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);
+
+    fn dump(&self) -> String {
+        unimplemented!()
+    }
 }

@@ -496,10 +496,14 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::space::*;
+        // use crate::vm::VMBinding;
+        // use crate::vm::ObjectModel;
 
         if object.is_null() {
             return object;
         }
+
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
 
         // assert object in space
         if crate::mmtk::SFT_MAP.get(object.to_address()).name() == "empty" {
@@ -528,7 +532,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         let worker = GCWorkerMutRef::new(self.worker());
         let trace = SFTProcessEdgesMutRef::new(self);
 
-        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        let sft = crate::mmtk::SFT_MAP.get(VM::VMObjectModel::object_start_ref(object));
         sft.sft_trace_object(trace, object, worker)
     }
 }

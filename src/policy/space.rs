@@ -123,6 +123,7 @@ impl SFT for EmptySpaceSFT {
     }
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
+        warn!("Object in empty space!");
         false
     }
     fn is_movable(&self) -> bool {
@@ -202,9 +203,8 @@ impl<'a> SFTMap<'a> {
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         debug!(
-            "Update SFT for [{}, {}) as {} (thread: {:?})",
+            "Update SFT for Chunk {} as {} (thread: {:?})",
             start,
-            start + bytes,
             space.name(),
             unsafe {libc::pthread_self()}
         );
@@ -213,8 +213,8 @@ impl<'a> SFTMap<'a> {
         let start_chunk = chunk_index_to_address(first);
         let end_chunk = chunk_index_to_address(last);
         debug!(
-            "Update SFT for {} bytes of [{} #{}, {} #{})",
-            bytes, start_chunk, first, end_chunk, last
+            "Update SFT for {} bytes of Chunk {} #{}",
+            bytes, start_chunk, first
         );
     }
 
@@ -309,6 +309,7 @@ impl<'a> SFTMap<'a> {
             );
         }
         self_mut.sft[chunk] = sft;
+        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -359,7 +360,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    // debug!("Got new pages for {} in chunk {}, new_chunk? {}", self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
+                    debug!("Got new pages {} for {} in chunk {}, new_chunk? {}", res.start, self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
                     // The following code was guarded by a page resource lock in Java MMTk.
                     // I think they are thread safe and we do not need a lock. So they
                     // are no longer guarded by a lock. If we see any issue here, considering
