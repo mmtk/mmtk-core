@@ -526,13 +526,34 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
             ss.copyspace0.print_vm_map();
             info!("vm map for copyspace1");
             ss.copyspace1.print_vm_map();
+
+            let start = VM::VMObjectModel::object_start_ref(object);
+            info!("Object start address {}: SFT? {}", start, crate::mmtk::SFT_MAP.get(start).name());
+            info!("copyspace0? {}", ss.copyspace0.address_in_space(start));
+            info!("copyspace1? {}", ss.copyspace1.address_in_space(start));
+        }
+
+
+        if crate::mmtk::SFT_MAP.get(object.to_address()).name() != crate::mmtk::SFT_MAP.get(VM::VMObjectModel::object_start_ref(object)).name() {
+            let ss = self.mmtk.plan.downcast_ref::<crate::plan::semispace::SemiSpace<VM>>().unwrap();
+            let start = VM::VMObjectModel::object_start_ref(object);
+            info!("Object start {} (Chunk {}) and Object {} (Chunk {}) are mapped to different spaces: {}, {}", start, conversions::chunk_align_down(start), object, conversions::chunk_align_down(object.to_address()), crate::mmtk::SFT_MAP.get(start).name(), crate::mmtk::SFT_MAP.get(object.to_address()).name());
+
+            info!("start:");
+            info!("copyspace0? {}", ss.copyspace0.address_in_space(start));
+            info!("copyspace1? {}", ss.copyspace1.address_in_space(start));
+            info!("object:");
+            info!("copyspace0? {} (fromspace? {}, descriptor: {:?})", ss.copyspace0.in_space(object), ss.copyspace0.is_from_space(), ss.copyspace0.common().descriptor);
+            info!("copyspace1? {} (fromspace? {}, descriptor: {:?})", ss.copyspace1.in_space(object), ss.copyspace1.is_from_space(), ss.copyspace1.common().descriptor);
+
+            panic!()
         }
 
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
         let trace = SFTProcessEdgesMutRef::new(self);
 
-        let sft = crate::mmtk::SFT_MAP.get(VM::VMObjectModel::object_start_ref(object));
+        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
         sft.sft_trace_object(trace, object, worker)
     }
 }

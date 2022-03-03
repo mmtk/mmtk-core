@@ -249,7 +249,22 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("Copied [{:?} -> {:?}]", object, new_object);
             (false, new_object)
         };
-        debug_assert!(crate::mmtk::SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (original? {}. wait for forward? {}) has empty SFT", new_object, object, wait_for_forward);
+        {
+            use crate::mmtk::SFT_MAP;
+            use crate::util::conversions;
+            let new_obj_start = VM::VMObjectModel::object_start_ref(new_object);
+
+            debug_assert!(SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (original? {}. wait for forward? {}) has empty SFT", new_object, object, wait_for_forward);
+
+            if SFT_MAP.get(new_object.to_address()).name() != SFT_MAP.get(new_obj_start).name() {
+                warn!("Object after copying {} has incorrect SFT entries.", new_object);
+                warn!("Object start {} (chunk {}), SFT = {}", new_obj_start, conversions::chunk_align_down(new_obj_start), SFT_MAP.get(new_obj_start).name());
+                warn!("Object {} (chunk {}), SFT = {}", new_object, conversions::chunk_align_down(new_object.to_address()), SFT_MAP.get(new_object.to_address()).name());
+                warn!("Object is forwarded here? {}", !wait_for_forward);
+                panic!()
+            }
+        }
+
         new_object
     }
 

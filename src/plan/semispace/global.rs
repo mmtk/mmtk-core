@@ -89,6 +89,11 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         let hi = self.hi.load(Ordering::SeqCst);
         self.copyspace0.prepare(hi);
         self.copyspace1.prepare(!hi);
+        if hi {
+            info!("Copy from copyspace0 to copyspace1");
+        } else {
+            info!("Copy from copyspace1 to copyspace0");
+        }
         self.fromspace_mut()
             .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
         self.tospace_mut().set_copy_for_sft_trace(None);

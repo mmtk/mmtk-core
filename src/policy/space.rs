@@ -360,7 +360,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    debug!("Got new pages {} for {} in chunk {}, new_chunk? {}", res.start, self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
+                    debug!("Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}", res.start, res.pages, self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
                     // The following code was guarded by a page resource lock in Java MMTk.
                     // I think they are thread safe and we do not need a lock. So they
                     // are no longer guarded by a lock. If we see any issue here, considering
@@ -391,6 +391,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     debug_assert_eq!(crate::mmtk::SFT_MAP.get(res.start).name(), self.get_name());
                     debug_assert!(self.address_in_space(res.start));
                     debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start), self.common().descriptor);
+                    debug_assert_eq!(crate::mmtk::SFT_MAP.get(res.start + bytes - 1).name(), self.get_name());
+                    debug_assert!(self.address_in_space(res.start + bytes - 1));
+                    debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start + bytes - 1), self.common().descriptor);
 
                     // debug!("Space.acquire(), returned = {}", res.start);
                     res.start
@@ -446,6 +449,15 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         //     (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
         //     "should only grow space for new chunks at chunk-aligned start address"
         // );
+        if SFT_MAP.get(start).name() == "empty" || SFT_MAP.get(start + bytes - 1).name() == "empty" {
+            if !new_chunk {
+                warn!("In grow_space(start = {}, bytes = {}, new_chunk = {}), we will have empty SFT entries", start, bytes, new_chunk);
+                warn!("chunk for {} = {}", start, SFT_MAP.get(start).name());
+                warn!("chunk for {} = {}", start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
+
+                panic!();
+            }
+        }
         if new_chunk {
             SFT_MAP.update(self.as_sft(), start, bytes);
         }
