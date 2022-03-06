@@ -109,7 +109,7 @@ const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 #[derive(Debug)]
 struct EmptySpaceSFT {}
 
-pub(crate) const EMPTY_SFT_NAME: &str = "empty";
+const EMPTY_SFT_NAME: &str = "empty";
 
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
@@ -202,11 +202,7 @@ impl<'a> SFTMap<'a> {
     }
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
-        debug!(
-            "Update SFT for Chunk {} as {}",
-            start,
-            space.name(),
-        );
+        debug!("Update SFT for Chunk {} as {}", start, space.name(),);
         let first = start.chunk_index();
         let start_chunk = chunk_index_to_address(first);
         debug!(
@@ -235,7 +231,11 @@ impl<'a> SFTMap<'a> {
             };
             let chunks: Vec<usize> = (i..max).collect();
             let space_names: Vec<&str> = chunks.iter().map(|&x| self.sft[x].name()).collect();
-            res.push_str(&format!("{}: {}", chunk_index_to_address(i), space_names.join(",")));
+            res.push_str(&format!(
+                "{}: {}",
+                chunk_index_to_address(i),
+                space_names.join(",")
+            ));
             res.push('\n');
         }
 
@@ -263,7 +263,11 @@ impl<'a> SFTMap<'a> {
     #[allow(dead_code)]
     pub fn clear(&self, chunk_start: Address) {
         if DEBUG_SFT {
-            debug!("Clear SFT for chunk {} (was {})", chunk_start, self.get(chunk_start).name());
+            debug!(
+                "Clear SFT for chunk {} (was {})",
+                chunk_start,
+                self.get(chunk_start).name()
+            );
         }
         assert!(chunk_start.is_aligned_to(BYTES_IN_CHUNK));
         let chunk_idx = chunk_start.chunk_index();
@@ -275,7 +279,11 @@ impl<'a> SFTMap<'a> {
     pub fn clear_by_index(&self, chunk_idx: usize) {
         if DEBUG_SFT {
             let chunk_start = chunk_index_to_address(chunk_idx);
-            debug!("Clear SFT for chunk {} by index (was {})", chunk_start, self.get(chunk_start).name());
+            debug!(
+                "Clear SFT for chunk {} by index (was {})",
+                chunk_start,
+                self.get(chunk_start).name()
+            );
         }
         self.set(chunk_idx, &EMPTY_SPACE_SFT)
     }
@@ -321,8 +329,19 @@ impl<'a> SFTMap<'a> {
         let object_sft = self.get(object.to_address());
         let object_start_sft = self.get(VM::VMObjectModel::object_start_ref(object));
 
-        debug_assert!(object_sft.name() != EMPTY_SFT_NAME, "Object {} has empty SFT", object);
-        debug_assert_eq!(object_sft.name(), object_start_sft.name(), "Object {} has incorrect SFT entries (object start = {}, object = {}).", object, object_start_sft.name(), object_sft.name());
+        debug_assert!(
+            object_sft.name() != EMPTY_SFT_NAME,
+            "Object {} has empty SFT",
+            object
+        );
+        debug_assert_eq!(
+            object_sft.name(),
+            object_start_sft.name(),
+            "Object {} has incorrect SFT entries (object start = {}, object = {}).",
+            object,
+            object_start_sft.name(),
+            object_sft.name()
+        );
     }
 }
 
@@ -366,7 +385,14 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
-                    debug!("Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}", res.start, res.pages, self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
+                    debug!(
+                        "Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}",
+                        res.start,
+                        res.pages,
+                        self.get_name(),
+                        conversions::chunk_align_down(res.start),
+                        res.new_chunk
+                    );
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
                     // Mmap the pages and the side metadata, and handle error. In case of any error,
@@ -393,13 +419,21 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     {
                         // --- Assert the cell address ---
                         // The cell address should have a valid SFT.
-                        debug_assert!(SFT_MAP.get(res.start).name() != EMPTY_SFT_NAME, "Newly allocated address {} has its SFT as empty (chunk {})", res.start, conversions::chunk_align_down(res.start));
+                        debug_assert!(
+                            SFT_MAP.get(res.start).name() != EMPTY_SFT_NAME,
+                            "Newly allocated address {} has its SFT as empty (chunk {})",
+                            res.start,
+                            conversions::chunk_align_down(res.start)
+                        );
                         // The SFT should be correct.
                         debug_assert_eq!(SFT_MAP.get(res.start).name(), self.get_name());
                         // The cell address is in our space.
                         debug_assert!(self.address_in_space(res.start));
                         // The descriptor should be correct.
-                        debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start), self.common().descriptor);
+                        debug_assert_eq!(
+                            self.common().vm_map().get_descriptor_for_address(res.start),
+                            self.common().descriptor
+                        );
 
                         // --- Assert the last byte in the allocated region ---
                         let last_byte = res.start + bytes - 1;
@@ -408,7 +442,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         // The last byte in the allocated memory should be in this space.
                         debug_assert!(self.address_in_space(last_byte));
                         // The descriptor for the last byte should be correct.
-                        debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(last_byte), self.common().descriptor);
+                        debug_assert_eq!(
+                            self.common().vm_map().get_descriptor_for_address(last_byte),
+                            self.common().descriptor
+                        );
                     }
 
                     debug!("Space.acquire(), returned = {}", res.start);

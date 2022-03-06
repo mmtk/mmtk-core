@@ -60,7 +60,11 @@ impl Map for Map32 {
                 self.descriptor_map[index].is_empty(),
                 "Conflicting virtual address request"
             );
-            debug!("Set descriptor {:?} for Chunk {}", descriptor, conversions::chunk_index_to_address(index));
+            debug!(
+                "Set descriptor {:?} for Chunk {}",
+                descriptor,
+                conversions::chunk_index_to_address(index)
+            );
             self_mut.descriptor_map[index] = descriptor;
             //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
             e += BYTES_IN_CHUNK;
@@ -272,7 +276,10 @@ impl Map32 {
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
             let index = (chunk + offset) as usize;
-            debug!("Clear descriptor for Chunk {}", conversions::chunk_index_to_address(index));
+            debug!(
+                "Clear descriptor for Chunk {}",
+                conversions::chunk_index_to_address(index)
+            );
             self.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
             SFT_MAP.clear_by_index(index);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);

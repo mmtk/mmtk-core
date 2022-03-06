@@ -103,7 +103,9 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         // For stress test, limit is [0, block_size) to artificially make the
         // check in the fastpath (alloc()) fail. The real limit is recovered by
         // adding it to the current cursor.
-        if new_cursor > self.cursor + self.limit.as_usize() || object_ref_may_cross_chunk::<VM>(new_cursor) {
+        if new_cursor > self.cursor + self.limit.as_usize()
+            || object_ref_may_cross_chunk::<VM>(new_cursor)
+        {
             self.acquire_block(size, align, offset, true)
         } else {
             fill_alignment_gap::<VM>(self.cursor, result);

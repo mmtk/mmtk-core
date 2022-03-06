@@ -127,8 +127,8 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
 /// have object reference pointing outside the alocated memory), this method has no overhead.
 #[inline(always)]
 pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
-    use crate::vm::ObjectModel;
     use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK};
+    use crate::vm::ObjectModel;
 
     if VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET == 0 {
         return false;
