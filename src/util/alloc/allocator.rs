@@ -113,6 +113,18 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
     }
 }
 
+/// Check if the object reference for this allocation may cross and fall into the next chunk.
+/// In our allocation, we guarantee that the metadata for the address (range) we allocate is
+/// properly initialized. However, it is possible that for some VMs, the object reference they
+/// define points to the end of an allocated region, which means the metadata for the object
+/// reference may not be initialized.
+/// We map our metadata (including side metadata and SFT) by chunks. So as long as the object
+/// reference is in the same chunk as the allocated cell address, we should be fine. This method
+/// checks if the object reference for an address may fall into the next chunk. If that happens,
+/// the allocation should not allocate the last few bytes in the chunk, and simply go to slowpath.
+/// Note that this method is used in the allocation fastpath. So it is _performance critical_.
+/// We expect if `ObjectModel::MAXIMUM_OBJECT_REF_OFFSET` is 0 (which means the binding will not
+/// have object reference pointing outside the alocated memory), this method has no overhead.
 #[inline(always)]
 pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
     use crate::vm::ObjectModel;

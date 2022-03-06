@@ -104,12 +104,12 @@ define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
-const DEBUG_SFT: bool = cfg!(debug_assertions) && true;
+const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
 #[derive(Debug)]
 struct EmptySpaceSFT {}
 
-const EMPTY_SFT_NAME: &str = "empty";
+pub(crate) const EMPTY_SFT_NAME: &str = "empty";
 
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {
@@ -192,7 +192,7 @@ impl<'a> SFTMap<'a> {
         let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
         if DEBUG_SFT {
             trace!(
-                "Get SFT for {} #{} = {}", 
+                "Get SFT for {} #{} = {}",
                 address,
                 address.chunk_index(),
                 res.name()
@@ -203,15 +203,12 @@ impl<'a> SFTMap<'a> {
 
     fn log_update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
         debug!(
-            "Update SFT for Chunk {} as {} (thread: {:?})",
+            "Update SFT for Chunk {} as {}",
             start,
             space.name(),
-            unsafe {libc::pthread_self()}
         );
         let first = start.chunk_index();
-        let last = conversions::chunk_align_up(start + bytes).chunk_index();
         let start_chunk = chunk_index_to_address(first);
-        let end_chunk = chunk_index_to_address(last);
         debug!(
             "Update SFT for {} bytes of Chunk {} #{}",
             bytes, start_chunk, first
@@ -225,7 +222,7 @@ impl<'a> SFTMap<'a> {
         }
     }
 
-    pub(crate) fn print_sft_map(&self) -> String {
+    fn print_sft_map(&self) -> String {
         // print the entire SFT map
         let mut res = String::new();
 
@@ -309,7 +306,6 @@ impl<'a> SFTMap<'a> {
             );
         }
         self_mut.sft[chunk] = sft;
-        std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn is_in_space(&self, object: ObjectReference) -> bool {
@@ -317,6 +313,16 @@ impl<'a> SFTMap<'a> {
             return false;
         }
         self.get(object.to_address()).is_mmtk_object(object)
+    }
+
+    /// Make sure we have valid SFT entries for the object reference.
+    #[cfg(debug_assertions)]
+    pub fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
+        let object_sft = self.get(object.to_address());
+        let object_start_sft = self.get(VM::VMObjectModel::object_start_ref(object));
+
+        debug_assert!(object_sft.name() != EMPTY_SFT_NAME, "Object {} has empty SFT", object);
+        debug_assert_eq!(object_sft.name(), object_start_sft.name(), "Object {} has incorrect SFT entries (object start = {}, object = {}).", object, object_start_sft.name(), object_sft.name());
     }
 }
 
@@ -350,21 +356,17 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Polling ..");
 
         if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
-            // debug!("Collection required");
+            debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
-            // debug!("Collection not required");
+            debug!("Collection not required");
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
                     debug!("Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}", res.start, res.pages, self.get_name(), conversions::chunk_align_down(res.start), res.new_chunk);
-                    // The following code was guarded by a page resource lock in Java MMTk.
-                    // I think they are thread safe and we do not need a lock. So they
-                    // are no longer guarded by a lock. If we see any issue here, considering
-                    // adding a space lock here.
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
                     // Mmap the pages and the side metadata, and handle error. In case of any error,
@@ -387,15 +389,29 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         memory::zero(res.start, bytes);
                     }
 
-                    debug_assert!(crate::mmtk::SFT_MAP.get(res.start).name() != "empty", "Newly allocated address {} has its SFT as empty (chunk {} #{}, pthread {})", res.start, conversions::chunk_align_down(res.start), conversions::chunk_align_down(res.start).chunk_index(), unsafe {libc::pthread_self()});
-                    debug_assert_eq!(crate::mmtk::SFT_MAP.get(res.start).name(), self.get_name());
-                    debug_assert!(self.address_in_space(res.start));
-                    debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start), self.common().descriptor);
-                    debug_assert_eq!(crate::mmtk::SFT_MAP.get(res.start + bytes - 1).name(), self.get_name());
-                    debug_assert!(self.address_in_space(res.start + bytes - 1));
-                    debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start + bytes - 1), self.common().descriptor);
+                    // Some assertions
+                    {
+                        // --- Assert the cell address ---
+                        // The cell address should have a valid SFT.
+                        debug_assert!(SFT_MAP.get(res.start).name() != EMPTY_SFT_NAME, "Newly allocated address {} has its SFT as empty (chunk {})", res.start, conversions::chunk_align_down(res.start));
+                        // The SFT should be correct.
+                        debug_assert_eq!(SFT_MAP.get(res.start).name(), self.get_name());
+                        // The cell address is in our space.
+                        debug_assert!(self.address_in_space(res.start));
+                        // The descriptor should be correct.
+                        debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(res.start), self.common().descriptor);
 
-                    // debug!("Space.acquire(), returned = {}", res.start);
+                        // --- Assert the last byte in the allocated region ---
+                        let last_byte = res.start + bytes - 1;
+                        // The SFT for the last byte in the allocated memory should be correct.
+                        debug_assert_eq!(SFT_MAP.get(last_byte).name(), self.get_name());
+                        // The last byte in the allocated memory should be in this space.
+                        debug_assert!(self.address_in_space(last_byte));
+                        // The descriptor for the last byte should be correct.
+                        debug_assert_eq!(self.common().vm_map().get_descriptor_for_address(last_byte), self.common().descriptor);
+                    }
+
+                    debug!("Space.acquire(), returned = {}", res.start);
                     res.start
                 }
                 Err(_) => {
@@ -444,20 +460,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             bytes,
             new_chunk
         );
-        // FIXME: This assertion is too strict. See https://github.com/mmtk/mmtk-core/issues/374
-        // debug_assert!(
-        //     (new_chunk && start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,
-        //     "should only grow space for new chunks at chunk-aligned start address"
-        // );
-        if SFT_MAP.get(start).name() == "empty" || SFT_MAP.get(start + bytes - 1).name() == "empty" {
-            if !new_chunk {
-                warn!("In grow_space(start = {}, bytes = {}, new_chunk = {}), we will have empty SFT entries", start, bytes, new_chunk);
-                warn!("chunk for {} = {}", start, SFT_MAP.get(start).name());
-                warn!("chunk for {} = {}", start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
-
-                panic!();
-            }
+        // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
+        #[cfg(debug_assertions)]
+        if !new_chunk {
+            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME && SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we will have empty SFT entries (chunk for {} = {}, chunk for {} = {}", start, bytes, new_chunk, start, SFT_MAP.get(start).name(), start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
         }
+
         if new_chunk {
             SFT_MAP.update(self.as_sft(), start, bytes);
         }
@@ -593,6 +601,7 @@ pub struct CommonSpace<VM: VMBinding> {
     // TODO: This should be a constant for performance.
     pub needs_log_bit: bool,
 
+    /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
 
     p: PhantomData<VM>,
@@ -715,7 +724,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 panic!("failed to mmap meta memory");
             }
             SFT_MAP.update(space.as_sft(), self.start, self.extent);
-            info!("Init SFT for {} from {} to {}", self.name, self.start, self.start + self.extent);
         }
     }
 

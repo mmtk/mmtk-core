@@ -46,17 +46,5 @@ pub trait Map: Sized {
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
-    // fn get_chunk_index(&self, address: Address) -> usize {
-    //     address >> LOG_BYTES_IN_CHUNK
-    // }
-
-    // fn address_for_chunk_index(&self, chunk: usize) -> Address {
-    //     unsafe { Address::from_usize(chunk << LOG_BYTES_IN_CHUNK) }
-    // }
-
     fn add_to_cumulative_committed_pages(&self, pages: usize);
-
-    fn dump(&self) -> String {
-        unimplemented!()
-    }
 }

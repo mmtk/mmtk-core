@@ -101,8 +101,8 @@ impl Map for Map32 {
         if head.is_zero() {
             debug_assert!(self.next_link[chunk as usize] == 0);
         } else {
-            self_mut.next_link[chunk as usize] = (head).chunk_index() as _;
-            self_mut.prev_link[(head).chunk_index()] = chunk;
+            self_mut.next_link[chunk as usize] = head.chunk_index() as _;
+            self_mut.prev_link[head.chunk_index()] = chunk;
         }
         debug_assert!(self.prev_link[chunk as usize] == 0);
         rtn
@@ -110,7 +110,7 @@ impl Map for Map32 {
 
     fn get_next_contiguous_region(&self, start: Address) -> Address {
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = (start).chunk_index();
+        let chunk = start.chunk_index();
         if chunk == 0 || self.next_link[chunk] == 0 {
             unsafe { Address::zero() }
         } else {
@@ -121,7 +121,7 @@ impl Map for Map32 {
 
     fn get_contiguous_region_chunks(&self, start: Address) -> usize {
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = (start).chunk_index();
+        let chunk = start.chunk_index();
         self.region_map.size(chunk as i32) as _
     }
 
@@ -134,7 +134,7 @@ impl Map for Map32 {
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
-            let chunk = (any_chunk).chunk_index();
+            let chunk = any_chunk.chunk_index();
             while self_mut.next_link[chunk] != 0 {
                 let x = self_mut.next_link[chunk];
                 self_mut.free_contiguous_chunks_no_lock(x);
@@ -151,7 +151,7 @@ impl Map for Map32 {
         debug!("free_contiguous_chunks: {}", start);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = (start).chunk_index();
+        let chunk = start.chunk_index();
         self_mut.free_contiguous_chunks_no_lock(chunk as _)
     }
 
@@ -161,8 +161,8 @@ impl Map for Map32 {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
-        let first_chunk = (start_address).chunk_index();
-        let last_chunk = (to).chunk_index();
+        let first_chunk = start_address.chunk_index();
+        let last_chunk = to.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
         let trailing_chunks = MAX_CHUNKS - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
@@ -230,33 +230,13 @@ impl Map for Map32 {
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = (address).chunk_index();
+        let index = address.chunk_index();
         self.descriptor_map[index]
     }
 
     fn add_to_cumulative_committed_pages(&self, pages: usize) {
         self.cumulative_committed_pages
             .fetch_add(pages, Ordering::Relaxed);
-    }
-
-    fn dump(&self) -> String {
-        let mut ret = String::new();
-        let mut i = 0;
-        const PER_LINE: usize = 10;
-        while i < self.descriptor_map.len() {
-            let this_len = if self.descriptor_map.len() > i + PER_LINE {
-                PER_LINE
-            } else {
-                self.descriptor_map.len() - i
-            };
-            ret.push_str(&format!("Chunk {} - {}: ", conversions::chunk_index_to_address(i), conversions::chunk_index_to_address(i + this_len)));
-            for j in 0..this_len {
-                ret.push_str(&format!("{:?},", self.descriptor_map[i + j]))
-            }
-            ret.push('\n');
-            i += PER_LINE;
-        }
-        ret
     }
 }
 

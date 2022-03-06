@@ -248,11 +248,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `reference`: The object to be queried.
     fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
 
-    /// If ObjectReference is a positive offset from the cell address returned from an allocation,
-    /// this constant defines the maximum possible offset. If, for the binding, ObjectReference
-    /// is the same or is a negative offset from cell, this constant can be left as 0.
-    /// MMTk uses this value to make sure that the cell address and the object reference are in the
-    /// same chunk.
+    /// The maximum offset from an allocation cell address to the object reference for the address.
+    /// The value is defaulted to 0, which is suitable for most bindings.
+    /// A VM binding should ONLY change this value if their object reference may point to (or past)
+    /// the end of allocated memory region. For example, an allocation of 12 bytes
+    /// returns `addr`, and the object reference equals to or is larger than `addr + 12`. If that is the case for a binding,
+    /// they need to override this value to the maximum possible offset. Say if their object references
+    /// could be 12 bytes or 16 bytes offset from the cell address, the value should be the maximum, which is 16.
+    /// Note that this value is used in the allocation fastpath, and any non-zero value will introduce small overheads.
+    /// If a binding implements allocation fastpath, they also need to implement the check [`object_ref_may_cross_chunk()`](crate::util::alloc::allocator::object_ref_may_cross_chunk).
     const MAXIMUM_OBJECT_REF_OFFSET: usize = 0;
 
     /// Return the lowest address of the storage associated with an object.

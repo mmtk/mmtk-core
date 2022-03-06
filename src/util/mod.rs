@@ -51,7 +51,6 @@ pub mod metadata;
 pub(crate) mod object_forwarding;
 /// MMTk command line options.
 pub(crate) mod options;
-pub(crate) mod panic;
 /// Utilities funcitons for Rust
 pub(crate) mod rust_util;
 /// Sanity checker for GC.

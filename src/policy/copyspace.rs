@@ -196,7 +196,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         }
     }
 
-    pub fn is_from_space(&self) -> bool {
+    fn is_from_space(&self) -> bool {
         self.from_space.load(Ordering::SeqCst)
     }
 
@@ -231,12 +231,12 @@ impl<VM: VMBinding> CopySpace<VM> {
         let forwarding_status = object_forwarding::attempt_to_forward::<VM>(object);
 
         trace!("checking if object is being forwarded");
-        let (wait_for_forward, new_object) = if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
+        if object_forwarding::state_is_forwarded_or_being_forwarded(forwarding_status) {
             trace!("... yes it is");
             let new_object =
                 object_forwarding::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             trace!("Returning");
-            (true, new_object)
+            new_object
         } else {
             trace!("... no it isn't. Copying");
             let new_object = object_forwarding::forward_object::<VM>(
@@ -247,25 +247,8 @@ impl<VM: VMBinding> CopySpace<VM> {
             trace!("Forwarding pointer");
             trace.process_node(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
-            (false, new_object)
-        };
-        {
-            use crate::mmtk::SFT_MAP;
-            use crate::util::conversions;
-            let new_obj_start = VM::VMObjectModel::object_start_ref(new_object);
-
-            debug_assert!(SFT_MAP.get(new_object.to_address()).name() != "empty", "Object after copying {} (original? {}. wait for forward? {}) has empty SFT", new_object, object, wait_for_forward);
-
-            if SFT_MAP.get(new_object.to_address()).name() != SFT_MAP.get(new_obj_start).name() {
-                warn!("Object after copying {} has incorrect SFT entries.", new_object);
-                warn!("Object start {} (chunk {}), SFT = {}", new_obj_start, conversions::chunk_align_down(new_obj_start), SFT_MAP.get(new_obj_start).name());
-                warn!("Object {} (chunk {}), SFT = {}", new_object, conversions::chunk_align_down(new_object.to_address()), SFT_MAP.get(new_object.to_address()).name());
-                warn!("Object is forwarded here? {}", !wait_for_forward);
-                panic!()
-            }
+            new_object
         }
-
-        new_object
     }
 
     #[allow(dead_code)] // Only used with certain features (such as sanity)
