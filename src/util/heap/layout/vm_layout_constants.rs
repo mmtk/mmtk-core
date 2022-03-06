@@ -24,6 +24,7 @@ pub const LOG_BYTES_IN_CHUNK: usize = 22;
 
 /** Coarsest unit of address space allocation. */
 pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
+pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 
 /** Coarsest unit of address space allocation, in pages */
 pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK as usize - LOG_BYTES_IN_PAGE as usize);

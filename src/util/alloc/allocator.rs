@@ -113,6 +113,18 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
     }
 }
 
+#[inline(always)]
+pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
+    use crate::vm::ObjectModel;
+    use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK};
+
+    if VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET == 0 {
+        return false;
+    }
+
+    (addr & CHUNK_MASK) + VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET > BYTES_IN_CHUNK
+}
+
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.
 pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`VMThread`] associated with this allocator instance.

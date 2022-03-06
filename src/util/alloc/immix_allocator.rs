@@ -1,4 +1,4 @@
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap, object_ref_may_cross_chunk};
 use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
@@ -79,7 +79,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
 
-        if new_cursor > self.limit {
+        if new_cursor > self.limit || object_ref_may_cross_chunk::<VM>(new_cursor) {
             trace!(
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls

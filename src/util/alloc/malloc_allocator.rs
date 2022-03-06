@@ -43,6 +43,8 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
             offset,
             ret
         );
+        // If this ever fails, we need to do such a check before returning the result.
+        debug_assert!(!crate::util::alloc::allocator::object_ref_may_cross_chunk::<VM>(ret));
         ret
     }
 }
