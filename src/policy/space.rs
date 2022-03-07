@@ -366,7 +366,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
         // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
         // its SFT is properly set.
-        let _lock = self.common().acquire_lock.lock().unwrap();
+        let lock = self.common().acquire_lock.lock().unwrap();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -378,6 +378,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
+            drop(lock); // drop the lock before calling to VM
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
@@ -461,6 +462,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
+                    drop(lock); // drop the lock before calling to VM
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
