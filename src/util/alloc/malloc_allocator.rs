@@ -1,7 +1,7 @@
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
+use crate::util::alloc::object_ref_guard::object_ref_may_cross_chunk;
 use crate::util::alloc::Allocator;
-use crate::util::alloc::allocator::postcheck_object_ref_may_cross_chunk;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
@@ -38,7 +38,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
 
         loop {
             let ret = self.space.alloc(self.tls, size, align, offset);
-            if postcheck_object_ref_may_cross_chunk::<VM>(ret) {
+            if object_ref_may_cross_chunk::<VM>(ret) {
                 self.space.free(ret);
             } else {
                 trace!(

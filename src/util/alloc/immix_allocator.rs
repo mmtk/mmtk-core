@@ -1,4 +1,5 @@
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap, adjust_thread_local_buffer_limit};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
+use super::object_ref_guard::adjust_thread_local_buffer_limit;
 use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;

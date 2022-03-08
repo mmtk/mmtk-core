@@ -248,16 +248,14 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `reference`: The object to be queried.
     fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
 
-    /// The maximum offset from an allocation cell address to the object reference for the address.
-    /// The value is defaulted to 0, which is suitable for most bindings.
-    /// A VM binding should ONLY change this value if their object reference may point to (or past)
-    /// the end of allocated memory region. For example, an allocation of 12 bytes
-    /// returns `addr`, and the object reference equals to or is larger than `addr + 12`. If that is the case for a binding,
-    /// they need to override this value to the maximum possible offset. Say if their object references
-    /// could be 12 bytes or 16 bytes offset from the cell address, the value should be the maximum, which is 16.
-    /// Note that this value is used in the allocation fastpath, and any non-zero value will introduce small overheads.
-    /// If a binding implements allocation fastpath, they also need to implement the check [`object_ref_may_cross_chunk()`](crate::util::alloc::allocator::object_ref_may_cross_chunk).
-    const MAXIMUM_OBJECT_REF_OFFSET: usize = 0;
+    /// For our allocation result `[cell, cell + bytes)`, if a binding's
+    /// definition of `ObjectReference` may point outside the cell (i.e. `object_ref >= cell + bytes`),
+    /// the binding needs to provide a `Some` value for this constant and
+    /// the value is the maximum of `object_ref - cell`. If a binding's
+    /// `ObjectReference` always points to an address in the cell (i.e. `[cell, cell + bytes)`),
+    /// they can leave this as `None`.
+    /// MMTk allocators use this value to make sure that the metadata for object reference is properly set.
+    const OBJECT_REF_OFFSET_BEYOND_CELL: Option<usize> = None;
 
     /// Return the lowest address of the storage associated with an object.
     ///

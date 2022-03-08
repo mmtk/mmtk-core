@@ -113,48 +113,6 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
     }
 }
 
-/// Check if the object reference for this allocation may cross and fall into the next chunk.
-/// In our allocation, we guarantee that the metadata for the address (range) we allocate is
-/// properly initialized. However, it is possible that for some VMs, the object reference they
-/// define points to the end of an allocated region, which means the metadata for the object
-/// reference may not be initialized.
-/// We map our metadata (including side metadata and SFT) by chunks. So as long as the object
-/// reference is in the same chunk as the allocated cell address, we should be fine. This method
-/// checks if the object reference for an address may fall into the next chunk. If that happens,
-/// the allocation should not allocate the last few bytes in the chunk, and simply go to slowpath.
-/// Note that this method is used in the allocation fastpath. So it is _performance critical_.
-/// We expect if `ObjectModel::MAXIMUM_OBJECT_REF_OFFSET` is 0 (which means the binding will not
-/// have object reference pointing outside the alocated memory), this method has no overhead.
-#[inline(always)]
-pub fn postcheck_object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
-    use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK};
-    use crate::vm::ObjectModel;
-
-    if VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET == 0 {
-        return false;
-    }
-
-    (addr & CHUNK_MASK) + VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET > BYTES_IN_CHUNK
-}
-
-#[inline(always)]
-pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Address {
-    use crate::vm::ObjectModel;
-    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-
-    if VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET != 0 && limit.is_aligned_to(BYTES_IN_CHUNK) {
-        debug_assert!(limit.as_usize() > VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET);
-        limit - VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET
-    } else {
-        limit
-    }
-}
-
-pub fn precheck_object_ref_may_cross_chunk<VM: VMBinding>(size: usize) -> bool {
-    use crate::vm::ObjectModel;
-    size <= VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET
-}
-
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.
 pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`VMThread`] associated with this allocator instance.
@@ -187,6 +145,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// Note that in the case where the VM is out of memory, we invoke
     /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
     /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
+    ///
+    /// An allocator needs to make sure the object reference for the returned address is in the same
+    /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
+    /// See [`crate::util::alloc::object_ref_guard`].
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
