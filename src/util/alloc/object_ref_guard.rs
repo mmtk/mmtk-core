@@ -36,17 +36,19 @@ pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Addres
     limit
 }
 
-/// Assert that the object reference should never cross chunks
+/// Assert that the object reference should always inside the allocation cell
 #[cfg(debug_assertions)]
-pub fn assert_object_ref_wont_cross_chunk<VM: VMBinding>(size: usize) {
+pub fn assert_object_ref_in_cell<VM: VMBinding>(size: usize) {
     if VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.is_none() {
         return;
     }
 
+    // If the object ref offset is smaller than size, it is always inside the allocation cell.
     debug_assert!(
-        size <= VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap(),
-        "Allocating objects of size {} may cross chunk",
-        size
+        size > VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap(),
+        "Allocating objects of size {} may cross chunk (OBJECT_REF_OFFSET_BEYOND_CELL = {})",
+        size,
+        VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap()
     );
 }
 
