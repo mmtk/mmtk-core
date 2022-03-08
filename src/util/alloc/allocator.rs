@@ -126,7 +126,7 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(
 /// We expect if `ObjectModel::MAXIMUM_OBJECT_REF_OFFSET` is 0 (which means the binding will not
 /// have object reference pointing outside the alocated memory), this method has no overhead.
 #[inline(always)]
-pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
+pub fn postcheck_object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
     use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK};
     use crate::vm::ObjectModel;
 
@@ -135,6 +135,24 @@ pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
     }
 
     (addr & CHUNK_MASK) + VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET > BYTES_IN_CHUNK
+}
+
+#[inline(always)]
+pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Address {
+    use crate::vm::ObjectModel;
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+
+    if VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET != 0 && limit.is_aligned_to(BYTES_IN_CHUNK) {
+        debug_assert!(limit.as_usize() > VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET);
+        limit - VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET
+    } else {
+        limit
+    }
+}
+
+pub fn precheck_object_ref_may_cross_chunk<VM: VMBinding>(size: usize) -> bool {
+    use crate::vm::ObjectModel;
+    size <= VM::VMObjectModel::MAXIMUM_OBJECT_REF_OFFSET
 }
 
 /// A trait which implements allocation routines. Every allocator needs to implements this trait.

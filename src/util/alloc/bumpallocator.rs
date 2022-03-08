@@ -1,4 +1,4 @@
-use super::allocator::{align_allocation_no_fill, fill_alignment_gap, object_ref_may_cross_chunk};
+use super::allocator::{align_allocation_no_fill, fill_alignment_gap, adjust_thread_local_buffer_limit};
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
@@ -25,7 +25,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn set_limit(&mut self, cursor: Address, limit: Address) {
         self.cursor = cursor;
-        self.limit = limit;
+        self.limit = adjust_thread_local_buffer_limit::<VM>(limit);
     }
 
     pub fn reset(&mut self) {
@@ -58,7 +58,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
 
-        if new_cursor > self.limit || object_ref_may_cross_chunk::<VM>(new_cursor) {
+        if new_cursor > self.limit {
             trace!("Thread local buffer used up, go to alloc slow path");
             self.alloc_slow(size, align, offset)
         } else {
@@ -103,9 +103,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         // For stress test, limit is [0, block_size) to artificially make the
         // check in the fastpath (alloc()) fail. The real limit is recovered by
         // adding it to the current cursor.
-        if new_cursor > self.cursor + self.limit.as_usize()
-            || object_ref_may_cross_chunk::<VM>(new_cursor)
-        {
+        if new_cursor > self.cursor + self.limit.as_usize() {
             self.acquire_block(size, align, offset, true)
         } else {
             fill_alignment_gap::<VM>(self.cursor, result);

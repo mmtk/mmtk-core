@@ -1,6 +1,7 @@
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
+use crate::util::alloc::allocator::postcheck_object_ref_may_cross_chunk;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::vm::VMBinding;
@@ -35,17 +36,21 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         assert!(offset >= 0);
 
-        let ret = self.space.alloc(self.tls, size, align, offset);
-        trace!(
-            "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
-            size,
-            align,
-            offset,
-            ret
-        );
-        // If this ever fails, we need to do such a check before returning the result.
-        debug_assert!(!crate::util::alloc::allocator::object_ref_may_cross_chunk::<VM>(ret));
-        ret
+        loop {
+            let ret = self.space.alloc(self.tls, size, align, offset);
+            if postcheck_object_ref_may_cross_chunk::<VM>(ret) {
+                self.space.free(ret);
+            } else {
+                trace!(
+                    "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
+                    size,
+                    align,
+                    offset,
+                    ret
+                );
+                return ret;
+            }
+        }
     }
 }
 

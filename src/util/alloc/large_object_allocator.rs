@@ -32,6 +32,8 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+        debug_assert!(!crate::util::alloc::allocator::precheck_object_ref_may_cross_chunk::<VM>(size));
+
         let cell: Address = self.alloc_slow(size, align, offset);
         // We may get a null ptr from alloc due to the VM being OOM
         if !cell.is_zero() {
