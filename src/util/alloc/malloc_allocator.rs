@@ -38,7 +38,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
 
         let ret = self.space.alloc(self.tls, size, align, offset);
         if !object_ref_may_cross_chunk::<VM>(ret) {
-            return ret;
+            ret
         } else {
             // The address we got does not pass object ref checks. We cache it and free it later.
             // We free the results in the end to avoid malloc giving us the free'd address again.
