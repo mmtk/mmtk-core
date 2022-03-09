@@ -378,7 +378,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
-            drop(lock); // drop the lock before calling to VM
+            drop(lock); // drop the lock before block
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
@@ -418,17 +418,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
                     // Some assertions
                     {
-                        // --- Assert the cell address ---
-                        // The cell address should have a valid SFT.
-                        debug_assert!(
-                            SFT_MAP.get(res.start).name() != EMPTY_SFT_NAME,
-                            "Newly allocated address {} has its SFT as empty (chunk {})",
-                            res.start,
-                            conversions::chunk_align_down(res.start)
-                        );
-                        // The SFT should be correct.
+                        // --- Assert the start of the allocated region ---
+                        // The start address SFT should be correct.
                         debug_assert_eq!(SFT_MAP.get(res.start).name(), self.get_name());
-                        // The cell address is in our space.
+                        // The start address is in our space.
                         debug_assert!(self.address_in_space(res.start));
                         // The descriptor should be correct.
                         debug_assert_eq!(
@@ -462,7 +455,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    drop(lock); // drop the lock before calling to VM
+                    drop(lock); // drop the lock before block
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
@@ -499,10 +492,12 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             bytes,
             new_chunk
         );
+
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
         #[cfg(debug_assertions)]
         if !new_chunk {
-            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME && SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we will have empty SFT entries (chunk for {} = {}, chunk for {} = {}", start, bytes, new_chunk, start, SFT_MAP.get(start).name(), start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
+            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})", start, bytes, new_chunk, start, SFT_MAP.get(start).name());
+            debug_assert!(SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}", start, bytes, new_chunk, start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
         }
 
         if new_chunk {
