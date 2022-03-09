@@ -1,11 +1,11 @@
-//! This module includes functions to make sure an invariant: for each object we allocate (`[cell, cell + bytes)`), the metadata for
-//! the object reference (`object_ref`) is the same as the allocated memory. Given that we always initialize metadata based on chunks,
+//! This module includes functions to make sure the following invariant always holds: for each object we allocate (`[cell, cell + bytes)`), the metadata for
+//! the object reference (`object_ref`) is always in the range of the allocated memory. Given that we always initialize metadata based on chunks,
 //! we simply need to make sure that `object_ref` is in the same chunk as `[cell, cell + bytes)`. In other words, we avoid
 //! allocating an address for which the object reference may be in another chunk.
 //!
 //! Note that where an ObjectReference points to is defined by a binding. We only have this problem if an object reference may point
 //! to an address that is outside our allocated memory (`object_ref >= cell + bytes`). We ask a binding to specify
-//! `ObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL` to be a value if their object reference may point to an address outside the allocated
+//! `ObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL` if their object reference may point to an address outside the allocated
 //! memory. `ObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL` should be the max of `object_ref - cell`.
 //!
 //! There are various ways we deal with this.
@@ -60,5 +60,6 @@ pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
         return false;
     }
 
-    (addr & CHUNK_MASK) + VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap() > BYTES_IN_CHUNK
+    (addr & CHUNK_MASK) + VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap()
+        >= BYTES_IN_CHUNK
 }

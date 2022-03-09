@@ -63,9 +63,6 @@ pub(crate) const LOCAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS);
 
 #[cfg(target_pointer_width = "32")]
-pub(super) const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
-
-#[cfg(target_pointer_width = "32")]
 pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =
     BYTES_IN_CHUNK >> LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO;
 

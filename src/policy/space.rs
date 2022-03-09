@@ -212,12 +212,10 @@ impl<'a> SFTMap<'a> {
     }
 
     fn trace_sft_map(&self) {
-        // For large heaps, it takes long to iterate each chunk. So check log level first.
-        if log::log_enabled!(log::Level::Trace) {
-            trace!("{}", self.print_sft_map());
-        }
+        trace!("{}", self.print_sft_map());
     }
 
+    // This can be used during debugging to print SFT map.
     fn print_sft_map(&self) -> String {
         // print the entire SFT map
         let mut res = String::new();
