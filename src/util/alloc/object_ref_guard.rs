@@ -28,7 +28,9 @@ pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Addres
     if let Some(offset) = VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL {
         if limit.is_aligned_to(BYTES_IN_CHUNK) {
             debug_assert!(limit.as_usize() > offset);
-            // We simply not use the last few bytes. This is a rare case anyway (expect less than 1% of allocation goes here)
+            // We simply not use the last few bytes. This is a rare case anyway (expect less than 1% of slowpath allocation goes here).
+            // It should be possible for us to check if we can use the last few bytes to finish an allocation request when we 'exhaust'
+            // thread local buffer. But probably it won't give us much benefit and it complicates our allocation code.
             return limit - offset;
         }
     }
