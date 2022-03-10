@@ -698,6 +698,94 @@
 <span id="693">693</span>
 <span id="694">694</span>
 <span id="695">695</span>
+<span id="696">696</span>
+<span id="697">697</span>
+<span id="698">698</span>
+<span id="699">699</span>
+<span id="700">700</span>
+<span id="701">701</span>
+<span id="702">702</span>
+<span id="703">703</span>
+<span id="704">704</span>
+<span id="705">705</span>
+<span id="706">706</span>
+<span id="707">707</span>
+<span id="708">708</span>
+<span id="709">709</span>
+<span id="710">710</span>
+<span id="711">711</span>
+<span id="712">712</span>
+<span id="713">713</span>
+<span id="714">714</span>
+<span id="715">715</span>
+<span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
+<span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
+<span id="728">728</span>
+<span id="729">729</span>
+<span id="730">730</span>
+<span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -728,6 +816,7 @@
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
 
 <span class="kw">use</span> <span class="ident">downcast_rs::Downcast</span>;
 
@@ -822,6 +911,7 @@
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="macro">warn!</span>(<span class="string">&quot;Object in empty space!&quot;</span>);
         <span class="bool-val">false</span>
     }
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
@@ -854,8 +944,9 @@
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="macro">panic!</span>(
-            <span class="string">&quot;Call trace_object() on {:x}, which maps to an empty space&quot;</span>,
-            <span class="ident">_object</span>
+            <span class="string">&quot;Call trace_object() on {} (chunk {}), which maps to an empty space&quot;</span>,
+            <span class="ident">_object</span>,
+            <span class="ident">conversions::chunk_align_down</span>(<span class="ident">_object</span>.<span class="ident">to_address</span>()),
         )
     }
 }
@@ -899,38 +990,42 @@
     }
 
     <span class="kw">fn</span> <span class="ident">log_update</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>), <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>) {
-        <span class="macro">debug!</span>(
-            <span class="string">&quot;Update SFT for [{}, {}) as {}&quot;</span>,
-            <span class="ident">start</span>,
-            <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span>,
-            <span class="ident">space</span>.<span class="ident">name</span>()
-        );
+        <span class="macro">debug!</span>(<span class="string">&quot;Update SFT for Chunk {} as {}&quot;</span>, <span class="ident">start</span>, <span class="ident">space</span>.<span class="ident">name</span>(),);
         <span class="kw">let</span> <span class="ident">first</span> <span class="op">=</span> <span class="ident">start</span>.<span class="ident">chunk_index</span>();
-        <span class="kw">let</span> <span class="ident">last</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_up</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span>).<span class="ident">chunk_index</span>();
         <span class="kw">let</span> <span class="ident">start_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">first</span>);
-        <span class="kw">let</span> <span class="ident">end_chunk</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">last</span>);
         <span class="macro">debug!</span>(
-            <span class="string">&quot;Update SFT for {} bytes of [{} #{}, {} #{})&quot;</span>,
-            <span class="ident">bytes</span>, <span class="ident">start_chunk</span>, <span class="ident">first</span>, <span class="ident">end_chunk</span>, <span class="ident">last</span>
+            <span class="string">&quot;Update SFT for {} bytes of Chunk {} #{}&quot;</span>,
+            <span class="ident">bytes</span>, <span class="ident">start_chunk</span>, <span class="ident">first</span>
         );
     }
 
     <span class="kw">fn</span> <span class="ident">trace_sft_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// For large heaps, it takes long to iterate each chunk. So check log level first.</span>
-        <span class="kw">if</span> <span class="macro">log::log_enabled!</span>(<span class="ident">log::Level::Trace</span>) {
-            <span class="comment">// print the entire SFT map</span>
-            <span class="kw">const</span> <span class="ident">SPACE_PER_LINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>;
-            <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> (<span class="number">0</span>..<span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()).<span class="ident">step_by</span>(<span class="ident">SPACE_PER_LINE</span>) {
-                <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>() {
-                    <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()
-                } <span class="kw">else</span> {
-                    <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span>
-                };
-                <span class="kw">let</span> <span class="ident">chunks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">i</span>..<span class="ident">max</span>).<span class="ident">collect</span>();
-                <span class="kw">let</span> <span class="ident">space_names</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">chunks</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">x</span>].<span class="ident">name</span>()).<span class="ident">collect</span>();
-                <span class="macro">trace!</span>(<span class="string">&quot;Chunk {}: {}&quot;</span>, <span class="ident">i</span>, <span class="ident">space_names</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>));
-            }
+        <span class="macro">trace!</span>(<span class="string">&quot;{}&quot;</span>, <span class="self">self</span>.<span class="ident">print_sft_map</span>());
+    }
+
+    <span class="comment">// This can be used during debugging to print SFT map.</span>
+    <span class="kw">fn</span> <span class="ident">print_sft_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">String</span> {
+        <span class="comment">// print the entire SFT map</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">String::new</span>();
+
+        <span class="kw">const</span> <span class="ident">SPACE_PER_LINE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">10</span>;
+        <span class="kw">for</span> <span class="ident">i</span> <span class="kw">in</span> (<span class="number">0</span>..<span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()).<span class="ident">step_by</span>(<span class="ident">SPACE_PER_LINE</span>) {
+            <span class="kw">let</span> <span class="ident">max</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>() {
+                <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>()
+            } <span class="kw">else</span> {
+                <span class="ident">i</span> <span class="op">+</span> <span class="ident">SPACE_PER_LINE</span>
+            };
+            <span class="kw">let</span> <span class="ident">chunks</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> (<span class="ident">i</span>..<span class="ident">max</span>).<span class="ident">collect</span>();
+            <span class="kw">let</span> <span class="ident">space_names</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">str</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">chunks</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">x</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">sft</span>[<span class="ident">x</span>].<span class="ident">name</span>()).<span class="ident">collect</span>();
+            <span class="ident">res</span>.<span class="ident">push_str</span>(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+                <span class="string">&quot;{}: {}&quot;</span>,
+                <span class="ident">chunk_index_to_address</span>(<span class="ident">i</span>),
+                <span class="ident">space_names</span>.<span class="ident">join</span>(<span class="string">&quot;,&quot;</span>)
+            ));
+            <span class="ident">res</span>.<span class="ident">push</span>(<span class="string">&#39;\n&#39;</span>);
         }
+
+        <span class="ident">res</span>
     }
 
     <span class="doccomment">/// Update SFT map for the given address range.</span>
@@ -953,6 +1048,13 @@
     <span class="comment">// TODO: We should clear a SFT entry when a space releases a chunk.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
+        <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
+            <span class="macro">debug!</span>(
+                <span class="string">&quot;Clear SFT for chunk {} (was {})&quot;</span>,
+                <span class="ident">chunk_start</span>,
+                <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">chunk_start</span>).<span class="ident">name</span>()
+            );
+        }
         <span class="macro">assert!</span>(<span class="ident">chunk_start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
         <span class="kw">let</span> <span class="ident">chunk_idx</span> <span class="op">=</span> <span class="ident">chunk_start</span>.<span class="ident">chunk_index</span>();
         <span class="self">self</span>.<span class="ident">set</span>(<span class="ident">chunk_idx</span>, <span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>);
@@ -961,6 +1063,14 @@
     <span class="comment">// Currently only used by 32 bits vm map</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">dead_code</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_by_index</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_idx</span>: <span class="ident">usize</span>) {
+        <span class="kw">if</span> <span class="ident">DEBUG_SFT</span> {
+            <span class="kw">let</span> <span class="ident">chunk_start</span> <span class="op">=</span> <span class="ident">chunk_index_to_address</span>(<span class="ident">chunk_idx</span>);
+            <span class="macro">debug!</span>(
+                <span class="string">&quot;Clear SFT for chunk {} by index (was {})&quot;</span>,
+                <span class="ident">chunk_start</span>,
+                <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">chunk_start</span>).<span class="ident">name</span>()
+            );
+        }
         <span class="self">self</span>.<span class="ident">set</span>(<span class="ident">chunk_idx</span>, <span class="kw-2">&amp;</span><span class="ident">EMPTY_SPACE_SFT</span>)
     }
 
@@ -998,6 +1108,27 @@
         }
         <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()).<span class="ident">is_mmtk_object</span>(<span class="ident">object</span>)
     }
+
+    <span class="doccomment">/// Make sure we have valid SFT entries for the object reference.</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">assert_valid_entries_for_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+        <span class="kw">let</span> <span class="ident">object_sft</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">object</span>.<span class="ident">to_address</span>());
+        <span class="kw">let</span> <span class="ident">object_start_sft</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>));
+
+        <span class="macro">debug_assert!</span>(
+            <span class="ident">object_sft</span>.<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>,
+            <span class="string">&quot;Object {} has empty SFT&quot;</span>,
+            <span class="ident">object</span>
+        );
+        <span class="macro">debug_assert_eq!</span>(
+            <span class="ident">object_sft</span>.<span class="ident">name</span>(),
+            <span class="ident">object_start_sft</span>.<span class="ident">name</span>(),
+            <span class="string">&quot;Object {} has incorrect SFT entries (object start = {}, object = {}).&quot;</span>,
+            <span class="ident">object</span>,
+            <span class="ident">object_start_sft</span>.<span class="ident">name</span>(),
+            <span class="ident">object_sft</span>.<span class="ident">name</span>()
+        );
+    }
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="ident">Downcast</span> {
@@ -1017,6 +1148,12 @@
         <span class="comment">// initialize_collection() has to be called so we know GC is initialized.</span>
         <span class="kw">let</span> <span class="ident">allow_gc</span> <span class="op">=</span> <span class="ident">should_poll</span> <span class="op">&amp;&amp;</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">is_initialized</span>();
 
+        <span class="comment">// We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet</span>
+        <span class="comment">// set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not</span>
+        <span class="comment">// a new chunk so grow_space() won&#39;t be called on it. The second thread could return a result in the chunk before</span>
+        <span class="comment">// its SFT is properly set.</span>
+        <span class="kw">let</span> <span class="ident">lock</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">acquire_lock</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+
         <span class="macro">trace!</span>(<span class="string">&quot;Reserving pages&quot;</span>);
         <span class="kw">let</span> <span class="ident">pr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_page_resource</span>();
         <span class="kw">let</span> <span class="ident">pages_reserved</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">reserve_pages</span>(<span class="ident">pages</span>);
@@ -1027,6 +1164,7 @@
             <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
             <span class="macro">assert!</span>(<span class="ident">allow_gc</span>, <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
             <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
+            <span class="ident">drop</span>(<span class="ident">lock</span>); <span class="comment">// drop the lock before block</span>
             <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We have checked that this is mutator</span>
             <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() }
         } <span class="kw">else</span> {
@@ -1034,10 +1172,14 @@
 
             <span class="kw">match</span> <span class="ident">pr</span>.<span class="ident">get_new_pages</span>(<span class="self">self</span>.<span class="ident">common</span>().<span class="ident">descriptor</span>, <span class="ident">pages_reserved</span>, <span class="ident">pages</span>, <span class="ident">tls</span>) {
                 <span class="prelude-val">Ok</span>(<span class="ident">res</span>) =&gt; {
-                    <span class="comment">// The following code was guarded by a page resource lock in Java MMTk.</span>
-                    <span class="comment">// I think they are thread safe and we do not need a lock. So they</span>
-                    <span class="comment">// are no longer guarded by a lock. If we see any issue here, considering</span>
-                    <span class="comment">// adding a space lock here.</span>
+                    <span class="macro">debug!</span>(
+                        <span class="string">&quot;Got new pages {} ({} pages) for {} in chunk {}, new_chunk? {}&quot;</span>,
+                        <span class="ident">res</span>.<span class="ident">start</span>,
+                        <span class="ident">res</span>.<span class="ident">pages</span>,
+                        <span class="self">self</span>.<span class="ident">get_name</span>(),
+                        <span class="ident">conversions::chunk_align_down</span>(<span class="ident">res</span>.<span class="ident">start</span>),
+                        <span class="ident">res</span>.<span class="ident">new_chunk</span>
+                    );
                     <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">res</span>.<span class="ident">pages</span>);
                     <span class="self">self</span>.<span class="ident">grow_space</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">res</span>.<span class="ident">new_chunk</span>);
                     <span class="comment">// Mmap the pages and the side metadata, and handle error. In case of any error,</span>
@@ -1060,6 +1202,32 @@
                         <span class="ident">memory::zero</span>(<span class="ident">res</span>.<span class="ident">start</span>, <span class="ident">bytes</span>);
                     }
 
+                    <span class="comment">// Some assertions</span>
+                    {
+                        <span class="comment">// --- Assert the start of the allocated region ---</span>
+                        <span class="comment">// The start address SFT should be correct.</span>
+                        <span class="macro">debug_assert_eq!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">res</span>.<span class="ident">start</span>).<span class="ident">name</span>(), <span class="self">self</span>.<span class="ident">get_name</span>());
+                        <span class="comment">// The start address is in our space.</span>
+                        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">address_in_space</span>(<span class="ident">res</span>.<span class="ident">start</span>));
+                        <span class="comment">// The descriptor should be correct.</span>
+                        <span class="macro">debug_assert_eq!</span>(
+                            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_descriptor_for_address</span>(<span class="ident">res</span>.<span class="ident">start</span>),
+                            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">descriptor</span>
+                        );
+
+                        <span class="comment">// --- Assert the last byte in the allocated region ---</span>
+                        <span class="kw">let</span> <span class="ident">last_byte</span> <span class="op">=</span> <span class="ident">res</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>;
+                        <span class="comment">// The SFT for the last byte in the allocated memory should be correct.</span>
+                        <span class="macro">debug_assert_eq!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">last_byte</span>).<span class="ident">name</span>(), <span class="self">self</span>.<span class="ident">get_name</span>());
+                        <span class="comment">// The last byte in the allocated memory should be in this space.</span>
+                        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">address_in_space</span>(<span class="ident">last_byte</span>));
+                        <span class="comment">// The descriptor for the last byte should be correct.</span>
+                        <span class="macro">debug_assert_eq!</span>(
+                            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_descriptor_for_address</span>(<span class="ident">last_byte</span>),
+                            <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">descriptor</span>
+                        );
+                    }
+
                     <span class="macro">debug!</span>(<span class="string">&quot;Space.acquire(), returned = {}&quot;</span>, <span class="ident">res</span>.<span class="ident">start</span>);
                     <span class="ident">res</span>.<span class="ident">start</span>
                 }
@@ -1073,6 +1241,7 @@
                     <span class="kw">let</span> <span class="ident">gc_performed</span> <span class="op">=</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">true</span>, <span class="self">self</span>.<span class="ident">as_space</span>());
                     <span class="macro">debug_assert!</span>(<span class="ident">gc_performed</span>, <span class="string">&quot;GC not performed when forced.&quot;</span>);
                     <span class="ident">pr</span>.<span class="ident">clear_request</span>(<span class="ident">pages_reserved</span>);
+                    <span class="ident">drop</span>(<span class="ident">lock</span>); <span class="comment">// drop the lock before block</span>
                     <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>)); <span class="comment">// We asserted that this is mutator.</span>
                     <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() }
                 }
@@ -1109,11 +1278,14 @@
             <span class="ident">bytes</span>,
             <span class="ident">new_chunk</span>
         );
-        <span class="comment">// FIXME: This assertion is too strict. See https://github.com/mmtk/mmtk-core/issues/374</span>
-        <span class="comment">// debug_assert!(</span>
-        <span class="comment">//     (new_chunk &amp;&amp; start.is_aligned_to(BYTES_IN_CHUNK)) || !new_chunk,</span>
-        <span class="comment">//     &quot;should only grow space for new chunks at chunk-aligned start address&quot;</span>
-        <span class="comment">// );</span>
+
+        <span class="comment">// If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">new_chunk</span> {
+            <span class="macro">debug_assert!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>, <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>, <span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>, <span class="ident">start</span>, <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>());
+            <span class="macro">debug_assert!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>, <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}&quot;</span>, <span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>, <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>());
+        }
+
         <span class="kw">if</span> <span class="ident">new_chunk</span> {
             <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="ident">start</span>, <span class="ident">bytes</span>);
         }
@@ -1249,6 +1421,9 @@
     <span class="comment">// TODO: This should be a constant for performance.</span>
     <span class="kw">pub</span> <span class="ident">needs_log_bit</span>: <span class="ident">bool</span>,
 
+    <span class="doccomment">/// A lock used during acquire() to make sure only one thread can allocate.</span>
+    <span class="kw">pub</span> <span class="ident">acquire_lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
+
     <span class="ident">p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -1289,6 +1464,7 @@
             <span class="ident">needs_log_bit</span>: <span class="ident">opt</span>.<span class="ident">needs_log_bit</span>,
             <span class="ident">metadata</span>: <span class="ident">opt</span>.<span class="ident">side_metadata_specs</span>,
             <span class="ident">p</span>: <span class="ident">PhantomData</span>,
+            <span class="ident">acquire_lock</span>: <span class="ident">Mutex::new</span>(()),
         };
 
         <span class="kw">let</span> <span class="ident">vmrequest</span> <span class="op">=</span> <span class="ident">opt</span>.<span class="ident">vmrequest</span>;

@@ -153,6 +153,7 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
+<span id="151">151</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::heap_parameters</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -179,6 +180,7 @@
 
 <span class="doccomment">/** Coarsest unit of address space allocation. */</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES_IN_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CHUNK_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) <span class="op">-</span> <span class="number">1</span>;
 
 <span class="doccomment">/** Coarsest unit of address space allocation, in pages */</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">PAGES_IN_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_BYTES_IN_CHUNK</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>);

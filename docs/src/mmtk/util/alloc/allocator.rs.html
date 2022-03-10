@@ -360,6 +360,10 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
@@ -507,6 +511,10 @@
     <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
     <span class="doccomment">/// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to</span>
     <span class="doccomment">/// it. We have no assumptions on whether the VM will continue executing or abort immediately.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// An allocator needs to make sure the object reference for the returned address is in the same</span>
+    <span class="doccomment">/// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).</span>
+    <span class="doccomment">/// See [`crate::util::alloc::object_ref_guard`].</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `size`: the allocation size in bytes.</span>

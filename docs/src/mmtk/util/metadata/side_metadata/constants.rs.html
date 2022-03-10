@@ -83,12 +83,9 @@
 <span id="78">78</span>
 <span id="79">79</span>
 <span id="80">80</span>
-<span id="81">81</span>
-<span id="82">82</span>
-<span id="83">83</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">LOG_BYTES_IN_CHUNK</span>};
+</pre><pre class="rust"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataOffset</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 
@@ -149,9 +146,6 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
     <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">LOCAL_SIDE_METADATA_BASE_ADDRESS</span>);
-
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">CHUNK_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> (<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_CHUNK</span>) <span class="op">-</span> <span class="number">1</span>;
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">const</span> <span class="ident">LOCAL_SIDE_METADATA_PER_CHUNK</span>: <span class="ident">usize</span> <span class="op">=</span>

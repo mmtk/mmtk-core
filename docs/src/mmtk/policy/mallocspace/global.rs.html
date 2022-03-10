@@ -609,6 +609,12 @@
 <span id="604">604</span>
 <span id="605">605</span>
 <span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
@@ -851,9 +857,15 @@
         <span class="ident">address</span>
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) {
+        <span class="kw">let</span> <span class="ident">offset_malloc_bit</span> <span class="op">=</span> <span class="ident">is_offset_malloc</span>(<span class="ident">addr</span>);
+        <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">addr</span>, <span class="ident">offset_malloc_bit</span>);
+        <span class="self">self</span>.<span class="ident">free_internal</span>(<span class="ident">addr</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc_bit</span>);
+    }
+
     <span class="comment">// XXX optimize: We pass the bytes in to free as otherwise there were multiple</span>
     <span class="comment">// indirect call instructions in the generated assembly</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">offset_malloc_bit</span>: <span class="ident">bool</span>) {
+    <span class="kw">fn</span> <span class="ident">free_internal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">offset_malloc_bit</span>: <span class="ident">bool</span>) {
         <span class="kw">if</span> <span class="ident">offset_malloc_bit</span> {
             <span class="macro">trace!</span>(<span class="string">&quot;Free memory {:x}&quot;</span>, <span class="ident">addr</span>);
             <span class="ident">offset_free</span>(<span class="ident">addr</span>);
@@ -984,7 +996,7 @@
             <span class="macro">trace!</span>(<span class="string">&quot;Object {} has been allocated but not marked&quot;</span>, <span class="ident">object</span>);
 
             <span class="comment">// Free object</span>
-            <span class="self">self</span>.<span class="ident">free</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc</span>);
+            <span class="self">self</span>.<span class="ident">free_internal</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc</span>);
             <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, <span class="ident">object</span>);
             <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>) };
 

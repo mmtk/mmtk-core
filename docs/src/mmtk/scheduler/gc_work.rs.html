@@ -592,6 +592,10 @@
 <span id="587">587</span>
 <span id="588">588</span>
 <span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -1094,6 +1098,10 @@
         <span class="kw">if</span> <span class="ident">object</span>.<span class="ident">is_null</span>() {
             <span class="kw">return</span> <span class="ident">object</span>;
         }
+
+        <span class="comment">// Make sure we have valid SFT entries for the object.</span>
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+        <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">assert_valid_entries_for_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
 
         <span class="comment">// Erase &lt;VM&gt; type parameter</span>
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">GCWorkerMutRef::new</span>(<span class="self">self</span>.<span class="ident">worker</span>());

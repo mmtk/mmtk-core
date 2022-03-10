@@ -223,6 +223,8 @@
 <span id="218">218</span>
 <span id="219">219</span>
 <span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{
     <span class="ident">compare_exchange_metadata</span>, <span class="ident">load_metadata</span>, <span class="ident">store_metadata</span>, <span class="ident">MetadataSpec</span>,
@@ -323,6 +325,8 @@
             <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
         );
     }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+    <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">assert_valid_entries_for_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>);
     <span class="ident">new_object</span>
 }
 

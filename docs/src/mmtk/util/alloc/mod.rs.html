@@ -27,29 +27,55 @@
 <span id="22">22</span>
 <span id="23">23</span>
 <span id="24">24</span>
-</pre><pre class="rust"><code><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocator</span>;
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+</pre><pre class="rust"><code><span class="doccomment">///! Various allocators implementation.</span>
+
+<span class="doccomment">/// The allocator trait and allocation-related functions.</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::fill_alignment_gap</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::AllocationError</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::Allocator</span>;
 
+<span class="doccomment">/// Functions to ensure an object reference for an allocation has valid metadata.</span>
+<span class="kw">mod</span> <span class="ident">object_ref_guard</span>;
+
+<span class="doccomment">/// A list of all the allocators, embedded in Mutator</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocators</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocators::AllocatorSelector</span>;
 
+<span class="doccomment">/// Bump pointer allocator</span>
 <span class="kw">mod</span> <span class="ident">bumpallocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bumpallocator::BumpAllocator</span>;
 
+<span class="doccomment">/// Large object allocator</span>
 <span class="kw">mod</span> <span class="ident">large_object_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">large_object_allocator::LargeObjectAllocator</span>;
 
+<span class="doccomment">/// An alloactor backed by malloc</span>
 <span class="kw">mod</span> <span class="ident">malloc_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">malloc_allocator::MallocAllocator</span>;
 
+<span class="doccomment">/// Immix allocator</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immix_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::immix_allocator::ImmixAllocator</span>;
 
+<span class="doccomment">/// Mark compact allocator (actually a bump pointer allocator with an extra heade word)</span>
 <span class="kw">mod</span> <span class="ident">markcompact_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">markcompact_allocator::MarkCompactAllocator</span>;
 
+<span class="doccomment">/// Embedded metadata pages</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">embedded_meta_data</span>;
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0-nightly (e646f3d2a 2022-02-10)" ></div>

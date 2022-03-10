@@ -177,7 +177,9 @@
 <span id="172">172</span>
 <span id="173">173</span>
 <span id="174">174</span>
+<span id="175">175</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::object_ref_guard::adjust_thread_local_buffer_limit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
@@ -204,7 +206,7 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_limit</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cursor</span>: <span class="ident">Address</span>, <span class="ident">limit</span>: <span class="ident">Address</span>) {
         <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cursor</span>;
-        <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">limit</span>;
+        <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">adjust_thread_local_buffer_limit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">limit</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {

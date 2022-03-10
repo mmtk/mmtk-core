@@ -364,6 +364,15 @@
 <span id="359">359</span>
 <span id="360">360</span>
 <span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
@@ -613,6 +622,15 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `reference`: The object to be queried.</span>
     <span class="kw">fn</span> <span class="ident">get_type_descriptor</span>(<span class="ident">reference</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">i8</span>];
+
+    <span class="doccomment">/// For our allocation result `[cell, cell + bytes)`, if a binding&#39;s</span>
+    <span class="doccomment">/// definition of `ObjectReference` may point outside the cell (i.e. `object_ref &gt;= cell + bytes`),</span>
+    <span class="doccomment">/// the binding needs to provide a `Some` value for this constant and</span>
+    <span class="doccomment">/// the value is the maximum of `object_ref - cell`. If a binding&#39;s</span>
+    <span class="doccomment">/// `ObjectReference` always points to an address in the cell (i.e. `[cell, cell + bytes)`),</span>
+    <span class="doccomment">/// they can leave this as `None`.</span>
+    <span class="doccomment">/// MMTk allocators use this value to make sure that the metadata for object reference is properly set.</span>
+    <span class="kw">const</span> <span class="ident">OBJECT_REF_OFFSET_BEYOND_CELL</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> <span class="op">=</span> <span class="prelude-val">None</span>;
 
     <span class="doccomment">/// Return the lowest address of the storage associated with an object.</span>
     <span class="doccomment">///</span>
