@@ -248,6 +248,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `reference`: The object to be queried.
     fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
 
+    /// For our allocation result `[cell, cell + bytes)`, if a binding's
+    /// definition of `ObjectReference` may point outside the cell (i.e. `object_ref >= cell + bytes`),
+    /// the binding needs to provide a `Some` value for this constant and
+    /// the value is the maximum of `object_ref - cell`. If a binding's
+    /// `ObjectReference` always points to an address in the cell (i.e. `[cell, cell + bytes)`),
+    /// they can leave this as `None`.
+    /// MMTk allocators use this value to make sure that the metadata for object reference is properly set.
+    const OBJECT_REF_OFFSET_BEYOND_CELL: Option<usize> = None;
+
     /// Return the lowest address of the storage associated with an object.
     ///
     /// Arguments:

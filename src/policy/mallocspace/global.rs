@@ -240,9 +240,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
         address
     }
 
+    pub fn free(&self, addr: Address) {
+        let offset_malloc_bit = is_offset_malloc(addr);
+        let bytes = get_malloc_usable_size(addr, offset_malloc_bit);
+        self.free_internal(addr, bytes, offset_malloc_bit);
+    }
+
     // XXX optimize: We pass the bytes in to free as otherwise there were multiple
     // indirect call instructions in the generated assembly
-    pub fn free(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
+    fn free_internal(&self, addr: Address, bytes: usize, offset_malloc_bit: bool) {
         if offset_malloc_bit {
             trace!("Free memory {:x}", addr);
             offset_free(addr);
@@ -373,7 +379,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             trace!("Object {} has been allocated but not marked", object);
 
             // Free object
-            self.free(obj_start, bytes, offset_malloc);
+            self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
             unsafe { unset_alloc_bit_unsafe(object) };
 

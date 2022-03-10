@@ -146,6 +146,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
     /// it. We have no assumptions on whether the VM will continue executing or abort immediately.
     ///
+    /// An allocator needs to make sure the object reference for the returned address is in the same
+    /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
+    /// See [`crate::util::alloc::object_ref_guard`].
+    ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
     /// * `align`: the required alignment in bytes.

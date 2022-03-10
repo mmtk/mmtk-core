@@ -55,10 +55,15 @@ impl Map for Map32 {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         let mut e = 0;
         while e < extent {
-            let index = self.get_chunk_index(start + e);
+            let index = (start + e).chunk_index();
             assert!(
                 self.descriptor_map[index].is_empty(),
                 "Conflicting virtual address request"
+            );
+            debug!(
+                "Set descriptor {:?} for Chunk {}",
+                descriptor,
+                conversions::chunk_index_to_address(index)
             );
             self_mut.descriptor_map[index] = descriptor;
             //   VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, index, space);
@@ -95,13 +100,13 @@ impl Map for Map32 {
             return unsafe { Address::zero() };
         }
         self_mut.total_available_discontiguous_chunks -= chunks;
-        let rtn = self.address_for_chunk_index(chunk as _);
+        let rtn = conversions::chunk_index_to_address(chunk as _);
         self.insert(rtn, chunks << LOG_BYTES_IN_CHUNK, descriptor);
         if head.is_zero() {
             debug_assert!(self.next_link[chunk as usize] == 0);
         } else {
-            self_mut.next_link[chunk as usize] = self.get_chunk_index(head) as _;
-            self_mut.prev_link[self.get_chunk_index(head)] = chunk;
+            self_mut.next_link[chunk as usize] = head.chunk_index() as _;
+            self_mut.prev_link[head.chunk_index()] = chunk;
         }
         debug_assert!(self.prev_link[chunk as usize] == 0);
         rtn
@@ -109,18 +114,18 @@ impl Map for Map32 {
 
     fn get_next_contiguous_region(&self, start: Address) -> Address {
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = self.get_chunk_index(start);
+        let chunk = start.chunk_index();
         if chunk == 0 || self.next_link[chunk] == 0 {
             unsafe { Address::zero() }
         } else {
             let a = self.next_link[chunk];
-            self.address_for_chunk_index(a as _)
+            conversions::chunk_index_to_address(a as _)
         }
     }
 
     fn get_contiguous_region_chunks(&self, start: Address) -> usize {
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = self.get_chunk_index(start);
+        let chunk = start.chunk_index();
         self.region_map.size(chunk as i32) as _
     }
 
@@ -129,10 +134,11 @@ impl Map for Map32 {
     }
 
     fn free_all_chunks(&self, any_chunk: Address) {
+        debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(any_chunk == conversions::chunk_align_down(any_chunk));
         if !any_chunk.is_zero() {
-            let chunk = self.get_chunk_index(any_chunk);
+            let chunk = any_chunk.chunk_index();
             while self_mut.next_link[chunk] != 0 {
                 let x = self_mut.next_link[chunk];
                 self_mut.free_contiguous_chunks_no_lock(x);
@@ -146,9 +152,10 @@ impl Map for Map32 {
     }
 
     fn free_contiguous_chunks(&self, start: Address) -> usize {
+        debug!("free_contiguous_chunks: {}", start);
         let (_sync, self_mut) = self.mut_self_with_sync();
         debug_assert!(start == conversions::chunk_align_down(start));
-        let chunk = self.get_chunk_index(start);
+        let chunk = start.chunk_index();
         self_mut.free_contiguous_chunks_no_lock(chunk as _)
     }
 
@@ -158,8 +165,8 @@ impl Map for Map32 {
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
         let start_address = from;
-        let first_chunk = self.get_chunk_index(start_address);
-        let last_chunk = self.get_chunk_index(to);
+        let first_chunk = start_address.chunk_index();
+        let last_chunk = to.chunk_index();
         let unavail_start_chunk = last_chunk + 1;
         let trailing_chunks = MAX_CHUNKS - unavail_start_chunk;
         let pages = (1 + last_chunk - first_chunk) * PAGES_IN_CHUNK;
@@ -227,7 +234,7 @@ impl Map for Map32 {
     }
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
-        let index = self.get_chunk_index(address);
+        let index = address.chunk_index();
         self.descriptor_map[index]
     }
 
@@ -268,8 +275,13 @@ impl Map32 {
         self.prev_link[chunk as usize] = 0;
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
-            self.descriptor_map[(chunk + offset) as usize] = SpaceDescriptor::UNINITIALIZED;
-            SFT_MAP.clear_by_index((chunk + offset) as usize);
+            let index = (chunk + offset) as usize;
+            debug!(
+                "Clear descriptor for Chunk {}",
+                conversions::chunk_index_to_address(index)
+            );
+            self.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
+            SFT_MAP.clear_by_index(index);
             // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
         }
         chunks as _
