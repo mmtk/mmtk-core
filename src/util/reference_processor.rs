@@ -188,7 +188,7 @@ impl ReferenceProcessor {
 
     pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
         let mut sync = self.sync().lock().unwrap();
-        VM::VMReferenceGlue::set_referent(reff, referent);
+        // VM::VMReferenceGlue::set_referent(reff, referent);
         sync.references.push(reff.to_address());
     }
 
