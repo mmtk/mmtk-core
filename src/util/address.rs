@@ -453,6 +453,8 @@ mod tests {
 pub struct ObjectReference(usize);
 
 impl ObjectReference {
+    pub const NULL: ObjectReference = ObjectReference(0);
+
     /// converts the ObjectReference to an Address
     #[inline(always)]
     pub fn to_address(self) -> Address {

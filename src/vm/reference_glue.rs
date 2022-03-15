@@ -3,6 +3,7 @@ use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
+use crate::scheduler::ProcessEdgesWork;
 
 /// VM-specific methods for reference processing.
 pub trait ReferenceGlue<VM: VMBinding> {
@@ -30,16 +31,5 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// * `referent`: The referent object reference.
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
-    /// Process a reference with the current semantics and return an updated reference (e.g. with a new address)
-    /// if the reference is still alive, otherwise return a null object reference.
-    ///
-    /// Arguments:
-    /// * `trace`: A reference to a `TraceLocal` object for this reference.
-    /// * `reference`: The address of the reference. This may or may not be the address of a heap object, depending on the VM.
-    /// * `tls`: The GC thread that is processing this reference.
-    fn process_reference<T: TraceLocal>(
-        trace: &mut T,
-        reference: ObjectReference,
-        tls: VMWorkerThread,
-    ) -> ObjectReference;
+    fn enqueue_reference(object: ObjectReference);
 }
