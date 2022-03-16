@@ -14,7 +14,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
-use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec};
+use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec, store_metadata};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -407,14 +407,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 crate::util::alloc_bit::unset_alloc_bit(object);
                 ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
-            if !super::MARK_LINE_AT_SCAN_TIME {
-                self.mark_lines(new_object);
-            }
             debug_assert_eq!(
                 Block::containing::<VM>(new_object).get_state(),
                 BlockState::Marked
             );
             trace.process_node(new_object);
+            debug_assert!(new_object.is_live());
             new_object
         }
     }
@@ -643,10 +641,25 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
         align: usize,
         offset: isize,
     ) -> Address {
-        if self.defrag_allocator.immix_space().in_defrag() {
+        if self.get_space().in_defrag() {
             self.defrag_allocator.alloc(bytes, align, offset)
         } else {
             self.copy_allocator.alloc(bytes, align, offset)
+        }
+    }
+    #[inline(always)]
+    fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
+        // Mark the object
+        store_metadata::<VM>(
+            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            obj,
+            self.get_space().mark_state as usize,
+            None,
+            Some(Ordering::SeqCst),
+        );
+        // Mark the line
+        if !super::MARK_LINE_AT_SCAN_TIME {
+            self.get_space().mark_lines(obj);
         }
     }
 }
@@ -661,5 +674,13 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
             copy_allocator: ImmixAllocator::new(tls.0, Some(space), plan, false),
             defrag_allocator: ImmixAllocator::new(tls.0, Some(space), plan, true),
         }
+    }
+
+    #[inline(always)]
+    fn get_space(&self) -> &ImmixSpace<VM> {
+        // Both copy allocators should point to the same space.
+        debug_assert_eq!(self.defrag_allocator.immix_space().common().descriptor, self.copy_allocator.immix_space().common().descriptor);
+        // Just get the space from either allocator
+        self.defrag_allocator.immix_space()
     }
 }
