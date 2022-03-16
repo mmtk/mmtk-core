@@ -14,7 +14,9 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
-use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec, store_metadata};
+use crate::util::metadata::{
+    self, compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
+};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -679,7 +681,10 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
     #[inline(always)]
     fn get_space(&self) -> &ImmixSpace<VM> {
         // Both copy allocators should point to the same space.
-        debug_assert_eq!(self.defrag_allocator.immix_space().common().descriptor, self.copy_allocator.immix_space().common().descriptor);
+        debug_assert_eq!(
+            self.defrag_allocator.immix_space().common().descriptor,
+            self.copy_allocator.immix_space().common().descriptor
+        );
         // Just get the space from either allocator
         self.defrag_allocator.immix_space()
     }
