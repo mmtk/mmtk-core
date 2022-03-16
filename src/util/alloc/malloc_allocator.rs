@@ -1,5 +1,6 @@
 use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
+use crate::util::alloc::object_ref_guard::object_ref_may_cross_chunk;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;
 use crate::util::Address;
@@ -36,14 +37,28 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
         assert!(offset >= 0);
 
         let ret = self.space.alloc(self.tls, size, align, offset);
-        trace!(
-            "MallocSpace.alloc size = {}, align = {}, offset = {}, res = {}",
-            size,
-            align,
-            offset,
+        if !object_ref_may_cross_chunk::<VM>(ret) {
             ret
-        );
-        ret
+        } else {
+            // The address we got does not pass object ref checks. We cache it and free it later.
+            // We free the results in the end to avoid malloc giving us the free'd address again.
+            // The creation of the vec is put here so for the common case where we succeed in the first allocation,
+            // we do not need to create this vec.
+            let mut to_free = vec![ret];
+            loop {
+                let ret = self.space.alloc(self.tls, size, align, offset);
+                if object_ref_may_cross_chunk::<VM>(ret) {
+                    // The result does not pass check. Cache it.
+                    to_free.push(ret);
+                } else {
+                    // The result passes the check. We free all the cached results, and return the new result.
+                    for addr in to_free.iter() {
+                        self.space.free(*addr);
+                    }
+                    return ret;
+                }
+            }
+        }
     }
 }
 

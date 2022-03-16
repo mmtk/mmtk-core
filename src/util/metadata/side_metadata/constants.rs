@@ -1,6 +1,6 @@
-use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
-use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::Address;
 
@@ -61,9 +61,6 @@ pub(crate) const LOCAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset = SideMetad
 #[cfg(target_pointer_width = "64")]
 pub(crate) const LOCAL_SIDE_METADATA_BASE_OFFSET: SideMetadataOffset =
     SideMetadataOffset::addr(LOCAL_SIDE_METADATA_BASE_ADDRESS);
-
-#[cfg(target_pointer_width = "32")]
-pub(super) const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 
 #[cfg(target_pointer_width = "32")]
 pub(super) const LOCAL_SIDE_METADATA_PER_CHUNK: usize =

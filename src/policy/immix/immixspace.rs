@@ -14,7 +14,9 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{self, *};
-use crate::util::metadata::{self, compare_exchange_metadata, load_metadata, MetadataSpec, store_metadata};
+use crate::util::metadata::{
+    self, compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
+};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -649,7 +651,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     }
     #[inline(always)]
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
-        // mark the object
+        // Mark the object
         store_metadata::<VM>(
             &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             obj,
@@ -657,6 +659,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
             None,
             Some(Ordering::SeqCst),
         );
+        // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.get_space().mark_lines(obj);
         }
@@ -675,9 +678,14 @@ impl<VM: VMBinding> ImmixCopyContext<VM> {
         }
     }
 
+    #[inline(always)]
     fn get_space(&self) -> &ImmixSpace<VM> {
-        // Same space
-        debug_assert_eq!(self.defrag_allocator.immix_space().common().descriptor, self.copy_allocator.immix_space().common().descriptor);
+        // Both copy allocators should point to the same space.
+        debug_assert_eq!(
+            self.defrag_allocator.immix_space().common().descriptor,
+            self.copy_allocator.immix_space().common().descriptor
+        );
+        // Just get the space from either allocator
         self.defrag_allocator.immix_space()
     }
 }
