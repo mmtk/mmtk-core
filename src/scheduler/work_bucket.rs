@@ -161,6 +161,7 @@ pub enum WorkBucketStage {
     FinalRefClosure,
     PhantomRefClosure,
     CalculateForwarding,
+    SecondRoots,
     RefForwarding,
     FinalizableForwarding,
     Compact,

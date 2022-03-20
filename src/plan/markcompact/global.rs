@@ -104,12 +104,23 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
-        scheduler.work_buckets[WorkBucketStage::RefForwarding].add(UpdateReferences::<VM>::new());
+        scheduler.work_buckets[WorkBucketStage::SecondRoots].add(UpdateReferences::<VM>::new());
         scheduler.work_buckets[WorkBucketStage::Compact].add(Compact::<VM>::new(&self.mc_space));
 
         // Release global/collectors/mutators
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
+
+        // Reference processing
+        if !*self.base().options.no_reference_types {
+            use crate::util::reference_processor::{SoftRefProcessing, WeakRefProcessing, PhantomRefProcessing};
+            scheduler.work_buckets[WorkBucketStage::SoftRefClosure].add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+
+            use crate::util::reference_processor::RefForwarding;
+            scheduler.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
+        }
 
         // Finalization
         if !*self.base().options.no_finalizer {
