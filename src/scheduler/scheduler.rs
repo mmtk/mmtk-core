@@ -59,6 +59,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
@@ -93,6 +94,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             open_next(Closure);
             open_next(RefClosure);
             open_next(CalculateForwarding);
+            open_next(SecondRoots);
             open_next(RefForwarding);
             open_next(Compact);
             open_next(Release);

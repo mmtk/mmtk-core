@@ -158,6 +158,7 @@ pub enum WorkBucketStage {
     // we may need more than one buckets for each reference strength.
     RefClosure,
     CalculateForwarding,
+    SecondRoots,
     RefForwarding,
     Compact,
     Release,
