@@ -65,6 +65,12 @@ impl ReferenceProcessors {
         self.phantom.add_candidate::<VM>(reff, referent);
     }
 
+    pub fn enqueue_refs<E: ProcessEdgesWork>(&self, trace: &mut E) {
+        self.soft.enqueue::<E>(trace, false);
+        self.weak.enqueue::<E>(trace, false);
+        self.phantom.enqueue::<E>(trace, false);
+    }
+
     pub fn forward_refs<E: ProcessEdgesWork>(&self, trace: &mut E) {
         self.soft.forward::<E>(trace, false);
         self.weak.forward::<E>(trace, false);
@@ -148,6 +154,8 @@ struct ReferenceProcessorSync {
      */
     unforwarded_references: Option<Vec<Address>>,
 
+    enqueued_references: Vec<ObjectReference>,
+
     /**
      * Index into the <code>references</code> table for the start of
      * the reference nursery.
@@ -161,6 +169,7 @@ impl ReferenceProcessor {
             sync: UnsafeCell::new(Mutex::new(ReferenceProcessorSync {
                 references: Vec::with_capacity(INITIAL_SIZE),
                 unforwarded_references: None,
+                enqueued_references: vec![],
                 nursery_index: 0,
             })),
             semantics,
@@ -204,6 +213,14 @@ impl ReferenceProcessor {
         e.trace_object(object)
     }
 
+    pub fn enqueue<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
+        let mut sync = unsafe { self.sync_mut() };
+
+        for obj in sync.enqueued_references.drain(..) {
+            <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(obj);
+        }
+    }
+
     pub fn forward<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = unsafe { self.sync_mut() };
         let references: &mut Vec<Address> = &mut sync.references;
@@ -238,6 +255,32 @@ impl ReferenceProcessor {
             let new_reference = Self::get_forwarded_reference(trace, reference);
             *unforwarded_ref = new_reference.to_address();
         }
+
+        let mut new_queue = vec![];
+        for obj in sync.enqueued_references.drain(..) {
+            let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(obj);
+            let new_referent = Self::get_forwarded_referent(trace, old_referent);
+            if !old_referent.is_null() {
+                // make sure MC forwards the referent
+                // debug_assert!(old_referent != new_referent);
+            }
+            <E::VM as VMBinding>::VMReferenceGlue::set_referent(
+                obj,
+                new_referent,
+            );
+            let new_reference = Self::get_forwarded_reference(trace, obj);
+            // debug_assert!(!obj.is_null());
+            // debug_assert!(obj != new_reference);
+            if TRACE_DETAIL {
+                use crate::vm::ObjectModel;
+                trace!("Forwarding enqueued reference: {} (size: {})", obj, <E::VM as VMBinding>::VMObjectModel::get_current_size(obj));
+                trace!(" referent: {} (forwarded to {})", old_referent, new_referent);
+                trace!(" reference: forwarded to {}", new_reference);
+            }
+            // <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(new_reference);
+            new_queue.push(new_reference);
+        }
+        sync.enqueued_references = new_queue;
 
         if TRACE {
             trace!("Ending ReferenceProcessor.forward({:?})", self.semantics)
@@ -275,7 +318,7 @@ impl ReferenceProcessor {
                 let reference = unsafe { references[i].to_object_reference() };
 
                 /* Determine liveness (and forward if necessary) the reference */
-                let new_reference = self.process_reference(trace, reference, tls);
+                let new_reference = self.process_reference(trace, reference, tls, &mut sync.enqueued_references);
                 if !new_reference.is_null() {
                     references[to_index] = new_reference.to_address();
                     to_index += 1;
@@ -361,6 +404,7 @@ impl ReferenceProcessor {
         trace: &mut E,
         reference: ObjectReference,
         tls: VMWorkerThread,
+        enqueued_references: &mut Vec<ObjectReference>,
     ) -> ObjectReference {
         debug_assert!(!reference.is_null());
 
@@ -377,6 +421,8 @@ impl ReferenceProcessor {
 
         // The reference object is live
         let new_reference = Self::get_forwarded_reference(trace, reference);
+        // This assert should be true for mark compact
+        // debug_assert_eq!(reference, new_reference);
         let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
 
         if TRACE_DETAIL { trace!(" ~> {}", old_referent); }
@@ -396,6 +442,8 @@ impl ReferenceProcessor {
             // Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
             let new_referent = Self::get_forwarded_referent(trace, old_referent);
+            // This assert should be true for mark compact
+            // debug_assert_eq!(old_referent, new_referent);
 
             if TRACE_DETAIL { trace!(" ~> {}", new_referent); }
             debug_assert!(new_referent.is_live());
@@ -415,7 +463,8 @@ impl ReferenceProcessor {
             else if TRACE_UNREACHABLE { trace!(" UNREACHABLE referent: {}", old_referent); }
 
             <E::VM as VMBinding>::VMReferenceGlue::clear_referent(new_reference);
-            <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(new_reference);
+            // <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(new_reference);
+            enqueued_references.push(new_reference);
             return ObjectReference::NULL;
         }
     }
@@ -477,6 +526,20 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
     }
 }
 impl<E: ProcessEdgesWork> RefForwarding<E> {
+    pub fn new() -> Self {
+        Self(PhantomData)
+    }
+}
+
+pub struct RefEnqueue<E: ProcessEdgesWork>(PhantomData<E>);
+impl<E: ProcessEdgesWork> GCWork<E::VM> for RefEnqueue<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        let mut w = E::new(vec![], false, mmtk);
+        w.set_worker(worker);
+        mmtk.reference_processors.enqueue_refs(&mut w);
+    }
+}
+impl<E: ProcessEdgesWork> RefEnqueue<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }

@@ -222,6 +222,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             use crate::util::reference_processor::RefForwarding;
             self.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+
+            use crate::util::reference_processor::RefEnqueue;
+            self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<C::ProcessEdgesWorkType>::new());
         }
 
         // Finalization
