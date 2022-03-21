@@ -277,14 +277,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             bucket.deactivate();
         }
-        // self.work_buckets[WorkBucketStage::Prepare].deactivate();
-        // self.work_buckets[WorkBucketStage::Closure].deactivate();
-        // self.work_buckets[WorkBucketStage::RefClosure].deactivate();
-        // self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
-        // self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
-        // self.work_buckets[WorkBucketStage::Compact].deactivate();
-        // self.work_buckets[WorkBucketStage::Release].deactivate();
-        // self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
     pub fn reset_state(&self) {
@@ -295,14 +287,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             bucket.deactivate();
         }
-        // // self.work_buckets[WorkBucketStage::Prepare].deactivate();
-        // self.work_buckets[WorkBucketStage::Closure].deactivate();
-        // self.work_buckets[WorkBucketStage::RefClosure].deactivate();
-        // self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
-        // self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
-        // self.work_buckets[WorkBucketStage::Compact].deactivate();
-        // self.work_buckets[WorkBucketStage::Release].deactivate();
-        // self.work_buckets[WorkBucketStage::Final].deactivate();
     }
 
     pub fn debug_assert_all_buckets_deactivated(&self) {
@@ -313,14 +297,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
             debug_assert!(!bucket.is_activated());
         }
-        // debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::CalculateForwarding].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::Compact].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
-        // debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
     }
 
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {

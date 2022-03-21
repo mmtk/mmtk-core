@@ -115,23 +115,36 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     // From the cell address, `cell - GC_EXTRA_HEADER_WORD` is where we store the header forwarding pointer.
 
     /// Get the address for header forwarding pointer
+    #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
         VM::VMObjectModel::object_start_ref(object) - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
+    #[inline(always)]
     fn get_header_forwarding_pointer(object: ObjectReference) -> ObjectReference {
         unsafe { Self::header_forwarding_pointer_address(object).load::<ObjectReference>() }
     }
 
     /// Store header forwarding pointer for an object
-    fn store_header_forwarding_pointer(object: ObjectReference, forwarding_pointer: ObjectReference) {
-        unsafe { Self::header_forwarding_pointer_address(object).store::<ObjectReference>(forwarding_pointer); }
+    #[inline(always)]
+    fn store_header_forwarding_pointer(
+        object: ObjectReference,
+        forwarding_pointer: ObjectReference,
+    ) {
+        unsafe {
+            Self::header_forwarding_pointer_address(object)
+                .store::<ObjectReference>(forwarding_pointer);
+        }
     }
 
     // Clear header forwarding pointer for an object
+    #[inline(always)]
     fn clear_header_forwarding_pointer(object: ObjectReference) {
-        crate::util::memory::zero(Self::header_forwarding_pointer_address(object), GC_EXTRA_HEADER_BYTES);
+        crate::util::memory::zero(
+            Self::header_forwarding_pointer_address(object),
+            GC_EXTRA_HEADER_BYTES,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -296,11 +309,20 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             let align = VM::VMObjectModel::get_align_when_copied(obj);
             let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
             to = align_allocation_no_fill::<VM>(to, align, offset);
-            let new_obj = VM::VMObjectModel::get_reference_when_copied_to(obj, to + Self::HEADER_RESERVED_IN_BYTES);
+            let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
+                obj,
+                to + Self::HEADER_RESERVED_IN_BYTES,
+            );
 
             Self::store_header_forwarding_pointer(obj, new_obj);
 
-            trace!("Calculate forward: {} (size when copied = {}) ~> {} (size = {})", obj, VM::VMObjectModel::get_size_when_copied(obj), to, copied_size);
+            trace!(
+                "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
+                obj,
+                VM::VMObjectModel::get_size_when_copied(obj),
+                to,
+                copied_size
+            );
 
             to += copied_size;
         }
@@ -324,8 +346,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
             trace!("Compact {} to {}", obj, forwarding_pointer);
             if !forwarding_pointer.is_null() {
-                let copied_size =
-                    VM::VMObjectModel::get_size_when_copied(obj);
+                let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 let new_object = forwarding_pointer;
                 Self::clear_header_forwarding_pointer(new_object);
 
@@ -351,6 +372,5 @@ impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompa
     #[inline(always)]
     fn size(object: ObjectReference) -> usize {
         VM::VMObjectModel::get_current_size(object)
-            // + MarkCompactSpace::<VM>::HEADER_RESERVED_IN_BYTES
     }
 }
