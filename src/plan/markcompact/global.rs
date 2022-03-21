@@ -111,20 +111,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
 
-        // Reference processing
-        if !*self.base().options.no_reference_types {
-            use crate::util::reference_processor::{SoftRefProcessing, WeakRefProcessing, PhantomRefProcessing};
-            scheduler.work_buckets[WorkBucketStage::SoftRefClosure].add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
-            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure].add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
-
-            use crate::util::reference_processor::RefForwarding;
-            scheduler.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
-
-            use crate::util::reference_processor::RefEnqueue;
-            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<ForwardingProcessEdges<VM>>::new());
-        }
-
         // Finalization
         if !*self.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
