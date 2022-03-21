@@ -216,8 +216,10 @@ impl ReferenceProcessor {
     pub fn enqueue<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = unsafe { self.sync_mut() };
 
-        for obj in sync.enqueued_references.drain(..) {
-            <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(obj);
+        if !sync.enqueued_references.is_empty() {
+            debug!("enqueue: {:?}", sync.enqueued_references);
+            <E::VM as VMBinding>::VMReferenceGlue::enqueue_references(&sync.enqueued_references);
+            sync.enqueued_references.clear();
         }
     }
 
@@ -278,6 +280,7 @@ impl ReferenceProcessor {
                 trace!(" reference: forwarded to {}", new_reference);
             }
             // <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(new_reference);
+            debug_assert!(!new_reference.is_null(), "reference {:?}'s forwarding pointer is NULL", obj);
             new_queue.push(new_reference);
         }
         sync.enqueued_references = new_queue;
