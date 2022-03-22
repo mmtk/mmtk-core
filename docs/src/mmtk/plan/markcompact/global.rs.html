@@ -316,7 +316,7 @@
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::CalculateForwarding</span>]
             .<span class="ident">add</span>(<span class="ident">CalculateForwardingAddress</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>));
         <span class="comment">// do another trace to update references</span>
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>].<span class="ident">add</span>(<span class="ident">UpdateReferences</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SecondRoots</span>].<span class="ident">add</span>(<span class="ident">UpdateReferences</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>());
         <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Compact</span>].<span class="ident">add</span>(<span class="ident">Compact</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">mc_space</span>));
 
         <span class="comment">// Release global/collectors/mutators</span>

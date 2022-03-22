@@ -246,11 +246,11 @@
         <span class="comment">// scheduler.work_buckets[WorkBucketStage::RefForwarding]</span>
         <span class="comment">//     .add(ScanStackRoots::&lt;ForwardingProcessEdges&lt;VM&gt;&gt;::new());</span>
         <span class="kw">for</span> <span class="ident">mutator</span> <span class="kw">in</span> <span class="ident">VM::VMActivePlan::mutators</span>() {
-            <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
+            <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SecondRoots</span>]
                 .<span class="ident">add</span>(<span class="ident">ScanStackRoot</span>::<span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="ident">mutator</span>));
         }
 
-        <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
+        <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SecondRoots</span>]
             .<span class="ident">add</span>(<span class="ident">ScanVMSpecificRoots</span>::<span class="op">&lt;</span><span class="ident">ForwardingProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::new</span>());
     }
 }

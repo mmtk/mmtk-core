@@ -327,6 +327,58 @@
 <span id="322">322</span>
 <span id="323">323</span>
 <span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SpaceOptions</span>, <span class="ident">SFT</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill</span>;
@@ -347,6 +399,9 @@
 
 <span class="kw">const</span> <span class="ident">GC_MARK_BIT_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 
+<span class="doccomment">/// For each MarkCompact object, we need one extra word for storing forwarding pointer (Lisp-2 implementation).</span>
+<span class="doccomment">/// Note that considering the object alignment, we may end up allocating/reserving more than one word per object.</span>
+<span class="doccomment">/// See [`MarkCompactSpace::HEADER_RESERVED_IN_BYTES`].</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GC_EXTRA_HEADER_WORD</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span>;
 <span class="kw">const</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">GC_EXTRA_HEADER_WORD</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_WORD</span>;
 
@@ -356,11 +411,13 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">get_forwarded_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-        <span class="comment">// the current forwarding pointer implementation will store forwarding pointers</span>
-        <span class="comment">// in dead objects&#39; header, which is not the case in mark compact. Mark compact</span>
-        <span class="comment">// implements its own forwarding mechanism</span>
-        <span class="macro">unimplemented!</span>()
+    <span class="kw">fn</span> <span class="ident">get_forwarded_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_header_forwarding_pointer</span>(<span class="ident">object</span>);
+        <span class="kw">if</span> <span class="ident">forwarding_pointer</span>.<span class="ident">is_null</span>() {
+            <span class="prelude-val">None</span>
+        } <span class="kw">else</span> {
+            <span class="prelude-val">Some</span>(<span class="ident">forwarding_pointer</span>)
+        }
     }
 
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
@@ -422,12 +479,54 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkCompactSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// We need one extra header word for each object. Considering the alignment requirement, this is</span>
+    <span class="doccomment">/// the actual bytes we need to reserve for each allocation.</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEADER_RESERVED_IN_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">VM::MAX_ALIGNMENT</span> <span class="op">&gt;</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span> {
         <span class="ident">VM::MAX_ALIGNMENT</span>
     } <span class="kw">else</span> {
         <span class="ident">GC_EXTRA_HEADER_BYTES</span>
     }
     .<span class="ident">next_power_of_two</span>();
+
+    <span class="comment">// The following are a few functions for manipulating header forwarding poiner.</span>
+    <span class="comment">// Basically for each allocation request, we allocate extra bytes of [`HEADER_RESERVED_IN_BYTES`].</span>
+    <span class="comment">// From the allocation result we get (e.g. `alloc_res`), `alloc_res + HEADER_RESERVED_IN_BYTES` is the cell</span>
+    <span class="comment">// address we return to the binding. It ensures we have at least one word (`GC_EXTRA_HEADER_WORD`) before</span>
+    <span class="comment">// the cell address, and ensures the cell address is properly aligned.</span>
+    <span class="comment">// From the cell address, `cell - GC_EXTRA_HEADER_WORD` is where we store the header forwarding pointer.</span>
+
+    <span class="doccomment">/// Get the address for header forwarding pointer</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">header_forwarding_pointer_address</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span> {
+        <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>) <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>
+    }
+
+    <span class="doccomment">/// Get header forwarding pointer for an object</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">get_header_forwarding_pointer</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw">unsafe</span> { <span class="ident"><span class="self">Self</span>::header_forwarding_pointer_address</span>(<span class="ident">object</span>).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>() }
+    }
+
+    <span class="doccomment">/// Store header forwarding pointer for an object</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">store_header_forwarding_pointer</span>(
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">forwarding_pointer</span>: <span class="ident">ObjectReference</span>,
+    ) {
+        <span class="kw">unsafe</span> {
+            <span class="ident"><span class="self">Self</span>::header_forwarding_pointer_address</span>(<span class="ident">object</span>)
+                .<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>(<span class="ident">forwarding_pointer</span>);
+        }
+    }
+
+    <span class="comment">// Clear header forwarding pointer for an object</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">clear_header_forwarding_pointer</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+        <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(
+            <span class="ident"><span class="self">Self</span>::header_forwarding_pointer_address</span>(<span class="ident">object</span>),
+            <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
+        );
+    }
 
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
@@ -503,13 +602,7 @@
             <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
         }
 
-        <span class="comment">// For markcompact, only one word is required to store the forwarding pointer</span>
-        <span class="comment">// and it is always stored in front of the object start address. However, the</span>
-        <span class="comment">// number of extra bytes required is determined by the object alignment</span>
-        <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span>
-            <span class="kw">unsafe</span> { (<span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>() };
-
-        <span class="kw">unsafe</span> { (<span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>).<span class="ident">to_object_reference</span>() }
+        <span class="ident"><span class="self">Self</span>::get_header_forwarding_pointer</span>(<span class="ident">object</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
@@ -597,10 +690,24 @@
             <span class="kw">let</span> <span class="ident">align</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_when_copied</span>(<span class="ident">obj</span>);
             <span class="kw">let</span> <span class="ident">offset</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_align_offset_when_copied</span>(<span class="ident">obj</span>);
             <span class="ident">to</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">to</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-            <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
-            <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">store</span>(<span class="ident">to</span>) }
+            <span class="kw">let</span> <span class="ident">new_obj</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_reference_when_copied_to</span>(
+                <span class="ident">obj</span>,
+                <span class="ident">to</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>,
+            );
+
+            <span class="ident"><span class="self">Self</span>::store_header_forwarding_pointer</span>(<span class="ident">obj</span>, <span class="ident">new_obj</span>);
+
+            <span class="macro">trace!</span>(
+                <span class="string">&quot;Calculate forward: {} (size when copied = {}) ~&gt; {} (size = {})&quot;</span>,
+                <span class="ident">obj</span>,
+                <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>),
+                <span class="ident">to</span>,
+                <span class="ident">copied_size</span>
+            );
+
             <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>;
         }
+        <span class="macro">debug!</span>(<span class="string">&quot;Calculate forward end: to = {}&quot;</span>, <span class="ident">to</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compact</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -616,27 +723,25 @@
             <span class="comment">// clear the alloc bit</span>
             <span class="ident">alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">obj</span>.<span class="ident">to_address</span>());
 
-            <span class="kw">let</span> <span class="ident">forwarding_pointer_addr</span> <span class="op">=</span> <span class="ident">obj</span>.<span class="ident">to_address</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>;
-            <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">forwarding_pointer_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>() };
-            <span class="kw">if</span> <span class="ident">forwarding_pointer</span> <span class="op">!</span><span class="op">=</span> <span class="ident">Address::ZERO</span> {
-                <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span>
-                    <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>) <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
-                <span class="ident">to</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span>;
-                <span class="kw">let</span> <span class="ident">object_addr</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span>;
-                <span class="comment">// clear forwarding pointer</span>
-                <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(
-                    <span class="ident">forwarding_pointer</span> <span class="op">+</span> <span class="ident"><span class="self">Self</span>::HEADER_RESERVED_IN_BYTES</span> <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
-                    <span class="ident">GC_EXTRA_HEADER_BYTES</span>,
-                );
-                <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">forwarding_pointer_addr</span>, <span class="ident">GC_EXTRA_HEADER_BYTES</span>);
+            <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_header_forwarding_pointer</span>(<span class="ident">obj</span>);
+
+            <span class="macro">trace!</span>(<span class="string">&quot;Compact {} to {}&quot;</span>, <span class="ident">obj</span>, <span class="ident">forwarding_pointer</span>);
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">forwarding_pointer</span>.<span class="ident">is_null</span>() {
+                <span class="kw">let</span> <span class="ident">copied_size</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::get_size_when_copied</span>(<span class="ident">obj</span>);
+                <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">forwarding_pointer</span>;
+                <span class="ident"><span class="self">Self</span>::clear_header_forwarding_pointer</span>(<span class="ident">new_object</span>);
+
                 <span class="comment">// copy object</span>
-                <span class="kw">let</span> <span class="ident">target</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">object_addr</span>.<span class="ident">to_object_reference</span>() };
-                <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">target</span>, <span class="ident">Address::ZERO</span>);
+                <span class="macro">trace!</span>(<span class="string">&quot; copy from {} to {}&quot;</span>, <span class="ident">obj</span>, <span class="ident">new_object</span>);
+                <span class="kw">let</span> <span class="ident">end_of_new_object</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">new_object</span>, <span class="ident">Address::ZERO</span>);
                 <span class="comment">// update alloc_bit,</span>
-                <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">target</span>);
-                <span class="ident">to</span> <span class="op">+</span><span class="op">=</span> <span class="ident">copied_size</span>
+                <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">new_object</span>);
+                <span class="ident">to</span> <span class="op">=</span> <span class="ident">new_object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">copied_size</span>;
+                <span class="macro">debug_assert_eq!</span>(<span class="ident">end_of_new_object</span>, <span class="ident">to</span>);
             }
         }
+
+        <span class="macro">debug!</span>(<span class="string">&quot;Compact end: to = {}&quot;</span>, <span class="ident">to</span>);
 
         <span class="comment">// reset the bump pointer</span>
         <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">reset_cursor</span>(<span class="ident">to</span>);
@@ -648,7 +753,6 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
         <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">object</span>)
-            <span class="op">+</span> <span class="ident">MarkCompactSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::HEADER_RESERVED_IN_BYTES</span>
     }
 }
 </code></pre></div>

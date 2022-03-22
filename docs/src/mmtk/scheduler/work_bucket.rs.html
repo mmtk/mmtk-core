@@ -168,6 +168,7 @@
 <span id="163">163</span>
 <span id="164">164</span>
 <span id="165">165</span>
+<span id="166">166</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">enum_map::Enum</span>;
@@ -328,6 +329,7 @@
     <span class="comment">// we may need more than one buckets for each reference strength.</span>
     <span class="ident">RefClosure</span>,
     <span class="ident">CalculateForwarding</span>,
+    <span class="ident">SecondRoots</span>,
     <span class="ident">RefForwarding</span>,
     <span class="ident">Compact</span>,
     <span class="ident">Release</span>,
