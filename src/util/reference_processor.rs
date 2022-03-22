@@ -145,14 +145,14 @@ struct ReferenceProcessorSync {
     /**
      * The table of reference objects for the current semantics
      */
-    references: Vec<Address>,
+    references: Vec<ObjectReference>,
 
     /**
      * In a MarkCompact (or similar) collector, we need to update the {@code references}
      * field, and then update its contents.  We implement this by saving the pointer in
      * this untraced field for use during the {@code forward} pass.
      */
-    unforwarded_references: Option<Vec<Address>>,
+    // unforwarded_references: Option<Vec<Address>>,
 
     enqueued_references: Vec<ObjectReference>,
 
@@ -168,7 +168,7 @@ impl ReferenceProcessor {
         ReferenceProcessor {
             sync: UnsafeCell::new(Mutex::new(ReferenceProcessorSync {
                 references: Vec::with_capacity(INITIAL_SIZE),
-                unforwarded_references: None,
+                // unforwarded_references: None,
                 enqueued_references: vec![],
                 nursery_index: 0,
             })),
@@ -191,14 +191,17 @@ impl ReferenceProcessor {
     pub fn clear(&self) {
         let mut sync = self.sync().lock().unwrap();
         sync.references.clear();
-        sync.unforwarded_references = None;
+        // sync.unforwarded_references = None;
         sync.nursery_index = 0;
     }
 
     pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, referent: ObjectReference) {
         let mut sync = self.sync().lock().unwrap();
         // VM::VMReferenceGlue::set_referent(reff, referent);
-        sync.references.push(reff.to_address());
+        if sync.references.iter().any(|r| *r == reff) {
+            return;
+        }
+        sync.references.push(reff);
     }
 
     fn get_forwarded_referent<E: ProcessEdgesWork>(e: &mut E, object: ObjectReference) -> ObjectReference {
@@ -225,38 +228,65 @@ impl ReferenceProcessor {
 
     pub fn forward<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = unsafe { self.sync_mut() };
-        let references: &mut Vec<Address> = &mut sync.references;
+        let references: &mut Vec<ObjectReference> = &mut sync.references;
         // XXX: Copies `unforwarded_references` out. Should be fine since it's not accessed
         //      concurrently & it's set to `None` at the end anyway..
-        let mut unforwarded_references: Vec<Address> = sync.unforwarded_references.clone().unwrap();
+        // let mut unforwarded_references: Vec<Address> = sync.unforwarded_references.clone().unwrap();
         if TRACE {
             trace!("Starting ReferenceProcessor.forward({:?})", self.semantics);
         }
-        if TRACE_DETAIL {
-            trace!("{:?} Reference table is {:?}", self.semantics, references);
-            trace!(
-                "{:?} unforwardedReferences is {:?}",
-                self.semantics,
-                unforwarded_references
-            );
-        }
+        // if TRACE_DETAIL {
+        //     trace!("{:?} Reference table is {:?}", self.semantics, references);
+        //     trace!(
+        //         "{:?} unforwardedReferences is {:?}",
+        //         self.semantics,
+        //         unforwarded_references
+        //     );
+        // }
 
-        for (i, unforwarded_ref) in unforwarded_references
-            .iter_mut()
-            .enumerate()
-            .take(references.len())
-        {
-            let reference = unsafe { unforwarded_ref.to_object_reference() };
-            if TRACE_DETAIL {
-                trace!("slot {:?}: forwarding {:?}", i, reference);
+        // for (i, unforwarded_ref) in unforwarded_references
+        //     .iter_mut()
+        //     .enumerate()
+        //     .take(references.len())
+        // {
+        //     let reference = unsafe { unforwarded_ref.to_object_reference() };
+        //     if TRACE_DETAIL {
+        //         trace!("slot {:?}: forwarding {:?}", i, reference);
+        //     }
+        //     <E::VM as VMBinding>::VMReferenceGlue::set_referent(
+        //         reference,
+        //         Self::get_forwarded_referent(trace, <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference)),
+        //     );
+        //     let new_reference = Self::get_forwarded_reference(trace, reference);
+        //     *unforwarded_ref = new_reference.to_address();
+        // }
+
+        let mut new_queue = vec![];
+        for obj in sync.references.drain(..) {
+            let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(obj);
+            let new_referent = Self::get_forwarded_referent(trace, old_referent);
+            if !old_referent.is_null() {
+                // make sure MC forwards the referent
+                // debug_assert!(old_referent != new_referent);
             }
             <E::VM as VMBinding>::VMReferenceGlue::set_referent(
-                reference,
-                Self::get_forwarded_referent(trace, <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference)),
+                obj,
+                new_referent,
             );
-            let new_reference = Self::get_forwarded_reference(trace, reference);
-            *unforwarded_ref = new_reference.to_address();
+            let new_reference = Self::get_forwarded_reference(trace, obj);
+            // debug_assert!(!obj.is_null());
+            // debug_assert!(obj != new_reference);
+            if TRACE_DETAIL {
+                use crate::vm::ObjectModel;
+                trace!("Forwarding reference: {} (size: {})", obj, <E::VM as VMBinding>::VMObjectModel::get_current_size(obj));
+                trace!(" referent: {} (forwarded to {})", old_referent, new_referent);
+                trace!(" reference: forwarded to {}", new_reference);
+            }
+            // <E::VM as VMBinding>::VMReferenceGlue::enqueue_reference(new_reference);
+            debug_assert!(!new_reference.is_null(), "reference {:?}'s forwarding pointer is NULL", obj);
+            new_queue.push(new_reference);
         }
+        sync.references = new_queue;
 
         let mut new_queue = vec![];
         for obj in sync.enqueued_references.drain(..) {
@@ -288,7 +318,7 @@ impl ReferenceProcessor {
         if TRACE {
             trace!("Ending ReferenceProcessor.forward({:?})", self.semantics)
         }
-        sync.unforwarded_references = None;
+        // sync.unforwarded_references = None;
     }
 
     fn scan<E: ProcessEdgesWork>(
@@ -299,8 +329,8 @@ impl ReferenceProcessor {
         tls: VMWorkerThread,
     ) {
         let sync = unsafe { self.sync_mut() };
-        sync.unforwarded_references = Some(sync.references.clone());
-        let references: &mut Vec<Address> = &mut sync.references;
+        // sync.unforwarded_references = Some(sync.references.clone());
+        let references: &mut Vec<ObjectReference> = &mut sync.references;
 
         if TRACE {
             trace!("Starting ReferenceProcessor.scan({:?})", self.semantics);
@@ -312,26 +342,24 @@ impl ReferenceProcessor {
             trace!("{:?} Reference table is {:?}", self.semantics, references);
         }
         if retain {
-            for addr in references.iter().skip(from_index) {
-                let reference = unsafe { addr.to_object_reference() };
-                self.scan_retain_referent::<E>(trace, reference);
+            for reference in references.iter().skip(from_index) {
+                self.scan_retain_referent::<E>(trace, *reference);
             }
         } else {
             for i in from_index..references.len() {
-                let reference = unsafe { references[i].to_object_reference() };
+                let reference = references[i];
 
                 /* Determine liveness (and forward if necessary) the reference */
                 let new_reference = self.process_reference(trace, reference, tls, &mut sync.enqueued_references);
                 if !new_reference.is_null() {
-                    references[to_index] = new_reference.to_address();
+                    references[to_index] = new_reference;
                     to_index += 1;
                     if TRACE_DETAIL {
                         let index = to_index - 1;
                         trace!(
-                            "SCANNED {} {:?} -> {:?}",
+                            "SCANNED {} {:?}",
                             index,
                             references[index],
-                            unsafe { references[index].to_object_reference() }
                         );
                     }
                 }

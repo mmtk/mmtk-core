@@ -221,7 +221,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::PhantomRefClosure].add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
             use crate::util::reference_processor::RefForwarding;
-            self.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+            if plan.constraints().needs_forward_after_liveness {
+                self.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+            }
 
             use crate::util::reference_processor::RefEnqueue;
             self.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<C::ProcessEdgesWorkType>::new());

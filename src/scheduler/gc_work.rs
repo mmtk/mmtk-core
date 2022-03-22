@@ -121,7 +121,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             w.local_work_bucket.add(ReleaseCollector);
         }
         // TODO: Process weak references properly
-        mmtk.reference_processors.clear();
+        // mmtk.reference_processors.clear();
     }
 }
 
