@@ -502,8 +502,8 @@ impl ObjectReference {
         SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
     }
 
-    pub fn is_mapped(self) -> bool {
-        SFT_MAP.is_in_space(self)
+    pub fn is_in_any_space(self) -> bool {
+        SFT_MAP.is_in_any_space(self)
     }
 
     #[cfg(feature = "sanity")]

@@ -382,6 +382,19 @@ pub struct BasePlan<VM: VMBinding> {
     pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
     pub ro_space: ImmortalSpace<VM>,
+
+    /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
+    /// for boot image.
+    ///
+    /// If VM space is present, it has some special interaction with the
+    /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
+    ///
+    /// -   The `is_mmtk_object` funciton requires the alloc_bit side metadata to identify objects,
+    ///     but currently we do not require the boot image to provide it, so it will not work if the
+    ///     address argument is in the VM space.
+    ///
+    /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
+    ///     the VM space.
     #[cfg(feature = "vm_space")]
     pub vm_space: ImmortalSpace<VM>,
 }

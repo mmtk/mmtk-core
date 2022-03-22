@@ -62,6 +62,9 @@ code_space  = []
 # metadata
 global_alloc_bit = []
 
+# conservative garbage collection support
+is_mmtk_object = ["global_alloc_bit"]
+
 # Run sanity GC
 sanity = []
 # Run analysis
