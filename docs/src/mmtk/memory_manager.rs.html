@@ -495,6 +495,75 @@
 <span id="490">490</span>
 <span id="491">491</span>
 <span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
+<span id="502">502</span>
+<span id="503">503</span>
+<span id="504">504</span>
+<span id="505">505</span>
+<span id="506">506</span>
+<span id="507">507</span>
+<span id="508">508</span>
+<span id="509">509</span>
+<span id="510">510</span>
+<span id="511">511</span>
+<span id="512">512</span>
+<span id="513">513</span>
+<span id="514">514</span>
+<span id="515">515</span>
+<span id="516">516</span>
+<span id="517">517</span>
+<span id="518">518</span>
+<span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
+<span id="554">554</span>
+<span id="555">555</span>
+<span id="556">556</span>
+<span id="557">557</span>
+<span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -809,21 +878,90 @@
     <span class="ident">object</span>.<span class="ident">is_live</span>()
 }
 
-<span class="doccomment">/// Is the object in the mapped memory? The runtime can use this function to check</span>
-<span class="doccomment">/// if an object is in MMTk heap.</span>
+<span class="doccomment">/// Check if `addr` is the address of an object reference to an MMTk object.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Concretely:</span>
+<span class="doccomment">/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any</span>
+<span class="doccomment">///     space in MMTk.</span>
+<span class="doccomment">/// 2.  Also return true if there exists an `objref: ObjectReference` such that</span>
+<span class="doccomment">///     -   `objref` is a valid object reference to an object in any space in MMTk, and</span>
+<span class="doccomment">///     -   `lo &lt;= objref.to_address() &lt; hi`, where</span>
+<span class="doccomment">///         -   `lo = addr.align_down(ALLOC_BIT_REGION_SIZE)` and</span>
+<span class="doccomment">///         -   `hi = lo + ALLOC_BIT_REGION_SIZE` and</span>
+<span class="doccomment">///         -   `ALLOC_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].</span>
+<span class="doccomment">///             It is the byte granularity of the alloc bit.</span>
+<span class="doccomment">/// 3.  Return false otherwise.  This function never panics.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Case 2 means **this function is imprecise for misaligned addresses**.</span>
+<span class="doccomment">/// This function uses the &quot;alloc bits&quot; side metadata, i.e. a bitmap.</span>
+<span class="doccomment">/// For space efficiency, each bit of the bitmap governs a small region of memory.</span>
+<span class="doccomment">/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),</span>
+<span class="doccomment">/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),</span>
+<span class="doccomment">/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.</span>
+<span class="doccomment">/// The alignment of a region is also the region size.</span>
+<span class="doccomment">/// If an alloc bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region</span>
+<span class="doccomment">/// is the valid object reference.</span>
+<span class="doccomment">/// Therefore, if the input `addr` is not properly aligned, but is close to a valid object</span>
+<span class="doccomment">/// reference, this function may still return true.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// For the reason above, the VM **must check if `addr` is properly aligned** before calling this</span>
+<span class="doccomment">/// function.  For most VMs, valid object references are always aligned to the word size, so</span>
+<span class="doccomment">/// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can</span>
+<span class="doccomment">/// always check against [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function is useful for conservative root scanning.  The VM can iterate through all words in</span>
+<span class="doccomment">/// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses</span>
+<span class="doccomment">/// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the</span>
+<span class="doccomment">/// word is really a reference.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)</span>
+<span class="doccomment">/// is present.  See [`crate::plan::global::BasePlan::vm_space`].</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Argument:</span>
+<span class="doccomment">/// * `addr`: An arbitrary address.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident"><span class="kw">crate</span>::util::is_mmtk_object::is_mmtk_object</span>(<span class="ident">addr</span>)
+}
+
+<span class="doccomment">/// Return true if the `object` lies in a region of memory where</span>
+<span class="doccomment">/// -   only MMTk can allocate into, or</span>
+<span class="doccomment">/// -   only MMTk&#39;s delegated memory allocator (such as a malloc implementation) can allocate into</span>
+<span class="doccomment">///     for allocation requests from MMTk.</span>
+<span class="doccomment">/// Return false otherwise.  This function never panics.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Particularly, if this function returns true, `object` cannot be an object allocated by the VM</span>
+<span class="doccomment">/// itself.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// If this function returns true, the object cannot be allocate by the `malloc` function called by</span>
+<span class="doccomment">/// the VM, either. In other words, if the `MallocSpace` of MMTk called `malloc` to allocate the</span>
+<span class="doccomment">/// object for the VM in response to `memory_manager::alloc`, this function will return true; but</span>
+<span class="doccomment">/// if the VM directly called `malloc` to allocate the object, this function will return false.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// If `is_mmtk_object(object.to_address())` returns true, `is_in_mmtk_spaces(object)` must also</span>
+<span class="doccomment">/// return true.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function is useful if an object reference in the VM can be either a pointer into the MMTk</span>
+<span class="doccomment">/// heap, or a pointer to non-MMTk objects.  If the VM has a pre-built boot image that contains</span>
+<span class="doccomment">/// primordial objects, or if the VM has its own allocator or uses any third-party allocators, or</span>
+<span class="doccomment">/// if the VM allows an object reference to point to native objects such as C++ objects, this</span>
+<span class="doccomment">/// function can distinguish between MMTk-allocated objects and other objects.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)</span>
+<span class="doccomment">/// is present.  See [`crate::plan::global::BasePlan::vm_space`].</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mapped_object</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">object</span>.<span class="ident">is_mapped</span>()
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_mmtk_spaces</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">object</span>.<span class="ident">is_in_any_space</span>()
 }
 
 <span class="doccomment">/// Is the address in the mapped memory? The runtime can use this function to check</span>
-<span class="doccomment">/// if an address is mapped by MMTk. Note that this is different than is_mapped_object().</span>
+<span class="doccomment">/// if an address is mapped by MMTk. Note that this is different than is_in_mmtk_spaces().</span>
 <span class="doccomment">/// For malloc spaces, MMTk does not map those addresses (malloc does the mmap), so</span>
-<span class="doccomment">/// this function will return false, but is_mapped_object will return true if the address</span>
+<span class="doccomment">/// this function will return false, but is_in_mmtk_spaces will return true if the address</span>
 <span class="doccomment">/// is actually a valid object in malloc spaces. To check if an object is in our heap,</span>
-<span class="doccomment">/// the runtime should always use is_mapped_object(). This function is_mapped_address()</span>
+<span class="doccomment">/// the runtime should always use is_in_mmtk_spaces(). This function is_mapped_address()</span>
 <span class="doccomment">/// may get removed at some point.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>

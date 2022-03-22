@@ -615,6 +615,16 @@
 <span id="610">610</span>
 <span id="611">611</span>
 <span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
@@ -690,8 +700,18 @@
     }
 
     <span class="comment">// For malloc space, we need to further check the alloc bit.</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>)
+    }
+
+    <span class="doccomment">/// For malloc space, we just use the side metadata.</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_zero</span>());
+        <span class="comment">// `addr` cannot be mapped by us. It should be mapped by the malloc library.</span>
+        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_mapped</span>());
+        <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">addr</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {

@@ -1,0 +1,1 @@
+initSidebarItems({"constant":[["ALLOC_BIT_REGION_SIZE","The region size (in bytes) of the `ALLOC_BIT` side metadata. The VM can use this to check if an object is properly aligned."]],"fn":[["is_mmtk_object",""]]});

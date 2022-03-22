@@ -786,6 +786,39 @@
 <span id="781">781</span>
 <span id="782">782</span>
 <span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -813,6 +846,9 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::memory</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
@@ -866,8 +902,25 @@
     <span class="doccomment">/// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses</span>
     <span class="doccomment">/// in the space contain actual MMTk objects. So they need a further check.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
+    }
+    <span class="doccomment">/// Is `addr` a valid object reference to an object allocated in this space?</span>
+    <span class="doccomment">/// This default implementation works for all spaces that use MMTk&#39;s mapper to allocate memory.</span>
+    <span class="doccomment">/// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.</span>
+    <span class="doccomment">/// Such spaces needs to override this method.</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="comment">// Having found the SFT means the `addr` is in one of our spaces.</span>
+        <span class="comment">// Although the SFT map is allocated eagerly when the space is contiguous,</span>
+        <span class="comment">// the pages of the space itself are acquired on demand.</span>
+        <span class="comment">// Therefore, the page of `addr` may not have been mapped, yet.</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_mapped</span>() {
+            <span class="kw">return</span> <span class="bool-val">false</span>;
+        }
+        <span class="comment">// The `addr` is mapped. We use the global alloc bit to get the exact answer.</span>
+        <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">addr</span>)
     }
     <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).</span>
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
@@ -926,7 +979,12 @@
         <span class="bool-val">false</span>
     }
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">false</span>
     }
 
@@ -1102,11 +1160,19 @@
         <span class="ident">self_mut</span>.<span class="ident">sft</span>[<span class="ident">chunk</span>] <span class="op">=</span> <span class="ident">sft</span>;
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_any_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">if</span> <span class="ident">object</span>.<span class="ident">to_address</span>().<span class="ident">chunk_index</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>() {
             <span class="kw">return</span> <span class="bool-val">false</span>;
         }
-        <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()).<span class="ident">is_mmtk_object</span>(<span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()).<span class="ident">is_in_space</span>(<span class="ident">object</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">if</span> <span class="ident">addr</span>.<span class="ident">chunk_index</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">sft</span>.<span class="ident">len</span>() {
+            <span class="kw">return</span> <span class="bool-val">false</span>;
+        }
+        <span class="self">self</span>.<span class="ident">get</span>(<span class="ident">addr</span>).<span class="ident">is_mmtk_object</span>(<span class="ident">addr</span>)
     }
 
     <span class="doccomment">/// Make sure we have valid SFT entries for the object reference.</span>

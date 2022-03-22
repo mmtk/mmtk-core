@@ -86,6 +86,8 @@
 <span id="81">81</span>
 <span id="82">82</span>
 <span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Utilities used by other modules, including allocators, heap implementation, etc.</span>
 
 <span class="comment">// Allow unused code in the util mod. We may have some functions that are not in use,</span>
@@ -129,6 +131,8 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">finalizable_processor</span>;
 <span class="doccomment">/// Heap implementation, including page resource, mmapper, etc.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">heap</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">is_mmtk_object</span>;
 <span class="doccomment">/// Logger initialization</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">logger</span>;
 <span class="doccomment">/// Various malloc implementations (conditionally compiled by features)</span>

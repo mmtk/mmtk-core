@@ -284,6 +284,13 @@
 <span id="279">279</span>
 <span id="280">280</span>
 <span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
@@ -440,10 +447,17 @@
     }
 }
 
-<span class="comment">// Check if a given object was allocated by malloc</span>
+<span class="doccomment">/// Check if a given object was allocated by malloc</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">object</span>.<span class="ident">to_address</span>())
-        <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">object</span>.<span class="ident">to_address</span>())
+    <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">object</span>.<span class="ident">to_address</span>())
+}
+
+<span class="doccomment">/// Check if there is an object allocated by malloc at the address.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This function doesn&#39;t check if `addr` is aligned.</span>
+<span class="doccomment">/// If not, it will try to load the alloc bit for the address rounded down to the metadata&#39;s granularity.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">addr</span>) <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">addr</span>)
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_marked</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {

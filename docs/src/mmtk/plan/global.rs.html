@@ -950,6 +950,19 @@
 <span id="945">945</span>
 <span id="946">946</span>
 <span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1334,6 +1347,19 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">code_lo_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">ro_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+
+    <span class="doccomment">/// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM</span>
+    <span class="doccomment">/// for boot image.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// If VM space is present, it has some special interaction with the</span>
+    <span class="doccomment">/// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// -   The `is_mmtk_object` funciton requires the alloc_bit side metadata to identify objects,</span>
+    <span class="doccomment">///     but currently we do not require the boot image to provide it, so it will not work if the</span>
+    <span class="doccomment">///     address argument is in the VM space.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in</span>
+    <span class="doccomment">///     the VM space.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">vm_space</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
