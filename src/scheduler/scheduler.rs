@@ -59,6 +59,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::RefClosure => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
             WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
@@ -93,6 +94,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             open_next(Closure);
             open_next(RefClosure);
             open_next(CalculateForwarding);
+            open_next(SecondRoots);
             open_next(RefForwarding);
             open_next(Compact);
             open_next(Release);
@@ -246,36 +248,33 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn deactivate_all(&self) {
-        self.work_buckets[WorkBucketStage::Prepare].deactivate();
-        self.work_buckets[WorkBucketStage::Closure].deactivate();
-        self.work_buckets[WorkBucketStage::RefClosure].deactivate();
-        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
-        self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
-        self.work_buckets[WorkBucketStage::Compact].deactivate();
-        self.work_buckets[WorkBucketStage::Release].deactivate();
-        self.work_buckets[WorkBucketStage::Final].deactivate();
+        for (stage, bucket) in self.work_buckets.iter() {
+            if stage == WorkBucketStage::Unconstrained {
+                continue;
+            }
+
+            bucket.deactivate();
+        }
     }
 
     pub fn reset_state(&self) {
-        // self.work_buckets[WorkBucketStage::Prepare].deactivate();
-        self.work_buckets[WorkBucketStage::Closure].deactivate();
-        self.work_buckets[WorkBucketStage::RefClosure].deactivate();
-        self.work_buckets[WorkBucketStage::CalculateForwarding].deactivate();
-        self.work_buckets[WorkBucketStage::RefForwarding].deactivate();
-        self.work_buckets[WorkBucketStage::Compact].deactivate();
-        self.work_buckets[WorkBucketStage::Release].deactivate();
-        self.work_buckets[WorkBucketStage::Final].deactivate();
+        for (stage, bucket) in self.work_buckets.iter() {
+            if stage == WorkBucketStage::Unconstrained || stage == WorkBucketStage::Prepare {
+                continue;
+            }
+
+            bucket.deactivate();
+        }
     }
 
     pub fn debug_assert_all_buckets_deactivated(&self) {
-        debug_assert!(!self.work_buckets[WorkBucketStage::Prepare].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::Closure].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::RefClosure].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::CalculateForwarding].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::RefForwarding].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::Compact].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::Release].is_activated());
-        debug_assert!(!self.work_buckets[WorkBucketStage::Final].is_activated());
+        for (stage, bucket) in self.work_buckets.iter() {
+            if stage == WorkBucketStage::Unconstrained {
+                return;
+            }
+
+            debug_assert!(!bucket.is_activated());
+        }
     }
 
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
