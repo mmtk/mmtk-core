@@ -312,21 +312,90 @@ pub fn is_live_object(object: ObjectReference) -> bool {
     object.is_live()
 }
 
-/// Is the object in the mapped memory? The runtime can use this function to check
-/// if an object is in MMTk heap.
+/// Check if `addr` is the address of an object reference to an MMTk object.
+///
+/// Concretely:
+/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any
+///     space in MMTk.
+/// 2.  Also return true if there exists an `objref: ObjectReference` such that
+///     -   `objref` is a valid object reference to an object in any space in MMTk, and
+///     -   `lo <= objref.to_address() < hi`, where
+///         -   `lo = addr.align_down(ALLOC_BIT_REGION_SIZE)` and
+///         -   `hi = lo + ALLOC_BIT_REGION_SIZE` and
+///         -   `ALLOC_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+///             It is the byte granularity of the alloc bit.
+/// 3.  Return false otherwise.  This function never panics.
+///
+/// Case 2 means **this function is imprecise for misaligned addresses**.
+/// This function uses the "alloc bits" side metadata, i.e. a bitmap.
+/// For space efficiency, each bit of the bitmap governs a small region of memory.
+/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
+/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
+/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
+/// The alignment of a region is also the region size.
+/// If an alloc bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
+/// is the valid object reference.
+/// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
+/// reference, this function may still return true.
+///
+/// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
+/// function.  For most VMs, valid object references are always aligned to the word size, so
+/// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
+/// always check against [`crate::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE`].
+///
+/// This function is useful for conservative root scanning.  The VM can iterate through all words in
+/// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
+/// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
+/// word is really a reference.
+///
+/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+///
+/// Argument:
+/// * `addr`: An arbitrary address.
+#[cfg(feature = "is_mmtk_object")]
+pub fn is_mmtk_object(addr: Address) -> bool {
+    crate::util::is_mmtk_object::is_mmtk_object(addr)
+}
+
+/// Return true if the `object` lies in a region of memory where
+/// -   only MMTk can allocate into, or
+/// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into
+///     for allocation requests from MMTk.
+/// Return false otherwise.  This function never panics.
+///
+/// Particularly, if this function returns true, `object` cannot be an object allocated by the VM
+/// itself.
+///
+/// If this function returns true, the object cannot be allocate by the `malloc` function called by
+/// the VM, either. In other words, if the `MallocSpace` of MMTk called `malloc` to allocate the
+/// object for the VM in response to `memory_manager::alloc`, this function will return true; but
+/// if the VM directly called `malloc` to allocate the object, this function will return false.
+///
+/// If `is_mmtk_object(object.to_address())` returns true, `is_in_mmtk_spaces(object)` must also
+/// return true.
+///
+/// This function is useful if an object reference in the VM can be either a pointer into the MMTk
+/// heap, or a pointer to non-MMTk objects.  If the VM has a pre-built boot image that contains
+/// primordial objects, or if the VM has its own allocator or uses any third-party allocators, or
+/// if the VM allows an object reference to point to native objects such as C++ objects, this
+/// function can distinguish between MMTk-allocated objects and other objects.
+///
+/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_mapped_object(object: ObjectReference) -> bool {
-    object.is_mapped()
+pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
+    object.is_in_any_space()
 }
 
 /// Is the address in the mapped memory? The runtime can use this function to check
-/// if an address is mapped by MMTk. Note that this is different than is_mapped_object().
+/// if an address is mapped by MMTk. Note that this is different than is_in_mmtk_spaces().
 /// For malloc spaces, MMTk does not map those addresses (malloc does the mmap), so
-/// this function will return false, but is_mapped_object will return true if the address
+/// this function will return false, but is_in_mmtk_spaces will return true if the address
 /// is actually a valid object in malloc spaces. To check if an object is in our heap,
-/// the runtime should always use is_mapped_object(). This function is_mapped_address()
+/// the runtime should always use is_in_mmtk_spaces(). This function is_mapped_address()
 /// may get removed at some point.
 ///
 /// Arguments:

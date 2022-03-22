@@ -26,6 +26,9 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
 
+#[cfg(feature = "is_mmtk_object")]
+use crate::util::alloc_bit;
+
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::Mutex;
@@ -78,8 +81,25 @@ pub trait SFT {
     /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
     /// in the space contain actual MMTk objects. So they need a further check.
     #[inline(always)]
-    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
         true
+    }
+    /// Is `addr` a valid object reference to an object allocated in this space?
+    /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
+    /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
+    /// Such spaces needs to override this method.
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        // Having found the SFT means the `addr` is in one of our spaces.
+        // Although the SFT map is allocated eagerly when the space is contiguous,
+        // the pages of the space itself are acquired on demand.
+        // Therefore, the page of `addr` may not have been mapped, yet.
+        if !addr.is_mapped() {
+            return false;
+        }
+        // The `addr` is mapped. We use the global alloc bit to get the exact answer.
+        alloc_bit::is_alloced_object(addr)
     }
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
@@ -138,7 +158,12 @@ impl SFT for EmptySpaceSFT {
         false
     }
     #[inline(always)]
-    fn is_mmtk_object(&self, _object: ObjectReference) -> bool {
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, _addr: Address) -> bool {
         false
     }
 
@@ -314,11 +339,19 @@ impl<'a> SFTMap<'a> {
         self_mut.sft[chunk] = sft;
     }
 
-    pub fn is_in_space(&self, object: ObjectReference) -> bool {
+    pub fn is_in_any_space(&self, object: ObjectReference) -> bool {
         if object.to_address().chunk_index() >= self.sft.len() {
             return false;
         }
-        self.get(object.to_address()).is_mmtk_object(object)
+        self.get(object.to_address()).is_in_space(object)
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    pub fn is_mmtk_object(&self, addr: Address) -> bool {
+        if addr.chunk_index() >= self.sft.len() {
+            return false;
+        }
+        self.get(addr).is_mmtk_object(addr)
     }
 
     /// Make sure we have valid SFT entries for the object reference.
