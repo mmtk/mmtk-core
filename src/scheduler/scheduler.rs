@@ -215,14 +215,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
         // Reference processing
         if !*plan.base().options.no_reference_types {
-            use crate::util::reference_processor::{SoftRefProcessing, WeakRefProcessing, PhantomRefProcessing};
-            self.work_buckets[WorkBucketStage::SoftRefClosure].add(SoftRefProcessing::<C::ProcessEdgesWorkType>::new());
-            self.work_buckets[WorkBucketStage::WeakRefClosure].add(WeakRefProcessing::<C::ProcessEdgesWorkType>::new());
-            self.work_buckets[WorkBucketStage::PhantomRefClosure].add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
+            use crate::util::reference_processor::{
+                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
+            };
+            self.work_buckets[WorkBucketStage::SoftRefClosure]
+                .add(SoftRefProcessing::<C::ProcessEdgesWorkType>::new());
+            self.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(WeakRefProcessing::<C::ProcessEdgesWorkType>::new());
+            self.work_buckets[WorkBucketStage::PhantomRefClosure]
+                .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
-                self.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+                self.work_buckets[WorkBucketStage::RefForwarding]
+                    .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
             }
 
             use crate::util::reference_processor::RefEnqueue;

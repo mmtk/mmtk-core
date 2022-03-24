@@ -1,10 +1,10 @@
 use std::sync::Mutex;
 use std::vec::Vec;
 
+use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
-use crate::scheduler::ProcessEdgesWork;
 
 /// Holds all reference processors for each weak reference Semantics.
 /// Currently this is based on Java's weak reference semantics (soft/weak/phantom).
@@ -73,18 +73,26 @@ impl ReferenceProcessors {
     /// the forwarding addresses yet, thus we cannot do forwarding during scan refs. And for those
     /// plans, this separate step is required.
     pub fn forward_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        debug_assert!(mmtk.plan.constraints().needs_forward_after_liveness, "A plan with needs_forward_after_liveness=false does not need a separate forward step");
-        self.soft.forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
-        self.weak.forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
-        self.phantom.forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        debug_assert!(
+            mmtk.plan.constraints().needs_forward_after_liveness,
+            "A plan with needs_forward_after_liveness=false does not need a separate forward step"
+        );
+        self.soft
+            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.weak
+            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.phantom
+            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
     }
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
     /// Scan weak references.
     pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        self.soft.scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
-        self.weak.scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+        self.soft
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+        self.weak
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
     }
 
     /// Scan soft references.
@@ -94,7 +102,8 @@ impl ReferenceProcessors {
         if !mmtk.plan.is_emergency_collection() {
             // This step only retains the referents (keep the referents alive), it does not update its addresses.
             // We will call soft.scan() again with retain=false to update its addresses based on liveness.
-            self.soft.scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), true);
+            self.soft
+                .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), true);
         }
     }
 
@@ -102,9 +111,10 @@ impl ReferenceProcessors {
     pub fn scan_phantom_refs<E: ProcessEdgesWork>(
         &self,
         trace: &mut E,
-        _mmtk: &'static MMTK<E::VM>
+        mmtk: &'static MMTK<E::VM>,
     ) {
-        self.phantom.scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+        self.phantom
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
     }
 }
 
@@ -113,12 +123,6 @@ impl Default for ReferenceProcessors {
         Self::new()
     }
 }
-
-// Debug flags
-pub const TRACE: bool = true;
-pub const TRACE_UNREACHABLE: bool = true;
-pub const TRACE_DETAIL: bool = true;
-pub const TRACE_FORWARD: bool = true;
 
 // XXX: We differ from the original implementation
 //      by ignoring "stress," i.e. where the array
@@ -196,17 +200,26 @@ impl ReferenceProcessor {
     // easier to understand.
 
     #[inline(always)]
-    fn get_forwarded_referent<E: ProcessEdgesWork>(e: &mut E, referent: ObjectReference) -> ObjectReference {
+    fn get_forwarded_referent<E: ProcessEdgesWork>(
+        e: &mut E,
+        referent: ObjectReference,
+    ) -> ObjectReference {
         e.trace_object(referent)
     }
 
     #[inline(always)]
-    fn get_forwarded_reference<E: ProcessEdgesWork>(e: &mut E, object: ObjectReference) -> ObjectReference {
+    fn get_forwarded_reference<E: ProcessEdgesWork>(
+        e: &mut E,
+        object: ObjectReference,
+    ) -> ObjectReference {
         e.trace_object(object)
     }
 
     #[inline(always)]
-    fn keep_referent_alive<E: ProcessEdgesWork>(e: &mut E, referent: ObjectReference) -> ObjectReference {
+    fn keep_referent_alive<E: ProcessEdgesWork>(
+        e: &mut E,
+        referent: ObjectReference,
+    ) -> ObjectReference {
         e.trace_object(referent)
     }
 
@@ -226,63 +239,69 @@ impl ReferenceProcessor {
     /// nursery is not used for this.
     pub fn forward<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
-        if TRACE {
-            trace!("Starting ReferenceProcessor.forward({:?})", self.semantics);
-        }
+        debug!("Starting ReferenceProcessor.forward({:?})", self.semantics);
 
         // Forward a single reference
         #[inline(always)]
-        fn forward_reference<E: ProcessEdgesWork>(trace: &mut E, reference: ObjectReference) -> ObjectReference {
+        fn forward_reference<E: ProcessEdgesWork>(
+            trace: &mut E,
+            reference: ObjectReference,
+        ) -> ObjectReference {
             let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
             let new_referent = ReferenceProcessor::get_forwarded_referent(trace, old_referent);
-            <E::VM as VMBinding>::VMReferenceGlue::set_referent(
-                reference,
-                new_referent,
-            );
+            <E::VM as VMBinding>::VMReferenceGlue::set_referent(reference, new_referent);
             let new_reference = ReferenceProcessor::get_forwarded_reference(trace, reference);
-            if TRACE_DETAIL {
+            {
                 use crate::vm::ObjectModel;
-                trace!("Forwarding reference: {} (size: {})", reference, <E::VM as VMBinding>::VMObjectModel::get_current_size(reference));
-                trace!(" referent: {} (forwarded to {})", old_referent, new_referent);
+                trace!(
+                    "Forwarding reference: {} (size: {})",
+                    reference,
+                    <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
+                );
+                trace!(
+                    " referent: {} (forwarded to {})",
+                    old_referent,
+                    new_referent
+                );
                 trace!(" reference: forwarded to {}", new_reference);
             }
-            debug_assert!(!new_reference.is_null(), "reference {:?}'s forwarding pointer is NULL", reference);
+            debug_assert!(
+                !new_reference.is_null(),
+                "reference {:?}'s forwarding pointer is NULL",
+                reference
+            );
             new_reference
         }
 
-        sync.references.iter_mut().for_each(|slot: &mut ObjectReference| {
-            let reference = *slot;
-            *slot = forward_reference::<E>(trace, reference);
-        });
+        sync.references
+            .iter_mut()
+            .for_each(|slot: &mut ObjectReference| {
+                let reference = *slot;
+                *slot = forward_reference::<E>(trace, reference);
+            });
 
-        sync.enqueued_references.iter_mut().for_each(|slot: &mut ObjectReference| {
-            let reference = *slot;
-            *slot = forward_reference::<E>(trace, reference);
-        });
+        sync.enqueued_references
+            .iter_mut()
+            .for_each(|slot: &mut ObjectReference| {
+                let reference = *slot;
+                *slot = forward_reference::<E>(trace, reference);
+            });
 
-        if TRACE {
-            trace!("Ending ReferenceProcessor.forward({:?})", self.semantics)
-        }
+        debug!("Ending ReferenceProcessor.forward({:?})", self.semantics)
     }
 
     /// Scan the reference table.
-    fn scan<E: ProcessEdgesWork>(
-        &self,
-        trace: &mut E,
-        nursery: bool,
-        retain: bool,
-    ) {
+    fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, nursery: bool, retain: bool) {
         let mut sync = self.sync.lock().unwrap();
 
-        if TRACE {
-            trace!("Starting ReferenceProcessor.scan({:?})", self.semantics);
-        }
+        debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
         // Start scanning from here
         let from_index = if nursery { sync.nursery_index } else { 0 };
 
-        if TRACE_DETAIL {
-            trace!("{:?} Reference table is {:?}", self.semantics, sync.references);
-        }
+        debug!(
+            "{:?} Reference table is {:?}",
+            self.semantics, sync.references
+        );
         if retain {
             for reference in sync.references.iter().skip(from_index) {
                 // Retain the referent. This does not update the reference table.
@@ -300,22 +319,16 @@ impl ReferenceProcessor {
                 let reference = sync.references[i];
 
                 // Determine liveness (and forward if necessary) the reference
-                let new_reference = self.process_reference(trace, reference, &mut sync.enqueued_references);
+                let new_reference =
+                    self.process_reference(trace, reference, &mut sync.enqueued_references);
                 // If the reference is alive, put it back to the array
                 if !new_reference.is_null() {
                     sync.references[to_index] = new_reference;
                     to_index += 1;
-                    if TRACE_DETAIL {
-                        let index = to_index - 1;
-                        trace!(
-                            "SCANNED {} {:?}",
-                            index,
-                            sync.references[index],
-                        );
-                    }
+                    trace!("SCANNED {} {:?}", i, new_reference,);
                 }
             }
-            trace!(
+            debug!(
                 "{:?} references: {} -> {}",
                 self.semantics,
                 sync.references.len(),
@@ -325,24 +338,16 @@ impl ReferenceProcessor {
             sync.references.truncate(to_index);
         }
 
-        if TRACE {
-            trace!("Ending ReferenceProcessor.scan({:?})", self.semantics);
-        }
+        debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
     }
 
     /// This method deals only with soft references. It retains the referent
     /// if the reference is definitely reachable.
-    fn retain_referent<E: ProcessEdgesWork>(
-        &self,
-        trace: &mut E,
-        reference: ObjectReference,
-    ) {
+    fn retain_referent<E: ProcessEdgesWork>(&self, trace: &mut E, reference: ObjectReference) {
         debug_assert!(!reference.is_null());
         debug_assert!(self.semantics == Semantics::SOFT);
 
-        if TRACE_DETAIL {
-            trace!("Processing reference: {:?}", reference);
-        }
+        trace!("Processing reference: {:?}", reference);
 
         if !reference.is_live() {
             // Reference is currently unreachable but may get reachable by the
@@ -355,9 +360,7 @@ impl ReferenceProcessor {
         if !referent.is_null() {
             Self::keep_referent_alive(trace, referent);
         }
-        if TRACE_DETAIL {
-            trace!(" ~> {:?} (retained)", referent.to_address());
-        }
+        trace!(" ~> {:?} (retained)", referent.to_address());
     }
 
     /// Process a reference.
@@ -375,39 +378,39 @@ impl ReferenceProcessor {
     ) -> ObjectReference {
         debug_assert!(!reference.is_null());
 
-        if TRACE_DETAIL { trace!("Process reference: {}", reference); }
+        trace!("Process reference: {}", reference);
 
         // If the reference is dead, we're done with it. Let it (and
         // possibly its referent) be garbage-collected.
         if !reference.is_live() {
             <E::VM as VMBinding>::VMReferenceGlue::clear_referent(reference);
-            if TRACE_UNREACHABLE { trace!(" UNREACHABLE reference: {}", reference); }
-            if TRACE_DETAIL { trace!(" (unreachable)"); }
+            trace!(" UNREACHABLE reference: {}", reference);
+            trace!(" (unreachable)");
             return ObjectReference::NULL;
         }
 
         // The reference object is live
         let new_reference = Self::get_forwarded_reference(trace, reference);
         let old_referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
-        if TRACE_DETAIL { trace!(" ~> {}", old_referent); }
+        trace!(" ~> {}", old_referent);
 
         // If the application has cleared the referent the Java spec says
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
         if old_referent.is_null() {
-            if TRACE_DETAIL { trace!(" (null referent) "); }
+            trace!(" (null referent) ");
             return ObjectReference::NULL;
         }
 
-        if TRACE_DETAIL { trace!(" => {}", new_reference); }
+        trace!(" => {}", new_reference);
 
         if old_referent.is_live() {
             // Referent is still reachable in a way that is as strong as
             // or stronger than the current reference level.
             let new_referent = Self::get_forwarded_referent(trace, old_referent);
             debug_assert!(new_referent.is_live());
-            if TRACE_DETAIL { trace!(" ~> {}", new_referent); }
+            trace!(" ~> {}", new_referent);
 
             // The reference object stays on the waiting list, and the
             // referent is untouched. The only thing we must do is
@@ -417,15 +420,14 @@ impl ReferenceProcessor {
 
             // Update the referent
             <E::VM as VMBinding>::VMReferenceGlue::set_referent(new_reference, new_referent);
-            return new_reference;
+            new_reference
         } else {
             // Referent is unreachable. Clear the referent and enqueue the reference object.
-            if TRACE_DETAIL { trace!(" UNREACHABLE"); }
-            else if TRACE_UNREACHABLE { trace!(" UNREACHABLE referent: {}", old_referent); }
+            trace!(" UNREACHABLE referent: {}", old_referent);
 
             <E::VM as VMBinding>::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);
-            return ObjectReference::NULL;
+            ObjectReference::NULL
         }
     }
 }
@@ -435,6 +437,7 @@ use crate::scheduler::GCWorker;
 use crate::MMTK;
 use std::marker::PhantomData;
 
+#[derive(Default)]
 pub struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -450,6 +453,7 @@ impl<E: ProcessEdgesWork> SoftRefProcessing<E> {
     }
 }
 
+#[derive(Default)]
 pub struct WeakRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for WeakRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -465,6 +469,7 @@ impl<E: ProcessEdgesWork> WeakRefProcessing<E> {
     }
 }
 
+#[derive(Default)]
 pub struct PhantomRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for PhantomRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -480,6 +485,7 @@ impl<E: ProcessEdgesWork> PhantomRefProcessing<E> {
     }
 }
 
+#[derive(Default)]
 pub struct RefForwarding<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
@@ -495,6 +501,7 @@ impl<E: ProcessEdgesWork> RefForwarding<E> {
     }
 }
 
+#[derive(Default)]
 pub struct RefEnqueue<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for RefEnqueue<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
