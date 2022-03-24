@@ -122,7 +122,7 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             scheduler.work_buckets[WorkBucketStage::RefForwarding].add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefEnqueue;
-            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<ForwardingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
         }
 
         // Finalization

@@ -416,7 +416,8 @@ pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
     mmtk.plan.modify_check(object);
 }
 
-/// Add a reference to the list of weak references.
+/// Add a reference to the list of weak references. A binding may
+/// call this either when a weak reference is created, or when a weak reference is traced during GC.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -431,7 +432,8 @@ pub fn add_weak_candidate<VM: VMBinding>(
         .add_weak_candidate::<VM>(reff, referent);
 }
 
-/// Add a reference to the list of soft references.
+/// Add a reference to the list of soft references. A binding may
+/// call this either when a weak reference is created, or when a weak reference is traced during GC.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -446,7 +448,8 @@ pub fn add_soft_candidate<VM: VMBinding>(
         .add_soft_candidate::<VM>(reff, referent);
 }
 
-/// Add a reference to the list of phantom references.
+/// Add a reference to the list of phantom references. A binding may
+/// call this either when a weak reference is created, or when a weak reference is traced during GC.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.

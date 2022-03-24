@@ -30,6 +30,8 @@ pub struct PlanConstraints {
     pub needs_linear_scan: bool,
     pub needs_concurrent_workers: bool,
     pub generate_gc_trace: bool,
+    /// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.
+    /// For plans that use those policies, they should set this as true.
     pub needs_forward_after_liveness: bool,
 }
 

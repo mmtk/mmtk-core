@@ -383,6 +383,13 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
 }
 
 /// Scan & update a list of object slots
+//
+// Note: be very careful when using this trait. process_node() will push objects
+// to the buffer, and it is expected that at the end of the operation, flush()
+// is called to create new scan work from the buffered objects. If flush()
+// is not called, we may miss the objects in the GC and have dangling pointers.
+// FIXME: We possibly want to enforce Drop on this trait, and require calling
+// flush() in Drop.
 pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self::VM>>
 {
