@@ -227,6 +227,32 @@ impl ReferenceProcessor {
     pub fn enqueue<VM: VMBinding>(&self) {
         let mut sync = self.sync.lock().unwrap();
 
+        // This is the end of a GC. We do some assertions here to make sure our reference tables are correct.
+        #[cfg(debug_assertions)]
+        {
+            // For references in the table, the reference needs to be valid, and if the referent is not null, it should be valid as well
+            sync.references.iter().for_each(|reff| {
+                debug_assert!(!reff.is_null());
+                debug_assert!(reff.is_in_any_space());
+                let referent = VM::VMReferenceGlue::get_referent(*reff);
+                if !referent.is_null() {
+                    debug_assert!(
+                        referent.is_in_any_space(),
+                        "Referent {:?} (of reference {:?}) is not in any space",
+                        referent,
+                        reff
+                    );
+                }
+            });
+            // For references that will be enqueue'd, the referent needs to be valid, and the referent needs to be null.
+            sync.enqueued_references.iter().for_each(|reff| {
+                debug_assert!(!reff.is_null());
+                debug_assert!(reff.is_in_any_space());
+                let referent = VM::VMReferenceGlue::get_referent(*reff);
+                debug_assert!(referent.is_null());
+            });
+        }
+
         if !sync.enqueued_references.is_empty() {
             debug!("enqueue: {:?}", sync.enqueued_references);
             VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references);
