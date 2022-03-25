@@ -1,5 +1,7 @@
 use std::sync::Mutex;
 use std::vec::Vec;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
@@ -146,6 +148,18 @@ pub struct ReferenceProcessor {
 
     /// The semantics for the reference processor
     semantics: Semantics,
+
+    /// Is it allowed to add candidate to this reference processor? The value is true for most of the time,
+    /// but it is set to false once we start scanning references (that is after the liveness transitive closure),
+    /// at which point we do not expect to encounter any 'new' reference in the same GC, because 1. no
+    /// new reference is created during the GC, and 2. existing references should have been traced and added
+    /// to the reference processor. This makes sure that no new entry will be added to our reference table once
+    /// we start scanning until the end of that GC.
+    // This also avoids the issue that we may have forwarded references in our table, and the binding
+    // traces and finds an unforwarded reference and attempts to add it as a candidate again.
+    // I have observed this with mark compact & OpenJDK. I am not 100% sure what is the root cause for it, but
+    // this fixes it.
+    accept_candidate: AtomicBool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -180,12 +194,18 @@ impl ReferenceProcessor {
                 nursery_index: 0,
             }),
             semantics,
+            accept_candidate: AtomicBool::new(true),
         }
     }
 
     /// Add a candidate.
     // TODO: do we need the referent argument?
+    #[inline(always)]
     pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, _referent: ObjectReference) {
+        if !self.accept_candidate.load(Ordering::SeqCst) {
+            return;
+        }
+
         let mut sync = self.sync.lock().unwrap();
         // We make sure that we do not have duplicate entries
         // TODO: Should we use hash set instead?
@@ -193,6 +213,14 @@ impl ReferenceProcessor {
             return;
         }
         sync.references.push(reff);
+    }
+
+    fn disallow_new_candidate(&self) {
+        self.accept_candidate.store(false, Ordering::SeqCst);
+    }
+
+    fn allow_new_candidate(&self) {
+        self.accept_candidate.store(true, Ordering::SeqCst);
     }
 
     // These funcions simply call `trace_object()`, which does two things: 1. to make sure the object is kept alive
@@ -258,6 +286,8 @@ impl ReferenceProcessor {
             VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references);
             sync.enqueued_references.clear();
         }
+
+        self.allow_new_candidate();
     }
 
     /// Forward the reference tables in the reference processor. This is only needed if a plan does not forward
@@ -318,6 +348,9 @@ impl ReferenceProcessor {
 
     /// Scan the reference table.
     fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, nursery: bool, retain: bool) {
+        // We start scanning. No longer accept new candidates.
+        self.disallow_new_candidate();
+
         let mut sync = self.sync.lock().unwrap();
 
         debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
