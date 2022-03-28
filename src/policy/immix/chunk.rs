@@ -202,7 +202,7 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         space.defrag.mark_histograms.lock().clear();
-        self.generate_tasks(|chunk| box SweepChunk { space, chunk })
+        self.generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
     }
 }
 

@@ -27,7 +27,7 @@ impl EventCounter {
             name,
             implicitly_start,
             merge_phases,
-            count: box [0; MAX_PHASES],
+            count: Box::new([0; MAX_PHASES]),
             current_count: 0,
             running: false,
             stats,

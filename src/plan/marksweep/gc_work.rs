@@ -49,7 +49,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         // non-atomic accesses
         while chunk < end {
             if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
-                work_packets.push(box MSSweepChunk { ms, chunk });
+                work_packets.push(Box::new(MSSweepChunk { ms, chunk }));
             }
 
             chunk += BYTES_IN_CHUNK;

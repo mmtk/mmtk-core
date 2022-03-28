@@ -239,7 +239,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self
             .chunk_map
-            .generate_tasks(|chunk| box PrepareBlockState {
+            .generate_tasks(|chunk| Box::new(PrepareBlockState {
                 space,
                 chunk,
                 defrag_threshold: if space.in_defrag() {
@@ -247,7 +247,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 } else {
                     None
                 },
-            });
+            }));
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
         // Update line mark state
         if !super::BLOCK_ONLY {
