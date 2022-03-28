@@ -1,7 +1,7 @@
-use std::sync::Mutex;
-use std::vec::Vec;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
+use std::vec::Vec;
 
 use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
@@ -150,16 +150,18 @@ pub struct ReferenceProcessor {
     semantics: Semantics,
 
     /// Is it allowed to add candidate to this reference processor? The value is true for most of the time,
-    /// but it is set to false once we start scanning references (that is after the liveness transitive closure),
-    /// at which point we do not expect to encounter any 'new' reference in the same GC, because 1. no
-    /// new reference is created during the GC, and 2. existing references should have been traced and added
-    /// to the reference processor. This makes sure that no new entry will be added to our reference table once
-    /// we start scanning until the end of that GC.
-    // This also avoids the issue that we may have forwarded references in our table, and the binding
-    // traces and finds an unforwarded reference and attempts to add it as a candidate again.
-    // I have observed this with mark compact & OpenJDK. I am not 100% sure what is the root cause for it, but
-    // this fixes it.
-    accept_candidate: AtomicBool,
+    /// but it is set to false once we finish forwarding references, at which point we do not expect to encounter
+    /// any 'new' reference in the same GC. This makes sure that no new entry will be added to our reference table once
+    /// we finish forwarding, as we will not be able to process the entry in that GC.
+    // This avoids an issue in the following scenario in mark compact:
+    // 1. First trace: add a candidate WR
+    // 2. Weak reference scan: scan the reference table, as MC does not forward object in the first trace. This scan does not update any reference.
+    // 3. Second trace: call add_candidate again with WR, but WR gets ignored as we already have WR in our reference table.
+    // 4. Weak reference forward: call trace_object for WR, which pushes WR to the node buffer and update WR -> WR' in our reference table.
+    // 5. When we trace objects in the node buffer, we will attempt to add WR as a candidate. As we have updated WR to WR' in our reference
+    //    table, we would accept WR as a candidate. But we will not trace WR again, and WR will be invalid after this GC.
+    // This flag is set to false after Step 4, so in Step 5, we will ignore adding WR.
+    allow_new_candidate: AtomicBool,
 }
 
 #[derive(Debug, PartialEq)]
@@ -194,7 +196,7 @@ impl ReferenceProcessor {
                 nursery_index: 0,
             }),
             semantics,
-            accept_candidate: AtomicBool::new(true),
+            allow_new_candidate: AtomicBool::new(true),
         }
     }
 
@@ -202,7 +204,7 @@ impl ReferenceProcessor {
     // TODO: do we need the referent argument?
     #[inline(always)]
     pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, _referent: ObjectReference) {
-        if !self.accept_candidate.load(Ordering::SeqCst) {
+        if !self.allow_new_candidate.load(Ordering::SeqCst) {
             return;
         }
 
@@ -216,11 +218,11 @@ impl ReferenceProcessor {
     }
 
     fn disallow_new_candidate(&self) {
-        self.accept_candidate.store(false, Ordering::SeqCst);
+        self.allow_new_candidate.store(false, Ordering::SeqCst);
     }
 
     fn allow_new_candidate(&self) {
-        self.accept_candidate.store(true, Ordering::SeqCst);
+        self.allow_new_candidate.store(true, Ordering::SeqCst);
     }
 
     // These funcions simply call `trace_object()`, which does two things: 1. to make sure the object is kept alive
@@ -343,14 +345,14 @@ impl ReferenceProcessor {
                 *slot = forward_reference::<E>(trace, reference);
             });
 
-        debug!("Ending ReferenceProcessor.forward({:?})", self.semantics)
+        debug!("Ending ReferenceProcessor.forward({:?})", self.semantics);
+
+        // We finish forwarding. No longer accept new candidates.
+        self.disallow_new_candidate();
     }
 
     /// Scan the reference table.
     fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, nursery: bool, retain: bool) {
-        // We start scanning. No longer accept new candidates.
-        self.disallow_new_candidate();
-
         let mut sync = self.sync.lock().unwrap();
 
         debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
