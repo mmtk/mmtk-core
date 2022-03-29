@@ -4,7 +4,6 @@ use crate::{
     util::{Address, ObjectReference},
     vm::*,
 };
-use std::iter::Step;
 
 /// Data structure to reference a line within an immix block.
 #[repr(C)]
@@ -94,58 +93,103 @@ impl Line {
         let start_line = Line::from(Line::align(start));
         let mut end_line = Line::from(Line::align(end));
         if !Line::is_aligned(end) {
-            end_line = Line::forward(end_line, 1)
+            end_line = end_line.next_line();
         }
         let mut marked_lines = 0;
-        for line in start_line..end_line {
+        let iter = ImmixLineIterator::new(start_line, end_line);
+        for line in iter {
             if !line.is_marked(state) {
                 marked_lines += 1;
             }
             line.mark(state)
         }
+        // for line in start_line..end_line {
+        //     if !line.is_marked(state) {
+        //         marked_lines += 1;
+        //     }
+        //     line.mark(state)
+        // }
         marked_lines
+    }
+
+    pub fn next_line(&self) -> Line {
+        self.next_nth_line(1)
+    }
+
+    pub fn next_nth_line(&self, n: usize) -> Line {
+        debug_assert!(!super::BLOCK_ONLY);
+        debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
+        Line(self.start() + (n << Self::LOG_BYTES))
     }
 }
 
-#[allow(clippy::assertions_on_constants)]
-impl Step for Line {
-    /// Get the number of lines between the given two lines.
-    #[inline(always)]
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        debug_assert!(!super::BLOCK_ONLY);
-        if start > end {
-            return None;
+pub struct ImmixLineIterator {
+    current: Line,
+    end: Line,
+}
+
+impl ImmixLineIterator {
+    pub fn new(start: Line, end: Line) -> Self {
+        Self {
+            current: start,
+            end,
         }
-        Some((end.start() - start.start()) >> Line::LOG_BYTES)
-    }
-    /// result = line_address + count * block_size
-    #[inline(always)]
-    fn forward(start: Self, count: usize) -> Self {
-        debug_assert!(!super::BLOCK_ONLY);
-        Self::from(start.start() + (count << Self::LOG_BYTES))
-    }
-    /// result = line_address + count * block_size
-    #[inline(always)]
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        debug_assert!(!super::BLOCK_ONLY);
-        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::forward(start, count))
-    }
-    /// result = line_address + count * block_size
-    #[inline(always)]
-    fn backward(start: Self, count: usize) -> Self {
-        debug_assert!(!super::BLOCK_ONLY);
-        Self::from(start.start() - (count << Self::LOG_BYTES))
-    }
-    /// result = line_address - count * block_size
-    #[inline(always)]
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        debug_assert!(!super::BLOCK_ONLY);
-        if start.start().as_usize() < (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::backward(start, count))
     }
 }
+
+impl Iterator for ImmixLineIterator {
+    type Item = Line;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        let next = self.current.next_line();
+        if next < self.end {
+            self.current = next;
+            Some(next)
+        } else {
+            None
+        }
+    }
+}
+
+// #[allow(clippy::assertions_on_constants)]
+// impl Step for Line {
+//     /// Get the number of lines between the given two lines.
+//     #[inline(always)]
+//     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         if start > end {
+//             return None;
+//         }
+//         Some((end.start() - start.start()) >> Line::LOG_BYTES)
+//     }
+//     /// result = line_address + count * block_size
+//     #[inline(always)]
+//     fn forward(start: Self, count: usize) -> Self {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         Self::from(start.start() + (count << Self::LOG_BYTES))
+//     }
+//     /// result = line_address + count * block_size
+//     #[inline(always)]
+//     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::forward(start, count))
+//     }
+//     /// result = line_address + count * block_size
+//     #[inline(always)]
+//     fn backward(start: Self, count: usize) -> Self {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         Self::from(start.start() - (count << Self::LOG_BYTES))
+//     }
+//     /// result = line_address - count * block_size
+//     #[inline(always)]
+//     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         if start.start().as_usize() < (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::backward(start, count))
+//     }
+// }

@@ -1,13 +1,13 @@
 use super::chunk::Chunk;
 use super::defrag::Histogram;
-use super::line::Line;
+use super::line::{Line, ImmixLineIterator};
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use spin::{Mutex, MutexGuard};
-use std::{iter::Step, ops::Range, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -214,12 +214,27 @@ impl Block {
         self.set_state(BlockState::Unallocated);
     }
 
+    pub fn next_block(&self) -> Block {
+        debug_assert!(self.start().as_usize() < usize::MAX - Self::BYTES);
+        Block(self.start() + Self::BYTES)
+    }
+
+    #[inline(always)]
+    pub fn start_line(&self) -> Line {
+        Line::from(self.start())
+    }
+
+    #[inline(always)]
+    pub fn end_line(&self) -> Line {
+        Line::from(self.end())
+    }
+
     /// Get the range of lines within the block.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn lines(&self) -> Range<Line> {
+    pub fn lines(&self) -> ImmixLineIterator {
         debug_assert!(!super::BLOCK_ONLY);
-        Line::from(self.start())..Line::from(self.end())
+        ImmixLineIterator::new(self.start_line(), self.end_line())
     }
 
     /// Sweep this block.
@@ -290,44 +305,72 @@ impl Block {
     }
 }
 
-impl Step for Block {
-    /// Get the number of blocks between the given two blocks.
-    #[inline(always)]
-    #[allow(clippy::assertions_on_constants)]
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        debug_assert!(!super::BLOCK_ONLY);
-        if start > end {
-            return None;
+pub struct ImmixBlockIterator {
+    current: Block,
+    end: Block,
+}
+
+impl ImmixBlockIterator {
+    pub fn new(start: Block, end: Block) -> Self {
+        Self {
+            current: start,
+            end,
         }
-        Some((end.start() - start.start()) >> Self::LOG_BYTES)
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << Self::LOG_BYTES))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::forward(start, count))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << Self::LOG_BYTES))
-    }
-    /// result = block_address - count * block_size
-    #[inline(always)]
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::backward(start, count))
     }
 }
+
+impl Iterator for ImmixBlockIterator {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        let next = self.current.next_block();
+        if next < self.end {
+            self.current = next;
+            Some(next)
+        } else {
+            None
+        }
+    }
+}
+
+// impl Step for Block {
+//     /// Get the number of blocks between the given two blocks.
+//     #[inline(always)]
+//     #[allow(clippy::assertions_on_constants)]
+//     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+//         debug_assert!(!super::BLOCK_ONLY);
+//         if start > end {
+//             return None;
+//         }
+//         Some((end.start() - start.start()) >> Self::LOG_BYTES)
+//     }
+//     /// result = block_address + count * block_size
+//     #[inline(always)]
+//     fn forward(start: Self, count: usize) -> Self {
+//         Self::from(start.start() + (count << Self::LOG_BYTES))
+//     }
+//     /// result = block_address + count * block_size
+//     #[inline(always)]
+//     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+//         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::forward(start, count))
+//     }
+//     /// result = block_address + count * block_size
+//     #[inline(always)]
+//     fn backward(start: Self, count: usize) -> Self {
+//         Self::from(start.start() - (count << Self::LOG_BYTES))
+//     }
+//     /// result = block_address - count * block_size
+//     #[inline(always)]
+//     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+//         if start.start().as_usize() < (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::backward(start, count))
+//     }
+// }
 
 /// A non-block single-linked list to store blocks.
 #[derive(Default)]

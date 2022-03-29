@@ -1,4 +1,4 @@
-use super::block::{Block, BlockState};
+use super::block::{Block, BlockState, ImmixBlockIterator};
 use super::defrag::Histogram;
 use super::immixspace::ImmixSpace;
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
@@ -9,7 +9,7 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
-use std::{iter::Step, ops::Range, sync::atomic::Ordering};
+use std::{ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
@@ -48,10 +48,15 @@ impl Chunk {
 
     /// Get a range of blocks within this chunk.
     #[inline(always)]
-    pub fn blocks(&self) -> Range<Block> {
+    pub fn blocks(&self) -> ImmixBlockIterator {
         let start = Block::from(Block::align(self.0));
         let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
-        start..end
+        ImmixBlockIterator::new(start, end)
+    }
+
+    pub fn next_chunk(&self) -> Chunk {
+        debug_assert!(self.start().as_usize() <= usize::MAX - Self::BYTES);
+        Chunk(self.start() + Self::BYTES)
     }
 
     /// Sweep this chunk.
@@ -80,42 +85,70 @@ impl Chunk {
     }
 }
 
-impl Step for Chunk {
-    /// Get the number of chunks between the given two chunks.
-    #[inline(always)]
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        if start > end {
-            return None;
+pub struct ImmixChunkIterator {
+    current: Chunk,
+    end: Chunk,
+}
+
+impl ImmixChunkIterator {
+    pub fn new(start: Chunk, end: Chunk) -> Self {
+        Self {
+            current: start,
+            end,
         }
-        Some((end.start() - start.start()) >> Self::LOG_BYTES)
-    }
-    /// result = chunk_address + count * block_size
-    #[inline(always)]
-    fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << Self::LOG_BYTES))
-    }
-    /// result = chunk_address + count * block_size
-    #[inline(always)]
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::forward(start, count))
-    }
-    /// result = chunk_address + count * block_size
-    #[inline(always)]
-    fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << Self::LOG_BYTES))
-    }
-    /// result = chunk_address - count * block_size
-    #[inline(always)]
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::backward(start, count))
     }
 }
+
+impl Iterator for ImmixChunkIterator {
+    type Item = Chunk;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        let next = self.current.next_chunk();
+        if next < self.end {
+            self.current = next;
+            Some(next)
+        } else {
+            None
+        }
+    }
+}
+
+// impl Step for Chunk {
+//     /// Get the number of chunks between the given two chunks.
+//     #[inline(always)]
+//     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+//         if start > end {
+//             return None;
+//         }
+//         Some((end.start() - start.start()) >> Self::LOG_BYTES)
+//     }
+//     /// result = chunk_address + count * block_size
+//     #[inline(always)]
+//     fn forward(start: Self, count: usize) -> Self {
+//         Self::from(start.start() + (count << Self::LOG_BYTES))
+//     }
+//     /// result = chunk_address + count * block_size
+//     #[inline(always)]
+//     fn forward_checked(start: Self, count: usize) -> Option<Self> {
+//         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::forward(start, count))
+//     }
+//     /// result = chunk_address + count * block_size
+//     #[inline(always)]
+//     fn backward(start: Self, count: usize) -> Self {
+//         Self::from(start.start() - (count << Self::LOG_BYTES))
+//     }
+//     /// result = chunk_address - count * block_size
+//     #[inline(always)]
+//     fn backward_checked(start: Self, count: usize) -> Option<Self> {
+//         if start.start().as_usize() < (count << Self::LOG_BYTES) {
+//             return None;
+//         }
+//         Some(Self::backward(start, count))
+//     }
+// }
 
 /// Chunk allocation state
 #[repr(u8)]
@@ -157,11 +190,11 @@ impl ChunkMap {
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
                 range.start = chunk;
-                range.end = Chunk::forward(chunk, 1);
+                range.end = chunk.next_chunk();
             } else if chunk < range.start {
                 range.start = chunk;
             } else if range.end <= chunk {
-                range.end = Chunk::forward(chunk, 1);
+                range.end = chunk.next_chunk();
             }
         }
     }
@@ -177,8 +210,9 @@ impl ChunkMap {
     }
 
     /// A range of all chunks in the heap.
-    pub fn all_chunks(&self) -> Range<Chunk> {
-        self.chunk_range.lock().clone()
+    pub fn all_chunks(&self) -> ImmixChunkIterator {
+        let chunk_range = self.chunk_range.lock();
+        ImmixChunkIterator::new(chunk_range.start, chunk_range.end)
     }
 
     /// Helper function to create per-chunk processing work packets.
