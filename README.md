@@ -20,12 +20,11 @@ We maintain an up to date list of the prerequisite for building MMTk and its bin
 
 ## Build
 
-Building MMTk requires a nightly Rust toolchain.
-As the Rust language and its libraries (crates) are frequently evolving, we recommend using the nightly toolchain specified in the [`rust-toolchain`](rust-toolchain) file.
+MMTk can build with a stable Rust toolchain. However,
+as the Rust language and its libraries (crates) are frequently evolving, we recommend using the toolchain specified in the [`rust-toolchain`](rust-toolchain) file.
 
 ```console
-$ # replace nightly-YYYY-MM-DD with the toolchain version specified in mmtk-dev-env
-$ export RUSTUP_TOOLCHAIN=nightly-YYYY-MM-DD
+$ export RUSTUP_TOOLCHAIN=`cat rust-toolchain`
 
 $ cargo build
 ```
