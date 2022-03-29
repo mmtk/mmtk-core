@@ -12,6 +12,7 @@ use crate::{
 pub struct Line(Address);
 
 impl From<Address> for Line {
+    #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
     fn from(address: Address) -> Line {
         debug_assert!(!super::BLOCK_ONLY);
@@ -20,10 +21,10 @@ impl From<Address> for Line {
     }
 }
 
-impl Into<Address> for Line {
+impl From<Line> for Address {
     #[inline(always)]
-    fn into(self) -> Address {
-        self.0
+    fn from(line: Line) -> Address {
+        line.0
     }
 }
 

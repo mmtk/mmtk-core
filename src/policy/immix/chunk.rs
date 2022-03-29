@@ -25,10 +25,10 @@ impl From<Address> for Chunk {
     }
 }
 
-impl Into<Address> for Chunk {
+impl From<Chunk> for Address {
     #[inline(always)]
-    fn into(self) -> Address {
-        self.0
+    fn from(chunk: Chunk) -> Address {
+        chunk.0
     }
 }
 

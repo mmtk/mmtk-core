@@ -76,10 +76,10 @@ impl From<Address> for Block {
     }
 }
 
-impl Into<Address> for Block {
+impl From<Block> for Address {
     #[inline(always)]
-    fn into(self) -> Address {
-        self.0
+    fn from(block: Block) -> Address {
+        block.0
     }
 }
 

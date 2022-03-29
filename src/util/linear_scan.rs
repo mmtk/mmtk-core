@@ -164,10 +164,10 @@ mod tests {
         }
     }
 
-    impl Into<Address> for Page {
+    impl From<Page> for Address {
         #[inline(always)]
-        fn into(self) -> Address {
-            self.0
+        fn from(page: Page) -> Address {
+            page.0
         }
     }
 
