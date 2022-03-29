@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
@@ -89,14 +90,6 @@ impl ReferenceProcessors {
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
-    /// Scan weak references.
-    pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        self.soft
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
-        self.weak
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
-    }
-
     /// Scan soft references.
     pub fn scan_soft_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
         // For soft refs, it is up to the VM to decide when to reclaim this.
@@ -107,6 +100,14 @@ impl ReferenceProcessors {
             self.soft
                 .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), true);
         }
+    }
+
+    /// Scan weak references.
+    pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
+        self.soft
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+        self.weak
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
     }
 
     /// Scan phantom references.
@@ -177,7 +178,7 @@ struct ReferenceProcessorSync {
     /// stay in the table (if the referent is alive) or go to enqueued_reference (if the referent is dead and cleared).
     /// Note that this table should not have duplicate entries, otherwise we will scan the duplicates multiple times, and
     /// that may lead to incorrect results.
-    references: Vec<ObjectReference>,
+    references: HashSet<ObjectReference>,
 
     /// References whose referents are cleared during this GC. We add references to this table during
     /// scanning, and we pop from this table during the enqueue work at the end of GC.
@@ -191,7 +192,7 @@ impl ReferenceProcessor {
     pub fn new(semantics: Semantics) -> Self {
         ReferenceProcessor {
             sync: Mutex::new(ReferenceProcessorSync {
-                references: Vec::with_capacity(INITIAL_SIZE),
+                references: HashSet::with_capacity(INITIAL_SIZE),
                 enqueued_references: vec![],
                 nursery_index: 0,
             }),
@@ -209,12 +210,7 @@ impl ReferenceProcessor {
         }
 
         let mut sync = self.sync.lock().unwrap();
-        // We make sure that we do not have duplicate entries
-        // TODO: Should we use hash set instead?
-        if sync.references.iter().any(|r| *r == reff) {
-            return;
-        }
-        sync.references.push(reff);
+        sync.references.insert(reff);
     }
 
     fn disallow_new_candidate(&self) {
@@ -331,19 +327,17 @@ impl ReferenceProcessor {
             new_reference
         }
 
-        sync.references
-            .iter_mut()
-            .for_each(|slot: &mut ObjectReference| {
-                let reference = *slot;
-                *slot = forward_reference::<E>(trace, reference);
-            });
+        sync.references = sync
+            .references
+            .iter()
+            .map(|reff| forward_reference::<E>(trace, *reff))
+            .collect();
 
-        sync.enqueued_references
-            .iter_mut()
-            .for_each(|slot: &mut ObjectReference| {
-                let reference = *slot;
-                *slot = forward_reference::<E>(trace, reference);
-            });
+        sync.enqueued_references = sync
+            .enqueued_references
+            .iter()
+            .map(|reff| forward_reference::<E>(trace, *reff))
+            .collect();
 
         debug!("Ending ReferenceProcessor.forward({:?})", self.semantics);
 
@@ -352,51 +346,38 @@ impl ReferenceProcessor {
     }
 
     /// Scan the reference table.
-    fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, nursery: bool, retain: bool) {
+    // TODO: nursery is currently ignored. We used to use Vec for the reference table, and use an int
+    // to point to the reference that we last scanned. However, when we use HashSet for reference table,
+    // we can no longer do that.
+    fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool, retain: bool) {
         let mut sync = self.sync.lock().unwrap();
 
         debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
-        // Start scanning from here
-        let from_index = if nursery { sync.nursery_index } else { 0 };
 
         debug!(
             "{:?} Reference table is {:?}",
             self.semantics, sync.references
         );
         if retain {
-            for reference in sync.references.iter().skip(from_index) {
-                // Retain the referent. This does not update the reference table.
-                // There will be a later scan pass that update the reference table.
+            for reference in sync.references.iter() {
                 self.retain_referent::<E>(trace, *reference);
             }
         } else {
-            // A cursor. Live reference will be stored at the cursor.
-            let mut to_index = from_index;
+            // Put processed references in this set
+            let mut new_set = HashSet::with_capacity(INITIAL_SIZE);
+            debug_assert!(sync.enqueued_references.is_empty());
+            // Put enqueued reference in this vec
+            let mut enqueued_references = vec![];
 
-            // Iterate from from_index, process/forward for each reference.
-            // If the reference is alive (process_reference() returned a non-NULL value),
-            // store the forwarded reference back at the cursor.
-            for i in from_index..sync.references.len() {
-                let reference = sync.references[i];
-
+            for reff in sync.references.iter() {
                 // Determine liveness (and forward if necessary) the reference
-                let new_reference =
-                    self.process_reference(trace, reference, &mut sync.enqueued_references);
-                // If the reference is alive, put it back to the array
+                let new_reference = self.process_reference(trace, *reff, &mut enqueued_references);
                 if !new_reference.is_null() {
-                    sync.references[to_index] = new_reference;
-                    to_index += 1;
-                    trace!("SCANNED {} {:?}", i, new_reference,);
+                    new_set.insert(new_reference);
                 }
             }
-            debug!(
-                "{:?} references: {} -> {}",
-                self.semantics,
-                sync.references.len(),
-                to_index
-            );
-            sync.nursery_index = to_index;
-            sync.references.truncate(to_index);
+            sync.references = new_set;
+            sync.enqueued_references = enqueued_references;
         }
 
         debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
