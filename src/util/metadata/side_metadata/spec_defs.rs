@@ -1,11 +1,11 @@
 use crate::util::constants::*;
 use crate::util::heap::layout::vm_layout_constants::*;
+use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::constants::{
     GLOBAL_SIDE_METADATA_BASE_OFFSET, LOCAL_SIDE_METADATA_BASE_OFFSET,
 };
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::linear_scan::Region;
 
 // This macro helps define side metadata specs, and layout their offsets one after another.
 // The macro is implemented with the incremental TT muncher pattern (see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html).

@@ -1,6 +1,7 @@
 use super::block::{Block, BlockState};
 use super::defrag::Histogram;
 use super::immixspace::ImmixSpace;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
 use crate::{
     scheduler::*,
@@ -8,7 +9,6 @@ use crate::{
     vm::*,
     MMTK,
 };
-use crate::util::linear_scan::{Region, RegionIterator};
 use spin::Mutex;
 use std::{ops::Range, sync::atomic::Ordering};
 

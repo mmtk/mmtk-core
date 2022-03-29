@@ -5,10 +5,10 @@ use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
+use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::Address;
 use crate::vm::*;
-use crate::util::linear_scan::Region;
 
 /// Immix allocator
 #[repr(C)]

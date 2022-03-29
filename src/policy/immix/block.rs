@@ -3,10 +3,10 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::Address;
 use crate::vm::*;
-use crate::util::linear_scan::{Region, RegionIterator};
 use spin::{Mutex, MutexGuard};
 use std::sync::atomic::Ordering;
 
@@ -104,7 +104,6 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
-
 
     /// Get the chunk containing the block.
     #[inline(always)]

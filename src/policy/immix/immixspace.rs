@@ -13,13 +13,13 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::metadata::{
     self, compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
 };
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
-use crate::util::linear_scan::{Region, RegionIterator};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,

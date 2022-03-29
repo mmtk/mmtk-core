@@ -136,12 +136,113 @@ impl<R: Region> Iterator for RegionIterator<R> {
     type Item = R;
 
     fn next(&mut self) -> Option<R> {
-        let next = self.current.next();
-        if next < self.end {
-            self.current = next;
-            Some(next)
+        if self.current < self.end {
+            let ret = self.current;
+            self.current = self.current.next();
+            Some(ret)
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::constants::LOG_BYTES_IN_PAGE;
+
+    const PAGE_SIZE: usize = 1 << LOG_BYTES_IN_PAGE;
+
+    #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+    struct Page(Address);
+
+    impl From<Address> for Page {
+        #[inline(always)]
+        fn from(address: Address) -> Page {
+            debug_assert!(address.is_aligned_to(Self::BYTES));
+            Self(address)
+        }
+    }
+
+    impl Into<Address> for Page {
+        #[inline(always)]
+        fn into(self) -> Address {
+            self.0
+        }
+    }
+
+    impl Region for Page {
+        const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
+    }
+
+    #[test]
+    fn test_region_methods() {
+        let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
+        let addr4k1 = unsafe { Address::from_usize(PAGE_SIZE + 1) };
+
+        // align
+        debug_assert_eq!(Page::align(addr4k), addr4k);
+        debug_assert_eq!(Page::align(addr4k1), addr4k);
+        debug_assert!(Page::is_aligned(addr4k));
+        debug_assert!(!Page::is_aligned(addr4k1));
+
+        let page = Page::from(addr4k);
+        // start/end
+        debug_assert_eq!(page.start(), addr4k);
+        debug_assert_eq!(page.end(), addr4k + PAGE_SIZE);
+        // next
+        debug_assert_eq!(page.next().start(), addr4k + PAGE_SIZE);
+        debug_assert_eq!(page.next_nth(1).start(), addr4k + PAGE_SIZE);
+        debug_assert_eq!(page.next_nth(2).start(), addr4k + 2 * PAGE_SIZE);
+    }
+
+    #[test]
+    fn test_region_iterator_normal() {
+        let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
+        let page = Page::from(addr4k);
+        let end_page = page.next_nth(5);
+
+        let mut results = vec![];
+        let iter = RegionIterator::new(page, end_page);
+        for p in iter {
+            results.push(p);
+        }
+        debug_assert_eq!(
+            results,
+            vec![
+                page,
+                page.next_nth(1),
+                page.next_nth(2),
+                page.next_nth(3),
+                page.next_nth(4)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_region_iterator_same_start_end() {
+        let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
+        let page = Page::from(addr4k);
+
+        let mut results = vec![];
+        let iter = RegionIterator::new(page, page);
+        for p in iter {
+            results.push(p);
+        }
+        debug_assert_eq!(results, vec![]);
+    }
+
+    #[test]
+    fn test_region_iterator_smaller_end() {
+        let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
+        let page = Page::from(addr4k);
+        let end = Page::from(Address::ZERO);
+
+        let mut results = vec![];
+        let iter = RegionIterator::new(page, end);
+        for p in iter {
+            results.push(p);
+        }
+        debug_assert_eq!(results, vec![]);
     }
 }
