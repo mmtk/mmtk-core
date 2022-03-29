@@ -17,17 +17,14 @@ use std::sync::Once;
 /// in every read, InitializeOnce has no extra check for reads.
 pub struct InitializeOnce<T: 'static> {
     v: UnsafeCell<MaybeUninit<T>>,
-    /// The function that is used to create the initialization value. This will be only called once.
-    init_fn: &'static dyn Fn() -> T,
     /// This is used to guarantee `init_fn` is only called once.
     once: Once,
 }
 
 impl<T> InitializeOnce<T> {
-    pub const fn new(init_fn: &'static dyn Fn() -> T) -> Self {
+    pub const fn new() -> Self {
         InitializeOnce {
             v: UnsafeCell::new(MaybeUninit::uninit()),
-            init_fn,
             once: Once::new(),
         }
     }
@@ -36,9 +33,9 @@ impl<T> InitializeOnce<T> {
     /// If this method is called by multiple threads, the first thread will
     /// initialize the value, and the other threads will be blocked until the
     /// initialization is done (`Once` returns).
-    pub fn initialize_once(&self) {
+    pub fn initialize_once(&self, init_fn: &'static dyn Fn() -> T) {
         self.once.call_once(|| {
-            unsafe { &mut *self.v.get() }.write((self.init_fn)());
+            unsafe { &mut *self.v.get() }.write(init_fn());
         });
         debug_assert!(self.once.is_completed());
     }
