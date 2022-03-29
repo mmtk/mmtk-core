@@ -229,7 +229,7 @@ impl<VM: VMBinding> WorkerLocalStat<VM> {
         let mut counters: Vec<Box<dyn WorkCounter>> = vec![Box::new(WorkDuration::new())];
         #[cfg(feature = "perf_counter")]
         for e in &mmtk.options.work_perf_events.events {
-            counters.push(box WorkPerfEvent::new(&e.0, e.1, e.2));
+            counters.push(Box::new(WorkPerfEvent::new(&e.0, e.1, e.2)));
         }
         counters
     }

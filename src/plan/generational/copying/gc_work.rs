@@ -1,6 +1,6 @@
 use super::global::GenCopy;
-use crate::vm::*;
 use crate::scheduler::gc_work::SFTProcessEdges;
+use crate::vm::*;
 
 pub struct GenCopyGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyGCWorkContext<VM> {

@@ -1,6 +1,6 @@
 use super::chunk::Chunk;
 use super::defrag::Histogram;
-use super::line::{Line, ImmixLineIterator};
+use super::line::{ImmixLineIterator, Line};
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::metadata::side_metadata::{self, *};

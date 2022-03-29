@@ -72,7 +72,7 @@ mod initialize_once_tests {
         // Create multiple threads to initialize the same `InitializeOnce` value
         const N_THREADS: usize = 1000;
         // The test value
-        static I: InitializeOnce<usize> = InitializeOnce::new(&initialize_usize);
+        static I: InitializeOnce<usize> = InitializeOnce::new();
         // Count how many times the function is called
         static INITIALIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
         // The function to create initial value
@@ -84,7 +84,7 @@ mod initialize_once_tests {
         let mut threads = vec![];
         for _ in 1..N_THREADS {
             threads.push(thread::spawn(|| {
-                I.initialize_once();
+                I.initialize_once(&initialize_usize);
                 // Every thread should see the value correctly initialized.
                 assert_eq!(*I, 42);
             }));

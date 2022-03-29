@@ -8,7 +8,9 @@ use mmtk::util::constants::LOG_BITS_IN_WORD;
 use mmtk::util::is_mmtk_object::ALLOC_BIT_REGION_SIZE;
 use mmtk::util::*;
 
-static SINGLE_OBJECT: Fixture<SingleObject> = Fixture::new();
+lazy_static! {
+    static ref SINGLE_OBJECT: Fixture<SingleObject> = Fixture::new();
+}
 
 fn basic_filter(addr: Address) -> bool {
     !addr.is_zero() && addr.as_usize() % ALLOC_BIT_REGION_SIZE == OBJECT_REF_OFFSET

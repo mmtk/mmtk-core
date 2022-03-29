@@ -238,7 +238,8 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn acquire_recyclable_lines(&mut self, size: usize, align: usize, offset: isize) -> bool {
         while self.line.is_some() || self.acquire_recyclable_block() {
             let line = self.line.unwrap();
-            if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line) {
+            if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line)
+            {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
                 self.cursor = start_line.start();
                 self.limit = adjust_thread_local_buffer_limit::<VM>(end_line.start());

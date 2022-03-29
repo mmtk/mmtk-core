@@ -200,7 +200,8 @@ impl FragmentedMapper {
     }
 
     fn new_slab() -> Box<Slab> {
-        let mapped: Box<Slab> = Box::new(unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) });
+        let mapped: Box<Slab> =
+            Box::new(unsafe { transmute([MapState::Unmapped; MMAP_NUM_CHUNKS]) });
         mapped
     }
 
