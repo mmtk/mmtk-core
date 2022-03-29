@@ -1,4 +1,4 @@
-use super::block::{Block, BlockState, ImmixBlockIterator};
+use super::block::{Block, BlockState};
 use super::defrag::Histogram;
 use super::immixspace::ImmixSpace;
 use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
@@ -8,6 +8,7 @@ use crate::{
     vm::*,
     MMTK,
 };
+use crate::util::linear_scan::{Region, RegionIterator};
 use spin::Mutex;
 use std::{ops::Range, sync::atomic::Ordering};
 
@@ -16,47 +17,39 @@ use std::{ops::Range, sync::atomic::Ordering};
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Chunk(Address);
 
+impl From<Address> for Chunk {
+    #[inline(always)]
+    fn from(address: Address) -> Chunk {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
+    }
+}
+
+impl Into<Address> for Chunk {
+    #[inline(always)]
+    fn into(self) -> Address {
+        self.0
+    }
+}
+
+impl Region for Chunk {
+    const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
+}
+
 impl Chunk {
     /// Chunk constant with zero address
     const ZERO: Self = Self(Address::ZERO);
-    /// Log bytes in chunk
-    pub const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
-    /// Bytes in chunk
-    pub const BYTES: usize = 1 << Self::LOG_BYTES;
     /// Log blocks in chunk
     pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
     /// Blocks in chunk
     pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
 
-    /// Align the give address to the chunk boundary.
-    pub const fn align(address: Address) -> Address {
-        address.align_down(Self::BYTES)
-    }
-
-    /// Get the chunk from a given address.
-    /// The address must be chunk-aligned.
-    #[inline(always)]
-    pub fn from(address: Address) -> Self {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-
-    /// Get chunk start address
-    pub const fn start(&self) -> Address {
-        self.0
-    }
-
     /// Get a range of blocks within this chunk.
     #[inline(always)]
-    pub fn blocks(&self) -> ImmixBlockIterator {
+    pub fn blocks(&self) -> RegionIterator<Block> {
         let start = Block::from(Block::align(self.0));
         let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
-        ImmixBlockIterator::new(start, end)
-    }
-
-    pub fn next_chunk(&self) -> Chunk {
-        debug_assert!(self.start().as_usize() <= usize::MAX - Self::BYTES);
-        Chunk(self.start() + Self::BYTES)
+        RegionIterator::<Block>::new(start, end)
     }
 
     /// Sweep this chunk.
@@ -84,71 +77,6 @@ impl Chunk {
         }
     }
 }
-
-pub struct ImmixChunkIterator {
-    current: Chunk,
-    end: Chunk,
-}
-
-impl ImmixChunkIterator {
-    pub fn new(start: Chunk, end: Chunk) -> Self {
-        Self {
-            current: start,
-            end,
-        }
-    }
-}
-
-impl Iterator for ImmixChunkIterator {
-    type Item = Chunk;
-
-    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        let next = self.current.next_chunk();
-        if next < self.end {
-            self.current = next;
-            Some(next)
-        } else {
-            None
-        }
-    }
-}
-
-// impl Step for Chunk {
-//     /// Get the number of chunks between the given two chunks.
-//     #[inline(always)]
-//     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-//         if start > end {
-//             return None;
-//         }
-//         Some((end.start() - start.start()) >> Self::LOG_BYTES)
-//     }
-//     /// result = chunk_address + count * block_size
-//     #[inline(always)]
-//     fn forward(start: Self, count: usize) -> Self {
-//         Self::from(start.start() + (count << Self::LOG_BYTES))
-//     }
-//     /// result = chunk_address + count * block_size
-//     #[inline(always)]
-//     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-//         if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
-//             return None;
-//         }
-//         Some(Self::forward(start, count))
-//     }
-//     /// result = chunk_address + count * block_size
-//     #[inline(always)]
-//     fn backward(start: Self, count: usize) -> Self {
-//         Self::from(start.start() - (count << Self::LOG_BYTES))
-//     }
-//     /// result = chunk_address - count * block_size
-//     #[inline(always)]
-//     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-//         if start.start().as_usize() < (count << Self::LOG_BYTES) {
-//             return None;
-//         }
-//         Some(Self::backward(start, count))
-//     }
-// }
 
 /// Chunk allocation state
 #[repr(u8)]
@@ -190,11 +118,11 @@ impl ChunkMap {
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
                 range.start = chunk;
-                range.end = chunk.next_chunk();
+                range.end = chunk.next();
             } else if chunk < range.start {
                 range.start = chunk;
             } else if range.end <= chunk {
-                range.end = chunk.next_chunk();
+                range.end = chunk.next();
             }
         }
     }
@@ -210,9 +138,9 @@ impl ChunkMap {
     }
 
     /// A range of all chunks in the heap.
-    pub fn all_chunks(&self) -> ImmixChunkIterator {
+    pub fn all_chunks(&self) -> RegionIterator<Chunk> {
         let chunk_range = self.chunk_range.lock();
-        ImmixChunkIterator::new(chunk_range.start, chunk_range.end)
+        RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
     /// Helper function to create per-chunk processing work packets.

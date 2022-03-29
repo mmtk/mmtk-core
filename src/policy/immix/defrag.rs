@@ -5,6 +5,7 @@ use super::{
 };
 use crate::policy::space::Space;
 use crate::{util::constants::LOG_BYTES_IN_PAGE, vm::*};
+use crate::util::linear_scan::Region;
 use spin::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 

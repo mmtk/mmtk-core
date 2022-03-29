@@ -5,6 +5,7 @@ use crate::util::metadata::side_metadata::constants::{
 };
 use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::linear_scan::Region;
 
 // This macro helps define side metadata specs, and layout their offsets one after another.
 // The macro is implemented with the incremental TT muncher pattern (see https://danielkeep.github.io/tlborm/book/pat-incremental-tt-munchers.html).

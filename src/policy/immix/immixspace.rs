@@ -19,6 +19,7 @@ use crate::util::metadata::{
 };
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
@@ -498,7 +499,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if cursor == mark_data.len() {
             return None;
         }
-        let start = search_start.next_nth_line(cursor - start_cursor);
+        let start = search_start.next_nth(cursor - start_cursor);
         // Find limit
         while cursor < mark_data.len() {
             let mark = mark_data.get(cursor);
@@ -507,8 +508,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             cursor += 1;
         }
-        let end = search_start.next_nth_line(cursor - start_cursor);
-        debug_assert!(ImmixLineIterator::new(start, end)
+        let end = search_start.next_nth(cursor - start_cursor);
+        debug_assert!(RegionIterator::<Line>::new(start, end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
         Some((start, end))
     }

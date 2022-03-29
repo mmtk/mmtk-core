@@ -8,6 +8,7 @@ use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::Address;
 use crate::vm::*;
+use crate::util::linear_scan::Region;
 
 /// Immix allocator
 #[repr(C)]
