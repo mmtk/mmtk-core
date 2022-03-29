@@ -1,17 +1,3 @@
-// #![allow(incomplete_features)]
-// #![feature(integer_atomics)]
-// #![feature(is_sorted)]
-// #![feature(drain_filter)]
-// #![feature(nll)]
-// #![feature(box_syntax)]
-// #![feature(arbitrary_self_types)]
-// #![feature(associated_type_defaults)]
-// #![feature(specialization)]
-// #![feature(trait_alias)]
-// #![feature(step_trait)]
-// #![feature(adt_const_params)]
-// #![feature(generic_const_exprs)]
-// #![feature(const_fn_trait_bound)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
