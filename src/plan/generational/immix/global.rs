@@ -4,7 +4,7 @@ use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::immix::gc_work::TraceKind;
+use crate::plan::immix::gc_work::{TRACE_KIND_FAST, TRACE_KIND_DEFRAG};
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
@@ -130,13 +130,13 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         } else if defrag {
             debug!("Full heap GC Defrag");
             scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Defrag }>>(
+                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>>(
                     self,
                 );
         } else {
             debug!("Full heap GC Fast");
             scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, { TraceKind::Fast }>>(self);
+                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>>(self);
         }
     }
 

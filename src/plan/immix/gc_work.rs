@@ -7,11 +7,9 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub(in crate::plan) enum TraceKind {
-    Fast,
-    Defrag,
-}
+pub(in crate::plan) type TraceKind = u8;
+pub(in crate::plan) const TRACE_KIND_FAST: TraceKind = 0;
+pub(in crate::plan) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 /// Object tracing for Immix.
 /// Note that it is possible to use [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges) for immix.
@@ -62,7 +60,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
             return object;
         }
         if self.immix().immix_space.in_space(object) {
-            if KIND == TraceKind::Fast {
+            if KIND == TRACE_KIND_FAST {
                 self.immix().immix_space.fast_trace_object(self, object)
             } else {
                 self.immix().immix_space.trace_object(
@@ -81,7 +79,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork for ImmixProcessEdge
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        if KIND == TraceKind::Defrag && Self::OVERWRITE_REFERENCE {
+        if KIND == TRACE_KIND_DEFRAG && Self::OVERWRITE_REFERENCE {
             unsafe { slot.store(new_object) };
         }
     }
