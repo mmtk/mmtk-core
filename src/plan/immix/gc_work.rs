@@ -7,6 +7,10 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
+// It would be better if we use an enum for this. However, we use this as
+// a constant type parameter, and Rust only accepts integer and bool for
+// constant type parameters for now. We need to wait until `adt_const_params` is
+// stablized.
 pub(in crate::plan) type TraceKind = u8;
 pub(in crate::plan) const TRACE_KIND_FAST: TraceKind = 0;
 pub(in crate::plan) const TRACE_KIND_DEFRAG: TraceKind = 1;

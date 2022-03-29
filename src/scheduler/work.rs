@@ -56,5 +56,7 @@ use crate::plan::Plan;
 pub trait GCWorkContext {
     type VM: VMBinding;
     type PlanType: Plan<VM = Self::VM>;
+    // We should use SFTProcessEdges as the default value for this associate type. However, this requires
+    // `associated_type_defaults` which has not yet been stablized.
     type ProcessEdgesWorkType: ProcessEdgesWork<VM = Self::VM>;
 }
