@@ -68,8 +68,10 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
     }
 }
 
+use crate::scheduler::gc_work::SFTProcessEdges;
 pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
+    type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
 }
