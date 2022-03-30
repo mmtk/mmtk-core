@@ -2,8 +2,9 @@ use crate::DummyVM;
 use mmtk::scheduler::*;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::ObjectReference;
+use mmtk::vm::EdgeVisitor;
 use mmtk::vm::Scanning;
-use mmtk::{Mutator, TransitiveClosure};
+use mmtk::Mutator;
 
 pub struct VMScanning {}
 
@@ -26,8 +27,8 @@ impl Scanning<DummyVM> for VMScanning {
     fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = DummyVM>>() {
         unimplemented!()
     }
-    fn scan_object<T: TransitiveClosure>(
-        _trace: &mut T,
+    fn scan_object<EV: EdgeVisitor>(
+        _edge_visitor: &mut EV,
         _object: ObjectReference,
         _tls: VMWorkerThread,
     ) {

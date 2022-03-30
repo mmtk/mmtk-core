@@ -1,9 +1,16 @@
-use crate::plan::{Mutator, TransitiveClosure};
+use crate::plan::Mutator;
 use crate::scheduler::GCWorker;
 use crate::scheduler::ProcessEdgesWork;
-use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
+
+// Callback trait of scanning functions that report edges.
+pub trait EdgeVisitor {
+    /// Call this function for each edge.
+    fn visit_edge(&mut self, edge: Address);
+    // TODO: Add visit_soft_edge, visit_weak_edge, ... here.
+}
 
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
@@ -20,11 +27,11 @@ pub trait Scanning<VM: VMBinding> {
     /// in favor of bulk scanning `scan_objects`.
     ///
     /// Arguments:
-    /// * `trace`: The `TransitiveClosure` to use for scanning.
+    /// * `edge_visitor`: Called back for each edge.
     /// * `object`: The object to be scanned.
     /// * `tls`: The GC worker thread that is doing this tracing.
-    fn scan_object<T: TransitiveClosure>(
-        trace: &mut T,
+    fn scan_object<EV: EdgeVisitor>(
+        edge_visitor: &mut EV,
         object: ObjectReference,
         tls: VMWorkerThread,
     );
