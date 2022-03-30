@@ -522,11 +522,11 @@ the <code>&amp;</code> prefix).</li>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>        space_mapping: box {
+</span>        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
             vec
-        },
+        }),
 <span class="boring">}
 </span></code></pre></pre>
 <p>The <code>create_space_mapping</code> and <code>create_allocator_mapping</code> call that have appeared all

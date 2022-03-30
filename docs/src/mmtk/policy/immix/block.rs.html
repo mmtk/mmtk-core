@@ -1,9 +1,6 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/policy/immix/block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src&#x2F;policy&#x2F;immix&#x2F;block.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>block.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../../storage.js"></script><script src="../../../../crates.js"></script><script defer src="../../../../main.js"></script><script defer src="../../../../source-script.js"></script><script defer src="../../../../source-files.js"></script>
+    <noscript><link rel="stylesheet" href="../../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a class="sidebar-logo" href="../../../../mmtk/index.html"><div class="logo-container"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></div>
+        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../../mmtk/index.html"><img class="rust-logo" src="../../../../rust-logo.png" alt="logo"></a><nav class="sub"><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="18" height="18" alt="Pick another theme!" src="../../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../../settings.html" title="settings"><img width="18" height="18" alt="Change settings" src="../../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
 <span id="4">  4</span>
@@ -328,59 +325,17 @@
 <span id="323">323</span>
 <span id="324">324</span>
 <span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::chunk::Chunk</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ImmixSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan</span>::{<span class="ident">Region</span>, <span class="ident">RegionIterator</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="self">self</span>, <span class="kw-2">*</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
-<span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">iter::Step</span>, <span class="ident">ops::Range</span>, <span class="ident">sync::atomic::Ordering</span>};
+<span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
 <span class="doccomment">/// The block allocation state.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>)]</span>
@@ -440,11 +395,26 @@
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Block</span>(<span class="ident">Address</span>);
 
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Block</span> {
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Block</span> {
+        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
+        <span class="self">Self</span>(<span class="ident">address</span>)
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">block</span>: <span class="ident">Block</span>) -&gt; <span class="ident">Address</span> {
+        <span class="ident">block</span>.<span class="number">0</span>
+    }
+}
+
+<span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Block</span> {
+    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">15</span>;
+}
+
 <span class="kw">impl</span> <span class="ident">Block</span> {
-    <span class="doccomment">/// Log bytes in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">15</span>;
-    <span class="doccomment">/// Bytes in block</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>;
     <span class="doccomment">/// Log pages in block</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
     <span class="doccomment">/// Pages in block</span>
@@ -461,36 +431,6 @@
     <span class="doccomment">/// Block mark table (side)</span>
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MARK_TABLE</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
         <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK</span>;
-
-    <span class="doccomment">/// Align the address to a block boundary.</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">align</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">address</span>.<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
-    }
-
-    <span class="doccomment">/// Get the block from a given address.</span>
-    <span class="doccomment">/// The address must be block-aligned.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
-        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
-        <span class="self">Self</span>(<span class="ident">address</span>)
-    }
-
-    <span class="doccomment">/// Get the block containing the given address.</span>
-    <span class="doccomment">/// The input address does not need to be aligned.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">containing</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span>(<span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>).<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>))
-    }
-
-    <span class="doccomment">/// Get block start address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="number">0</span>
-    }
-
-    <span class="doccomment">/// Get block end address</span>
-    <span class="kw">pub</span> <span class="kw">const</span> <span class="kw">fn</span> <span class="ident">end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        <span class="self">self</span>.<span class="number">0</span>.<span class="ident">add</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
-    }
 
     <span class="doccomment">/// Get the chunk containing the block.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -587,12 +527,22 @@
         <span class="self">self</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unallocated</span>);
     }
 
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
+        <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">start</span>())
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">end_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
+        <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">end</span>())
+    }
+
     <span class="doccomment">/// Get the range of lines within the block.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">lines</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">RegionIterator</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">start</span>())..<span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">end</span>())
+        <span class="ident">RegionIterator</span>::<span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>.<span class="ident">start_line</span>(), <span class="self">self</span>.<span class="ident">end_line</span>())
     }
 
     <span class="doccomment">/// Sweep this block.</span>
@@ -663,45 +613,6 @@
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Step</span> <span class="kw">for</span> <span class="ident">Block</span> {
-    <span class="doccomment">/// Get the number of blocks between the given two blocks.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">steps_between</span>(<span class="ident">start</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>, <span class="ident">end</span>: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="kw">if</span> <span class="ident">start</span> <span class="op">&gt;</span> <span class="ident">end</span> {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
-        }
-        <span class="prelude-val">Some</span>((<span class="ident">end</span>.<span class="ident">start</span>() <span class="op">-</span> <span class="ident">start</span>.<span class="ident">start</span>()) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>)
-    }
-    <span class="doccomment">/// result = block_address + count * block_size</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
-    }
-    <span class="doccomment">/// result = block_address + count * block_size</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">forward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&gt;</span> <span class="ident">usize::MAX</span> <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
-        }
-        <span class="prelude-val">Some</span>(<span class="ident"><span class="self">Self</span>::forward</span>(<span class="ident">start</span>, <span class="ident">count</span>))
-    }
-    <span class="doccomment">/// result = block_address + count * block_size</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">start</span>.<span class="ident">start</span>() <span class="op">-</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
-    }
-    <span class="doccomment">/// result = block_address - count * block_size</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">backward_checked</span>(<span class="ident">start</span>: <span class="self">Self</span>, <span class="ident">count</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="ident">start</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&lt;</span> (<span class="ident">count</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>) {
-            <span class="kw">return</span> <span class="prelude-val">None</span>;
-        }
-        <span class="prelude-val">Some</span>(<span class="ident"><span class="self">Self</span>::backward</span>(<span class="ident">start</span>, <span class="ident">count</span>))
-    }
-}
-
 <span class="doccomment">/// A non-block single-linked list to store blocks.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockList</span> {
@@ -740,5 +651,5 @@
     }
 }
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.60.0-nightly (e646f3d2a 2022-02-10)" ></div>
+</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
 </body></html>

@@ -204,6 +204,7 @@ one can create and write their own work packet that implements the <code>Process
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
     type VM = VM;
     type PlanType = MyGC&lt;VM&gt;;
+    type ProcessEdgesWorkType = SFTProcessEdges&lt;Self::VM&gt;;
 }
 <span class="boring">}
 </span></code></pre></pre>
