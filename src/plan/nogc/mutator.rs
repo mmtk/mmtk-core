@@ -46,7 +46,7 @@ pub fn create_nogc_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(MULTI_SPACE_RESERVED_ALLOCATORS, false, plan);
             vec.push((
                 AllocatorSelector::BumpPointer(0),
@@ -61,14 +61,14 @@ pub fn create_nogc_mutator<VM: VMBinding>(
                 &plan.downcast_ref::<NoGC<VM>>().unwrap().los,
             ));
             vec
-        },
+        }),
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,

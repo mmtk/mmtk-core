@@ -3,11 +3,12 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
-use crate::util::{Address, ObjectReference};
+use crate::util::Address;
 use crate::vm::*;
 use spin::{Mutex, MutexGuard};
-use std::{iter::Step, ops::Range, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -67,11 +68,26 @@ impl BlockState {
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
+impl From<Address> for Block {
+    #[inline(always)]
+    fn from(address: Address) -> Block {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
+    }
+}
+
+impl From<Block> for Address {
+    #[inline(always)]
+    fn from(block: Block) -> Address {
+        block.0
+    }
+}
+
+impl Region for Block {
+    const LOG_BYTES: usize = 15;
+}
+
 impl Block {
-    /// Log bytes in block
-    pub const LOG_BYTES: usize = 15;
-    /// Bytes in block
-    pub const BYTES: usize = 1 << Self::LOG_BYTES;
     /// Log pages in block
     pub const LOG_PAGES: usize = Self::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
     /// Pages in block
@@ -88,36 +104,6 @@ impl Block {
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::IX_BLOCK_MARK;
-
-    /// Align the address to a block boundary.
-    pub const fn align(address: Address) -> Address {
-        address.align_down(Self::BYTES)
-    }
-
-    /// Get the block from a given address.
-    /// The address must be block-aligned.
-    #[inline(always)]
-    pub fn from(address: Address) -> Self {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-
-    /// Get the block containing the given address.
-    /// The input address does not need to be aligned.
-    #[inline(always)]
-    pub fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
-    }
-
-    /// Get block start address
-    pub const fn start(&self) -> Address {
-        self.0
-    }
-
-    /// Get block end address
-    pub const fn end(&self) -> Address {
-        self.0.add(Self::BYTES)
-    }
 
     /// Get the chunk containing the block.
     #[inline(always)]
@@ -214,12 +200,22 @@ impl Block {
         self.set_state(BlockState::Unallocated);
     }
 
+    #[inline(always)]
+    pub fn start_line(&self) -> Line {
+        Line::from(self.start())
+    }
+
+    #[inline(always)]
+    pub fn end_line(&self) -> Line {
+        Line::from(self.end())
+    }
+
     /// Get the range of lines within the block.
     #[allow(clippy::assertions_on_constants)]
     #[inline(always)]
-    pub fn lines(&self) -> Range<Line> {
+    pub fn lines(&self) -> RegionIterator<Line> {
         debug_assert!(!super::BLOCK_ONLY);
-        Line::from(self.start())..Line::from(self.end())
+        RegionIterator::<Line>::new(self.start_line(), self.end_line())
     }
 
     /// Sweep this block.
@@ -287,45 +283,6 @@ impl Block {
                 false
             }
         }
-    }
-}
-
-impl Step for Block {
-    /// Get the number of blocks between the given two blocks.
-    #[inline(always)]
-    #[allow(clippy::assertions_on_constants)]
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        debug_assert!(!super::BLOCK_ONLY);
-        if start > end {
-            return None;
-        }
-        Some((end.start() - start.start()) >> Self::LOG_BYTES)
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << Self::LOG_BYTES))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::forward(start, count))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << Self::LOG_BYTES))
-    }
-    /// result = block_address - count * block_size
-    #[inline(always)]
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << Self::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::backward(start, count))
     }
 }
 

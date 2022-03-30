@@ -76,11 +76,11 @@ pub fn create_mygc_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         // Modify
         // ANCHOR: space_mapping
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::BumpPointer(0), mygc.tospace()));
             vec
-        },
+        }),
         // ANCHOR_END: space_mapping
         prepare_func: &mygc_mutator_prepare, // Modify
         release_func: &mygc_mutator_release, // Modify
@@ -88,7 +88,7 @@ pub fn create_mygc_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,

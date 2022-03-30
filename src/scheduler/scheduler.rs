@@ -280,7 +280,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
         worker
             .sender
-            .send(CoordinatorMessage::Work(box work))
+            .send(CoordinatorMessage::Work(Box::new(work)))
             .unwrap();
     }
 

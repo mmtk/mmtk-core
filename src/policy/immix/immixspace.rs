@@ -13,6 +13,7 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
+use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::metadata::{
     self, compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
@@ -30,11 +31,7 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
-use std::{
-    iter::Step,
-    ops::Range,
-    sync::{atomic::AtomicU8, Arc},
-};
+use std::sync::{atomic::AtomicU8, Arc};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -237,9 +234,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
         // # Safety: ImmixSpace reference is always valid within this collection cycle.
         let space = unsafe { &*(self as *const Self) };
-        let work_packets = self
-            .chunk_map
-            .generate_tasks(|chunk| box PrepareBlockState {
+        let work_packets = self.chunk_map.generate_tasks(|chunk| {
+            Box::new(PrepareBlockState {
                 space,
                 chunk,
                 defrag_threshold: if space.in_defrag() {
@@ -247,7 +243,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 } else {
                     None
                 },
-            });
+            })
+        });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
         // Update line mark state
         if !super::BLOCK_ONLY {
@@ -478,11 +475,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Hole searching.
     ///
     /// Linearly scan lines in a block to search for the next
-    /// hole, starting from the given line.
+    /// hole, starting from the given line. If we find available lines,
+    /// return a tuple of the start line and the end line (non-inclusive).
     ///
     /// Returns None if the search could not find any more holes.
     #[allow(clippy::assertions_on_constants)]
-    pub fn get_next_available_lines(&self, search_start: Line) -> Option<Range<Line>> {
+    pub fn get_next_available_lines(&self, search_start: Line) -> Option<(Line, Line)> {
         debug_assert!(!super::BLOCK_ONLY);
         let unavail_state = self.line_unavail_state.load(Ordering::Acquire);
         let current_state = self.line_mark_state.load(Ordering::Acquire);
@@ -501,7 +499,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if cursor == mark_data.len() {
             return None;
         }
-        let start = Line::forward(search_start, cursor - start_cursor);
+        let start = search_start.next_nth(cursor - start_cursor);
         // Find limit
         while cursor < mark_data.len() {
             let mark = mark_data.get(cursor);
@@ -510,10 +508,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             cursor += 1;
         }
-        let end = Line::forward(search_start, cursor - start_cursor);
-        debug_assert!((start..end)
+        let end = search_start.next_nth(cursor - start_cursor);
+        debug_assert!(RegionIterator::<Line>::new(start, end)
             .all(|line| !line.is_marked(unavail_state) && !line.is_marked(current_state)));
-        Some(start..end)
+        Some((start, end))
     }
 
     pub fn is_last_gc_exhaustive(did_defrag_for_last_gc: bool) -> bool {
