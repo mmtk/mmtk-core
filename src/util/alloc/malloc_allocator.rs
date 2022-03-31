@@ -9,18 +9,32 @@ use crate::Plan;
 
 #[repr(C)]
 pub struct MallocAllocator<VM: VMBinding> {
+    /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
+    /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static MallocSpace<VM>,
+    /// [`Plan`] instance that this allocator instance is associated with.
     plan: &'static dyn Plan<VM = VM>,
+    /// Required to make sure that only the outermost scope of [`Allocator::alloc_slow_inline`]
+    /// will increment the allocation bytes.
+    is_in_stress_test_alloc: bool,
 }
 
 impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
     fn get_space(&self) -> &'static dyn Space<VM> {
         self.space as &'static dyn Space<VM>
     }
+
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
     }
+
+    fn swap_is_in_stress_test_allocation(&mut self, in_stress_test_allocation: bool) -> bool {
+        let old = self.is_in_stress_test_alloc;
+        self.is_in_stress_test_alloc = in_stress_test_allocation;
+        old
+    }
+
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         self.alloc_slow(size, align, offset)
     }
@@ -68,6 +82,11 @@ impl<VM: VMBinding> MallocAllocator<VM> {
         space: &'static MallocSpace<VM>,
         plan: &'static dyn Plan<VM = VM>,
     ) -> Self {
-        MallocAllocator { tls, space, plan }
+        MallocAllocator {
+            tls,
+            space,
+            plan,
+            is_in_stress_test_alloc: false,
+        }
     }
 }

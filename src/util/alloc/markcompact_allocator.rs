@@ -40,6 +40,11 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         self.bump_allocator.get_tls()
     }
 
+    fn swap_is_in_stress_test_allocation(&mut self, is_stress_test_allocation: bool) -> bool {
+        self.bump_allocator
+            .swap_is_in_stress_test_allocation(is_stress_test_allocation)
+    }
+
     fn does_thread_local_allocation(&self) -> bool {
         true
     }
@@ -66,11 +71,14 @@ impl<VM: VMBinding> Allocator<VM> for MarkCompactAllocator<VM> {
         self.bump_allocator.alloc_slow_once(size, align, offset)
     }
 
-    // Slow path for allocation if the precise stress test has been enabled.
-    // It works by manipulating the limit to be below the cursor always.
-    // Performs three kinds of allocations: (i) if the hard limit has been met;
-    // (ii) the bump pointer semantics from the fastpath; and (iii) if the stress
-    // factor has been crossed.
+    /// Slow path for allocation if precise stress testing has been enabled.
+    /// It works by manipulating the limit to be always below the cursor.
+    /// Can have three different cases:
+    ///  - acquires a new block if the hard limit has been met;
+    ///  - allocates an object using the bump pointer semantics from the
+    ///    fastpath if there is sufficient space; and
+    ///  - does not allocate an object but forces a poll for GC if the stress
+    ///    factor has been crossed.
     fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,

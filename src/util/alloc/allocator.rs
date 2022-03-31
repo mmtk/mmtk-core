@@ -118,20 +118,24 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     /// Return the [`VMThread`] associated with this allocator instance.
     fn get_tls(&self) -> VMThread;
 
-    /// Return the [`Space`] instance associated with this allocator instance.
+    /// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     fn get_space(&self) -> &'static dyn Space<VM>;
 
     /// Return the [`Plan`] instance that this allocator instance is associated with.
     fn get_plan(&self) -> &'static dyn Plan<VM = VM>;
+
+    /// Swap value of flag to inform inner scopes that a stress test allocation is in progress. Used to ensure
+    /// correctness of the global allocation counter.
+    fn swap_is_in_stress_test_allocation(&mut self, in_stress_test_allocation: bool) -> bool;
 
     /// Return if this allocator can do thread local allocation. If an allocator does not do thread
     /// local allocation, each allocation will go to slowpath and will have a check for GC polls.
     fn does_thread_local_allocation(&self) -> bool;
 
     /// Return at which granularity the allocator acquires memory from the global space and use
-    /// them as thread local buffer. For example, the [`BumpAllocator`] acquires memory at 32KB
+    /// them as thread local buffer. For example, the [`BumpAllocator`](crate::util::alloc::BumpAllocator) acquires memory at 32KB
     /// blocks. Depending on the actual size for the current object, they always acquire memory of
-    /// N*32KB (N>=1). Thus the [`BumpAllocator`] returns 32KB for this method.  Only allocators
+    /// N*32KB (N>=1). Thus the [`BumpAllocator`](crate::util::alloc::BumpAllocator) returns 32KB for this method.  Only allocators
     /// that do thread local allocation need to implement this method.
     fn get_thread_local_buffer_granularity(&self) -> usize {
         assert!(self.does_thread_local_allocation(), "An allocator that does not thread local allocation does not have a buffer granularity.");
@@ -140,7 +144,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
     /// An allocation attempt. The implementation of this function depends on the allocator used.
     /// If an allocator supports thread local allocations, then the allocation will be serviced
-    /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`].
+    /// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).
     ///
     /// Note that in the case where the VM is out of memory, we invoke
     /// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to
@@ -148,7 +152,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     ///
     /// An allocator needs to make sure the object reference for the returned address is in the same
     /// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).
-    /// See [`crate::util::alloc::object_ref_guard`].
+    /// See [`crate::util::alloc::object_ref_guard`](util/alloc/object_ref_guard).
     ///
     /// Arguments:
     /// * `size`: the allocation size in bytes.
@@ -170,9 +174,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
     /// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A
     /// slowpath allocation in MMTk attempts to allocate the object using the per-allocator
-    /// definition of [`alloc_slow_once`]. This function also accounts for increasing the
+    /// definition of [`alloc_slow_once`](Allocator::alloc_slow_once). This function also accounts for increasing the
     /// allocation bytes in order to support stress testing. In case precise stress testing is
-    /// being used, the [`alloc_slow_once_precise_stress`] function is used instead.
+    /// being used, the [`alloc_slow_once_precise_stress`](Allocator::alloc_slow_once_precise_stress) function is used instead.
     ///
     /// Note that in the case where the VM is out of memory, we invoke
     /// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform
@@ -193,7 +197,13 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
         // Information about the previous collection.
         let mut emergency_collection = false;
-        let mut previous_result_zero = false;
+        // In the case where a GC is triggered, there will be multiple nested allocation calls that will try
+        // to increase the allocation bytes resulting in double counting an allocation. We mitigate this by
+        // only allowing the outermost scope to increase the allocation bytes. The outermost scope will be the
+        // first scope to set the `is_in_stress_test_allocation` boolean to true and hence we ensure each allocation
+        // is counted exactly once.
+        let outermost_scope_stress = stress_test && !self.swap_is_in_stress_test_allocation(true);
+
         loop {
             // Try to allocate using the slow path
             let result = if is_mutator && stress_test && plan.is_precise_stress() {
@@ -215,6 +225,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
 
             if !is_mutator {
                 debug_assert!(!result.is_zero());
+                if stress_test {
+                    self.swap_is_in_stress_test_allocation(false);
+                }
+
                 return result;
             }
 
@@ -224,14 +238,9 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     plan.allocation_success.store(true, Ordering::SeqCst);
                 }
 
-                // When a GC occurs, the resultant address provided by `acquire()` is 0x0.
-                // Hence, another iteration of this loop occurs. In such a case, the second
-                // iteration tries to allocate again, and if is successful, then the allocation
-                // bytes are updated. However, this leads to double counting of the allocation:
-                // (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()
-                // called by acquire(). In order to not double count the allocation, we only
-                // update allocation bytes if the previous result wasn't 0x0.
-                if stress_test && self.get_plan().is_initialized() && !previous_result_zero {
+                // Only update if we are the outermost scope, ensuring the allocation bytes are only incremented once
+                // per allocation
+                if stress_test && outermost_scope_stress && self.get_plan().is_initialized() {
                     let allocated_size =
                         if plan.is_precise_stress() || !self.does_thread_local_allocation() {
                             // For precise stress test, or for allocators that do not have thread local buffer,
@@ -259,6 +268,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     }
                 }
 
+                if stress_test {
+                    self.swap_is_in_stress_test_allocation(false);
+                }
+
                 return result;
             }
 
@@ -280,6 +293,11 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     trace!("Throw HeapOutOfMemory!");
                     VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     plan.allocation_success.swap(false, Ordering::SeqCst);
+
+                    if stress_test {
+                        self.swap_is_in_stress_test_allocation(false);
+                    }
+
                     return result;
                 }
             }
@@ -298,11 +316,10 @@ pub trait Allocator<VM: VMBinding>: Downcast {
             // attempt to allocate before we signal an OOM.
             emergency_collection = self.get_plan().is_emergency_collection();
             trace!("Got emergency collection as {}", emergency_collection);
-            previous_result_zero = true;
         }
     }
 
-    /// Single slow path allocation attempt. This is called by [`alloc_slow_inline`]. The
+    /// Single slow path allocation attempt. This is called by [`alloc_slow_inline`](Allocator::alloc_slow_inline). The
     /// implementation of this function depends on the allocator used. Generally, if an allocator
     /// supports thread local allocations, it will try to allocate more TLAB space here. If it
     /// doesn't, then (generally) the allocator simply allocates enough space for the current

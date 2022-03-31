@@ -18,7 +18,9 @@ pub struct ImmixAllocator<VM: VMBinding> {
     cursor: Address,
     /// Limit for bump pointer
     limit: Address,
+    /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
+    /// [`Plan`] instance that this allocator instance is associated with.
     plan: &'static dyn Plan<VM = VM>,
     /// *unused*
     hot: bool,
@@ -32,14 +34,18 @@ pub struct ImmixAllocator<VM: VMBinding> {
     request_for_large: bool,
     /// Hole-searching cursor
     line: Option<Line>,
-    /// Are we doing alloc slow when stress test is turned on. This is only set to true,
-    /// during the allow_slow_once_stress_test() call. In the call, we will restore the correct
-    /// limit for bump allocation, and call alloc() to try resolve the allocation request with
-    /// the thread local buffer. If we cannot do the allocation from the thread local buffer,
-    /// we will eventually call allow_slow_once_stress_test(). With this flag set to true, we know
-    /// we are resolving an allocation request and have failed the thread local allocation. In
-    /// this case, we will acquire new block from the space.
+    /// Are we doing alloc slow when stress test is turned on. This is only set to true, during the
+    /// [`ImmixAllocator::allow_slow_once_precise_stress`] call. In the call, we will restore the
+    /// correct limit for bump allocation, and call [`ImmixAllocator::alloc`] to try resolve the
+    /// allocation request with the thread local buffer. If we cannot do the allocation from the
+    /// thread local buffer, we will eventually call
+    /// [`ImmixAllocator::allow_slow_once_precise_stress`]. With this flag set to true, we know we
+    /// are resolving an allocation request and have failed the thread local allocation. In this
+    /// case, we will acquire new block from the space.
     alloc_slow_for_stress: bool,
+    /// Required to make sure that only the outermost scope of [`Allocator::alloc_slow_inline`]
+    /// will increment the allocation bytes.
+    is_in_stress_test_alloc: bool,
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
@@ -60,6 +66,12 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
 
     fn get_plan(&self) -> &'static dyn Plan<VM = VM> {
         self.plan
+    }
+
+    fn swap_is_in_stress_test_allocation(&mut self, in_stress_test_allocation: bool) -> bool {
+        let old = self.is_in_stress_test_alloc;
+        self.is_in_stress_test_alloc = in_stress_test_allocation;
+        old
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -126,7 +138,11 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
         offset: isize,
         need_poll: bool,
     ) -> Address {
-        trace!("{:?}: alloc_slow_once_precise_stress", self.tls);
+        trace!(
+            "{:?}: size {}, alloc_slow_once_precise_stress",
+            self.tls,
+            size
+        );
         // If we are required to make a poll, we call acquire_clean_block() which will acquire memory
         // from the space which includes a GC poll.
         if need_poll {
@@ -163,7 +179,11 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             self.alloc_slow_for_stress = true;
             // Try allocate. The allocator will try allocate from thread local buffer, if that fails, it will
             // get a clean block.
-            trace!("{:?}: alloc_slow_once_precise_stress - alloc()", self.tls);
+            trace!(
+                "{:?}: size {}, alloc_slow_once_precise_stress - alloc()",
+                self.tls,
+                size
+            );
             let ret = self.alloc(size, align, offset);
             // Indicate that we finish the alloc slow for stress test.
             self.alloc_slow_for_stress = false;
@@ -199,6 +219,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             request_for_large: false,
             line: None,
             alloc_slow_for_stress: false,
+            is_in_stress_test_alloc: false,
         }
     }
 
@@ -229,7 +250,18 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("{:?}: alloc_slow_hot", self.tls);
         if self.acquire_recyclable_lines(size, align, offset) {
-            self.alloc(size, align, offset)
+            // If stress test is active, then we need to go to the slow path instead of directly
+            // calling alloc(). This is because the `acquire_recyclable_lines` manipulates the
+            // cursor and limit; if we directly call `alloc()` then we will miss updating the
+            // allocation as the TLAB will service the allocation request. If we set the limit in
+            // `acquire_recyclable_lines`, then we risk running into an infinite loop of failing the
+            // fastpath and then trying to allocate from a recyclable line.
+            let stress_test = self.plan.base().is_stress_test_gc_enabled();
+            if stress_test {
+                self.alloc_slow_inline(size, align, offset)
+            } else {
+                self.alloc(size, align, offset)
+            }
         } else {
             self.alloc_slow_inline(size, align, offset)
         }
@@ -293,7 +325,12 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         match self.immix_space().get_clean_block(self.tls, self.copy) {
             None => Address::ZERO,
             Some(block) => {
-                trace!("{:?}: Acquired a new block {:?}", self.tls, block);
+                trace!(
+                    "{:?}: Acquired a new block {:?} -> {:?}",
+                    self.tls,
+                    block.start(),
+                    block.end()
+                );
                 if self.request_for_large {
                     self.large_cursor = block.start();
                     self.large_limit = adjust_thread_local_buffer_limit::<VM>(block.end());
@@ -311,23 +348,28 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     /// This method may be reentrant. We need to check before setting the values.
     fn set_limit_for_stress(&mut self) {
         if self.cursor < self.limit {
+            let old_limit = self.limit;
             let new_limit = unsafe { Address::from_usize(self.limit - self.cursor) };
             self.limit = new_limit;
             trace!(
-                "{:?}: set_limit_for_stress. normal {} -> {}",
+                "{:?}: set_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
-                self.limit,
-                new_limit
+                self.cursor,
+                old_limit,
+                new_limit,
             );
         }
+
         if self.large_cursor < self.large_limit {
+            let old_lg_limit = self.large_limit;
             let new_lg_limit = unsafe { Address::from_usize(self.large_limit - self.large_cursor) };
             self.large_limit = new_lg_limit;
             trace!(
-                "{:?}: set_limit_for_stress. large {} -> {}",
+                "{:?}: set_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_limit,
-                new_lg_limit
+                self.large_cursor,
+                old_lg_limit,
+                new_lg_limit,
             );
         }
     }
@@ -337,23 +379,28 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     /// This method may be reentrant. We need to check before setting the values.
     fn restore_limit_for_stress(&mut self) {
         if self.limit < self.cursor {
+            let old_limit = self.limit;
             let new_limit = self.cursor + self.limit.as_usize();
             self.limit = new_limit;
             trace!(
-                "{:?}: restore_limit_for_stress. normal {} -> {}",
+                "{:?}: restore_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
-                self.limit,
-                new_limit
+                self.cursor,
+                old_limit,
+                new_limit,
             );
         }
+
         if self.large_limit < self.large_cursor {
+            let old_lg_limit = self.large_limit;
             let new_lg_limit = self.large_cursor + self.large_limit.as_usize();
             self.large_limit = new_lg_limit;
             trace!(
-                "{:?}: restore_limit_for_stress. large {} -> {}",
+                "{:?}: restore_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_limit,
-                new_lg_limit
+                self.large_cursor,
+                old_lg_limit,
+                new_lg_limit,
             );
         }
     }
