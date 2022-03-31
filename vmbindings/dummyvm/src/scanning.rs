@@ -9,12 +9,6 @@ use mmtk::Mutator;
 pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
-    fn scan_objects<W: ProcessEdgesWork<VM = DummyVM>>(
-        _objects: &[ObjectReference],
-        _worker: &mut GCWorker<DummyVM>,
-    ) {
-        unimplemented!()
-    }
     fn scan_thread_roots<W: ProcessEdgesWork<VM = DummyVM>>() {
         unimplemented!()
     }
@@ -28,9 +22,9 @@ impl Scanning<DummyVM> for VMScanning {
         unimplemented!()
     }
     fn scan_object<EV: EdgeVisitor>(
-        _edge_visitor: &mut EV,
-        _object: ObjectReference,
         _tls: VMWorkerThread,
+        _object: ObjectReference,
+        _edge_visitor: &mut EV,
     ) {
         unimplemented!()
     }

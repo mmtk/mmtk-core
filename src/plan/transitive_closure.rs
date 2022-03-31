@@ -6,7 +6,6 @@ use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::{Address, ObjectReference};
 use crate::vm::EdgeVisitor;
-use crate::MMTK;
 
 /// This trait is the fundamental mechanism for performing a
 /// transitive closure over an object graph.
@@ -26,22 +25,25 @@ impl<T: ProcessEdgesWork> TransitiveClosure for T {
 
 /// A transitive closure visitor to collect all the edges of an object.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
-    mmtk: &'static MMTK<E::VM>,
     buffer: Vec<Address>,
     worker: &'a mut GCWorker<E::VM>,
 }
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
-    pub fn new(
-        mmtk: &'static MMTK<E::VM>,
-        buffer: Vec<Address>,
-        worker: &'a mut GCWorker<E::VM>,
-    ) -> Self {
+    pub fn new(worker: &'a mut GCWorker<E::VM>) -> Self {
         Self {
-            mmtk,
-            buffer,
+            buffer: vec![],
             worker,
         }
+    }
+
+    fn flush(&mut self) {
+        let mut new_edges = Vec::new();
+        mem::swap(&mut new_edges, &mut self.buffer);
+        self.worker.add_work(
+            WorkBucketStage::Closure,
+            E::new(new_edges, false, self.worker.mmtk),
+        );
     }
 }
 
@@ -57,7 +59,7 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor for ObjectsClosure<'a, E> {
             mem::swap(&mut new_edges, &mut self.buffer);
             self.worker.add_work(
                 WorkBucketStage::Closure,
-                E::new(new_edges, false, self.mmtk),
+                E::new(new_edges, false, self.worker.mmtk),
             );
         }
     }
@@ -66,11 +68,6 @@ impl<'a, E: ProcessEdgesWork> EdgeVisitor for ObjectsClosure<'a, E> {
 impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
     #[inline(always)]
     fn drop(&mut self) {
-        let mut new_edges = Vec::new();
-        mem::swap(&mut new_edges, &mut self.buffer);
-        self.worker.add_work(
-            WorkBucketStage::Closure,
-            E::new(new_edges, false, self.mmtk),
-        );
+        self.flush();
     }
 }

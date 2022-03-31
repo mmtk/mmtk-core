@@ -594,15 +594,12 @@ impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ScanObjectsAndMarkLines");
-        let mut closure = ObjectsClosure::<E>::new(mmtk, vec![], worker);
+        let tls = worker.tls;
+        let mut closure = ObjectsClosure::<E>::new(worker);
         for object in &self.buffer {
-            <E::VM as VMBinding>::VMScanning::scan_object(
-                &mut closure,
-                *object,
-                VMWorkerThread(VMThread::UNINITIALIZED),
-            );
+            <E::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
             if super::MARK_LINE_AT_SCAN_TIME
                 && !super::BLOCK_ONLY
                 && self.immix_space.in_space(*object)

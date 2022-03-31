@@ -1,5 +1,4 @@
 use crate::plan::Mutator;
-use crate::scheduler::GCWorker;
 use crate::scheduler::ProcessEdgesWork;
 use crate::util::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
@@ -22,18 +21,17 @@ pub trait Scanning<VM: VMBinding> {
     /// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled
     const SINGLE_THREAD_MUTATOR_SCANNING: bool = true;
 
-    /// Delegated scanning of a object, processing each pointer field
-    /// encountered. This method probably will be removed in the future,
-    /// in favor of bulk scanning `scan_objects`.
+    /// Delegated scanning of a object, visiting each pointer field
+    /// encountered.
     ///
     /// Arguments:
-    /// * `edge_visitor`: Called back for each edge.
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
-    /// * `tls`: The GC worker thread that is doing this tracing.
+    /// * `edge_visitor`: Called back for each edge.
     fn scan_object<EV: EdgeVisitor>(
-        edge_visitor: &mut EV,
-        object: ObjectReference,
         tls: VMWorkerThread,
+        object: ObjectReference,
+        edge_visitor: &mut EV,
     );
 
     /// MMTk calls this method at the first time during a collection that thread's stacks
@@ -48,11 +46,18 @@ pub trait Scanning<VM: VMBinding> {
     /// Bulk scanning of objects, processing each pointer field for each object.
     ///
     /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `objects`: The slice of object references to be scanned.
-    fn scan_objects<W: ProcessEdgesWork<VM = VM>>(
+    /// * `edge_visitor`: Called back for each edge in each object in `objects`.
+    fn scan_objects<EV: EdgeVisitor>(
+        tls: VMWorkerThread,
         objects: &[ObjectReference],
-        worker: &mut GCWorker<VM>,
-    );
+        edge_visitor: &mut EV,
+    ) {
+        for object in objects.iter() {
+            Self::scan_object(tls, *object, edge_visitor);
+        }
+    }
 
     /// Scan all the mutators for roots.
     fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();
