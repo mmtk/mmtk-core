@@ -7,15 +7,26 @@ on:
 
 jobs:
   pre-code-review-checks:
-    runs-on: ubuntu-18.04
-    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: ubuntu-18.04, triple: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-18.04, triple: i686-unknown-linux-gnu }
+        rust:
+          - 1.57.0
+          - 1.59.0
+
+    name: ${{ matrix.target.triple }} / ${{ matrix.rust }}
+    runs-on: ${{ matrix.target.os }}
+
     steps:
       - uses: actions/checkout@v2
-      - name: Install latest nightly
+      - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: ${{ matrix.rust }}-${{ matrix.target.triple }}
           components: rustfmt, clippy
-          target: i686-unknown-linux-gnu
           # This overwrites the default toolchain with the toolchain specified above.
           override: true
 
