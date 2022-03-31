@@ -6,16 +6,29 @@ on:
       - master
 
 jobs:
+  # Setup dynamic test matrix
+  setup-test-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.rust.outputs.array }}
+    steps:
+      - uses: actions/checkout@v2
+      # Get rust version
+      - id: rust
+        run: |
+          export MSRV=`cargo read-manifest | python -c 'import json,sys; print(json.load(sys.stdin)["rust_version"])'`
+          export TEST=`cat rust-toolchain`
+          echo "::set-output name=array::[\"$MSRV\", \"$TEST\"]"
+
   pre-code-review-checks:
+    needs: setup-test-matrix
     strategy:
       fail-fast: false
       matrix:
         target:
           - { os: ubuntu-18.04, triple: x86_64-unknown-linux-gnu }
           - { os: ubuntu-18.04, triple: i686-unknown-linux-gnu }
-        rust:
-          - 1.57.0
-          - 1.59.0
+        rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: ${{ matrix.target.triple }} / ${{ matrix.rust }}
     runs-on: ${{ matrix.target.os }}
