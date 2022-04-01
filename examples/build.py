@@ -39,6 +39,16 @@ def exec_and_redirect(args, env=None):
     if p.returncode != 0:
         exit(p.returncode)
 
+# Get the active toolchain, something like this: stable-x86_64-unknown-linux-gnu
+active_toolchain = str(subprocess.check_output(["rustup", "show", "active-toolchain"]).decode('utf-8')).split(' ')[0]
+print("Active rust toolchain: " + active_toolchain)
+if "x86_64" in active_toolchain:
+    m32 = False
+elif "i686" in active_toolchain:
+    m32 = True
+else:
+    print("Unknown toolchain: " + active_toolchain)
+    sys.exit(1)
 
 system = platform.system()
 assert system == "Darwin" or system == "Linux"
@@ -71,15 +81,7 @@ exec_and_redirect(cmd + ["--release"])
 shutil.copyfile("{}/target/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
                 "./libmmtk{}".format(SUFFIX))
 
-if system == "Linux":
-    exec_and_redirect(cmd + ["--target=i686-unknown-linux-gnu"])
-    exec_and_redirect(
-        cmd + ["--release", "--target=i686-unknown-linux-gnu"])
-    shutil.copyfile(
-        "{}/target/i686-unknown-linux-gnu/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
-        "./libmmtk_32{}".format(SUFFIX))
-
-exec_and_redirect([
+cmd = [
     "clang",
     "-lmmtk",
     "-L.",
@@ -87,24 +89,13 @@ exec_and_redirect([
     "-O3",
     "-o",
     "test_mmtk",
-    "./examples/main.c"])
-
-if system == "Linux":
-    exec_and_redirect([
-        "clang",
-        "-lmmtk_32",
-        "-L.",
-        "-I{}/api".format(vmbinding),
-        "-O3", "-m32",
-        "-o",
-        "test_mmtk_32",
-        "./examples/main.c"])
+]
+if m32:
+    cmd.append("-m32")
+cmd.append("./examples/main.c")
+exec_and_redirect(cmd)
 
 for plan in PLANS:
     exec_and_redirect(["./test_mmtk"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
-    if system == "Linux":
-        exec_and_redirect(["./test_mmtk_32"], env={LIBRARY_PATH: ".", "MMTK_PLAN": plan})
 
 os.remove("./test_mmtk")
-if system == "Linux":
-    os.remove("./test_mmtk_32")

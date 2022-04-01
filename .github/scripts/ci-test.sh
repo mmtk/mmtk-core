@@ -4,9 +4,8 @@ export RUST_BACKTRACE=1
 
 for_all_features "cargo test"
 
-# For x86_64-linux, also check for i686
+# target-specific features
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
-    for_all_features "cargo test --target i686-unknown-linux-gnu"
     cargo test --features perf_counter
 fi
 

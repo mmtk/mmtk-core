@@ -11,10 +11,7 @@ for_all_features "cargo build"
 # Build release
 for_all_features "cargo build --release"
 
-# For x86_64-linux, also see if we can build for i686
+# target-specific features
 if [[ $arch == "x86_64" && $os == "linux" ]]; then
-    cargo build --target i686-unknown-linux-gnu
-    for_all_features "cargo build --target i686-unknown-linux-gnu"
-    for_all_features "cargo build --release --target i686-unknown-linux-gnu"
     cargo build --features perf_counter
 fi
