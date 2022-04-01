@@ -1,0 +1,26 @@
+name: Minimal Supported Rust Version
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  msrv:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-msrv
+        run: cargo install cargo-msrv
+      # Verify the MSRV defined in Cargo.toml
+      - name: Verify MSRV
+        run: cargo msrv verify
+      # If the previous step fails, find MSRV
+      - name: Find MSRV
+        if: failure()
+        run: cargo msrv
