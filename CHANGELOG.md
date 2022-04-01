@@ -9,7 +9,7 @@ GC Plans
 
 Policies
 ---
-* Fixed a bug that `ImmixCopyCnotext` did not set the mark bit after copying an object.
+* Fixed a bug that `ImmixCopyContext` did not set the mark bit after copying an object.
 * Fixed a bug that `MarkCompactSpace` used `ObjectReference` and `Address` interchangably. Now `MarkCompactSpace`
   properly deals with `ObjectReference`.
 
