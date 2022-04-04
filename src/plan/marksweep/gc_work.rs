@@ -49,7 +49,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
         // non-atomic accesses
         while chunk < end {
             if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
-                work_packets.push(box MSSweepChunk { ms, chunk });
+                work_packets.push(Box::new(MSSweepChunk { ms, chunk }));
             }
 
             chunk += BYTES_IN_CHUNK;
@@ -68,8 +68,10 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
     }
 }
 
+use crate::scheduler::gc_work::SFTProcessEdges;
 pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
     type PlanType = MarkSweep<VM>;
+    type ProcessEdgesWorkType = SFTProcessEdges<Self::VM>;
 }

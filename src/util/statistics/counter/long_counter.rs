@@ -139,7 +139,7 @@ impl<T: Diffable> LongCounter<T> {
             name,
             implicitly_start,
             merge_phases,
-            count: box [0; MAX_PHASES],
+            count: Box::new([0; MAX_PHASES]),
             diffable,
             start_value: None,
             total_count: 0,

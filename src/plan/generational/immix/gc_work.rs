@@ -7,7 +7,7 @@ use crate::vm::*;
 use crate::MMTK;
 use std::ops::{Deref, DerefMut};
 
-use crate::plan::immix::gc_work::TraceKind;
+use crate::plan::immix::gc_work::{TraceKind, TRACE_KIND_FAST};
 
 /// ProcessEdges for a full heap GC for generational immix. The const type parameter
 /// defines whether there is copying in the GC.
@@ -52,7 +52,7 @@ impl<VM: VMBinding, const KIND: TraceKind> ProcessEdgesWork
         }
 
         if self.plan.immix.in_space(object) {
-            if KIND == TraceKind::Fast {
+            if KIND == TRACE_KIND_FAST {
                 return self.plan.immix.fast_trace_object(self, object);
             } else {
                 return self.plan.immix.trace_object(

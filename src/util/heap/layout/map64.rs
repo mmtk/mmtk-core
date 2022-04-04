@@ -83,14 +83,14 @@ impl Map for Map64 {
 
         let heads = 1;
         let pages_per_block = RawMemoryFreeList::default_block_size(units as _, heads);
-        let list = box RawMemoryFreeList::new(
+        let list = Box::new(RawMemoryFreeList::new(
             start,
             start + list_extent,
             pages_per_block,
             units as _,
             grain,
             heads,
-        );
+        ));
 
         // `CommonFreeListPageResource` lives as a member in space instances.
         // Since `Space` instances are always stored as global variables, so it is safe here

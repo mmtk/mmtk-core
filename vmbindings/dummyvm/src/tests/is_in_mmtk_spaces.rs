@@ -4,7 +4,9 @@ use crate::tests::fixtures::{Fixture, SingleObject};
 use mmtk::memory_manager::is_in_mmtk_spaces;
 use mmtk::util::*;
 
-static SINGLE_OBJECT: Fixture<SingleObject> = Fixture::new();
+lazy_static! {
+    static ref SINGLE_OBJECT: Fixture<SingleObject> = Fixture::new();
+}
 
 #[test]
 pub fn null() {

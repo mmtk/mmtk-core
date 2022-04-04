@@ -19,7 +19,7 @@ pub struct Fixture<T: FixtureContent> {
 unsafe impl<T: FixtureContent> Sync for Fixture<T> {}
 
 impl<T: FixtureContent> Fixture<T> {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             content: AtomicRefCell::new(None),
             once: Once::new(),

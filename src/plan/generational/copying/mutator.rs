@@ -35,17 +35,17 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
     let gencopy = mmtk.plan.downcast_ref::<GenCopy<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box create_gen_space_mapping(&*mmtk.plan, &gencopy.gen.nursery),
+        space_mapping: Box::new(create_gen_space_mapping(&*mmtk.plan, &gencopy.gen.nursery)),
         prepare_func: &gencopy_mutator_prepare,
         release_func: &gencopy_mutator_release,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: box ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
+        barrier: Box::new(ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
             mmtk,
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-        ),
+        )),
         mutator_tls,
         config,
         plan: gencopy,

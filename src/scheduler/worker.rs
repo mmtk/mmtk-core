@@ -106,10 +106,10 @@ impl<VM: VMBinding> GCWorker<VM> {
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated() {
-            self.scheduler.work_buckets[bucket].add_with_priority(1000, box work);
+            self.scheduler.work_buckets[bucket].add_with_priority(1000, Box::new(work));
             return;
         }
-        self.local_work_buffer.push((bucket, box work));
+        self.local_work_buffer.push((bucket, Box::new(work)));
         if self.local_work_buffer.len() > LOCALLY_CACHED_WORKS {
             self.flush();
         }

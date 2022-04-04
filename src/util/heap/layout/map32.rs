@@ -72,10 +72,10 @@ impl Map for Map32 {
     }
 
     fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList> {
-        box IntArrayFreeList::from_parent(
+        Box::new(IntArrayFreeList::from_parent(
             &self.global_page_map,
             self.get_discontig_freelist_pr_ordinal(pr) as _,
-        )
+        ))
     }
 
     fn create_parent_freelist(
@@ -84,7 +84,7 @@ impl Map for Map32 {
         units: usize,
         grain: i32,
     ) -> Box<Self::FreeList> {
-        box IntArrayFreeList::new(units, grain, 1)
+        Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
     fn allocate_contiguous_chunks(

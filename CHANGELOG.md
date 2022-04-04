@@ -1,3 +1,32 @@
+0.11.0 (2022-04-01)
+===
+
+GC Plans
+---
+* Introduced a new work packet type `SFTProcessEdges`. Most plans now use `SFTProcessEdges` for tracing objects,
+  and no longer need to implement any plan-specific work packet. Mark compact and immix plans still use their own
+  tracing work packet.
+
+Policies
+---
+* Fixed a bug that `ImmixCopyContext` did not set the mark bit after copying an object.
+* Fixed a bug that `MarkCompactSpace` used `ObjectReference` and `Address` interchangably. Now `MarkCompactSpace`
+  properly deals with `ObjectReference`.
+
+API
+---
+* `is_mapped_object()` is superseded by `is_in_mmtk_spaces()`. It returns true if the given object reference is in
+  MMTk spaces, but it does not guarantee that the object reference actually points to an object.
+* `is_mmtk_object()` is added. It can be used to check if an object reference points to an object (useful for conservative stack canning).
+  `is_mmtk_object()` is only availble when the `is_mmtk_object` feature is enabled.
+
+Misc
+---
+* MMTk core now builds with stable Rust toolchains (minimal supported Rust version 1.57.0).
+* Fixed a bug that MMTk may not map metadata and SFT for an object reference if the object reference is in a different
+  chunk from the allocated address.
+* Added `trait Region` and `struct RegionIterator<R>` to allow convenient iteration through memory regions.
+
 0.10.0 (2022-02-14)
 ===
 

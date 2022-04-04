@@ -47,10 +47,11 @@ pub(crate) fn ensure_munmap_contiguos_metadata_space(
     spec: &SideMetadataSpec,
 ) -> usize {
     // nearest page-aligned starting address
-    let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+    let metadata_start = address_to_meta_address(spec, start);
+    let mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let mmap_size =
-        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    let metadata_size = (size + ((1 << addr_rshift(spec)) - 1)) >> addr_rshift(spec);
+    let mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         ensure_munmap_metadata(mmap_start, mmap_size);
     }
@@ -70,10 +71,11 @@ pub(crate) fn try_mmap_contiguous_metadata_space(
     debug_assert!(size % BYTES_IN_PAGE == 0);
 
     // nearest page-aligned starting address
-    let mmap_start = address_to_meta_address(spec, start).align_down(BYTES_IN_PAGE);
+    let metadata_start = address_to_meta_address(spec, start);
+    let mmap_start = metadata_start.align_down(BYTES_IN_PAGE);
     // nearest page-aligned ending address
-    let mmap_size =
-        address_to_meta_address(spec, start + size).align_up(BYTES_IN_PAGE) - mmap_start;
+    let metadata_size = (size + ((1 << addr_rshift(spec)) - 1)) >> addr_rshift(spec);
+    let mmap_size = (metadata_start + metadata_size).align_up(BYTES_IN_PAGE) - mmap_start;
     if mmap_size > 0 {
         if !no_reserve {
             MMAPPER.ensure_mapped(mmap_start, mmap_size >> LOG_BYTES_IN_PAGE)
