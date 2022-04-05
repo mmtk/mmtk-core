@@ -57,18 +57,18 @@ pub fn create_immix_mutator<VM: VMBinding>(
     let immix = plan.downcast_ref::<Immix<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::Immix(0), &immix.immix_space));
             vec
-        },
+        }),
         prepare_func: &immix_mutator_prepare,
         release_func: &immix_mutator_release,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,

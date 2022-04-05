@@ -33,18 +33,18 @@ pub fn create_markcompact_mutator<VM: VMBinding>(
     let markcompact = plan.downcast_ref::<MarkCompact<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::MarkCompact(0), markcompact.mc_space()));
             vec
-        },
+        }),
         prepare_func: &markcompact_mutator_prepare,
         release_func: &markcompact_mutator_release,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,

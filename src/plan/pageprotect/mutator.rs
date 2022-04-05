@@ -42,18 +42,18 @@ pub fn create_pp_mutator<VM: VMBinding>(
     let page = plan.downcast_ref::<PageProtect<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             vec.push((AllocatorSelector::LargeObject(0), &page.space));
             vec
-        },
+        }),
         prepare_func: &pp_mutator_prepare,
         release_func: &pp_mutator_release,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,
