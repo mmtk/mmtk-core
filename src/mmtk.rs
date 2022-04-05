@@ -101,6 +101,11 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
         self.plan.as_ref()
     }
+
+    #[inline(always)]
+    pub fn get_options(&self) -> &Options {
+        &self.options
+    }
 }
 
 impl<VM: VMBinding> Default for MMTK<VM> {
