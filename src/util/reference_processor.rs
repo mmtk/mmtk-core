@@ -36,31 +36,19 @@ impl ReferenceProcessors {
         }
     }
 
-    pub fn add_soft_candidate<VM: VMBinding>(
-        &self,
-        reff: ObjectReference,
-        referent: ObjectReference,
-    ) {
-        trace!("Add soft candidate: {} ~> {}", reff, referent);
-        self.soft.add_candidate::<VM>(reff, referent);
+    pub fn add_soft_candidate<VM: VMBinding>(&self, reff: ObjectReference) {
+        trace!("Add soft candidate: {}", reff);
+        self.soft.add_candidate::<VM>(reff);
     }
 
-    pub fn add_weak_candidate<VM: VMBinding>(
-        &self,
-        reff: ObjectReference,
-        referent: ObjectReference,
-    ) {
-        trace!("Add weak candidate: {} ~> {}", reff, referent);
-        self.weak.add_candidate::<VM>(reff, referent);
+    pub fn add_weak_candidate<VM: VMBinding>(&self, reff: ObjectReference) {
+        trace!("Add weak candidate: {}", reff);
+        self.weak.add_candidate::<VM>(reff);
     }
 
-    pub fn add_phantom_candidate<VM: VMBinding>(
-        &self,
-        reff: ObjectReference,
-        referent: ObjectReference,
-    ) {
-        trace!("Add phantom candidate: {} ~> {}", reff, referent);
-        self.phantom.add_candidate::<VM>(reff, referent);
+    pub fn add_phantom_candidate<VM: VMBinding>(&self, reff: ObjectReference) {
+        trace!("Add phantom candidate: {}", reff);
+        self.phantom.add_candidate::<VM>(reff);
     }
 
     /// This will invoke enqueue for each reference processor, which will
@@ -203,9 +191,8 @@ impl ReferenceProcessor {
     }
 
     /// Add a candidate.
-    // TODO: do we need the referent argument?
     #[inline(always)]
-    pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference, _referent: ObjectReference) {
+    pub fn add_candidate<VM: VMBinding>(&self, reff: ObjectReference) {
         if !self.allow_new_candidate.load(Ordering::SeqCst) {
             return;
         }

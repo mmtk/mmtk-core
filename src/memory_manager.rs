@@ -422,14 +422,8 @@ pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The weak reference to add.
-/// * `referent`: The object that the reference points to.
-pub fn add_weak_candidate<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    reff: ObjectReference,
-    referent: ObjectReference,
-) {
-    mmtk.reference_processors
-        .add_weak_candidate::<VM>(reff, referent);
+pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
+    mmtk.reference_processors.add_weak_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of soft references. A binding may
@@ -438,14 +432,8 @@ pub fn add_weak_candidate<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The soft reference to add.
-/// * `referent`: The object that the reference points to.
-pub fn add_soft_candidate<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    reff: ObjectReference,
-    referent: ObjectReference,
-) {
-    mmtk.reference_processors
-        .add_soft_candidate::<VM>(reff, referent);
+pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
+    mmtk.reference_processors.add_soft_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of phantom references. A binding may
@@ -454,14 +442,8 @@ pub fn add_soft_candidate<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The phantom reference to add.
-/// * `referent`: The object that the reference points to.
-pub fn add_phantom_candidate<VM: VMBinding>(
-    mmtk: &MMTK<VM>,
-    reff: ObjectReference,
-    referent: ObjectReference,
-) {
-    mmtk.reference_processors
-        .add_phantom_candidate::<VM>(reff, referent);
+pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
+    mmtk.reference_processors.add_phantom_candidate::<VM>(reff);
 }
 
 /// Generic hook to allow benchmarks to be harnessed. We do a full heap

@@ -331,7 +331,7 @@ options! {
     // Should finalization be disabled?
     no_finalizer:          bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should reference type processing be disabled?
-    no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = false,
+    no_reference_types:    bool                 [env_var: true, command_line: true]  [always_valid] = true,
     // The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)
     nursery_zeroing:       NurseryZeroingOptions[env_var: true, command_line: true]  [always_valid] = NurseryZeroingOptions::Temporal,
     // How frequent (every X bytes) should we do a stress GC?
