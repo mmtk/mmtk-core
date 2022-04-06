@@ -1,5 +1,6 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 
 /// VM-specific methods for reference processing.
@@ -35,5 +36,5 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// Note that this method is called for each type of weak references during GC, and
     /// the references slice will be cleared after this call is returned. That means
     /// MMTk will no longer keep these references alive once this method is returned.
-    fn enqueue_references(references: &[ObjectReference]);
+    fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread);
 }

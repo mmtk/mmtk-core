@@ -1,5 +1,6 @@
 use mmtk::vm::ReferenceGlue;
 use mmtk::util::ObjectReference;
+use mmtk::util::opaque_pointer::VMWorkerThread;
 use crate::DummyVM;
 
 pub struct VMReferenceGlue {}
@@ -11,7 +12,7 @@ impl ReferenceGlue<DummyVM> for VMReferenceGlue {
     fn get_referent(_object: ObjectReference) -> ObjectReference {
         unimplemented!()
     }
-    fn enqueue_references(_references: &[ObjectReference]) {
+    fn enqueue_references(_references: &[ObjectReference], _tls: VMWorkerThread) {
         unimplemented!()
     }
 }

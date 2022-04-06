@@ -6,6 +6,7 @@ use std::vec::Vec;
 
 use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
+use crate::util::VMWorkerThread;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 
@@ -65,10 +66,10 @@ impl ReferenceProcessors {
     /// This will invoke enqueue for each reference processor, which will
     /// call back to the VM to enqueue references whose referents are cleared
     /// in this GC.
-    pub fn enqueue_refs<VM: VMBinding>(&self) {
-        self.soft.enqueue::<VM>();
-        self.weak.enqueue::<VM>();
-        self.phantom.enqueue::<VM>();
+    pub fn enqueue_refs<VM: VMBinding>(&self, tls: VMWorkerThread) {
+        self.soft.enqueue::<VM>(tls);
+        self.weak.enqueue::<VM>(tls);
+        self.phantom.enqueue::<VM>(tls);
     }
 
     /// A separate reference forwarding step. Normally when we scan refs, we deal with forwarding.
@@ -250,7 +251,7 @@ impl ReferenceProcessor {
     }
 
     /// Inform the binding to enqueue the weak references whose referents were cleared in this GC.
-    pub fn enqueue<VM: VMBinding>(&self) {
+    pub fn enqueue<VM: VMBinding>(&self, tls: VMWorkerThread) {
         let mut sync = self.sync.lock().unwrap();
 
         // This is the end of a GC. We do some assertions here to make sure our reference tables are correct.
@@ -281,7 +282,7 @@ impl ReferenceProcessor {
 
         if !sync.enqueued_references.is_empty() {
             debug!("enqueue: {:?}", sync.enqueued_references);
-            VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references);
+            VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references, tls);
             sync.enqueued_references.clear();
         }
 
@@ -354,9 +355,10 @@ impl ReferenceProcessor {
 
         debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
 
-        debug!(
+        trace!(
             "{:?} Reference table is {:?}",
-            self.semantics, sync.references
+            self.semantics,
+            sync.references
         );
         if retain {
             for reference in sync.references.iter() {
@@ -376,6 +378,13 @@ impl ReferenceProcessor {
                     new_set.insert(new_reference);
                 }
             }
+            debug!(
+                "{:?} reference table from {} to {} ({} enqueued)",
+                self.semantics,
+                sync.references.len(),
+                new_set.len(),
+                enqueued_references.len()
+            );
             sync.references = new_set;
             sync.enqueued_references = enqueued_references;
         }
@@ -546,8 +555,8 @@ impl<E: ProcessEdgesWork> RefForwarding<E> {
 #[derive(Default)]
 pub struct RefEnqueue<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for RefEnqueue<VM> {
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.reference_processors.enqueue_refs::<VM>();
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
+        mmtk.reference_processors.enqueue_refs::<VM>(worker.tls);
     }
 }
 impl<VM: VMBinding> RefEnqueue<VM> {
