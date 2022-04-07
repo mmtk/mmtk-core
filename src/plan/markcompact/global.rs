@@ -97,10 +97,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
 
-        // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-            .add(ProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
-
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
@@ -122,6 +118,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
                 .add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
             scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+
+            // VM-specific weak ref processing
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]

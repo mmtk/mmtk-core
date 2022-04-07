@@ -120,8 +120,6 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         for w in &mmtk.scheduler.workers_shared {
             w.local_work_bucket.add(ReleaseCollector);
         }
-        // TODO: Process weak references properly
-        // mmtk.reference_processors.clear();
     }
 }
 
@@ -249,15 +247,15 @@ impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 /// processing of those weakrefs may be more complex. For such case, we delegate to the
 /// VM binding to process weak references.
 #[derive(Default)]
-pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+pub struct VMProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
 
-impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
         <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
