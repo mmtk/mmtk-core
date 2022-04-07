@@ -1,5 +1,4 @@
 use super::gc_work::ImmixGCWorkContext;
-use super::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -7,7 +6,10 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::plan::TransitiveClosure;
+use crate::policy::immix::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
+use crate::scheduler::GCWorker;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
@@ -18,6 +20,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
@@ -124,6 +127,26 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
+    }
+}
+
+impl<VM: VMBinding> crate::policy::immix::gc_work::ImmixPlan<VM> for Immix<VM> {
+    #[inline(always)]
+    fn get_immix_space(&'static self) -> &'static ImmixSpace<VM> {
+        &self.immix_space
+    }
+    #[inline(always)]
+    fn get_immix_copy_semantics() -> CopySemantics {
+        CopySemantics::DefaultCopy
+    }
+    #[inline(always)]
+    fn fallback_trace<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.common.trace_object::<T>(trace, object)
     }
 }
 

@@ -4,13 +4,15 @@ use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::immix::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::plan::TransitiveClosure;
+use crate::policy::immix::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
+use crate::scheduler::GCWorker;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -18,6 +20,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 
@@ -194,6 +197,26 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
     fn is_current_gc_nursery(&self) -> bool {
         !self.gen.gc_full_heap.load(Ordering::SeqCst)
+    }
+}
+
+impl<VM: VMBinding> crate::policy::immix::gc_work::ImmixPlan<VM> for GenImmix<VM> {
+    #[inline(always)]
+    fn get_immix_space(&'static self) -> &'static ImmixSpace<VM> {
+        &self.immix
+    }
+    #[inline(always)]
+    fn get_immix_copy_semantics() -> CopySemantics {
+        CopySemantics::Mature
+    }
+    #[inline(always)]
+    fn fallback_trace<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.gen.trace_object_full_heap::<T>(trace, object, worker)
     }
 }
 
