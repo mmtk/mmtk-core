@@ -87,16 +87,19 @@ impl ReferenceProcessors {
             // This step only retains the referents (keep the referents alive), it does not update its addresses.
             // We will call soft.scan() again with retain=false to update its addresses based on liveness.
             self.soft
-                .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), true);
+                .retain::<E>(trace, mmtk.plan.is_current_gc_nursery());
         }
+        // This will update the references (and the referents).
+        self.soft
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
     }
 
     /// Scan weak references.
     pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
         self.soft
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
         self.weak
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
     }
 
     /// Scan phantom references.
@@ -106,7 +109,7 @@ impl ReferenceProcessors {
         mmtk: &'static MMTK<E::VM>,
     ) {
         self.phantom
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery(), false);
+            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
     }
 }
 
@@ -268,7 +271,7 @@ impl ReferenceProcessor {
         }
 
         if !sync.enqueued_references.is_empty() {
-            debug!("enqueue: {:?}", sync.enqueued_references);
+            trace!("enqueue: {:?}", sync.enqueued_references);
             VM::VMReferenceGlue::enqueue_references(&sync.enqueued_references, tls);
             sync.enqueued_references.clear();
         }
@@ -333,11 +336,11 @@ impl ReferenceProcessor {
         self.disallow_new_candidate();
     }
 
-    /// Scan the reference table.
+    /// Scan the reference table, and update each reference/referent.
     // TODO: nursery is currently ignored. We used to use Vec for the reference table, and use an int
     // to point to the reference that we last scanned. However, when we use HashSet for reference table,
     // we can no longer do that.
-    fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool, retain: bool) {
+    fn scan<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         let mut sync = self.sync.lock().unwrap();
 
         debug!("Starting ReferenceProcessor.scan({:?})", self.semantics);
@@ -347,73 +350,82 @@ impl ReferenceProcessor {
             self.semantics,
             sync.references
         );
-        if retain {
-            for reference in sync.references.iter() {
-                self.retain_referent::<E>(trace, *reference);
-            }
-        } else {
-            // Put processed references in this set
-            let mut new_set = HashSet::with_capacity(INITIAL_SIZE);
-            debug_assert!(sync.enqueued_references.is_empty());
-            // Put enqueued reference in this vec
-            let mut enqueued_references = vec![];
 
-            for reff in sync.references.iter() {
-                // Determine liveness (and forward if necessary) the reference
-                let new_reference = self.process_reference(trace, *reff, &mut enqueued_references);
-                if !new_reference.is_null() {
-                    new_set.insert(new_reference);
-                }
-            }
-            debug!(
-                "{:?} reference table from {} to {} ({} enqueued)",
-                self.semantics,
-                sync.references.len(),
-                new_set.len(),
-                enqueued_references.len()
-            );
-            sync.references = new_set;
-            sync.enqueued_references = enqueued_references;
-        }
+        debug_assert!(sync.enqueued_references.is_empty());
+        // Put enqueued reference in this vec
+        let mut enqueued_references = vec![];
+
+        // Determinine liveness for each reference and only keep the refs if `process_reference()` returns Some.
+        let new_set: HashSet<ObjectReference> = sync
+            .references
+            .iter()
+            .filter_map(|reff| self.process_reference(trace, *reff, &mut enqueued_references))
+            .collect();
+
+        debug!(
+            "{:?} reference table from {} to {} ({} enqueued)",
+            self.semantics,
+            sync.references.len(),
+            new_set.len(),
+            enqueued_references.len()
+        );
+        sync.references = new_set;
+        sync.enqueued_references = enqueued_references;
 
         debug!("Ending ReferenceProcessor.scan({:?})", self.semantics);
     }
 
-    /// This method deals only with soft references. It retains the referent
-    /// if the reference is definitely reachable.
-    fn retain_referent<E: ProcessEdgesWork>(&self, trace: &mut E, reference: ObjectReference) {
-        debug_assert!(!reference.is_null());
+    /// Retain referent in the reference table. This method deals only with soft references.
+    /// It retains the referent if the reference is definitely reachable. This method does
+    /// not update reference or referent. So after this method, scan() should be used to update
+    /// the references/referents.
+    fn retain<E: ProcessEdgesWork>(&self, trace: &mut E, _nursery: bool) {
         debug_assert!(self.semantics == Semantics::SOFT);
 
-        trace!("Processing reference: {:?}", reference);
+        let sync = self.sync.lock().unwrap();
 
-        if !reference.is_live() {
-            // Reference is currently unreachable but may get reachable by the
-            // following trace. We postpone the decision.
-            return;
+        debug!("Starting ReferenceProcessor.retain({:?})", self.semantics);
+        trace!(
+            "{:?} Reference table is {:?}",
+            self.semantics,
+            sync.references
+        );
+
+        for reference in sync.references.iter() {
+            debug_assert!(!reference.is_null());
+
+            trace!("Processing reference: {:?}", reference);
+
+            if !reference.is_live() {
+                // Reference is currently unreachable but may get reachable by the
+                // following trace. We postpone the decision.
+                continue;
+            }
+
+            // Reference is definitely reachable.  Retain the referent.
+            let referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference);
+            if !referent.is_null() {
+                Self::keep_referent_alive(trace, referent);
+            }
+            trace!(" ~> {:?} (retained)", referent.to_address());
         }
 
-        // Reference is definitely reachable.  Retain the referent.
-        let referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(reference);
-        if !referent.is_null() {
-            Self::keep_referent_alive(trace, referent);
-        }
-        trace!(" ~> {:?} (retained)", referent.to_address());
+        debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
     }
 
     /// Process a reference.
     /// * If both the reference and the referent is alive, return the updated reference and update its referent properly.
-    /// * If the reference is alive, and the referent is not null but not alive, return a null pointer and the reference (with cleared referent) is enqueued.
-    /// * For other cases, return a null pointer.
+    /// * If the reference is alive, and the referent is not null but not alive, return None and the reference (with cleared referent) is enqueued.
+    /// * For other cases, return None.
     ///
-    /// If a null pointer is returned, the reference can be removed from the reference table. Otherwise, the updated reference should be kept
+    /// If a None value is returned, the reference can be removed from the reference table. Otherwise, the updated reference should be kept
     /// in the reference table.
     fn process_reference<E: ProcessEdgesWork>(
         &self,
         trace: &mut E,
         reference: ObjectReference,
         enqueued_references: &mut Vec<ObjectReference>,
-    ) -> ObjectReference {
+    ) -> Option<ObjectReference> {
         debug_assert!(!reference.is_null());
 
         trace!("Process reference: {}", reference);
@@ -424,7 +436,7 @@ impl ReferenceProcessor {
             <E::VM as VMBinding>::VMReferenceGlue::clear_referent(reference);
             trace!(" UNREACHABLE reference: {}", reference);
             trace!(" (unreachable)");
-            return ObjectReference::NULL;
+            return None;
         }
 
         // The reference object is live
@@ -438,7 +450,7 @@ impl ReferenceProcessor {
         // waiting list.
         if old_referent.is_null() {
             trace!(" (null referent) ");
-            return ObjectReference::NULL;
+            return None;
         }
 
         trace!(" => {}", new_reference);
@@ -458,14 +470,14 @@ impl ReferenceProcessor {
 
             // Update the referent
             <E::VM as VMBinding>::VMReferenceGlue::set_referent(new_reference, new_referent);
-            new_reference
+            Some(new_reference)
         } else {
             // Referent is unreachable. Clear the referent and enqueue the reference object.
             trace!(" UNREACHABLE referent: {}", old_referent);
 
             <E::VM as VMBinding>::VMReferenceGlue::clear_referent(new_reference);
             enqueued_references.push(new_reference);
-            ObjectReference::NULL
+            None
         }
     }
 }
