@@ -1,4 +1,5 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::*;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
@@ -9,7 +10,6 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
-use crate::policy::gc_work::TraceKind;
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;

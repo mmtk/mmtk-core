@@ -5,6 +5,7 @@ use super::{
     defrag::Defrag,
 };
 use crate::plan::ObjectsClosure;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -30,7 +31,6 @@ use crate::{
     },
     MMTK,
 };
-use crate::policy::gc_work::TraceKind;
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
 
