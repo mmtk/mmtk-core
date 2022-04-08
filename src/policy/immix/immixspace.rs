@@ -30,8 +30,12 @@ use crate::{
     },
     MMTK,
 };
+use crate::policy::gc_work::TraceKind;
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
+
+pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
+pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,

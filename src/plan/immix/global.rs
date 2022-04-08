@@ -7,7 +7,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::plan::TransitiveClosure;
-use crate::policy::immix::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
+use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::GCWorker;
 use crate::scheduler::*;
@@ -127,26 +127,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
     fn common(&self) -> &CommonPlan<VM> {
         &self.common
-    }
-}
-
-impl<VM: VMBinding> crate::policy::immix::gc_work::ImmixPlan<VM> for Immix<VM> {
-    #[inline(always)]
-    fn get_immix_space(&'static self) -> &'static ImmixSpace<VM> {
-        &self.immix_space
-    }
-    #[inline(always)]
-    fn get_immix_copy_semantics() -> CopySemantics {
-        CopySemantics::DefaultCopy
-    }
-    #[inline(always)]
-    fn fallback_trace<T: TransitiveClosure>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        _worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        self.common.trace_object::<T>(trace, object)
     }
 }
 

@@ -9,7 +9,11 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
+use crate::policy::gc_work::TraceKind;
 use atomic::Ordering;
+
+pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
+pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,

@@ -8,27 +8,30 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::MMTK;
-
-use super::ImmixSpace;
+use crate::scheduler::GCWork;
 
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-// It would be better if we use an enum for this. However, we use this as
-// a constant type parameter, and Rust only accepts integer and bool for
-// constant type parameters for now. We need to wait until `adt_const_params` is
-// stablized.
 pub(crate) type TraceKind = u8;
-pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
-pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 /// An Immix plan can use `ImmixProcessEdgesWork`. This assumes there is only one immix space in the plan.
 /// For the sake of performance, the implementation of these methods should be marked as `inline(always)`.
-pub trait ImmixPlan<VM: VMBinding>: Plan<VM = VM> + Send {
+pub trait UsePolicyProcessEdges<VM: VMBinding>: Plan<VM = VM> + Send {
+    type SpaceType: Space<VM>;
+
     /// Returns a reference to the immix space.
-    fn get_immix_space(&'static self) -> &'static ImmixSpace<VM>;
+    fn get_target_space(&'static self) -> &'static Self::SpaceType;
     /// Returns the copy semantic for the immix space.
-    fn get_immix_copy_semantics() -> CopySemantics;
+    fn get_target_copy_semantics<const KIND: TraceKind>() -> CopySemantics;
+    /// How to trace object in target space
+    fn target_trace<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+    fn overwrite_reference<const KIND: TraceKind>() -> bool;
     /// How to trace objects if the object is not in the immix space.
     fn fallback_trace<T: TransitiveClosure>(
         &self,
@@ -36,21 +39,20 @@ pub trait ImmixPlan<VM: VMBinding>: Plan<VM = VM> + Send {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
+
+    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<VM>> {
+        Box::new(crate::scheduler::gc_work::ScanObjects::<E>::new(nodes, false))
+    }
 }
 
-/// Object tracing for Immix.
-/// Note that it is possible to use [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges) for immix.
-/// We need to: 1. add a plan-specific method to create scan work packets, as most plans use `ScanObjects` while
-/// immix uses `ScanObjectsAndMarkLines`, 2. use `ImmixSpace.trace_object()` which has an overhead of checking
-/// which trace method to use (with ImmixProcessEdges, we can know which trace method to use by statically checking `TraceKind`).
-pub struct ImmixProcessEdgesWork<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> {
+pub struct PolicyProcessEdges<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
     p: PhantomData<P>,
 }
 
-impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> ProcessEdgesWork
-    for ImmixProcessEdgesWork<VM, P, KIND>
+impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> ProcessEdgesWork
+    for PolicyProcessEdges<VM, P, KIND>
 {
     type VM = VM;
 
@@ -69,11 +71,7 @@ impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> ProcessEdgesWork
         if self.nodes.is_empty() {
             return;
         }
-        let scan_objects_work = crate::policy::immix::ScanObjectsAndMarkLines::<Self>::new(
-            self.pop_nodes(),
-            false,
-            self.plan.get_immix_space(),
-        );
+        let scan_objects_work = self.plan.create_scan_work::<Self>(self.pop_nodes());
         self.new_scan_work(scan_objects_work);
     }
 
@@ -83,17 +81,8 @@ impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> ProcessEdgesWork
         if object.is_null() {
             return object;
         }
-        if self.plan.get_immix_space().in_space(object) {
-            if KIND == TRACE_KIND_FAST {
-                self.plan.get_immix_space().fast_trace_object(self, object)
-            } else {
-                self.plan.get_immix_space().trace_object(
-                    self,
-                    object,
-                    P::get_immix_copy_semantics(),
-                    self.worker(),
-                )
-            }
+        if self.plan.get_target_space().in_space(object) {
+            self.plan.target_trace::<Self, KIND>(self, object, self.worker())
         } else {
             self.plan
                 .fallback_trace::<Self>(self, object, self.worker())
@@ -104,14 +93,14 @@ impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> ProcessEdgesWork
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        if KIND == TRACE_KIND_DEFRAG && Self::OVERWRITE_REFERENCE {
+        if P::overwrite_reference::<KIND>() && Self::OVERWRITE_REFERENCE {
             unsafe { slot.store(new_object) };
         }
     }
 }
 
-impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> Deref
-    for ImmixProcessEdgesWork<VM, P, KIND>
+impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Deref
+    for PolicyProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
     #[inline]
@@ -120,8 +109,8 @@ impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> Deref
     }
 }
 
-impl<VM: VMBinding, P: ImmixPlan<VM>, const KIND: TraceKind> DerefMut
-    for ImmixProcessEdgesWork<VM, P, KIND>
+impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> DerefMut
+    for PolicyProcessEdges<VM, P, KIND>
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {

@@ -10,6 +10,11 @@ use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::policy::gc_work::TraceKind;
+use crate::policy::gc_work::PolicyProcessEdges;
+use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
+use crate::plan::TransitiveClosure;
+use crate::util::copy::CopySemantics;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
@@ -83,105 +88,146 @@ impl<VM: VMBinding> Compact<VM> {
     }
 }
 
-// Transitive closure to mark live objects
-pub struct MarkingProcessEdges<VM: VMBinding> {
-    plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<VM>,
-}
+impl<VM: VMBinding> crate::policy::gc_work::UsePolicyProcessEdges<VM> for MarkCompact<VM> {
+    type SpaceType = MarkCompactSpace<VM>;
 
-impl<VM: VMBinding> MarkingProcessEdges<VM> {
-    fn markcompact(&self) -> &'static MarkCompact<VM> {
-        self.plan
+    /// Returns a reference to the immix space.
+    fn get_target_space(&'static self) -> &'static Self::SpaceType {
+        &self.mc_space
     }
-}
-
-impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
-    type VM = VM;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
-        Self { base, plan }
+    /// Returns the copy semantic for the immix space.
+    fn get_target_copy_semantics<const KIND: TraceKind>() -> CopySemantics {
+        CopySemantics::DefaultCopy
     }
-
-    #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.markcompact().mc_space().in_space(object) {
-            self.markcompact()
-                .mc_space()
-                .trace_mark_object::<Self>(self, object)
+    /// How to trace object in target space
+    fn target_trace<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if KIND == TRACE_KIND_MARK {
+            self.mc_space.trace_mark_object::<T>(trace, object)
         } else {
-            self.markcompact().common.trace_object::<Self>(self, object)
+            self.mc_space.trace_forward_object::<T>(trace, object)
         }
     }
-}
-
-impl<VM: VMBinding> Deref for MarkingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
+    fn overwrite_reference<const KIND: TraceKind>() -> bool {
+        true
+    }
+    /// How to trace objects if the object is not in the immix space.
+    fn fallback_trace<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.common.trace_object::<T>(trace, object)
     }
 }
 
-impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+pub type MarkingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
+pub type ForwardingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
 
-/// Transitive closure to update object references
-pub struct ForwardingProcessEdges<VM: VMBinding> {
-    plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<VM>,
-}
+// // Transitive closure to mark live objects
+// pub struct MarkingProcessEdges<VM: VMBinding> {
+//     plan: &'static MarkCompact<VM>,
+//     base: ProcessEdgesBase<VM>,
+// }
 
-impl<VM: VMBinding> ForwardingProcessEdges<VM> {
-    fn markcompact(&self) -> &'static MarkCompact<VM> {
-        self.plan
-    }
-}
+// impl<VM: VMBinding> MarkingProcessEdges<VM> {
+//     fn markcompact(&self) -> &'static MarkCompact<VM> {
+//         self.plan
+//     }
+// }
 
-impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
-    type VM = VM;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
-        Self { base, plan }
-    }
+// impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
+//     type VM = VM;
+//     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+//         let base = ProcessEdgesBase::new(edges, roots, mmtk);
+//         let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
+//         Self { base, plan }
+//     }
 
-    #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.markcompact().mc_space().in_space(object) {
-            self.markcompact()
-                .mc_space()
-                .trace_forward_object::<Self>(self, object)
-        } else {
-            self.markcompact().common.trace_object::<Self>(self, object)
-        }
-    }
-}
+//     #[inline]
+//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+//         if object.is_null() {
+//             return object;
+//         }
+//         if self.markcompact().mc_space().in_space(object) {
+//             self.markcompact()
+//                 .mc_space()
+//                 .trace_mark_object::<Self>(self, object)
+//         } else {
+//             self.markcompact().common.trace_object::<Self>(self, object)
+//         }
+//     }
+// }
 
-impl<VM: VMBinding> Deref for ForwardingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
+// impl<VM: VMBinding> Deref for MarkingProcessEdges<VM> {
+//     type Target = ProcessEdgesBase<VM>;
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.base
+//     }
+// }
 
-impl<VM: VMBinding> DerefMut for ForwardingProcessEdges<VM> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+// impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
+//     #[inline]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.base
+//     }
+// }
+
+// /// Transitive closure to update object references
+// pub struct ForwardingProcessEdges<VM: VMBinding> {
+//     plan: &'static MarkCompact<VM>,
+//     base: ProcessEdgesBase<VM>,
+// }
+
+// impl<VM: VMBinding> ForwardingProcessEdges<VM> {
+//     fn markcompact(&self) -> &'static MarkCompact<VM> {
+//         self.plan
+//     }
+// }
+
+// impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
+//     type VM = VM;
+//     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+//         let base = ProcessEdgesBase::new(edges, roots, mmtk);
+//         let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
+//         Self { base, plan }
+//     }
+
+//     #[inline]
+//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+//         if object.is_null() {
+//             return object;
+//         }
+//         if self.markcompact().mc_space().in_space(object) {
+//             self.markcompact()
+//                 .mc_space()
+//                 .trace_forward_object::<Self>(self, object)
+//         } else {
+//             self.markcompact().common.trace_object::<Self>(self, object)
+//         }
+//     }
+// }
+
+// impl<VM: VMBinding> Deref for ForwardingProcessEdges<VM> {
+//     type Target = ProcessEdgesBase<VM>;
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.base
+//     }
+// }
+
+// impl<VM: VMBinding> DerefMut for ForwardingProcessEdges<VM> {
+//     #[inline]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.base
+//     }
+// }
 
 pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
