@@ -1,1 +1,1 @@
-initSidebarItems({"trait":[["Scanning","VM-specific methods for scanning roots/objects."]]});
+initSidebarItems({"trait":[["EdgeVisitor",""],["Scanning","VM-specific methods for scanning roots/objects."]]});

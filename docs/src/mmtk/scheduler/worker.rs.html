@@ -207,7 +207,7 @@
     <span class="doccomment">/// The sending end of the channel to send message to the controller thread.</span>
     <span class="kw">pub</span> <span class="ident">sender</span>: <span class="ident">Sender</span><span class="op">&lt;</span><span class="ident">CoordinatorMessage</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The reference to the MMTk instance.</span>
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// True if this struct is the embedded GCWorker of the controller thread.</span>
     <span class="doccomment">/// False if this struct belongs to a standalone GCWorker thread.</span>
     <span class="ident">is_coordinator</span>: <span class="ident">bool</span>,

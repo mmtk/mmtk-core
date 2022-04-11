@@ -686,9 +686,6 @@
 <span id="684">684</span>
 <span id="685">685</span>
 <span id="686">686</span>
-<span id="687">687</span>
-<span id="688">688</span>
-<span id="689">689</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -1283,15 +1280,12 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ScanObjectsAndMarkLines</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span> {
-    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;ScanObjectsAndMarkLines&quot;</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">closure</span> <span class="op">=</span> <span class="ident">ObjectsClosure</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mmtk</span>, <span class="macro">vec!</span>[], <span class="ident">worker</span>);
+        <span class="kw">let</span> <span class="ident">tls</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">tls</span>;
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">closure</span> <span class="op">=</span> <span class="ident">ObjectsClosure</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">worker</span>);
         <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">buffer</span> {
-            <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::scan_object</span>(
-                <span class="kw-2">&amp;mut</span> <span class="ident">closure</span>,
-                <span class="kw-2">*</span><span class="ident">object</span>,
-                <span class="ident">VMWorkerThread</span>(<span class="ident">VMThread::UNINITIALIZED</span>),
-            );
+            <span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMScanning::scan_object</span>(<span class="ident">tls</span>, <span class="kw-2">*</span><span class="ident">object</span>, <span class="kw-2">&amp;mut</span> <span class="ident">closure</span>);
             <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::MARK_LINE_AT_SCAN_TIME</span>
                 <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>
                 <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">immix_space</span>.<span class="ident">in_space</span>(<span class="kw-2">*</span><span class="ident">object</span>)

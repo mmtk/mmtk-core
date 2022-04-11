@@ -71,12 +71,30 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">Mutator</span>, <span class="ident">TransitiveClosure</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::ProcessEdgesWork</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+
+<span class="comment">// Callback trait of scanning functions that report edges.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EdgeVisitor</span> {
+    <span class="doccomment">/// Call this function for each edge.</span>
+    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">Address</span>);
+    <span class="comment">// TODO: Add visit_soft_edge, visit_weak_edge, ... here.</span>
+}
 
 <span class="doccomment">/// VM-specific methods for scanning roots/objects.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Scanning</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
@@ -88,18 +106,17 @@
     <span class="doccomment">/// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled</span>
     <span class="kw">const</span> <span class="ident">SINGLE_THREAD_MUTATOR_SCANNING</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
-    <span class="doccomment">/// Delegated scanning of a object, processing each pointer field</span>
-    <span class="doccomment">/// encountered. This method probably will be removed in the future,</span>
-    <span class="doccomment">/// in favor of bulk scanning `scan_objects`.</span>
+    <span class="doccomment">/// Delegated scanning of a object, visiting each pointer field</span>
+    <span class="doccomment">/// encountered.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `trace`: The `TransitiveClosure` to use for scanning.</span>
+    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
     <span class="doccomment">/// * `object`: The object to be scanned.</span>
-    <span class="doccomment">/// * `tls`: The GC worker thread that is doing this tracing.</span>
-    <span class="kw">fn</span> <span class="ident">scan_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+    <span class="doccomment">/// * `edge_visitor`: Called back for each edge.</span>
+    <span class="kw">fn</span> <span class="ident">scan_object</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&gt;</span>(
         <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
     );
 
     <span class="doccomment">/// MMTk calls this method at the first time during a collection that thread&#39;s stacks</span>
@@ -114,11 +131,18 @@
     <span class="doccomment">/// Bulk scanning of objects, processing each pointer field for each object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
     <span class="doccomment">/// * `objects`: The slice of object references to be scanned.</span>
-    <span class="kw">fn</span> <span class="ident">scan_objects</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(
+    <span class="doccomment">/// * `edge_visitor`: Called back for each edge in each object in `objects`.</span>
+    <span class="kw">fn</span> <span class="ident">scan_objects</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&gt;</span>(
+        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
         <span class="ident">objects</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>],
-        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    );
+        <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
+    ) {
+        <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="ident">objects</span>.<span class="ident">iter</span>() {
+            <span class="ident"><span class="self">Self</span>::scan_object</span>(<span class="ident">tls</span>, <span class="kw-2">*</span><span class="ident">object</span>, <span class="ident">edge_visitor</span>);
+        }
+    }
 
     <span class="doccomment">/// Scan all the mutators for roots.</span>
     <span class="kw">fn</span> <span class="ident">scan_thread_roots</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>();
