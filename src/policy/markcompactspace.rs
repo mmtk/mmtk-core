@@ -371,6 +371,31 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 }
 
+use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
+
+impl<VM: VMBinding> crate::policy::gc_work::SupportPolicyProcessEdges<VM> for MarkCompactSpace<VM> {
+    #[inline(always)]
+    fn trace_object_with_tracekind<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        _copy: CopySemantics,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if KIND == TRACE_KIND_MARK {
+            self.trace_mark_object::<T>(trace, object)
+        } else {
+            self.trace_forward_object::<T>(trace, object)
+        }
+    }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: TraceKind>() -> bool {
+        KIND == TRACE_KIND_FORWARD
+    }
+}
+
 struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
     #[inline(always)]

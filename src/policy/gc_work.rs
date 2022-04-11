@@ -4,6 +4,7 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
@@ -16,25 +17,17 @@ use std::ops::{Deref, DerefMut};
 pub(crate) type TraceKind = u8;
 
 /// A plan that uses `PolicyProcessEdges` needs to provide an implementation for this trait.
-/// The plan needs to specify a target space. For objects in the target space, `target_trace()` is used to trace the object.
+/// The plan needs to specify a target space (which needs to implement `SupportPolicyProcessEdges`).
+/// For objects in the target space, `trace_object_with_tracekind()` is called to trace the object.
 /// Otherwise, `fallback_trace()` is used.
 /// For the sake of performance, the implementation of this trait should mark methods as `[inline(always)]`.
 pub trait UsePolicyProcessEdges<VM: VMBinding>: Plan<VM = VM> + Send {
-    type DefaultSpaceType: Space<VM>;
+    type TargetPolicy: SupportPolicyProcessEdges<VM>;
+    /// The copy semantics for objects in the space.
+    const COPY: CopySemantics;
 
-    /// Returns a reference to the default space.
-    fn get_target_space(&self) -> &Self::DefaultSpaceType;
-
-    /// How to trace object in the default space
-    fn target_trace<T: TransitiveClosure, const KIND: TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference;
-
-    /// Does this trace move object?
-    fn may_move_objects<const KIND: TraceKind>() -> bool;
+    /// Returns a reference to the target space.
+    fn get_target_space(&self) -> &Self::TargetPolicy;
 
     /// How to trace objects if the object is not in the default space.
     fn fallback_trace<T: TransitiveClosure>(
@@ -43,9 +36,22 @@ pub trait UsePolicyProcessEdges<VM: VMBinding>: Plan<VM = VM> + Send {
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
+}
 
-    /// Create a scan work from the nodes. By default, the `ScanObjects` work packet is used. If a policy
-    /// uses their own scan work packet, they should override this method.
+/// A policy that allows using `PolicyProcessEdges` needs to provide an implementation for this trait.
+/// For the sake of performance, the implementation of this trait should mark methods as `[inline(always)]`.
+pub trait SupportPolicyProcessEdges<VM: VMBinding>: Space<VM> {
+    /// Trace an object in the policy.
+    fn trace_object_with_tracekind<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        copy: CopySemantics,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+
+    /// Create scan work for the policy. By default, we use [`ScanObjects`](crate::scheduler::gc_work::ScanObjects).
+    /// If a policy has its own scan object work packet, they can override this method.
     #[inline(always)]
     fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
         &'static self,
@@ -55,13 +61,15 @@ pub trait UsePolicyProcessEdges<VM: VMBinding>: Plan<VM = VM> + Send {
             nodes, false,
         ))
     }
+
+    /// Does this trace move object?
+    fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
 /// This provides an alternative to [`SFTProcessEdges`](crate::scheduler::gc_work::SFTProcessEdges). For policies that cannot
 /// use `SFTProcessEdges`, they could try use this type. One major difference is that `PolicyProcessEdges` allows different
 /// traces for a policy.
-/// A plan that uses this needs to implement the `UsePolicyProcessEdges` trait, and should choose the policy that has multiple
-/// traces as the 'target'. See more details for [`UsePolicyProcessEdges`](crate::policy::gc_work::UsePolicyProcessEdges).
+/// A plan that uses this needs to implement the `UsePolicyProcessEdges` trait, and the policy needs to implement `SupportPolicyProcessEdges`.
 pub struct PolicyProcessEdges<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
@@ -83,7 +91,10 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
         if self.nodes.is_empty() {
             return;
         }
-        let scan_objects_work = self.plan.create_scan_work::<Self>(self.pop_nodes());
+        let scan_objects_work = self
+            .plan
+            .get_target_space()
+            .create_scan_work::<Self>(self.pop_nodes());
         self.new_scan_work(scan_objects_work);
     }
 
@@ -95,7 +106,8 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
         }
         if self.plan.get_target_space().in_space(object) {
             self.plan
-                .target_trace::<Self, KIND>(self, object, self.worker())
+                .get_target_space()
+                .trace_object_with_tracekind::<Self, KIND>(self, object, P::COPY, self.worker())
         } else {
             self.plan
                 .fallback_trace::<Self>(self, object, self.worker())
@@ -106,7 +118,7 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        if P::may_move_objects::<KIND>() {
+        if P::TargetPolicy::may_move_objects::<KIND>() {
             unsafe { slot.store(new_object) };
         }
     }

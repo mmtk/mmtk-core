@@ -1,7 +1,6 @@
 use super::global::MarkCompact;
 use crate::plan::TransitiveClosure;
 use crate::policy::gc_work::PolicyProcessEdges;
-use crate::policy::gc_work::TraceKind;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
@@ -90,31 +89,15 @@ pub type MarkingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE
 /// Forwarding trace
 pub type ForwardingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
 
+use crate::util::copy::CopySemantics;
+
 impl<VM: VMBinding> crate::policy::gc_work::UsePolicyProcessEdges<VM> for MarkCompact<VM> {
-    type DefaultSpaceType = MarkCompactSpace<VM>;
+    type TargetPolicy = MarkCompactSpace<VM>;
+    const COPY: CopySemantics = CopySemantics::DefaultCopy;
 
     #[inline(always)]
-    fn get_target_space(&self) -> &Self::DefaultSpaceType {
+    fn get_target_space(&self) -> &Self::TargetPolicy {
         &self.mc_space
-    }
-
-    #[inline(always)]
-    fn target_trace<T: TransitiveClosure, const KIND: TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        _worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if KIND == TRACE_KIND_MARK {
-            self.mc_space.trace_mark_object::<T>(trace, object)
-        } else {
-            self.mc_space.trace_forward_object::<T>(trace, object)
-        }
-    }
-
-    #[inline(always)]
-    fn may_move_objects<const KIND: TraceKind>() -> bool {
-        KIND == TRACE_KIND_FORWARD
     }
 
     #[inline(always)]
