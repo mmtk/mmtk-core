@@ -415,10 +415,10 @@ pub trait ProcessEdgesWork:
         // So maximum 1 `ScanObjects` work can be created from `nodes` buffer
     }
 
-    /// Create a new scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
+    /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
     #[inline]
-    fn new_scan_work(&mut self, work_packet: Box<dyn GCWork<Self::VM>>) {
+    fn start_scan_work(&mut self, work_packet: Box<dyn GCWork<Self::VM>>) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
@@ -431,6 +431,15 @@ pub trait ProcessEdgesWork:
         }
     }
 
+    /// Create scan work for the policy. By default, we use [`ScanObjects`](crate::scheduler::gc_work::ScanObjects).
+    /// If a policy has its own scan object work packet, they can override this method.
+    #[inline(always)]
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+        Box::new(crate::scheduler::gc_work::ScanObjects::<Self>::new(
+            nodes, false,
+        ))
+    }
+
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
     #[cold]
@@ -438,8 +447,8 @@ pub trait ProcessEdgesWork:
         if self.nodes.is_empty() {
             return;
         }
-        let scan_objects_work = ScanObjects::<Self>::new(self.pop_nodes(), false);
-        self.new_scan_work(Box::new(scan_objects_work));
+        let nodes = self.pop_nodes();
+        self.start_scan_work(self.create_scan_work(nodes));
     }
 
     #[inline]

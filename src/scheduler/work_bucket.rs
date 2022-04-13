@@ -113,6 +113,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     pub fn add<W: GCWork<VM>>(&self, work: W) {
         self.add_with_priority(Self::DEFAULT_PRIORITY, Box::new(work));
     }
+    /// Add a boxed work packet to this bucket, with a default priority (1000)
     pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
         self.add_with_priority(Self::DEFAULT_PRIORITY, work);
     }

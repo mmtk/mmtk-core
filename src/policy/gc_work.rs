@@ -86,16 +86,9 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
         Self { plan, base }
     }
 
-    #[cold]
-    fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
-        let scan_objects_work = self
-            .plan
-            .get_target_space()
-            .create_scan_work::<Self>(self.pop_nodes());
-        self.new_scan_work(scan_objects_work);
+    #[inline(always)]
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+        self.plan.get_target_space().create_scan_work::<Self>(nodes)
     }
 
     /// Trace object if it is in the target space. Otherwise call fallback_trace().
