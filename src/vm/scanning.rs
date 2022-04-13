@@ -13,6 +13,7 @@ pub trait EdgeVisitor {
 
 /// VM-specific methods for scanning roots/objects.
 pub trait Scanning<VM: VMBinding> {
+    const SCAN_THREAD_STACK_CONSERVATIVELY: bool = VM::CONSERVATIVE_SCANNING;
     /// Scan stack roots after all mutators are paused.
     const SCAN_MUTATORS_IN_SAFEPOINT: bool = true;
 

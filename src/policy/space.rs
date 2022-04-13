@@ -506,7 +506,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let start = VM::VMObjectModel::ref_to_address(object);
         self.address_in_space(start)
     }
-
+    /// Searches for object in this space conservatively. Returns `None` if `address` was not allocated in this space.
+    fn find_conservatively(&self, address: Address) -> Option<ObjectReference> {
+        let _ = address;
+        None
+    }
     /**
      * This is called after we get result from page resources.  The space may
      * tap into the hook to monitor heap growth.  The call is made from within the

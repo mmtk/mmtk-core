@@ -40,6 +40,7 @@ pub use tracelocal::TraceLocal;
 mod transitive_closure;
 pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
+mod conservative;
 mod generational;
 mod immix;
 mod markcompact;
@@ -51,6 +52,7 @@ mod semispace;
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.
 
+pub use conservative::marksweep::CONSERVATIVE_MS_CONSTRAINTS;
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
 pub use markcompact::MARKCOMPACT_CONSTRAINTS;
