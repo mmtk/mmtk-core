@@ -109,7 +109,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         ]);
 
         let res = MarkSweep {
-            ms: MallocSpace::new(global_metadata_specs.clone()),
+            ms: MallocSpace::new(true, global_metadata_specs.clone()),
             common: CommonPlan::new(
                 vm_map,
                 mmapper,

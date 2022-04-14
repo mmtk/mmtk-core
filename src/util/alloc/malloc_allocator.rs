@@ -53,7 +53,7 @@ impl<VM: VMBinding> Allocator<VM> for MallocAllocator<VM> {
                 } else {
                     // The result passes the check. We free all the cached results, and return the new result.
                     for addr in to_free.iter() {
-                        self.space.free(*addr);
+                        self.space.free_malloc_result(*addr);
                     }
                     return ret;
                 }
