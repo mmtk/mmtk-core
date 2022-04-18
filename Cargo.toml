@@ -58,7 +58,8 @@ perf_counter = ["pfm"]
 # spaces
 vm_space = []
 ro_space = []
-code_space  = []
+code_space = []
+malloc_space = []
 
 # metadata
 global_alloc_bit = []

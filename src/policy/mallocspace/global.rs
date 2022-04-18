@@ -290,12 +290,19 @@ impl<VM: VMBinding> MallocSpace<VM> {
         address
     }
 
+    /// This implements the free() API for the malloc space.
     pub fn free_manually(&self, address: Address) {
         debug_assert!(!self.is_gc_space(), "we can only manually free objects if it is non-GC malloc space");
         // Free the result
         self.free_malloc_result(address);
         // This is non-GC malloc space. We assume address === object reference.
         unset_alloc_bit(unsafe { address.to_object_reference() });
+    }
+
+    /// This implements the malloc_usable_size() API for the malloc.
+    pub fn malloc_usable_size(&self, address: Address) -> usize {
+        let offset_malloc_bit = is_offset_malloc(address);
+        get_malloc_usable_size(address, offset_malloc_bit)
     }
 
     /// Frees an address result that we get from maloc, but have ot yet returned to the user.

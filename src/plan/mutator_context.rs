@@ -225,6 +225,12 @@ pub(crate) fn create_allocator_mapping(
         reserved.n_bump_pointer += 1;
     }
 
+    #[cfg(feature = "malloc_space")]
+    {
+        map[AllocationSemantics::Malloc] = AllocatorSelector::Malloc(reserved.n_malloc);
+        reserved.n_malloc += 1;
+    }
+
     // spaces in common plan
 
     if include_common_plan {
@@ -280,6 +286,15 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
             &plan.base().ro_space,
         ));
         reserved.n_bump_pointer += 1;
+    }
+
+    #[cfg(feature = "malloc_space")]
+    {
+        vec.push((
+            AllocatorSelector::Malloc(reserved.n_malloc),
+            &plan.base().malloc_space,
+        ));
+        reserved.n_malloc += 1;
     }
 
     // spaces in CommonPlan

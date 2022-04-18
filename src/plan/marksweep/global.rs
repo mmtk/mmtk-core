@@ -108,6 +108,9 @@ impl<VM: VMBinding> MarkSweep<VM> {
             ACTIVE_CHUNK_METADATA_SPEC,
         ]);
 
+        if cfg!(feature = "malloc_space") {
+            panic!("We only allow one malloc space in use (marksweep currently uses malloc space and performs marksweep on it");
+        }
         let res = MarkSweep {
             ms: MallocSpace::new(true, global_metadata_specs.clone()),
             common: CommonPlan::new(

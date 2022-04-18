@@ -11,7 +11,9 @@ mod allocate_without_initialize_collection;
 mod allocate_with_initialize_collection;
 mod allocate_with_disable_collection;
 mod allocate_with_re_enable_collection;
-mod malloc;
+mod malloc_impl;
+#[cfg(feature = "malloc_space")]
+mod malloc_space;
 #[cfg(feature = "is_mmtk_object")]
 mod conservatism;
 mod is_in_mmtk_spaces;

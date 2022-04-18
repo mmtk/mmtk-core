@@ -50,6 +50,12 @@ pub extern "C" fn mmtk_post_alloc(mutator: *mut Mutator<DummyVM>, refer: ObjectR
     memory_manager::post_alloc::<DummyVM>(unsafe { &mut *mutator }, refer, bytes, semantics)
 }
 
+#[cfg(feature = "malloc_space")]
+#[no_mangle]
+pub extern "C" fn mmtk_free(address: Address) {
+    memory_manager::free::<DummyVM>(&SINGLETON, address)
+}
+
 #[no_mangle]
 pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
     !object.is_movable()

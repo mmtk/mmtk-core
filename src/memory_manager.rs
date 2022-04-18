@@ -139,6 +139,16 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, bytes, semantics);
 }
 
+#[cfg(feature = "malloc_space")]
+pub fn free<VM: VMBinding>(mmtk: &MMTK<VM>, address: Address) {
+    mmtk.plan.base().malloc_space.free_manually(address)
+}
+
+#[cfg(feature = "malloc_space")]
+pub fn malloc_usable_size<VM: VMBinding>(mmtk: &MMTK<VM>, address: Address) -> usize {
+    mmtk.plan.base().malloc_space.malloc_usable_size(address)
+}
+
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
 /// so that VM compilers may call it to help generate allocation fast-path.
 ///

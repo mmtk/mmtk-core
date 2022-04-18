@@ -28,6 +28,8 @@ use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
+#[cfg(feature = "malloc_space")]
+use crate::policy::mallocspace::MallocSpace;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -376,12 +378,23 @@ pub struct BasePlan<VM: VMBinding> {
     pub analysis_manager: AnalysisManager<VM>,
 
     // Spaces in base plan
+
+    /// Code space allows execution.
+    // TODO: a proper CodeSpace.
     #[cfg(feature = "code_space")]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "code_space")]
     pub code_lo_space: ImmortalSpace<VM>,
+
+    /// Read-only space does not allow write once read-only is enabled.
+    // TODO: a proper ReadOnlySpace
     #[cfg(feature = "ro_space")]
     pub ro_space: ImmortalSpace<VM>,
+
+    /// Malloc space allows manual malloc/free-alike API.
+    /// A user allocate into a malloc space with [`AllocationSemantics::Malloc`](crate::plan::AllocationSemantics)
+    #[cfg(feature = "malloc_space")]
+    pub malloc_space: MallocSpace<VM>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
     /// for boot image.
@@ -478,6 +491,8 @@ impl<VM: VMBinding> BasePlan<VM> {
                 &mut heap,
                 constraints,
             ),
+            #[cfg(feature = "malloc_space")]
+            malloc_space: MallocSpace::new(false, global_side_metadata_specs.clone()),
             #[cfg(feature = "vm_space")]
             vm_space: create_vm_space(
                 vm_map,
@@ -532,6 +547,8 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.code_lo_space.init(vm_map);
         #[cfg(feature = "ro_space")]
         self.ro_space.init(vm_map);
+        #[cfg(feature = "malloc_space")]
+        self.malloc_space.init(vm_map);
         #[cfg(feature = "vm_space")]
         {
             self.vm_space.init(vm_map);
@@ -588,6 +605,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         {
             pages += self.ro_space.reserved_pages();
         }
+        #[cfg(feature = "malloc_space")]
+        {
+            pages += self.malloc_space.reserved_pages();
+        }
 
         // The VM space may be used as an immutable boot image, in which case, we should not count
         // it as part of the heap size.
@@ -617,6 +638,11 @@ impl<VM: VMBinding> BasePlan<VM> {
             return self.ro_space.trace_object(_trace, _object);
         }
 
+        #[cfg(feature = "malloc_space")]
+        if self.malloc_space.in_space(_object) {
+            panic!("We cannot trace object in malloc_space");
+        }
+
         #[cfg(feature = "vm_space")]
         if self.vm_space.in_space(_object) {
             trace!("trace_object: object in boot space");
@@ -632,6 +658,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.code_lo_space.prepare();
         #[cfg(feature = "ro_space")]
         self.ro_space.prepare();
+        #[cfg(feature = "malloc_space")]
+        {
+            // We do not need to prepare for malloc space
+        }
         #[cfg(feature = "vm_space")]
         self.vm_space.prepare();
     }
@@ -643,6 +673,10 @@ impl<VM: VMBinding> BasePlan<VM> {
         self.code_lo_space.release();
         #[cfg(feature = "ro_space")]
         self.ro_space.release();
+        #[cfg(feature = "malloc_space")]
+        {
+            // We do not need to release for malloc space
+        }
         #[cfg(feature = "vm_space")]
         self.vm_space.release();
     }
@@ -825,6 +859,9 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "ro_space")]
         self.ro_space
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        #[cfg(feature = "malloc_space")]
+        self.malloc_space
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
         #[cfg(feature = "vm_space")]
         self.vm_space
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
@@ -957,4 +994,6 @@ pub enum AllocationSemantics {
     Code = 3,
     ReadOnly = 4,
     LargeCode = 5,
+    /// Malloc and free through MMTk.
+    Malloc = 6,
 }

@@ -3,9 +3,11 @@ use std::sync::Once;
 
 use mmtk::AllocationSemantics;
 use mmtk::util::{ObjectReference, VMThread, VMMutatorThread};
+use mmtk::Mutator;
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
+use crate::DummyVM;
 
 pub trait FixtureContent {
     fn create() -> Self;
@@ -64,5 +66,21 @@ impl FixtureContent for SingleObject {
         mmtk_post_alloc(handle, objref, size, semantics);
 
         SingleObject { objref }
+    }
+}
+
+pub struct MutatorInstance {
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl FixtureContent for MutatorInstance {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_gc_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        let mutator = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        MutatorInstance { mutator }
     }
 }
