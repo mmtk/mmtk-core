@@ -79,7 +79,8 @@ pub struct MallocSpace<VM: VMBinding> {
     pub work_live_bytes: AtomicUsize,
 }
 
-const NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE: &str = "Manual malloc space cannot use methods with an ObjectReference argument (there is no object in manual malloc space";
+const NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE: &str =
+    "Manual malloc space cannot use methods with an ObjectReference argument";
 
 impl<VM: VMBinding> SFT for MallocSpace<VM> {
     fn name(&self) -> &str {
