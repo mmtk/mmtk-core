@@ -56,6 +56,12 @@ pub extern "C" fn mmtk_free(address: Address) {
     memory_manager::free::<DummyVM>(&SINGLETON, address)
 }
 
+#[cfg(feature = "malloc_space")]
+#[no_mangle]
+pub extern "C" fn mmtk_malloc_usable_size(address: Address) -> usize {
+    memory_manager::malloc_usable_size::<DummyVM>(&SINGLETON, address)
+}
+
 #[no_mangle]
 pub extern "C" fn mmtk_will_never_move(object: ObjectReference) -> bool {
     !object.is_movable()

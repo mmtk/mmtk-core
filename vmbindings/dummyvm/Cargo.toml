@@ -22,3 +22,4 @@ atomic_refcell = "0.1.7"
 default = []
 is_mmtk_object = ["mmtk/is_mmtk_object"]
 malloc_space = ["mmtk/malloc_space"]
+nogc_multi_space = ["mmtk/nogc_multi_space"]

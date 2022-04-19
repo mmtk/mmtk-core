@@ -988,12 +988,27 @@ use enum_map::Enum;
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
 pub enum AllocationSemantics {
+    /// The default allocation semantic. Most allocation should use this semantic.
     Default = 0,
+    /// This semantic guarantees the memory won't be reclaimed by GC.
     Immortal = 1,
+    /// Large object. Generally a plan defines a constant `max_non_los_default_alloc_bytes`,
+    /// which specifies the max object size that can be allocated with the Default allocation semantic.
+    /// An object that is larger than the defined max size needs to be allocated with `Los`.
     Los = 2,
+    /// This semantic guarantees the memory has the execution permission.
     Code = 3,
+    /// This semantic allows the memory to be made read-only after allocation.
+    /// This semantic is not implemented yet.
     ReadOnly = 4,
+    /// Large object + Code.
+    // TODO: Do we need this? Can we merge this with code?
     LargeCode = 5,
-    /// Malloc and free through MMTk.
+    /// Malloc and free through MMTk. Note that when this is used, the user should treat the result
+    /// as if it is returned from malloc():
+    /// * The memory needs to be manually freed by the user.
+    /// * The user should not use any other API other than `free()` and `malloc_usable_size()` for the
+    ///   memory address we return. MMTk may panic if the user casts the memory address into an object
+    ///   reference, and pass the object reference in MMTk's API.
     Malloc = 6,
 }

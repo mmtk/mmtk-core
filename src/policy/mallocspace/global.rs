@@ -55,8 +55,8 @@ pub struct MallocSpace<VM: VMBinding> {
     /// mark/trace_object   yes            | no
     /// sweep/release       yes            | no
     /// object reference    normal         | no object reference, any method related with object reference cannot be used
-    /// set alloc bit       in post_alloc  | in alloc (post_alloc should not be called)
-    /// clear alloc bit     in sweep       | when freed manually
+    /// set alloc bit       in post_alloc  | in alloc if global_alloc_bit is set
+    /// clear alloc bit     in sweep       | when freed manually if global_alloc_bit is set
     is_gc_space: AtomicBool,
 
     // Mapping between allocated address and its size - this is used to check correctness.
@@ -275,7 +275,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 set_offset_malloc_bit(address);
             }
 
-            if !self.is_gc_space() {
+            if !self.is_gc_space() && cfg!(feature = "global_alloc_bit") {
                 // if this is a non-GC space, we directly set alloc bit for the address
                 set_alloc_bit(unsafe { address.to_object_reference() });
             }
@@ -295,8 +295,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         debug_assert!(!self.is_gc_space(), "we can only manually free objects if it is non-GC malloc space");
         // Free the result
         self.free_malloc_result(address);
-        // This is non-GC malloc space. We assume address === object reference.
-        unset_alloc_bit(unsafe { address.to_object_reference() });
+        // Unset alloc bit
+        if cfg!(feature = "global_alloc_bit") {
+            // This is non-GC malloc space. We assume address === object reference.
+            unset_alloc_bit(unsafe { address.to_object_reference() });
+        }
     }
 
     /// This implements the malloc_usable_size() API for the malloc.
