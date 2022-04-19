@@ -8,6 +8,8 @@ use crate::plan::transitive_closure::TransitiveClosure;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
+#[cfg(feature = "malloc_space")]
+use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -28,8 +30,6 @@ use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::*;
-#[cfg(feature = "malloc_space")]
-use crate::policy::mallocspace::MallocSpace;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -378,7 +378,6 @@ pub struct BasePlan<VM: VMBinding> {
     pub analysis_manager: AnalysisManager<VM>,
 
     // Spaces in base plan
-
     /// Code space allows execution.
     // TODO: a proper CodeSpace.
     #[cfg(feature = "code_space")]
@@ -996,13 +995,12 @@ pub enum AllocationSemantics {
     /// which specifies the max object size that can be allocated with the Default allocation semantic.
     /// An object that is larger than the defined max size needs to be allocated with `Los`.
     Los = 2,
-    /// This semantic guarantees the memory has the execution permission.
+    /// This semantic guarantees the memory will not be moved and has the execution permission.
     Code = 3,
     /// This semantic allows the memory to be made read-only after allocation.
     /// This semantic is not implemented yet.
     ReadOnly = 4,
     /// Large object + Code.
-    // TODO: Do we need this? Can we merge this with code?
     LargeCode = 5,
     /// Malloc and free through MMTk. Note that when this is used, the user should treat the result
     /// as if it is returned from malloc():

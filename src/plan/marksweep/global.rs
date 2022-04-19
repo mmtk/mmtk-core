@@ -109,8 +109,10 @@ impl<VM: VMBinding> MarkSweep<VM> {
         ]);
 
         if cfg!(feature = "malloc_space") {
+            // We can remove this check once we no longer use malloc marksweep.
             panic!("We only allow one malloc space in use (marksweep currently uses malloc space and performs marksweep on it");
         }
+
         let res = MarkSweep {
             ms: MallocSpace::new(true, global_metadata_specs.clone()),
             common: CommonPlan::new(

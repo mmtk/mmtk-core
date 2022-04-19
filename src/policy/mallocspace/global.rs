@@ -41,6 +41,11 @@ const ASSERT_ALLOCATION: bool = false;
 ///    it can be a non-GC space, the user will manage its allocation and free through a
 ///    malloc/free API. In this case, we do not perform any GC work on the space, and it is
 ///    purely the user's responsibility to manage objects in the space.
+/// 3. We do not allow more than one MallocSpace in a plan. MMTk has an assumption that
+///    each chunk belongs to one space. However, we cannot control the behavior of the underlying
+///    malloc, and two malloc spaces may break the assumption. This should not be a big issue
+///    as we would expect only one malloc space for `AllocationSemantics::Malloc`, and in the long
+///    term, we will not use `MallocSpace` for GC.
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
@@ -82,7 +87,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
         // If this is a GC space, we use mark bit to tell whether it is alive
         is_marked::<VM>(object, Some(Ordering::SeqCst))
     }
@@ -98,7 +107,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     // For malloc space, we need to further check the alloc bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
         is_alloced_by_malloc(object)
     }
 
@@ -106,7 +119,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     #[cfg(feature = "is_mmtk_object")]
     #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
@@ -114,7 +131,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
         trace!("initialize_object_metadata for object {}", object);
         let page_addr = conversions::page_align_down(object.to_address());
         set_page_mark(page_addr);
@@ -128,7 +149,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
         let trace = trace.into_mut::<VM>();
         self.trace_object(trace, object)
     }
@@ -162,7 +187,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
 
         let ret = is_alloced_by_malloc(object);
 
@@ -292,7 +321,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     /// This implements the free() API for the malloc space.
     pub fn free_manually(&self, address: Address) {
-        debug_assert!(!self.is_gc_space(), "we can only manually free objects if it is non-GC malloc space");
+        debug_assert!(
+            !self.is_gc_space(),
+            "we can only manually free objects if it is non-GC malloc space"
+        );
         // Free the result
         self.free_malloc_result(address);
         // Unset alloc bit
@@ -347,7 +379,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
         trace: &mut T,
         object: ObjectReference,
     ) -> ObjectReference {
-        debug_assert!(self.is_gc_space(), "{}", NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE);
+        debug_assert!(
+            self.is_gc_space(),
+            "{}",
+            NON_GC_MALLOC_SPACE_CANNOT_USE_OBJECTREFERENCE
+        );
 
         if object.is_null() {
             return object;
@@ -415,7 +451,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
-        debug_assert!(self.is_gc_space(), "sweep_chunk() should only be called in a GC malloc space");
+        debug_assert!(
+            self.is_gc_space(),
+            "sweep_chunk() should only be called in a GC malloc space"
+        );
         // Call the relevant sweep function depending on the location of the mark bits
         match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
