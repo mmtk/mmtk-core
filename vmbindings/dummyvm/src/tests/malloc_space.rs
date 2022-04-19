@@ -15,12 +15,17 @@ lazy_static! {
     static ref MUTATOR: Fixture<MutatorInstance> = Fixture::new();
 }
 
+const SIZE: usize = 40;
+const NO_OFFSET: isize = 0;
+const ALIGN: usize = 8;
+const OFFSET: isize = 4;
+
 #[test]
 pub fn malloc_free() {
     MUTATOR.with_fixture(|fixture| {
-        let res = mmtk_alloc(fixture.mutator, 40, 8, 0, AllocationSemantics::Malloc);
+        let res = mmtk_alloc(fixture.mutator, SIZE, ALIGN, NO_OFFSET, AllocationSemantics::Malloc);
         assert!(!res.is_zero());
-        assert!(res.is_aligned_to(8));
+        assert!(res.is_aligned_to(ALIGN));
         mmtk_free(res);
     })
 }
@@ -28,9 +33,9 @@ pub fn malloc_free() {
 #[test]
 pub fn malloc_offset() {
     MUTATOR.with_fixture(|fixture| {
-        let res = mmtk_alloc(fixture.mutator, 40, 8, 4, AllocationSemantics::Malloc);
+        let res = mmtk_alloc(fixture.mutator, SIZE, ALIGN, OFFSET, AllocationSemantics::Malloc);
         assert!(!res.is_zero());
-        assert!((res + 4usize).is_aligned_to(8));
+        assert!((res + OFFSET).is_aligned_to(ALIGN));
         mmtk_free(res);
     })
 }
@@ -38,10 +43,10 @@ pub fn malloc_offset() {
 #[test]
 pub fn malloc_usable_size() {
     MUTATOR.with_fixture(|fixture| {
-        let res = mmtk_alloc(fixture.mutator, 40, 8, 0, AllocationSemantics::Malloc);
+        let res = mmtk_alloc(fixture.mutator, SIZE, ALIGN, NO_OFFSET, AllocationSemantics::Malloc);
         assert!(!res.is_zero());
         let size = mmtk_malloc_usable_size(res);
-        assert_eq!(size, 40);
+        assert!(size >= SIZE);
         mmtk_free(res);
     })
 }
