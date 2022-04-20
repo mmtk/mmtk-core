@@ -80,3 +80,15 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
         );
     }
 }
+
+use crate::vm::VMBinding;
+use crate::util::copy::CopySemantics;
+use crate::policy::gc_work::TraceKind;
+
+pub trait PlanTraceObject<VM: VMBinding> {
+    fn trace_object<T: TransitiveClosure>(&self, trace: &mut T, object: ObjectReference, worker: &mut GCWorker<VM>) -> ObjectReference;
+}
+
+pub trait PolicyTraceObject<VM: VMBinding> {
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(&self, trace: &mut T, object: ObjectReference, copy: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference;
+}

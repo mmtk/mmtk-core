@@ -101,6 +101,18 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 }
 
+impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        if KIND == TRACE_KIND_MARK {
+            self.trace_mark_object(trace, object)
+        } else if KIND == TRACE_KIND_FORWARD {
+            self.trace_forward_object(trace, object)
+        } else {
+            unreachable!()
+        }
+    }
+}
+
 impl<VM: VMBinding> MarkCompactSpace<VM> {
     /// We need one extra header word for each object. Considering the alignment requirement, this is
     /// the actual bytes we need to reserve for each allocation.

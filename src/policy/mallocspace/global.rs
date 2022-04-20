@@ -189,6 +189,15 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 }
 
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
+
+impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for MallocSpace<VM> {
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object)
+    }
+}
+
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
         MallocSpace {

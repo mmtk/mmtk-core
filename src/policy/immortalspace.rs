@@ -111,6 +111,15 @@ impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {
     }
 }
 
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
+
+impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for ImmortalSpace<VM> {
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        self.trace_object(trace, object)
+    }
+}
+
 impl<VM: VMBinding> ImmortalSpace<VM> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

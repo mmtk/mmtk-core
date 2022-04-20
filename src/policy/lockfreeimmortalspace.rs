@@ -149,6 +149,16 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 }
 
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
+use crate::plan::TransitiveClosure;
+
+impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, _trace: &mut T, _object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
+        unreachable!()
+    }
+}
+
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     #[allow(dead_code)] // Only used with certain features.
     pub fn new(
