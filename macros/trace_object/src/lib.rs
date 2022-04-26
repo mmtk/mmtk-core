@@ -32,7 +32,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
 
         let trace_object_function = generate_trace_object(&spaces, &fallback, &ty_generics);
         let create_scan_work_function = generate_create_scan_work(&main_policy, &ty_generics);
-        let may_move_objects_function = generate_may_move_objects(&main_policy, &ty_generics);
+        let may_move_objects_function = generate_may_move_objects(&main_policy, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
                 #[inline(always)]
@@ -117,10 +117,10 @@ fn generate_trace_object<'a>(
 }
 
 fn generate_create_scan_work<'a>(
-    scan_work: &Option<&'a Field>,
+    main_policy_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    if let Some(f) = scan_work {
+    if let Some(f) = main_policy_field {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
@@ -139,24 +139,40 @@ fn generate_create_scan_work<'a>(
     }
 }
 
+// The function generated needs to be inlined and constant folded. Otherwise, there will be a huge
+// performance penalty.
 fn generate_may_move_objects<'a>(
-    scan_work: &Option<&'a Field>,
+    main_policy_field: &Option<&'a Field>,
+    parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    if let Some(f) = scan_work {
+    if let Some(f) = main_policy_field {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
-        quote! {
-            fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                use crate::plan::transitive_closure::PolicyTraceObject;
-                <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+        if let Some(p) = parent_field {
+            let p_ident = p.ident.as_ref().unwrap();
+            let ref p_ty = p.ty;
+            quote! {
+                fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+                    use crate::plan::transitive_closure::PolicyTraceObject;
+                    use crate::plan::transitive_closure::PlanTraceObject;
+                    <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>() || <#p_ty as PlanTraceObject #ty_generics>::may_move_objects::<KIND>()
+                }
+            }
+        } else {
+            quote! {
+                fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+                    use crate::plan::transitive_closure::PolicyTraceObject;
+                    <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+                }
             }
         }
     } else {
+        // If the plan has no main policy, by default we assume it does not move objects.
         quote! {
             fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                unreachable!()
+                false
             }
         }
     }

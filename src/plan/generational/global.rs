@@ -27,7 +27,8 @@ use macro_trace_object::PlanTraceObject;
 /// should include this type, and forward calls to it where possible.
 #[derive(PlanTraceObject)]
 pub struct Gen<VM: VMBinding> {
-    /// The nursery space. Its type depends on the actual plan.
+    /// The nursery space.
+    #[main_policy]
     #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.
