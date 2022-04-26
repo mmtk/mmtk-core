@@ -81,19 +81,33 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
     }
 }
 
-use crate::vm::VMBinding;
-use crate::util::copy::CopySemantics;
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::GCWork;
+use crate::util::copy::CopySemantics;
+use crate::vm::VMBinding;
 
 pub trait PlanTraceObject<VM: VMBinding> {
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(&self, trace: &mut T, object: ObjectReference, worker: &mut GCWorker<VM>) -> ObjectReference;
-    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<VM>>;
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
+        &'static self,
+        nodes: Vec<ObjectReference>,
+    ) -> Box<dyn GCWork<VM>>;
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
 pub trait PolicyTraceObject<VM: VMBinding> {
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(&self, trace: &mut T, object: ObjectReference, copy: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference;
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        copy: Option<CopySemantics>,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
     #[inline(always)]
     fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
         &'static self,

@@ -1,7 +1,5 @@
-use proc_macro2::TokenStream;
-use proc_macro_error::{abort, abort_call_site};
-use quote::quote;
-use syn::{spanned::Spanned, Attribute, DeriveInput, Field, FieldsNamed};
+use proc_macro_error::abort;
+use syn::{spanned::Spanned, Attribute, Field, FieldsNamed};
 
 pub fn get_field_attribute<'f>(field: &'f Field, attr_name: &str) -> Option<&'f Attribute> {
     let attrs = field

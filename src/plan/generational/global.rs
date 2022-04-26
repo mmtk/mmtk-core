@@ -166,7 +166,14 @@ impl<VM: VMBinding> Gen<VM> {
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
-        info!("{}", if is_full_heap { "Full heap GC" } else { "nursery GC"} );
+        info!(
+            "{}",
+            if is_full_heap {
+                "Full heap GC"
+            } else {
+                "nursery GC"
+            }
+        );
 
         is_full_heap
     }

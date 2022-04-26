@@ -9,7 +9,6 @@ use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 
 use crate::policy::gc_work::PlanProcessEdges;
-use crate::policy::gc_work::DEFAULT_TRACE;
 
 impl<VM: VMBinding> crate::policy::gc_work::UsePolicyProcessEdges<VM> for Immix<VM> {
     type TargetPolicy = ImmixSpace<VM>;

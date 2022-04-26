@@ -1,7 +1,6 @@
 use super::global::GenCopy;
-use crate::scheduler::gc_work::SFTProcessEdges;
-use crate::vm::*;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
+use crate::vm::*;
 
 use crate::policy::gc_work::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;

@@ -115,11 +115,19 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     }
 }
 
-use crate::util::copy::CopySemantics;
 use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
 
-impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
+impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM>
+    for LargeObjectSpace<VM>
+{
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
         self.trace_object(trace, object)
     }
     #[inline(always)]

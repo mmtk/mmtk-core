@@ -6,12 +6,10 @@ extern crate quote;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use syn::{parse_macro_input};
-use proc_macro_error::{abort, abort_call_site};
+use proc_macro_error::abort_call_site;
 use quote::quote;
-use syn::{spanned::Spanned, Attribute, DeriveInput, Field, FieldsNamed, TypeGenerics};
-use quote::ToTokens;
+use syn::{DeriveInput, Field, TypeGenerics};
 use syn::__private::TokenStream2;
-use syn::token::Token;
 
 mod util;
 
@@ -66,16 +64,11 @@ fn generate_trace_object<'a>(
 
         // Figure out copy
         let trace_attr = util::get_field_attribute(f, "trace").unwrap();
-        // parse tts
         let copy = if !trace_attr.tokens.is_empty() {
-            // let copy = trace_attr.parse_meta().unwrap();
-            // println!("copy {:?}", copy.name());
-            use syn::AttributeArgs;
             use syn::Token;
             use syn::NestedMeta;
             use syn::punctuated::Punctuated;
 
-            let attr_tokens: TokenStream = trace_attr.tokens.clone().into();
             let args = trace_attr.parse_args_with(Punctuated::<NestedMeta, Token![,]>::parse_terminated).unwrap();
             if let Some(NestedMeta::Meta(syn::Meta::Path(p))) = args.first() {
                 quote!{ Some(#p) }
@@ -139,7 +132,7 @@ fn generate_create_scan_work<'a>(
     }
 }
 
-// The function generated needs to be inlined and constant folded. Otherwise, there will be a huge
+// The generated function needs to be inlined and constant folded. Otherwise, there will be a huge
 // performance penalty.
 fn generate_may_move_objects<'a>(
     main_policy_field: &Option<&'a Field>,
@@ -147,11 +140,9 @@ fn generate_may_move_objects<'a>(
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
     if let Some(f) = main_policy_field {
-        let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
         if let Some(p) = parent_field {
-            let p_ident = p.ident.as_ref().unwrap();
             let ref p_ty = p.ty;
             quote! {
                 fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {

@@ -139,16 +139,22 @@ pub trait SupportPolicyProcessEdges<VM: VMBinding>: Space<VM> {
 //         &mut self.base
 //     }
 // }
-
 use crate::plan::transitive_closure::PlanTraceObject;
 
-pub struct PlanProcessEdges<VM: VMBinding, P: 'static + Plan<VM = VM> + PlanTraceObject<VM> + Sync, const KIND: TraceKind> {
+pub struct PlanProcessEdges<
+    VM: VMBinding,
+    P: 'static + Plan<VM = VM> + PlanTraceObject<VM> + Sync,
+    const KIND: TraceKind,
+> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> ProcessEdgesWork
-    for PlanProcessEdges<VM, P, KIND>
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > ProcessEdgesWork for PlanProcessEdges<VM, P, KIND>
 {
     type VM = VM;
 
@@ -169,7 +175,8 @@ impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, con
         if object.is_null() {
             return object;
         }
-        self.plan.trace_object::<Self, KIND>(self, object, self.worker())
+        self.plan
+            .trace_object::<Self, KIND>(self, object, self.worker())
     }
 
     #[inline]
@@ -184,8 +191,11 @@ impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, con
 
 // Impl Deref/DerefMut to ProcessEdgesBase for PolicyProcessEdges
 
-impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> Deref
-    for PlanProcessEdges<VM, P, KIND>
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > Deref for PlanProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
     #[inline]
@@ -194,8 +204,11 @@ impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, con
     }
 }
 
-impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> DerefMut
-    for PlanProcessEdges<VM, P, KIND>
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > DerefMut for PlanProcessEdges<VM, P, KIND>
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
