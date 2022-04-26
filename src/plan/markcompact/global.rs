@@ -26,11 +26,19 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
+use crate::util::copy::CopySemantics;
+
 use enum_map::EnumMap;
 use std::sync::Arc;
 
+use macro_trace_object::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
+    #[main_policy]
+    #[trace(CopySemantics::DefaultCopy)]
     pub mc_space: MarkCompactSpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
 }
 

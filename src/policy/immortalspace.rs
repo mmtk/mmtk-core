@@ -118,6 +118,10 @@ impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for I
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
         self.trace_object(trace, object)
     }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        false
+    }
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {

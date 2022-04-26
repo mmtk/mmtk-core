@@ -22,12 +22,19 @@ use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use macro_trace_object::PlanTraceObject;
+
 use enum_map::EnumMap;
 
+#[derive(PlanTraceObject)]
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
+    #[main_policy]
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
 }
 

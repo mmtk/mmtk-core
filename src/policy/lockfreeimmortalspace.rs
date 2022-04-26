@@ -157,6 +157,10 @@ impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for L
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, _trace: &mut T, _object: ObjectReference, _copy: Option<CopySemantics>, _worker: &mut GCWorker<VM>) -> ObjectReference {
         unreachable!()
     }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        unreachable!()
+    }
 }
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {

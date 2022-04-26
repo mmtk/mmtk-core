@@ -1,6 +1,6 @@
 use super::global::MarkCompact;
 use crate::plan::TransitiveClosure;
-use crate::policy::gc_work::PolicyProcessEdges;
+use crate::policy::gc_work::PlanProcessEdges;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
@@ -85,9 +85,9 @@ impl<VM: VMBinding> Compact<VM> {
 }
 
 /// Marking trace
-pub type MarkingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
+pub type MarkingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
-pub type ForwardingProcessEdges<VM> = PolicyProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
+pub type ForwardingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
 
 use crate::util::copy::CopySemantics;
 

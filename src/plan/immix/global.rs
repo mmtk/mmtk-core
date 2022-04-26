@@ -26,8 +26,14 @@ use std::sync::Arc;
 use atomic::Ordering;
 use enum_map::EnumMap;
 
+use macro_trace_object::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct Immix<VM: VMBinding> {
+    #[main_policy]
+    #[trace(CopySemantics::DefaultCopy)]
     pub immix_space: ImmixSpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
 }

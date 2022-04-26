@@ -1,4 +1,5 @@
 use super::gc_work::GenCopyGCWorkContext;
+use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
@@ -25,10 +26,17 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use macro_trace_object::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
+    #[fallback_trace]
     pub gen: Gen<VM>,
     pub hi: AtomicBool,
+    #[main_policy]
+    #[trace(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
+    #[trace(CopySemantics::Mature)]
     pub copyspace1: CopySpace<VM>,
 }
 
@@ -79,10 +87,14 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        let _ = self.request_full_heap_collection();
+        let is_full_heap = self.request_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
+        if is_full_heap {
+            scheduler.schedule_common_work::<GenCopyGCWorkContext<VM>>(self);
+        } else {
+            scheduler.schedule_common_work::<GenCopyNurseryGCWorkContext<VM>>(self);
+        }
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {

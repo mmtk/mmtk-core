@@ -118,11 +118,33 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 }
 
 impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for ImmixSpace<VM> {
+    #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, copy: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
         if KIND == TRACE_KIND_DEFRAG {
-            self.trace_object_with_opportunistic_copy(trace, object, copy.unwrap(), worker)
+            self.trace_object(trace, object, copy.unwrap(), worker)
         } else if KIND == TRACE_KIND_FAST {
-            self.trace_object_without_moving(trace, object)
+            self.fast_trace_object(trace, object)
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[inline(always)]
+    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
+        &'static self,
+        nodes: Vec<ObjectReference>,
+    ) -> Box<dyn GCWork<VM>> {
+        Box::new(crate::policy::immix::ScanObjectsAndMarkLines::<E>::new(
+            nodes, false, self,
+        ))
+    }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        if KIND == TRACE_KIND_DEFRAG {
+            true
+        } else if KIND == TRACE_KIND_FAST {
+            false
         } else {
             unreachable!()
         }

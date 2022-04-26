@@ -16,6 +16,8 @@ use std::ops::{Deref, DerefMut};
 /// mark vs forward trace for mark compact.
 pub(crate) type TraceKind = u8;
 
+pub const DEFAULT_TRACE: u8 = u8::MAX;
+
 /// A plan that uses `PolicyProcessEdges` needs to provide an implementation for this trait.
 /// The plan needs to specify a target space (which needs to implement `SupportPolicyProcessEdges`).
 /// For objects in the target space, `trace_object_with_tracekind()` is called to trace the object.
@@ -70,13 +72,83 @@ pub trait SupportPolicyProcessEdges<VM: VMBinding>: Space<VM> {
 /// use `SFTProcessEdges`, they could try use this type. One major difference is that `PolicyProcessEdges` allows different
 /// traces for a policy.
 /// A plan that uses this needs to implement the `UsePolicyProcessEdges` trait, and the policy needs to implement `SupportPolicyProcessEdges`.
-pub struct PolicyProcessEdges<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> {
+// pub struct PolicyProcessEdges<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> {
+//     plan: &'static P,
+//     base: ProcessEdgesBase<VM>,
+// }
+
+// impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> ProcessEdgesWork
+//     for PolicyProcessEdges<VM, P, KIND>
+// {
+//     type VM = VM;
+
+//     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+//         let base = ProcessEdgesBase::new(edges, roots, mmtk);
+//         let plan = base.plan().downcast_ref::<P>().unwrap();
+//         Self { plan, base }
+//     }
+
+//     #[inline(always)]
+//     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+//         self.plan.get_target_space().create_scan_work::<Self>(nodes)
+//     }
+
+//     /// Trace object if it is in the target space. Otherwise call fallback_trace().
+//     #[inline(always)]
+//     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+//         if object.is_null() {
+//             return object;
+//         }
+//         if self.plan.get_target_space().in_space(object) {
+//             self.plan
+//                 .get_target_space()
+//                 .trace_object_with_tracekind::<Self, KIND>(self, object, P::COPY, self.worker())
+//         } else {
+//             self.plan
+//                 .fallback_trace::<Self>(self, object, self.worker())
+//         }
+//     }
+
+//     #[inline]
+//     fn process_edge(&mut self, slot: Address) {
+//         let object = unsafe { slot.load::<ObjectReference>() };
+//         let new_object = self.trace_object(object);
+//         if P::TargetPolicy::may_move_objects::<KIND>() {
+//             unsafe { slot.store(new_object) };
+//         }
+//     }
+// }
+
+// // Impl Deref/DerefMut to ProcessEdgesBase for PolicyProcessEdges
+
+// impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Deref
+//     for PolicyProcessEdges<VM, P, KIND>
+// {
+//     type Target = ProcessEdgesBase<VM>;
+//     #[inline]
+//     fn deref(&self) -> &Self::Target {
+//         &self.base
+//     }
+// }
+
+// impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> DerefMut
+//     for PolicyProcessEdges<VM, P, KIND>
+// {
+//     #[inline]
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.base
+//     }
+// }
+
+use crate::plan::transitive_closure::PlanTraceObject;
+
+pub struct PlanProcessEdges<VM: VMBinding, P: 'static + Plan<VM = VM> + PlanTraceObject<VM> + Sync, const KIND: TraceKind> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> ProcessEdgesWork
-    for PolicyProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> ProcessEdgesWork
+    for PlanProcessEdges<VM, P, KIND>
 {
     type VM = VM;
 
@@ -88,7 +160,7 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
 
     #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
-        self.plan.get_target_space().create_scan_work::<Self>(nodes)
+        self.plan.create_scan_work::<Self>(nodes)
     }
 
     /// Trace object if it is in the target space. Otherwise call fallback_trace().
@@ -97,21 +169,14 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
         if object.is_null() {
             return object;
         }
-        if self.plan.get_target_space().in_space(object) {
-            self.plan
-                .get_target_space()
-                .trace_object_with_tracekind::<Self, KIND>(self, object, P::COPY, self.worker())
-        } else {
-            self.plan
-                .fallback_trace::<Self>(self, object, self.worker())
-        }
+        self.plan.trace_object::<Self, KIND>(self, object, self.worker())
     }
 
     #[inline]
     fn process_edge(&mut self, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
         let new_object = self.trace_object(object);
-        if P::TargetPolicy::may_move_objects::<KIND>() {
+        if P::may_move_objects::<KIND>() {
             unsafe { slot.store(new_object) };
         }
     }
@@ -119,8 +184,8 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Process
 
 // Impl Deref/DerefMut to ProcessEdgesBase for PolicyProcessEdges
 
-impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Deref
-    for PolicyProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> Deref
+    for PlanProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
     #[inline]
@@ -129,8 +194,8 @@ impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> Deref
     }
 }
 
-impl<VM: VMBinding, P: UsePolicyProcessEdges<VM>, const KIND: TraceKind> DerefMut
-    for PolicyProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync, const KIND: TraceKind> DerefMut
+    for PlanProcessEdges<VM, P, KIND>
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {

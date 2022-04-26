@@ -1,11 +1,15 @@
 use super::global::Immix;
 use crate::plan::TransitiveClosure;
-use crate::policy::gc_work::{PolicyProcessEdges, TraceKind};
+// use crate::policy::gc_work::{PolicyProcessEdges, TraceKind};
+use crate::policy::gc_work::TraceKind;
 use crate::policy::immix::ImmixSpace;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
+
+use crate::policy::gc_work::PlanProcessEdges;
+use crate::policy::gc_work::DEFAULT_TRACE;
 
 impl<VM: VMBinding> crate::policy::gc_work::UsePolicyProcessEdges<VM> for Immix<VM> {
     type TargetPolicy = ImmixSpace<VM>;
@@ -35,5 +39,5 @@ impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
 {
     type VM = VM;
     type PlanType = Immix<VM>;
-    type ProcessEdgesWorkType = PolicyProcessEdges<VM, Immix<VM>, KIND>;
+    type ProcessEdgesWorkType = PlanProcessEdges<VM, Immix<VM>, KIND>;
 }

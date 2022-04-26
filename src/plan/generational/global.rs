@@ -21,12 +21,17 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use macro_trace_object::PlanTraceObject;
+
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
+#[derive(PlanTraceObject)]
 pub struct Gen<VM: VMBinding> {
     /// The nursery space. Its type depends on the actual plan.
+    #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
     pub gc_full_heap: AtomicBool,
@@ -159,6 +164,8 @@ impl<VM: VMBinding> Gen<VM> {
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
+
+        info!("{}", if is_full_heap { "Full heap GC" } else { "nursery GC"} );
 
         is_full_heap
     }

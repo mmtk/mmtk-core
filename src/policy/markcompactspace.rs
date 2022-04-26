@@ -111,6 +111,16 @@ impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for M
             unreachable!()
         }
     }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        if KIND == TRACE_KIND_MARK {
+            false
+        } else if KIND == TRACE_KIND_FORWARD {
+            true
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 impl<VM: VMBinding> MarkCompactSpace<VM> {

@@ -112,6 +112,11 @@ impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for C
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, trace: &mut T, object: ObjectReference, copy: Option<CopySemantics>, worker: &mut GCWorker<VM>) -> ObjectReference {
         self.trace_object(trace, object, copy, worker)
     }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        true
+    }
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
@@ -219,7 +224,6 @@ impl<VM: VMBinding> CopySpace<VM> {
         // If this is not from space, we do not need to trace it (the object has been copied to the tosapce)
         if !self.is_from_space() {
             // The copy semantics for tospace should be none.
-            debug_assert!(semantics.is_none());
             return object;
         }
 

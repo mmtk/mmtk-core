@@ -33,6 +33,8 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use macro_trace_object::PlanTraceObject;
+
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
@@ -338,6 +340,7 @@ pub enum GcStatus {
 /**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
+#[derive(PlanTraceObject)]
 pub struct BasePlan<VM: VMBinding> {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
@@ -377,10 +380,13 @@ pub struct BasePlan<VM: VMBinding> {
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
+    #[trace]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "code_space")]
+    #[trace]
     pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
+    #[trace]
     pub ro_space: ImmortalSpace<VM>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
@@ -396,6 +402,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
     #[cfg(feature = "vm_space")]
+    #[trace]
     pub vm_space: ImmortalSpace<VM>,
 }
 
@@ -834,9 +841,13 @@ impl<VM: VMBinding> BasePlan<VM> {
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
+#[derive(PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
+    #[trace]
     pub immortal: ImmortalSpace<VM>,
+    #[trace]
     pub los: LargeObjectSpace<VM>,
+    #[fallback_trace]
     pub base: BasePlan<VM>,
 }
 
