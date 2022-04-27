@@ -108,7 +108,8 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for CopySpace<VM> {
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
+    #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,

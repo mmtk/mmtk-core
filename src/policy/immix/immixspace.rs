@@ -117,7 +117,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for ImmixSpace<VM> {
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
     #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
@@ -565,38 +565,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // If defrag is disabled, every GC is exhaustive.
             true
         }
-    }
-}
-
-impl<VM: VMBinding> crate::policy::gc_work::SupportPolicyProcessEdges<VM> for ImmixSpace<VM> {
-    #[inline(always)]
-    fn trace_object_with_tracekind<T: TransitiveClosure, const KIND: TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        copy: CopySemantics,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if KIND == TRACE_KIND_FAST {
-            self.fast_trace_object(trace, object)
-        } else {
-            self.trace_object(trace, object, copy, worker)
-        }
-    }
-
-    #[inline(always)]
-    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
-        &'static self,
-        nodes: Vec<ObjectReference>,
-    ) -> Box<dyn GCWork<VM>> {
-        Box::new(crate::policy::immix::ScanObjectsAndMarkLines::<E>::new(
-            nodes, false, self,
-        ))
-    }
-
-    #[inline(always)]
-    fn may_move_objects<const KIND: TraceKind>() -> bool {
-        KIND == TRACE_KIND_DEFRAG
     }
 }
 

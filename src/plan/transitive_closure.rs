@@ -83,39 +83,113 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
 
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::GCWork;
-use crate::util::copy::CopySemantics;
 use crate::vm::VMBinding;
 
+/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// Generally a plan does not need to manually implement this trait. Instead, we provide
+/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
+///
+/// A plan could also manually implement this trait. For the sake of performance, the implementation
+/// of this trait should mark methods as `[inline(always)]`.
 pub trait PlanTraceObject<VM: VMBinding> {
+    /// Trace objects in the plan. Generally one needs to figure out
+    /// which space an object resides in, and invokes the corresponding policy
+    /// trace object method.
     fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
+
+    /// Create a scan objects work packet for the plan. Usually [`ScanObjects`](scheduler/gc_work/ScanObjects)
+    /// is used. If a plan or any policy in the plan uses a specific scan work packet, the work packet is required
+    /// to handle objects that is in any space in the plan.
     fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
         &'static self,
         nodes: Vec<ObjectReference>,
     ) -> Box<dyn GCWork<VM>>;
+
+    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
+    /// return true.
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
-pub trait PolicyTraceObject<VM: VMBinding> {
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        copy: Option<CopySemantics>,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference;
-    #[inline(always)]
-    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
-        &'static self,
-        nodes: Vec<ObjectReference>,
-    ) -> Box<dyn GCWork<VM>> {
-        Box::new(crate::scheduler::gc_work::ScanObjects::<E>::new(
-            nodes, false,
-        ))
+use crate::plan::Plan;
+use crate::scheduler::gc_work::ProcessEdgesBase;
+use std::ops::{Deref, DerefMut};
+
+/// This provides an implementation of [`ProcessEdgesWork`](scheduler/gc_work/ProcessEdgesWork). A plan that implements
+/// `PlanTraceObject` can use this work packet for tracing objects.
+pub struct PlanProcessEdges<
+    VM: VMBinding,
+    P: 'static + Plan<VM = VM> + PlanTraceObject<VM> + Sync,
+    const KIND: TraceKind,
+> {
+    plan: &'static P,
+    base: ProcessEdgesBase<VM>,
+}
+
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > ProcessEdgesWork for PlanProcessEdges<VM, P, KIND>
+{
+    type VM = VM;
+
+    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+        let plan = base.plan().downcast_ref::<P>().unwrap();
+        Self { plan, base }
     }
-    fn may_move_objects<const KIND: TraceKind>() -> bool;
+
+    #[inline(always)]
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
+        self.plan.create_scan_work::<Self>(nodes)
+    }
+
+    #[inline(always)]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        self.plan
+            .trace_object::<Self, KIND>(self, object, self.worker())
+    }
+
+    #[inline]
+    fn process_edge(&mut self, slot: Address) {
+        let object = unsafe { slot.load::<ObjectReference>() };
+        let new_object = self.trace_object(object);
+        if P::may_move_objects::<KIND>() {
+            unsafe { slot.store(new_object) };
+        }
+    }
+}
+
+// Impl Deref/DerefMut to ProcessEdgesBase for PlanProcessEdges
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > Deref for PlanProcessEdges<VM, P, KIND>
+{
+    type Target = ProcessEdgesBase<VM>;
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.base
+    }
+}
+
+impl<
+        VM: VMBinding,
+        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
+        const KIND: TraceKind,
+    > DerefMut for PlanProcessEdges<VM, P, KIND>
+{
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.base
+    }
 }

@@ -13,6 +13,14 @@ use syn::__private::TokenStream2;
 
 mod util;
 
+/// Generally a plan needs to add these attributes in order for the macro to work:
+/// * add `#[derive(PlanTraceObject)]` to the plan struct.
+/// * add `#[trace]` to each space field the plan struct has. If the policy is a copying policy,
+///   it needs to further specify the copy semantic (`#[trace(CopySemantics::X)]`)
+/// * add `#[fallback_trace]` to the parent plan if the plan is composed with other plans (or parent plans).
+///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
+///   with `BasePlan`.
+/// * (optional) add `#[main_policy]` to _one_ space field in the plan.
 #[proc_macro_error]
 #[proc_macro_derive(PlanTraceObject, attributes(trace, main_policy, copy, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
@@ -101,7 +109,7 @@ fn generate_trace_object<'a>(
     quote! {
         fn trace_object<T: crate::plan::TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, __mmtk_trace: &mut T, __mmtk_objref: crate::util::ObjectReference, __mmtk_worker: &mut crate::scheduler::GCWorker<VM>) -> crate::util::ObjectReference {
             use crate::policy::space::Space;
-            use crate::plan::transitive_closure::PolicyTraceObject;
+            use crate::policy::gc_work::PolicyTraceObject;
             use crate::plan::transitive_closure::PlanTraceObject;
             #(#space_field_handler)*
             #parent_field_delegator
@@ -119,7 +127,7 @@ fn generate_create_scan_work<'a>(
 
         quote! {
             fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
-                use crate::plan::transitive_closure::PolicyTraceObject;
+                use crate::policy::gc_work::PolicyTraceObject;
                 <#f_ty as PolicyTraceObject #ty_generics>::create_scan_work::<E>(&self.#f_ident, nodes)
             }
         }
@@ -146,7 +154,7 @@ fn generate_may_move_objects<'a>(
             let ref p_ty = p.ty;
             quote! {
                 fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                    use crate::plan::transitive_closure::PolicyTraceObject;
+                    use crate::policy::gc_work::PolicyTraceObject;
                     use crate::plan::transitive_closure::PlanTraceObject;
                     <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>() || <#p_ty as PlanTraceObject #ty_generics>::may_move_objects::<KIND>()
                 }
@@ -154,7 +162,7 @@ fn generate_may_move_objects<'a>(
         } else {
             quote! {
                 fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                    use crate::plan::transitive_closure::PolicyTraceObject;
+                    use crate::policy::gc_work::PolicyTraceObject;
                     <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
                 }
             }

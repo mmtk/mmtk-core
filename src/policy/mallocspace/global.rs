@@ -192,7 +192,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
-impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM> for MallocSpace<VM> {
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpace<VM> {
+    #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,

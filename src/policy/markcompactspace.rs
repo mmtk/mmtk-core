@@ -10,6 +10,8 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
+use crate::util::copy::CopySemantics;
+use crate::scheduler::GCWorker;
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -101,9 +103,10 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::plan::transitive_closure::PolicyTraceObject<VM>
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM>
     for MarkCompactSpace<VM>
 {
+    #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
@@ -398,31 +401,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
         // reset the bump pointer
         self.pr.reset_cursor(to);
-    }
-}
-
-use crate::scheduler::GCWorker;
-use crate::util::copy::CopySemantics;
-
-impl<VM: VMBinding> crate::policy::gc_work::SupportPolicyProcessEdges<VM> for MarkCompactSpace<VM> {
-    #[inline(always)]
-    fn trace_object_with_tracekind<T: TransitiveClosure, const KIND: TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        _copy: CopySemantics,
-        _worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        if KIND == TRACE_KIND_MARK {
-            self.trace_mark_object::<T>(trace, object)
-        } else {
-            self.trace_forward_object::<T>(trace, object)
-        }
-    }
-
-    #[inline(always)]
-    fn may_move_objects<const KIND: TraceKind>() -> bool {
-        KIND == TRACE_KIND_FORWARD
     }
 }
 

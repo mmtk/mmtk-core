@@ -1,13 +1,11 @@
 use super::global::MarkCompact;
-use crate::plan::TransitiveClosure;
-use crate::policy::gc_work::PlanProcessEdges;
+use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::util::ObjectReference;
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
@@ -88,28 +86,6 @@ impl<VM: VMBinding> Compact<VM> {
 pub type MarkingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
 /// Forwarding trace
 pub type ForwardingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
-
-use crate::util::copy::CopySemantics;
-
-impl<VM: VMBinding> crate::policy::gc_work::UsePolicyProcessEdges<VM> for MarkCompact<VM> {
-    type TargetPolicy = MarkCompactSpace<VM>;
-    const COPY: CopySemantics = CopySemantics::DefaultCopy;
-
-    #[inline(always)]
-    fn get_target_space(&self) -> &Self::TargetPolicy {
-        &self.mc_space
-    }
-
-    #[inline(always)]
-    fn fallback_trace<T: TransitiveClosure>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        _worker: &mut GCWorker<VM>,
-    ) -> ObjectReference {
-        self.common.trace_object::<T>(trace, object)
-    }
-}
 
 pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {
