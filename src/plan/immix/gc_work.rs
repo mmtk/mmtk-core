@@ -1,7 +1,7 @@
 use super::global::Immix;
+use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::TraceKind;
 use crate::vm::VMBinding;
-use crate::plan::transitive_closure::PlanProcessEdges;
 
 pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
     std::marker::PhantomData<VM>,

@@ -153,9 +153,7 @@ use crate::plan::TransitiveClosure;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
-impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM>
-    for LockFreeImmortalSpace<VM>
-{
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,

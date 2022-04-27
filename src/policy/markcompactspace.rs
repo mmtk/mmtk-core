@@ -1,8 +1,10 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
 use crate::policy::gc_work::TraceKind;
 use crate::policy::space::*;
+use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
 use crate::util::metadata::load_metadata;
@@ -10,8 +12,6 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
-use crate::util::copy::CopySemantics;
-use crate::scheduler::GCWorker;
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -103,9 +103,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
     }
 }
 
-impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM>
-    for MarkCompactSpace<VM>
-{
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
     #[inline(always)]
     fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
         &self,

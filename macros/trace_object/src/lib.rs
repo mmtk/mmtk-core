@@ -20,7 +20,8 @@ mod util;
 /// * add `#[fallback_trace]` to the parent plan if the plan is composed with other plans (or parent plans).
 ///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
 ///   with `BasePlan`.
-/// * (optional) add `#[scan_work]` to _one_ space field in the plan.
+/// * (optional) add `#[scan_work]` to _one_ space field in the plan. `create_scan_work` will be generated based
+///   on the space.
 #[proc_macro_error]
 #[proc_macro_derive(PlanTraceObject, attributes(trace, scan_work, copy, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
@@ -37,7 +38,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
         let trace_object_function = generate_trace_object(&spaces, &fallback, &ty_generics);
-        let create_scan_work_function = generate_create_scan_work(&scan_work, &ty_generics);
+        let create_scan_work_function = generate_create_scan_work(&spaces, &scan_work, &ty_generics);
         let may_move_objects_function = generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
@@ -66,6 +67,7 @@ fn generate_trace_object<'a>(
     parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
+    // Generate a check with early return for each space
     let space_field_handler = space_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
@@ -78,6 +80,7 @@ fn generate_trace_object<'a>(
             use syn::punctuated::Punctuated;
 
             let args = trace_attr.parse_args_with(Punctuated::<NestedMeta, Token![,]>::parse_terminated).unwrap();
+            // CopySemantics::X is a path.
             if let Some(NestedMeta::Meta(syn::Meta::Path(p))) = args.first() {
                 quote!{ Some(#p) }
             } else {
@@ -94,6 +97,7 @@ fn generate_trace_object<'a>(
         }
     });
 
+    // Generate a fallback to the parent plan
     let parent_field_delegator = if let Some(f) = parent_field {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
@@ -118,10 +122,24 @@ fn generate_trace_object<'a>(
 }
 
 fn generate_create_scan_work<'a>(
-    main_policy_field: &Option<&'a Field>,
+    space_fields: &[&'a Field],
+    scan_work_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    if let Some(f) = main_policy_field {
+    if let Some(f) = scan_work_field {
+        // If the plan names a field for scan work, use it
+        let f_ident = f.ident.as_ref().unwrap();
+        let ref f_ty = f.ty;
+
+        quote! {
+            fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
+                use crate::policy::gc_work::PolicyTraceObject;
+                <#f_ty as PolicyTraceObject #ty_generics>::create_scan_work::<E>(&self.#f_ident, nodes)
+            }
+        }
+    } else if !space_fields.is_empty() {
+        // If the plan does not name a specific field for scan work, just use the first space for scan work
+        let f = space_fields[0];
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
@@ -132,9 +150,10 @@ fn generate_create_scan_work<'a>(
             }
         }
     } else {
+        // Otherwise, just panic
         quote! {
             fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
-                unreachable!()
+                panic!("Unable to create a scan work packet for the plan (the plan does not name a #[scan_work] field, or a #[trace] field")
             }
         }
     }
@@ -147,6 +166,7 @@ fn generate_may_move_objects<'a>(
     parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
+    // If any space or the parent may move objects, the plan may move objects
     let space_handlers = space_fields.iter().map(|f| {
         let ref f_ty = f.ty;
 
