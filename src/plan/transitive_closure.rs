@@ -106,6 +106,7 @@ pub trait PlanTraceObject<VM: VMBinding> {
     fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
+use crate::mmtk::MMTK;
 use crate::plan::Plan;
 use crate::scheduler::gc_work::ProcessEdgesBase;
 use std::ops::{Deref, DerefMut};
