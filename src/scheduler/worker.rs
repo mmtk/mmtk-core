@@ -48,7 +48,7 @@ pub struct GCWorker<VM: VMBinding> {
     /// The sending end of the channel to send message to the controller thread.
     pub sender: Sender<CoordinatorMessage<VM>>,
     /// The reference to the MMTk instance.
-    mmtk: &'static MMTK<VM>,
+    pub mmtk: &'static MMTK<VM>,
     /// True if this struct is the embedded GCWorker of the controller thread.
     /// False if this struct belongs to a standalone GCWorker thread.
     is_coordinator: bool,
