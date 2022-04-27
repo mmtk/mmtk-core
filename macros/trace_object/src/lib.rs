@@ -20,9 +20,9 @@ mod util;
 /// * add `#[fallback_trace]` to the parent plan if the plan is composed with other plans (or parent plans).
 ///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
 ///   with `BasePlan`.
-/// * (optional) add `#[main_policy]` to _one_ space field in the plan.
+/// * (optional) add `#[scan_work]` to _one_ space field in the plan.
 #[proc_macro_error]
-#[proc_macro_derive(PlanTraceObject, attributes(trace, main_policy, copy, fallback_trace))]
+#[proc_macro_derive(PlanTraceObject, attributes(trace, scan_work, copy, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
@@ -33,12 +33,12 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         ..
     }) = input.data {
         let spaces = util::get_fields_with_attribute(fields, "trace");
-        let main_policy = util::get_unique_field_with_attribute(fields, "main_policy");
+        let scan_work = util::get_unique_field_with_attribute(fields, "scan_work");
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
         let trace_object_function = generate_trace_object(&spaces, &fallback, &ty_generics);
-        let create_scan_work_function = generate_create_scan_work(&main_policy, &ty_generics);
-        let may_move_objects_function = generate_may_move_objects(&main_policy, &fallback, &ty_generics);
+        let create_scan_work_function = generate_create_scan_work(&scan_work, &ty_generics);
+        let may_move_objects_function = generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
                 #[inline(always)]
@@ -143,36 +143,34 @@ fn generate_create_scan_work<'a>(
 // The generated function needs to be inlined and constant folded. Otherwise, there will be a huge
 // performance penalty.
 fn generate_may_move_objects<'a>(
-    main_policy_field: &Option<&'a Field>,
+    space_fields: &[&'a Field],
     parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    if let Some(f) = main_policy_field {
+    let space_handlers = space_fields.iter().map(|f| {
         let ref f_ty = f.ty;
 
-        if let Some(p) = parent_field {
-            let ref p_ty = p.ty;
-            quote! {
-                fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                    use crate::policy::gc_work::PolicyTraceObject;
-                    use crate::plan::transitive_closure::PlanTraceObject;
-                    <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>() || <#p_ty as PlanTraceObject #ty_generics>::may_move_objects::<KIND>()
-                }
-            }
-        } else {
-            quote! {
-                fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                    use crate::policy::gc_work::PolicyTraceObject;
-                    <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
-                }
-            }
+        quote! {
+            || <#f_ty as PolicyTraceObject #ty_generics>::may_move_objects::<KIND>()
+        }
+    });
+
+    let parent_handler = if let Some(p) = parent_field {
+        let ref p_ty = p.ty;
+
+        quote! {
+            || <#p_ty as PlanTraceObject #ty_generics>::may_move_objects::<KIND>()
         }
     } else {
-        // If the plan has no main policy, by default we assume it does not move objects.
-        quote! {
-            fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-                false
-            }
+        TokenStream2::new()
+    };
+
+    quote! {
+        fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+            use crate::policy::gc_work::PolicyTraceObject;
+            use crate::plan::transitive_closure::PlanTraceObject;
+
+            false #(#space_handlers)* #parent_handler
         }
     }
 }

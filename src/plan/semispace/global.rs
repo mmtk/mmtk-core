@@ -29,7 +29,6 @@ use enum_map::EnumMap;
 #[derive(PlanTraceObject)]
 pub struct SemiSpace<VM: VMBinding> {
     pub hi: AtomicBool,
-    #[main_policy]
     #[trace(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
     #[trace(CopySemantics::DefaultCopy)]

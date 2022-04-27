@@ -28,7 +28,6 @@ use macro_trace_object::PlanTraceObject;
 #[derive(PlanTraceObject)]
 pub struct Gen<VM: VMBinding> {
     /// The nursery space.
-    #[main_policy]
     #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.

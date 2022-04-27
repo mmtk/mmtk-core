@@ -33,7 +33,6 @@ pub struct GenCopy<VM: VMBinding> {
     #[fallback_trace]
     pub gen: Gen<VM>,
     pub hi: AtomicBool,
-    #[main_policy]
     #[trace(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
     #[trace(CopySemantics::Mature)]

@@ -35,7 +35,6 @@ use macro_trace_object::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
-    #[main_policy]
     #[trace(CopySemantics::DefaultCopy)]
     pub mc_space: MarkCompactSpace<VM>,
     #[fallback_trace]

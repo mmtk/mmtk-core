@@ -31,7 +31,6 @@ use macro_trace_object::PlanTraceObject;
 pub struct MarkSweep<VM: VMBinding> {
     #[fallback_trace]
     common: CommonPlan<VM>,
-    #[main_policy]
     #[trace]
     ms: MallocSpace<VM>,
 }
