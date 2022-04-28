@@ -491,13 +491,31 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: <VM::VMRefe
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_object_for_finalization() is called when no_finalizer = true");
+        warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+/// Get an object registered for finalization. The returned object may or may not be ready for
+/// finalization.
+///
+/// This is useful for some VMs which require all finalizable objects to be finalized on exit.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn get_object_added_for_finalization<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
+    if *mmtk.options.no_finalizer {
+        warn!("get_object_added_for_finalization() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_added_object()
 }
 
 /// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
