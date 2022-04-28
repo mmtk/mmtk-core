@@ -127,18 +127,18 @@ pub extern "C" fn mmtk_handle_user_collection_request(tls: VMMutatorThread) {
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_add_weak_candidate(reff: ObjectReference, referent: ObjectReference) {
-    memory_manager::add_weak_candidate(&SINGLETON, reff, referent)
+pub extern "C" fn mmtk_add_weak_candidate(reff: ObjectReference) {
+    memory_manager::add_weak_candidate(&SINGLETON, reff)
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_add_soft_candidate(reff: ObjectReference, referent: ObjectReference) {
-    memory_manager::add_soft_candidate(&SINGLETON, reff, referent)
+pub extern "C" fn mmtk_add_soft_candidate(reff: ObjectReference) {
+    memory_manager::add_soft_candidate(&SINGLETON, reff)
 }
 
 #[no_mangle]
-pub extern "C" fn mmtk_add_phantom_candidate(reff: ObjectReference, referent: ObjectReference) {
-    memory_manager::add_phantom_candidate(&SINGLETON, reff, referent)
+pub extern "C" fn mmtk_add_phantom_candidate(reff: ObjectReference) {
+    memory_manager::add_phantom_candidate(&SINGLETON, reff)
 }
 
 #[no_mangle]

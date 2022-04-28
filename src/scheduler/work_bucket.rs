@@ -154,13 +154,17 @@ pub enum WorkBucketStage {
     Unconstrained,
     Prepare,
     Closure,
-    // TODO: We only support final reference at the moment. If we have references of multiple strengths,
-    // we may need more than one buckets for each reference strength.
-    RefClosure,
+    SoftRefClosure,
+    WeakRefClosure,
+    FinalRefClosure,
+    PhantomRefClosure,
     CalculateForwarding,
     SecondRoots,
     RefForwarding,
+    FinalizableForwarding,
     Compact,
     Release,
     Final,
 }
+
+pub const LAST_CLOSURE_BUCKET: WorkBucketStage = WorkBucketStage::PhantomRefClosure;
