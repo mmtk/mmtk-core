@@ -101,6 +101,12 @@ impl FinalizableProcessor {
     pub fn get_ready_object(&mut self) -> Option<ObjectReference> {
         self.ready_for_finalize.pop()
     }
+
+    pub fn get_added_object(&mut self) -> Option<ObjectReference> {
+        self.ready_for_finalize.pop().or_else(|| {
+            self.candidates.pop()
+        })
+    }
 }
 
 #[derive(Default)]
