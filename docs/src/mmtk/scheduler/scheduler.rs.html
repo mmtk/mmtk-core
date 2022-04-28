@@ -374,6 +374,36 @@
 <span id="372">372</span>
 <span id="373">373</span>
 <span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
@@ -433,10 +463,14 @@
             <span class="ident">WorkBucketStage::Unconstrained</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">true</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Prepare</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Closure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
-            <span class="ident">WorkBucketStage::RefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::SoftRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::WeakRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::FinalRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::PhantomRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::CalculateForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::SecondRoots</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::RefForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::FinalizableForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Compact</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Release</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Final</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>()),
@@ -454,7 +488,7 @@
                     <span class="kw">let</span> <span class="ident">should_open</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="ident">cur_stages</span>)
                         <span class="op">&amp;&amp;</span> <span class="ident">scheduler</span>.<span class="ident">all_workers_parked</span>();
                     <span class="comment">// Additional check before the `RefClosure` bucket opens.</span>
-                    <span class="kw">if</span> <span class="ident">should_open</span> <span class="op">&amp;&amp;</span> <span class="ident">s</span> <span class="op">==</span> <span class="ident">WorkBucketStage::RefClosure</span> {
+                    <span class="kw">if</span> <span class="ident">should_open</span> <span class="op">&amp;&amp;</span> <span class="ident">s</span> <span class="op">==</span> <span class="ident"><span class="kw">crate</span>::scheduler::work_bucket::LAST_CLOSURE_BUCKET</span> {
                         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">closure_end</span>) <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">as_ref</span>() {
                             <span class="kw">if</span> <span class="ident">closure_end</span>() {
                                 <span class="comment">// Don&#39;t open `RefClosure` if `closure_end` added more works to `Closure`.</span>
@@ -468,10 +502,14 @@
             };
 
             <span class="ident">open_next</span>(<span class="ident">Closure</span>);
-            <span class="ident">open_next</span>(<span class="ident">RefClosure</span>);
+            <span class="ident">open_next</span>(<span class="ident">SoftRefClosure</span>);
+            <span class="ident">open_next</span>(<span class="ident">WeakRefClosure</span>);
+            <span class="ident">open_next</span>(<span class="ident">FinalRefClosure</span>);
+            <span class="ident">open_next</span>(<span class="ident">PhantomRefClosure</span>);
             <span class="ident">open_next</span>(<span class="ident">CalculateForwarding</span>);
             <span class="ident">open_next</span>(<span class="ident">SecondRoots</span>);
             <span class="ident">open_next</span>(<span class="ident">RefForwarding</span>);
+            <span class="ident">open_next</span>(<span class="ident">FinalizableForwarding</span>);
             <span class="ident">open_next</span>(<span class="ident">Compact</span>);
             <span class="ident">open_next</span>(<span class="ident">Release</span>);
             <span class="ident">open_next</span>(<span class="ident">Final</span>);
@@ -559,10 +597,6 @@
         <span class="comment">// Prepare global/collectors/mutators</span>
         <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>].<span class="ident">add</span>(<span class="ident">Prepare</span>::<span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
 
-        <span class="comment">// VM-specific weak ref processing</span>
-        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
-            .<span class="ident">add</span>(<span class="ident">ProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
-
         <span class="comment">// Release global/collectors/mutators</span>
         <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">Release</span>::<span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
 
@@ -581,15 +615,41 @@
                 .<span class="ident">add</span>(<span class="ident">ScheduleSanityGC</span>::<span class="op">&lt;</span><span class="ident">C::PlanType</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">plan</span>));
         }
 
+        <span class="comment">// Reference processing</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_reference_types</span> {
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor</span>::{
+                <span class="ident">PhantomRefProcessing</span>, <span class="ident">SoftRefProcessing</span>, <span class="ident">WeakRefProcessing</span>,
+            };
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::SoftRefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">SoftRefProcessing</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::WeakRefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">WeakRefProcessing</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::PhantomRefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">PhantomRefProcessing</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+
+            <span class="comment">// VM-specific weak ref processing</span>
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::WeakRefClosure</span>]
+                .<span class="ident">add</span>(<span class="ident">VMProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::RefForwarding</span>;
+            <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span> {
+                <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
+                    .<span class="ident">add</span>(<span class="ident">RefForwarding</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+            }
+
+            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::RefEnqueue</span>;
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">RefEnqueue</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        }
+
         <span class="comment">// Finalization</span>
         <span class="kw">if</span> <span class="op">!</span><span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">no_finalizer</span> {
             <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor</span>::{<span class="ident">Finalization</span>, <span class="ident">ForwardFinalization</span>};
             <span class="comment">// finalization</span>
-            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefClosure</span>]
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::FinalRefClosure</span>]
                 .<span class="ident">add</span>(<span class="ident">Finalization</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
             <span class="comment">// forward refs</span>
             <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span> {
-                <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
+                <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::FinalizableForwarding</span>]
                     .<span class="ident">add</span>(<span class="ident">ForwardFinalization</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
             }
         }

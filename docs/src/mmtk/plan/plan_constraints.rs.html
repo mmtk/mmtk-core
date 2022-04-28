@@ -59,6 +59,8 @@
 <span id="57">57</span>
 <span id="58">58</span>
 <span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Plan-specific constraints.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::BarrierSelector</span>;
@@ -91,6 +93,8 @@
     <span class="kw">pub</span> <span class="ident">needs_linear_scan</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">needs_concurrent_workers</span>: <span class="ident">bool</span>,
     <span class="kw">pub</span> <span class="ident">generate_gc_trace</span>: <span class="ident">bool</span>,
+    <span class="doccomment">/// Some policies do object forwarding after the first liveness transitive closure, such as mark compact.</span>
+    <span class="doccomment">/// For plans that use those policies, they should set this as true.</span>
     <span class="kw">pub</span> <span class="ident">needs_forward_after_liveness</span>: <span class="ident">bool</span>,
 }
 

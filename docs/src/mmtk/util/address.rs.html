@@ -539,6 +539,8 @@
 <span id="537">537</span>
 <span id="538">538</span>
 <span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
@@ -994,6 +996,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectReference</span>(<span class="ident">usize</span>);
 
 <span class="kw">impl</span> <span class="ident">ObjectReference</span> {
+    <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NULL</span>: <span class="ident">ObjectReference</span> <span class="op">=</span> <span class="ident">ObjectReference</span>(<span class="number">0</span>);
+
     <span class="doccomment">/// converts the ObjectReference to an Address</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_address</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {

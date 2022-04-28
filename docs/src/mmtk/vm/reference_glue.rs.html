@@ -40,15 +40,9 @@
 <span id="38">38</span>
 <span id="39">39</span>
 <span id="40">40</span>
-<span id="41">41</span>
-<span id="42">42</span>
-<span id="43">43</span>
-<span id="44">44</span>
-<span id="45">45</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TraceLocal</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="doccomment">/// VM-specific methods for reference processing.</span>
@@ -77,18 +71,14 @@
     <span class="doccomment">/// * `referent`: The referent object reference.</span>
     <span class="kw">fn</span> <span class="ident">set_referent</span>(<span class="ident">reff</span>: <span class="ident">ObjectReference</span>, <span class="ident">referent</span>: <span class="ident">ObjectReference</span>);
 
-    <span class="doccomment">/// Process a reference with the current semantics and return an updated reference (e.g. with a new address)</span>
-    <span class="doccomment">/// if the reference is still alive, otherwise return a null object reference.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `trace`: A reference to a `TraceLocal` object for this reference.</span>
-    <span class="doccomment">/// * `reference`: The address of the reference. This may or may not be the address of a heap object, depending on the VM.</span>
-    <span class="doccomment">/// * `tls`: The GC thread that is processing this reference.</span>
-    <span class="kw">fn</span> <span class="ident">process_reference</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TraceLocal</span><span class="op">&gt;</span>(
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
-        <span class="ident">reference</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-    ) -&gt; <span class="ident">ObjectReference</span>;
+    <span class="doccomment">/// For reference types, if the referent is cleared during GC, the reference</span>
+    <span class="doccomment">/// will be added to a queue, and MMTk will call this method to inform</span>
+    <span class="doccomment">/// the VM about the changes for those references. This method is used</span>
+    <span class="doccomment">/// to implement Java&#39;s ReferenceQueue.</span>
+    <span class="doccomment">/// Note that this method is called for each type of weak references during GC, and</span>
+    <span class="doccomment">/// the references slice will be cleared after this call is returned. That means</span>
+    <span class="doccomment">/// MMTk will no longer keep these references alive once this method is returned.</span>
+    <span class="kw">fn</span> <span class="ident">enqueue_references</span>(<span class="ident">references</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>], <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>

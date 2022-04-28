@@ -531,6 +531,10 @@
 <span id="529">529</span>
 <span id="530">530</span>
 <span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
@@ -864,7 +868,11 @@
     <span class="comment">// Should finalization be disabled?</span>
     <span class="ident">no_finalizer</span>:          <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
     <span class="comment">// Should reference type processing be disabled?</span>
-    <span class="ident">no_reference_types</span>:    <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">false</span>,
+    <span class="comment">// If reference type processing is disabled, no weak reference processing work is scheduled,</span>
+    <span class="comment">// and we expect a binding to treat weak references as strong references.</span>
+    <span class="comment">// We disable weak reference processing by default, as we are still working on it. This will be changed to `false`</span>
+    <span class="comment">// once weak reference processing is implemented properly.</span>
+    <span class="ident">no_reference_types</span>:    <span class="ident">bool</span>                 [<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="bool-val">true</span>,
     <span class="comment">// The zeroing approach to use for new object allocations. Affects each plan differently. (not supported)</span>
     <span class="ident">nursery_zeroing</span>:       <span class="ident">NurseryZeroingOptions</span>[<span class="ident">env_var</span>: <span class="bool-val">true</span>, <span class="ident">command_line</span>: <span class="bool-val">true</span>]  [<span class="ident">always_valid</span>] <span class="op">=</span> <span class="ident">NurseryZeroingOptions::Temporal</span>,
     <span class="comment">// How frequent (every X bytes) should we do a stress GC?</span>

@@ -546,21 +546,6 @@
 <span id="544">544</span>
 <span id="545">545</span>
 <span id="546">546</span>
-<span id="547">547</span>
-<span id="548">548</span>
-<span id="549">549</span>
-<span id="550">550</span>
-<span id="551">551</span>
-<span id="552">552</span>
-<span id="553">553</span>
-<span id="554">554</span>
-<span id="555">555</span>
-<span id="556">556</span>
-<span id="557">557</span>
-<span id="558">558</span>
-<span id="559">559</span>
-<span id="560">560</span>
-<span id="561">561</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -979,49 +964,34 @@
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">modify_check</span>(<span class="ident">object</span>);
 }
 
-<span class="doccomment">/// Add a reference to the list of weak references.</span>
+<span class="doccomment">/// Add a reference to the list of weak references. A binding may</span>
+<span class="doccomment">/// call this either when a weak reference is created, or when a weak reference is traced during GC.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The weak reference to add.</span>
-<span class="doccomment">/// * `referent`: The object that the reference points to.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_weak_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">reff</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">referent</span>: <span class="ident">ObjectReference</span>,
-) {
-    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>
-        .<span class="ident">add_weak_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>, <span class="ident">referent</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_weak_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">reff</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>.<span class="ident">add_weak_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>);
 }
 
-<span class="doccomment">/// Add a reference to the list of soft references.</span>
+<span class="doccomment">/// Add a reference to the list of soft references. A binding may</span>
+<span class="doccomment">/// call this either when a weak reference is created, or when a weak reference is traced during GC.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The soft reference to add.</span>
-<span class="doccomment">/// * `referent`: The object that the reference points to.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_soft_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">reff</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">referent</span>: <span class="ident">ObjectReference</span>,
-) {
-    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>
-        .<span class="ident">add_soft_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>, <span class="ident">referent</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_soft_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">reff</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>.<span class="ident">add_soft_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>);
 }
 
-<span class="doccomment">/// Add a reference to the list of phantom references.</span>
+<span class="doccomment">/// Add a reference to the list of phantom references. A binding may</span>
+<span class="doccomment">/// call this either when a weak reference is created, or when a weak reference is traced during GC.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
 <span class="doccomment">/// * `reff`: The phantom reference to add.</span>
-<span class="doccomment">/// * `referent`: The object that the reference points to.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_phantom_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">reff</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">referent</span>: <span class="ident">ObjectReference</span>,
-) {
-    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>
-        .<span class="ident">add_phantom_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>, <span class="ident">referent</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_phantom_candidate</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">reff</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">mmtk</span>.<span class="ident">reference_processors</span>.<span class="ident">add_phantom_candidate</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">reff</span>);
 }
 
 <span class="doccomment">/// Generic hook to allow benchmarks to be harnessed. We do a full heap</span>
