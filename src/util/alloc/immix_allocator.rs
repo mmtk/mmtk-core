@@ -7,6 +7,7 @@ use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
+use crate::util::rust_util::unlikely;
 use crate::util::Address;
 use crate::vm::*;
 
@@ -34,14 +35,6 @@ pub struct ImmixAllocator<VM: VMBinding> {
     request_for_large: bool,
     /// Hole-searching cursor
     line: Option<Line>,
-    /// Are we doing alloc slow when stress test is turned on. This is only set to true,
-    /// during the allow_slow_once_stress_test() call. In the call, we will restore the correct
-    /// limit for bump allocation, and call alloc() to try resolve the allocation request with
-    /// the thread local buffer. If we cannot do the allocation from the thread local buffer,
-    /// we will eventually call allow_slow_once_stress_test(). With this flag set to true, we know
-    /// we are resolving an allocation request and have failed the thread local allocation. In
-    /// this case, we will acquire new block from the space.
-    alloc_slow_for_stress: bool,
 }
 
 impl<VM: VMBinding> ImmixAllocator<VM> {
@@ -147,29 +140,24 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
             return ret;
         }
 
-        // We are not yet required to do a stress GC. We will try to allocate from thread local buffer if possible.
-        // Restore the fake limit to the normal limit so we can do thread local alloaction normally.
+        // We are not yet required to do a stress GC. We will try to allocate from thread local
+        // buffer if possible.  Restore the fake limit to the normal limit so we can do thread
+        // local allocation normally. Check if we have exhausted our current thread local block,
+        // and if so, then directly acquire a new one
         self.restore_limit_for_stress();
-        let ret = if self.alloc_slow_for_stress {
-            // If we are already doing allow_slow for stress test, and reach here, it means we have failed the
-            // thread local allocation, and we have to get a new block from the space.
+        let ret = if self.require_new_block(size, align, offset) {
+            // We don't have enough space in thread local block to service the allocation request,
+            // hence allocate a new block
             trace!(
                 "{:?}: alloc_slow_once_precise_stress - acquire new block",
                 self.tls
             );
             self.acquire_clean_block(size, align, offset)
         } else {
-            // Indicate that we are doing alloc slow for stress test. If the alloc() cannot allocate from
-            // thread local buffer, we will reach this method again. In that case, we will need to poll, rather
-            // than attempting to alloc() again.
-            self.alloc_slow_for_stress = true;
-            // Try allocate. The allocator will try allocate from thread local buffer, if that fails, it will
-            // get a clean block.
-            trace!("{:?}: alloc_slow_once_precise_stress - alloc()", self.tls);
-            let ret = self.alloc(size, align, offset);
-            // Indicate that we finish the alloc slow for stress test.
-            self.alloc_slow_for_stress = false;
-            ret
+            // This `alloc()` call should always succeed given the if-branch checks if we are out
+            // of thread local block space
+            trace!("{:?}: alloc_slow_once_precise_stress - alloc()", self.tls,);
+            self.alloc(size, align, offset)
         };
         // Set fake limits
         self.set_limit_for_stress();
@@ -200,7 +188,6 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             large_limit: Address::ZERO,
             request_for_large: false,
             line: None,
-            alloc_slow_for_stress: false,
         }
     }
 
@@ -231,7 +218,23 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
     fn alloc_slow_hot(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("{:?}: alloc_slow_hot", self.tls);
         if self.acquire_recyclable_lines(size, align, offset) {
-            self.alloc(size, align, offset)
+            // If stress test is active, then we need to go to the slow path instead of directly
+            // calling `alloc()`. This is because the `acquire_recyclable_lines()` function
+            // manipulates the cursor and limit if a line can be recycled and if we directly call
+            // `alloc()` after recyling a line, then we will miss updating the `allocation_bytes`
+            // as the newly recycled line will service the allocation request. If we set the stress
+            // factor limit directly in `acquire_recyclable_lines()`, then we risk running into an
+            // loop of failing the fastpath (i.e. `alloc()`) and then trying to allocate from a
+            // recyclable line.  Hence, we bring the "if we're in stress test" check up a level and
+            // directly call `alloc_slow_inline()` which will properly account for the allocation
+            // request as well as allocate from the newly recycled line
+            let stress_test = self.plan.base().is_stress_test_gc_enabled();
+            let precise_stress = self.plan.base().is_precise_stress();
+            if unlikely(stress_test && precise_stress) {
+                self.alloc_slow_inline(size, align, offset)
+            } else {
+                self.alloc(size, align, offset)
+            }
         } else {
             self.alloc_slow_inline(size, align, offset)
         }
@@ -310,6 +313,28 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                 }
                 self.alloc(size, align, offset)
             }
+        }
+    }
+
+    /// Return whether the TLAB has been exhausted and we need to acquire a new block. Assumes that
+    /// the buffer limits have been restored using [`ImmixAllocator::restore_limit_for_stress`].
+    /// Note that this function may implicitly change the limits of the allocator.
+    fn require_new_block(&mut self, size: usize, align: usize, offset: isize) -> bool {
+        let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
+        let new_cursor = result + size;
+        let insufficient_space = new_cursor > self.limit;
+
+        // We want this function to behave as if `alloc()` has been called. Hence, we perform a
+        // size check and then return the conditions where `alloc_slow_inline()` would be called
+        // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
+        // to service the allocation request
+        if insufficient_space && size > Line::BYTES {
+            let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
+            let end = start + size;
+            end > self.large_limit
+        } else {
+            // We try to acquire recyclable lines here just like `alloc_slow_hot()`
+            insufficient_space && !self.acquire_recyclable_lines(size, align, offset)
         }
     }
 
