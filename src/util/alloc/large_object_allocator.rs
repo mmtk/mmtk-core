@@ -8,8 +8,11 @@ use crate::vm::VMBinding;
 
 #[repr(C)]
 pub struct LargeObjectAllocator<VM: VMBinding> {
+    /// [`VMThread`] associated with this allocator instance
     pub tls: VMThread,
+    /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static LargeObjectSpace<VM>,
+    /// [`Plan`] instance that this allocator instance is associated with.
     plan: &'static dyn Plan<VM = VM>,
 }
 
