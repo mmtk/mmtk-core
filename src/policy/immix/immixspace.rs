@@ -394,6 +394,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
             // until the object has been forwarded by the winner. Note that the object may not
             // necessarily get forwarded since Immix opportunistically moves objects.
+            #[allow(clippy::let_and_return)]
             let new_object =
                 ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
             #[cfg(debug_assertions)]
@@ -401,14 +402,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 if new_object == object {
                     debug_assert!(
                         self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || Self::is_pinned(object),
-                        "Forwarded object is the same as original object {:?} even though it should have been copied",
+                        "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
                 } else {
                     // new_object != object
                     debug_assert!(
                         !Block::containing::<VM>(new_object).is_defrag_source(),
-                        "Block {:?} containing forwarded object {:?} should not be a defragmentation source",
+                        "Block {:?} containing forwarded object {} should not be a defragmentation source",
                         Block::containing::<VM>(new_object),
                         new_object,
                     );
@@ -420,7 +421,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // forwarding status and return the unmoved object
             debug_assert!(
                 self.defrag.space_exhausted() || Self::is_pinned(object),
-                "Forwarded object is the same as original object {:?} even though it should have been copied",
+                "Forwarded object is the same as original object {} even though it should have been copied",
                 object,
             );
             ForwardingWord::clear_forwarding_bits::<VM>(object);

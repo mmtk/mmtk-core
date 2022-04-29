@@ -67,8 +67,8 @@ pub fn spin_and_get_forwarded_object<VM: VMBinding>(
         // the forwarding word while another thread was stuck spinning in the above loop.
         // See: https://github.com/mmtk/mmtk-core/issues/579
         debug_assert!(
-            forwarding_bits != BEING_FORWARDED,
-            "Invalid/Corrupted forwarding word {} for object {:?}",
+            forwarding_bits == FORWARDED || forwarding_bits == FORWARDING_NOT_TRIGGERED_YET,
+            "Invalid/Corrupted forwarding word {:x} for object {}",
             forwarding_bits,
             object,
         );
