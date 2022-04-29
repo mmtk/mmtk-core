@@ -391,11 +391,43 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
+            // We lost the forwarding race as some other thread has set the forwarding word; wait
+            // until the object has been forwarded by the winner. Note that the object may not
+            // necessarily get forwarded since Immix opportunistically moves objects.
+            let new_object =
+                ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+            #[cfg(debug_assertions)]
+            {
+                if new_object == object {
+                    debug_assert!(
+                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || Self::is_pinned(object),
+                        "Forwarded object is the same as original object {:?} even though it should have been copied",
+                        object,
+                    );
+                } else {
+                    // new_object != object
+                    debug_assert!(
+                        !Block::containing::<VM>(new_object).is_defrag_source(),
+                        "Block {:?} containing forwarded object {:?} should not be a defragmentation source",
+                        Block::containing::<VM>(new_object),
+                        new_object,
+                    );
+                }
+            }
+            new_object
         } else if self.is_marked(object, self.mark_state) {
+            // We won the forwarding race but the object is already marked so we clear the
+            // forwarding status and return the unmoved object
+            debug_assert!(
+                self.defrag.space_exhausted() || Self::is_pinned(object),
+                "Forwarded object is the same as original object {:?} even though it should have been copied",
+                object,
+            );
             ForwardingWord::clear_forwarding_bits::<VM>(object);
             object
         } else {
+            // We won the forwarding race; actually forward and copy the object if it is not pinned
+            // and we have sufficient space in our copy allocator
             let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
