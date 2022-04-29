@@ -74,6 +74,7 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
 
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::GCWork;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
@@ -93,13 +94,15 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Create a scan objects work packet for the plan. Usually [`ScanObjects`](scheduler/gc_work/ScanObjects)
-    /// is used. If a plan or any policy in the plan uses a specific scan work packet, the work packet is required
-    /// to handle objects that is in any space in the plan.
-    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
-        &'static self,
-        nodes: Vec<ObjectReference>,
-    ) -> Box<dyn GCWork<VM>>;
+    /// Scan objects in the plan. It is expected that each object will be scanned by `VM::VMScanning::scan_object()`.
+    /// If the object is in a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
+    /// this method should also invoke those policy specific methods.
+    fn scan_object<EV: EdgeVisitor>(
+        &self,
+        tls: VMWorkerThread,
+        object: ObjectReference,
+        edge_visitor: &mut EV,
+    );
 
     /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
     /// return true.
@@ -138,7 +141,7 @@ impl<
 
     #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
-        self.plan.create_scan_work::<Self>(nodes)
+        Box::new(PlanScanObjects::<Self, P>::new(self.plan, nodes, false))
     }
 
     #[inline(always)]
@@ -183,5 +186,49 @@ impl<
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+use std::marker::PhantomData;
+
+/// This provides an implementation of scanning objects work. Each object will be scanned by calling `scan_object()`
+/// in `PlanTraceObject`.
+pub struct PlanScanObjects<
+    E: ProcessEdgesWork,
+    P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync,
+> {
+    plan: &'static P,
+    buffer: Vec<ObjectReference>,
+    #[allow(dead_code)]
+    concurrent: bool,
+    phantom: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync>
+    PlanScanObjects<E, P>
+{
+    pub fn new(plan: &'static P, buffer: Vec<ObjectReference>, concurrent: bool) -> Self {
+        Self {
+            plan,
+            buffer,
+            concurrent,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync>
+    GCWork<E::VM> for PlanScanObjects<E, P>
+{
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("PlanScanObjects");
+        {
+            let tls = worker.tls;
+            let mut closure = ObjectsClosure::<E>::new(worker);
+            for object in &self.buffer {
+                self.plan.scan_object(tls, *object, &mut closure);
+            }
+        }
+        trace!("PlanScanObjects End");
     }
 }

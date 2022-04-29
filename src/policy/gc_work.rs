@@ -5,11 +5,11 @@ pub(crate) type TraceKind = u8;
 pub const DEFAULT_TRACE: u8 = u8::MAX;
 
 use crate::plan::TransitiveClosure;
-use crate::scheduler::gc_work::ProcessEdgesWork;
-use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
+use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::ObjectReference;
+use crate::vm::EdgeVisitor;
 use crate::vm::VMBinding;
 
 /// This trait defines policy-specific behavior for tracing objects.
@@ -28,18 +28,17 @@ pub trait PolicyTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Create a scan work packet. Note that a plan currently only uses one type
-    /// of the scan work packet. So a policy either uses the general `ScanObjects`
-    /// work, or implement their own packet. Their implementation needs to handle
-    /// cases that objects are not in this current space.
+    /// Policy-specific scan object. The implementation needs to guarantee that
+    /// they will call `VM::VMScanning::scan_object()` (or `Self::vm_scan_object()`) besides any space-specific work for the object.
     #[inline(always)]
-    fn create_scan_work<E: ProcessEdgesWork<VM = VM>>(
-        &'static self,
-        nodes: Vec<ObjectReference>,
-    ) -> Box<dyn GCWork<VM>> {
-        Box::new(crate::scheduler::gc_work::ScanObjects::<E>::new(
-            nodes, false,
-        ))
+    fn scan_object<EV: EdgeVisitor>(
+        &self,
+        tls: VMWorkerThread,
+        object: ObjectReference,
+        edge_visitor: &mut EV,
+    ) {
+        use crate::vm::Scanning;
+        VM::VMScanning::scan_object(tls, object, edge_visitor)
     }
 
     /// Return whether the policy moves objects.

@@ -20,10 +20,10 @@ mod util;
 /// * add `#[fallback_trace]` to the parent plan if the plan is composed with other plans (or parent plans).
 ///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
 ///   with `BasePlan`.
-/// * (optional) add `#[scan_work]` to _one_ space field in the plan. `create_scan_work` will be generated based
-///   on the space.
+/// * add `#[policy_scan]` to any space field that has some policy-specific scan_object(). For objects in those spaces,
+///   `scan_object()` in the policy will be called. For other objects, directly call `VM::VMScanning::scan_object()`.
 #[proc_macro_error]
-#[proc_macro_derive(PlanTraceObject, attributes(trace, scan_work, copy, fallback_trace))]
+#[proc_macro_derive(PlanTraceObject, attributes(trace, policy_scan, copy, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
@@ -34,11 +34,11 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         ..
     }) = input.data {
         let spaces = util::get_fields_with_attribute(fields, "trace");
-        let scan_work = util::get_unique_field_with_attribute(fields, "scan_work");
+        let scan_spaces = util::get_fields_with_attribute(fields, "policy_scan");
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
         let trace_object_function = generate_trace_object(&spaces, &fallback, &ty_generics);
-        let create_scan_work_function = generate_create_scan_work(&spaces, &scan_work, &ty_generics);
+        let scan_object_function = generate_scan_object(&scan_spaces, &ty_generics);
         let may_move_objects_function = generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
@@ -46,7 +46,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
                 #trace_object_function
 
                 #[inline(always)]
-                #create_scan_work_function
+                #scan_object_function
 
                 #[inline(always)]
                 #may_move_objects_function
@@ -121,40 +121,32 @@ fn generate_trace_object<'a>(
     }
 }
 
-fn generate_create_scan_work<'a>(
-    space_fields: &[&'a Field],
-    scan_work_field: &Option<&'a Field>,
+fn generate_scan_object<'a>(
+    scan_object_fields: &[&'a Field],
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    if let Some(f) = scan_work_field {
-        // If the plan names a field for scan work, use it
+    let scan_field_handler = scan_object_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
         quote! {
-            fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
+            if self.#f_ident.in_space(__mmtk_objref) {
                 use crate::policy::gc_work::PolicyTraceObject;
-                <#f_ty as PolicyTraceObject #ty_generics>::create_scan_work::<E>(&self.#f_ident, nodes)
+                <#f_ty as PolicyTraceObject #ty_generics>::scan_object::<EV>(&self.#f_ident, __mmtk_worker_tls, __mmtk_objref, __mmtk_ev);
+                return;
             }
         }
-    } else if !space_fields.is_empty() {
-        // If the plan does not name a specific field for scan work, just use the first space for scan work
-        let f = space_fields[0];
-        let f_ident = f.ident.as_ref().unwrap();
-        let ref f_ty = f.ty;
+    });
 
-        quote! {
-            fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
-                use crate::policy::gc_work::PolicyTraceObject;
-                <#f_ty as PolicyTraceObject #ty_generics>::create_scan_work::<E>(&self.#f_ident, nodes)
-            }
-        }
-    } else {
-        // Otherwise, just panic
-        quote! {
-            fn create_scan_work<E: crate::scheduler::gc_work::ProcessEdgesWork<VM = VM>>(&'static self, nodes: Vec<crate::util::ObjectReference>) -> Box<dyn crate::scheduler::GCWork<VM>> {
-                panic!("Unable to create a scan work packet for the plan (the plan does not name a #[scan_work] field, or a #[trace] field")
-            }
+    quote! {
+        fn scan_object<EV: crate::vm::EdgeVisitor>(&self, __mmtk_worker_tls: crate::util::opaque_pointer::VMWorkerThread, __mmtk_objref: crate::util::ObjectReference, __mmtk_ev: &mut EV) {
+            use crate::vm::Scanning;
+
+            // Plan specific
+            #(#scan_field_handler)*
+
+            // Default
+            VM::VMScanning::scan_object(__mmtk_worker_tls, __mmtk_objref, __mmtk_ev);
         }
     }
 }

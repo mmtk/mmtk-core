@@ -492,6 +492,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
 /// (such as `Space.set_copy_for_sft_trace()`, `SFT.sft_trace_object()`).
 /// Some plans are not using this type, mostly due to more complex tracing. Either it is impossible to use this type, or
 /// there is performance overheads for using this general trace type. In such cases, they implement their specific process edges.
+// TODO: This is not used any more. Should we remove it?
 pub struct SFTProcessEdges<VM: VMBinding> {
     pub base: ProcessEdgesBase<VM>,
 }
@@ -540,7 +541,10 @@ impl<VM: VMBinding> DerefMut for SFTProcessEdges<VM> {
     }
 }
 
-/// Scan & update a list of object slots
+/// Scan & update a list of object slots.
+/// Note that this work packet does not do any policy-specific scan
+/// object work (it won't call `scan_object()` in [`policy::gc_work::PolicytraceObject`]).
+/// It should be used only for policies that do not have policy-specific scan_object().
 pub struct ScanObjects<Edges: ProcessEdgesWork> {
     buffer: Vec<ObjectReference>,
     #[allow(unused)]
