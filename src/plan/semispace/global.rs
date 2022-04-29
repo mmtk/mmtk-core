@@ -22,7 +22,7 @@ use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use macro_trace_object::PlanTraceObject;
+use mmtk_macro_trace_object::PlanTraceObject;
 
 use enum_map::EnumMap;
 

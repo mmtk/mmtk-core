@@ -18,7 +18,8 @@ crate-type = ["rlib"]
 doctest = false
 
 [dependencies]
-macro-trace-object = { path = "macros/trace_object"}
+# MMTk macros
+mmtk-macro-trace-object = { path = "macros/trace_object"}
 
 custom_derive = "0.1"
 enum_derive = "0.1"

@@ -1,5 +1,5 @@
 [package]
-name = "macro-trace-object"
+name = "mmtk-macro-trace-object"
 version = "0.1.0"
 edition = "2021"
 

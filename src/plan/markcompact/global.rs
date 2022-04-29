@@ -31,7 +31,7 @@ use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
 
-use macro_trace_object::PlanTraceObject;
+use mmtk_macro_trace_object::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {

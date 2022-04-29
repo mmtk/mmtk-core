@@ -33,7 +33,7 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use macro_trace_object::PlanTraceObject;
+use mmtk_macro_trace_object::PlanTraceObject;
 
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
