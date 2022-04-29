@@ -175,6 +175,17 @@
 <span id="173">173</span>
 <span id="174">174</span>
 <span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::object_ref_guard::adjust_thread_local_buffer_limit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -193,10 +204,15 @@
 
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// [`VMThread`] associated with this allocator instance</span>
     <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMThread</span>,
+    <span class="doccomment">/// Current cursor for bump pointer</span>
     <span class="ident">cursor</span>: <span class="ident">Address</span>,
+    <span class="doccomment">/// Limit for bump pointer</span>
     <span class="ident">limit</span>: <span class="ident">Address</span>,
+    <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.</span>
     <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.</span>
     <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -221,12 +237,15 @@
     <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">space</span>
     }
+
     <span class="kw">fn</span> <span class="ident">get_plan</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">plan</span>
     }
+
     <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
     }
+
     <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="ident">BLOCK_SIZE</span>
     }
@@ -258,11 +277,14 @@
         <span class="self">self</span>.<span class="ident">acquire_block</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
     }
 
-    <span class="comment">// Slow path for allocation if the precise stress test has been enabled.</span>
-    <span class="comment">// It works by manipulating the limit to be below the cursor always.</span>
-    <span class="comment">// Performs three kinds of allocations: (i) if the hard limit has been met;</span>
-    <span class="comment">// (ii) the bump pointer semantics from the fastpath; and (iii) if the stress</span>
-    <span class="comment">// factor has been crossed.</span>
+    <span class="doccomment">/// Slow path for allocation if precise stress testing has been enabled.</span>
+    <span class="doccomment">/// It works by manipulating the limit to be always below the cursor.</span>
+    <span class="doccomment">/// Can have three different cases:</span>
+    <span class="doccomment">///  - acquires a new block if the hard limit has been met;</span>
+    <span class="doccomment">///  - allocates an object using the bump pointer semantics from the</span>
+    <span class="doccomment">///    fastpath if there is sufficient space; and</span>
+    <span class="doccomment">///  - does not allocate an object but forces a poll for GC if the stress</span>
+    <span class="doccomment">///    factor has been crossed.</span>
     <span class="kw">fn</span> <span class="ident">alloc_slow_once_precise_stress</span>(
         <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
         <span class="ident">size</span>: <span class="ident">usize</span>,

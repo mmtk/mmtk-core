@@ -356,11 +356,6 @@
 <span id="354">354</span>
 <span id="355">355</span>
 <span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
@@ -481,7 +476,7 @@
     <span class="doccomment">/// Return the [`VMThread`] associated with this allocator instance.</span>
     <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMThread</span>;
 
-    <span class="doccomment">/// Return the [`Space`] instance associated with this allocator instance.</span>
+    <span class="doccomment">/// Return the [`Space`](src/policy/space/Space) instance associated with this allocator instance.</span>
     <span class="kw">fn</span> <span class="ident">get_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
 
     <span class="doccomment">/// Return the [`Plan`] instance that this allocator instance is associated with.</span>
@@ -492,9 +487,9 @@
     <span class="kw">fn</span> <span class="ident">does_thread_local_allocation</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span>;
 
     <span class="doccomment">/// Return at which granularity the allocator acquires memory from the global space and use</span>
-    <span class="doccomment">/// them as thread local buffer. For example, the [`BumpAllocator`] acquires memory at 32KB</span>
+    <span class="doccomment">/// them as thread local buffer. For example, the [`BumpAllocator`](crate::util::alloc::BumpAllocator) acquires memory at 32KB</span>
     <span class="doccomment">/// blocks. Depending on the actual size for the current object, they always acquire memory of</span>
-    <span class="doccomment">/// N*32KB (N&gt;=1). Thus the [`BumpAllocator`] returns 32KB for this method.  Only allocators</span>
+    <span class="doccomment">/// N*32KB (N&gt;=1). Thus the [`BumpAllocator`](crate::util::alloc::BumpAllocator) returns 32KB for this method.  Only allocators</span>
     <span class="doccomment">/// that do thread local allocation need to implement this method.</span>
     <span class="kw">fn</span> <span class="ident">get_thread_local_buffer_granularity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="macro">assert!</span>(<span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>(), <span class="string">&quot;An allocator that does not thread local allocation does not have a buffer granularity.&quot;</span>);
@@ -503,7 +498,7 @@
 
     <span class="doccomment">/// An allocation attempt. The implementation of this function depends on the allocator used.</span>
     <span class="doccomment">/// If an allocator supports thread local allocations, then the allocation will be serviced</span>
-    <span class="doccomment">/// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`].</span>
+    <span class="doccomment">/// from its TLAB, otherwise it will default to using the slowpath, i.e. [`alloc_slow`](Allocator::alloc_slow).</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
     <span class="doccomment">/// [`Collection::out_of_memory`] to inform the binding and then return a null pointer back to</span>
@@ -511,7 +506,7 @@
     <span class="doccomment">///</span>
     <span class="doccomment">/// An allocator needs to make sure the object reference for the returned address is in the same</span>
     <span class="doccomment">/// chunk as the returned address (so the side metadata and the SFT for an object reference is valid).</span>
-    <span class="doccomment">/// See [`crate::util::alloc::object_ref_guard`].</span>
+    <span class="doccomment">/// See [`crate::util::alloc::object_ref_guard`](util/alloc/object_ref_guard).</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `size`: the allocation size in bytes.</span>
@@ -533,9 +528,9 @@
 
     <span class="doccomment">/// Slowpath allocation attempt. This function executes the actual slowpath allocation.  A</span>
     <span class="doccomment">/// slowpath allocation in MMTk attempts to allocate the object using the per-allocator</span>
-    <span class="doccomment">/// definition of [`alloc_slow_once`]. This function also accounts for increasing the</span>
+    <span class="doccomment">/// definition of [`alloc_slow_once`](Allocator::alloc_slow_once). This function also accounts for increasing the</span>
     <span class="doccomment">/// allocation bytes in order to support stress testing. In case precise stress testing is</span>
-    <span class="doccomment">/// being used, the [`alloc_slow_once_precise_stress`] function is used instead.</span>
+    <span class="doccomment">/// being used, the [`alloc_slow_once_precise_stress`](Allocator::alloc_slow_once_precise_stress) function is used instead.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Note that in the case where the VM is out of memory, we invoke</span>
     <span class="doccomment">/// [`Collection::out_of_memory`] with a [`AllocationError::HeapOutOfMemory`] error to inform</span>
@@ -557,6 +552,7 @@
         <span class="comment">// Information about the previous collection.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">previous_result_zero</span> <span class="op">=</span> <span class="bool-val">false</span>;
+
         <span class="kw">loop</span> {
             <span class="comment">// Try to allocate using the slow path</span>
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">is_mutator</span> <span class="op">&amp;&amp;</span> <span class="ident">stress_test</span> <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">is_precise_stress</span>() {
@@ -587,13 +583,7 @@
                     <span class="ident">plan</span>.<span class="ident">allocation_success</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
                 }
 
-                <span class="comment">// When a GC occurs, the resultant address provided by `acquire()` is 0x0.</span>
-                <span class="comment">// Hence, another iteration of this loop occurs. In such a case, the second</span>
-                <span class="comment">// iteration tries to allocate again, and if is successful, then the allocation</span>
-                <span class="comment">// bytes are updated. However, this leads to double counting of the allocation:</span>
-                <span class="comment">// (i) by the original alloc_slow_inline(); and (ii) by the alloc_slow_inline()</span>
-                <span class="comment">// called by acquire(). In order to not double count the allocation, we only</span>
-                <span class="comment">// update allocation bytes if the previous result wasn&#39;t 0x0.</span>
+                <span class="comment">// Only update the allocation bytes if we haven&#39;t failed a previous allocation in this loop</span>
                 <span class="kw">if</span> <span class="ident">stress_test</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">get_plan</span>().<span class="ident">is_initialized</span>() <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="ident">previous_result_zero</span> {
                     <span class="kw">let</span> <span class="ident">allocated_size</span> <span class="op">=</span>
                         <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">is_precise_stress</span>() <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">does_thread_local_allocation</span>() {
@@ -665,7 +655,7 @@
         }
     }
 
-    <span class="doccomment">/// Single slow path allocation attempt. This is called by [`alloc_slow_inline`]. The</span>
+    <span class="doccomment">/// Single slow path allocation attempt. This is called by [`alloc_slow_inline`](Allocator::alloc_slow_inline). The</span>
     <span class="doccomment">/// implementation of this function depends on the allocator used. Generally, if an allocator</span>
     <span class="doccomment">/// supports thread local allocations, it will try to allocate more TLAB space here. If it</span>
     <span class="doccomment">/// doesn&#39;t, then (generally) the allocator simply allocates enough space for the current</span>

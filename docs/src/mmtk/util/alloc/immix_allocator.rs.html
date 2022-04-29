@@ -360,6 +360,24 @@
 <span id="358">358</span>
 <span id="359">359</span>
 <span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::object_ref_guard::adjust_thread_local_buffer_limit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -380,7 +398,9 @@
     <span class="ident">cursor</span>: <span class="ident">Address</span>,
     <span class="doccomment">/// Limit for bump pointer</span>
     <span class="ident">limit</span>: <span class="ident">Address</span>,
+    <span class="doccomment">/// [`Space`](src/policy/space/Space) instance associated with this allocator instance.</span>
     <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="doccomment">/// [`Plan`] instance that this allocator instance is associated with.</span>
     <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// *unused*</span>
     <span class="ident">hot</span>: <span class="ident">bool</span>,
@@ -569,7 +589,7 @@
         <span class="self">self</span>.<span class="ident">space</span>
     }
 
-    <span class="doccomment">/// Large-object (larger than a line) bump alloaction.</span>
+    <span class="doccomment">/// Large-object (larger than a line) bump allocation.</span>
     <span class="kw">fn</span> <span class="ident">overflow_alloc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;{:?}: overflow_alloc&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>);
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">align_allocation_no_fill</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">large_cursor</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
@@ -655,7 +675,12 @@
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">immix_space</span>().<span class="ident">get_clean_block</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="self">self</span>.<span class="ident">copy</span>) {
             <span class="prelude-val">None</span> =&gt; <span class="ident">Address::ZERO</span>,
             <span class="prelude-val">Some</span>(<span class="ident">block</span>) =&gt; {
-                <span class="macro">trace!</span>(<span class="string">&quot;{:?}: Acquired a new block {:?}&quot;</span>, <span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">block</span>);
+                <span class="macro">trace!</span>(
+                    <span class="string">&quot;{:?}: Acquired a new block {:?} -&gt; {:?}&quot;</span>,
+                    <span class="self">self</span>.<span class="ident">tls</span>,
+                    <span class="ident">block</span>.<span class="ident">start</span>(),
+                    <span class="ident">block</span>.<span class="ident">end</span>()
+                );
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">request_for_large</span> {
                     <span class="self">self</span>.<span class="ident">large_cursor</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">start</span>();
                     <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">=</span> <span class="ident">adjust_thread_local_buffer_limit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">block</span>.<span class="ident">end</span>());
@@ -668,54 +693,65 @@
         }
     }
 
-    <span class="doccomment">/// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining thread local buffer size,</span>
-    <span class="doccomment">/// which should be always smaller than the bump cursor.</span>
-    <span class="doccomment">/// This method may be reentrant. We need to check before setting the values.</span>
+    <span class="doccomment">/// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining</span>
+    <span class="doccomment">/// thread local buffer size, which should be always smaller than the bump cursor. This method</span>
+    <span class="doccomment">/// may be reentrant. We need to check before setting the values.</span>
     <span class="kw">fn</span> <span class="ident">set_limit_for_stress</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">limit</span> {
+            <span class="kw">let</span> <span class="ident">old_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">limit</span>;
             <span class="kw">let</span> <span class="ident">new_limit</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="ident">limit</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">cursor</span>) };
             <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">new_limit</span>;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: set_limit_for_stress. normal {} -&gt; {}&quot;</span>,
+                <span class="string">&quot;{:?}: set_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>,
-                <span class="self">self</span>.<span class="ident">limit</span>,
-                <span class="ident">new_limit</span>
+                <span class="self">self</span>.<span class="ident">cursor</span>,
+                <span class="ident">old_limit</span>,
+                <span class="ident">new_limit</span>,
             );
         }
+
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">large_cursor</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">large_limit</span> {
+            <span class="kw">let</span> <span class="ident">old_lg_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">large_limit</span>;
             <span class="kw">let</span> <span class="ident">new_lg_limit</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">large_cursor</span>) };
             <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">=</span> <span class="ident">new_lg_limit</span>;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: set_limit_for_stress. large {} -&gt; {}&quot;</span>,
+                <span class="string">&quot;{:?}: set_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>,
-                <span class="self">self</span>.<span class="ident">large_limit</span>,
-                <span class="ident">new_lg_limit</span>
+                <span class="self">self</span>.<span class="ident">large_cursor</span>,
+                <span class="ident">old_lg_limit</span>,
+                <span class="ident">new_lg_limit</span>,
             );
         }
     }
 
-    <span class="doccomment">/// Restore the real limits for the bump allocation so we can do a properly thread local allocation.</span>
-    <span class="doccomment">/// The fake limit is the remaining thread local buffer size, and we restore the actual limit from the size and the cursor.</span>
-    <span class="doccomment">/// This method may be reentrant. We need to check before setting the values.</span>
+    <span class="doccomment">/// Restore the real limits for the bump allocation so we can properly do a thread local</span>
+    <span class="doccomment">/// allocation. The fake limit is the remaining thread local buffer size, and we restore the</span>
+    <span class="doccomment">/// actual limit from the size and the cursor. This method may be reentrant. We need to check</span>
+    <span class="doccomment">/// before setting the values.</span>
     <span class="kw">fn</span> <span class="ident">restore_limit_for_stress</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">limit</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">cursor</span> {
+            <span class="kw">let</span> <span class="ident">old_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">limit</span>;
             <span class="kw">let</span> <span class="ident">new_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">limit</span>.<span class="ident">as_usize</span>();
             <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">new_limit</span>;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: restore_limit_for_stress. normal {} -&gt; {}&quot;</span>,
+                <span class="string">&quot;{:?}: restore_limit_for_stress. normal c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>,
-                <span class="self">self</span>.<span class="ident">limit</span>,
-                <span class="ident">new_limit</span>
+                <span class="self">self</span>.<span class="ident">cursor</span>,
+                <span class="ident">old_limit</span>,
+                <span class="ident">new_limit</span>,
             );
         }
+
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">large_cursor</span> {
+            <span class="kw">let</span> <span class="ident">old_lg_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">large_limit</span>;
             <span class="kw">let</span> <span class="ident">new_lg_limit</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">large_cursor</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">large_limit</span>.<span class="ident">as_usize</span>();
             <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">=</span> <span class="ident">new_lg_limit</span>;
             <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?}: restore_limit_for_stress. large {} -&gt; {}&quot;</span>,
+                <span class="string">&quot;{:?}: restore_limit_for_stress. large c {} l {} -&gt; {}&quot;</span>,
                 <span class="self">self</span>.<span class="ident">tls</span>,
-                <span class="self">self</span>.<span class="ident">large_limit</span>,
-                <span class="ident">new_lg_limit</span>
+                <span class="self">self</span>.<span class="ident">large_cursor</span>,
+                <span class="ident">old_lg_limit</span>,
+                <span class="ident">new_lg_limit</span>,
             );
         }
     }
