@@ -114,7 +114,7 @@ impl ChunkMap {
         unsafe { side_metadata::store(&Self::ALLOC_TABLE, chunk.start(), state as u8 as _) };
         // If this is a newly allcoated chunk, then expand the chunk range.
         if state == ChunkState::Allocated {
-            debug_assert!(!chunk.start().is_zero());
+            assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
                 range.start = chunk;

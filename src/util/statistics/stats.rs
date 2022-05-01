@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-pub const MAX_PHASES: usize = 1 << 12;
+pub const MAX_PHASES: usize = 1 << 14;
 pub const MAX_COUNTERS: usize = 100;
 
 /// GC stats shared among counters

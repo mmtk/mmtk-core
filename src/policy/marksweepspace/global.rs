@@ -303,21 +303,25 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn acquire_block(&self, tls: VMThread, size: usize) -> BlockAcquireResult {
         let bin = mi_bin(size);
 
-        {
-            let mut abandoned = self.abandoned_available.lock().unwrap();
-            if !abandoned[bin].is_empty() {
-                let block = Block::from(abandoned[bin].pop::<VM>().start());
-                return BlockAcquireResult::AbandonedAvailable(block);
-            }
-        }
+        // {
+        //     let mut abandoned = self.abandoned_available.lock().unwrap();
+        //     if !abandoned[bin].is_empty() {
+        //         let block = Block::from(abandoned[bin].pop::<VM>().start());
+        //         eprintln!("acquire abandoned available block {:?}", block);
+        //         return BlockAcquireResult::AbandonedAvailable(block);
+        //     }
+        // }
 
-        {
-            let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-            if !abandoned_unswept[bin].is_empty() {
-                let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
-                return BlockAcquireResult::AbandondedUnswept(block);
-            }
-        }
-        BlockAcquireResult::Fresh(Block::from(self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE)))
+        // {
+        //     let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
+        //     if !abandoned_unswept[bin].is_empty() {
+        //         let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
+        //         eprintln!("acquire abandoned unswept block {:?}", block);
+        //         return BlockAcquireResult::AbandondedUnswept(block);
+        //     }
+        // }
+        let b = Block::from(self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE));
+        // eprintln!("acquire new block {:?}", b);
+        BlockAcquireResult::Fresh(b)
     }
 }

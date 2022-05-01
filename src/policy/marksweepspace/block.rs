@@ -139,7 +139,7 @@ impl Block {
     // }
 
     pub fn load_prev_block<VM: VMBinding>(&self) -> Block {
-        debug_assert!(!self.0.is_zero());
+        assert!(!self.0.is_zero());
         let prev = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -150,7 +150,7 @@ impl Block {
     }
 
     pub fn load_next_block<VM: VMBinding>(&self) -> Block {
-        debug_assert!(!self.is_zero());
+        assert!(!self.is_zero());
         let next = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -161,7 +161,7 @@ impl Block {
     }
 
     pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
-        debug_assert!(!self.0.is_zero());
+        assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -172,7 +172,7 @@ impl Block {
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
-        debug_assert!(!self.0.is_zero());
+        assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -183,7 +183,7 @@ impl Block {
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
-        debug_assert!(!self.0.is_zero());
+        assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -194,7 +194,7 @@ impl Block {
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
-        debug_assert!(!self.0.is_zero());
+        assert!(!self.0.is_zero());
         let block_list = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -251,7 +251,7 @@ impl Block {
     }
 
     pub fn has_free_cells<VM: VMBinding>(&self) -> bool {
-        debug_assert!(!self.is_zero());
+        assert!(!self.is_zero());
         !self.load_free_list::<VM>().is_zero()
     }
 
@@ -328,7 +328,7 @@ impl Block {
     /// The address must be block-aligned.
     #[inline(always)]
     pub const fn from(address: Address) -> Self {
-        // debug_assert!(address.is_aligned_to(BYTES_IN_BLOCK));
+        // assert!(address.is_aligned_to(BYTES_IN_BLOCK));
         Self(address)
     }
 }

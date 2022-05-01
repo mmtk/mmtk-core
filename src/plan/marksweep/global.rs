@@ -153,6 +153,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         unsafe { 
             mutator.allocators.free_list[0].assume_init_mut().abandon_blocks();
         }
+        println!("destroy mutator");
     }
 }
 

@@ -219,6 +219,7 @@ pub struct EndOfGC;
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("End of GC");
+        println!("End of GC");
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {

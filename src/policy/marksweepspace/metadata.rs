@@ -124,7 +124,7 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
     set_chunk_mark(chunk_start);
     let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     trace!("set chunk mark bit for {}", chunk_start);
-    debug_assert!(
+    assert!(
         mmap_metadata_result.is_ok(),
         "mmap sidemetadata failed for chunk_start ({})",
         chunk_start

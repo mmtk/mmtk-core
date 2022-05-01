@@ -77,6 +77,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
+    println!("new mutator");
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),

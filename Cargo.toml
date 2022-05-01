@@ -41,6 +41,12 @@ atomic_refcell = "0.1.7"
 crossbeam = "0.7.3"
 rand = "0.7.3"
 
+[profile.release]
+debug = true
+
+[profile.dev]
+opt-level = 3
+
 [features]
 default = []
 
