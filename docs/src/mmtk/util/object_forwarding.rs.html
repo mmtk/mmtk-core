@@ -222,6 +222,10 @@
 <span id="220">220</span>
 <span id="221">221</span>
 <span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{
     <span class="ident">compare_exchange_metadata</span>, <span class="ident">load_metadata</span>, <span class="ident">store_metadata</span>, <span class="ident">MetadataSpec</span>,
@@ -287,12 +291,16 @@
     <span class="kw">if</span> <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">FORWARDED</span> {
         <span class="ident">read_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     } <span class="kw">else</span> {
-        <span class="macro">panic!</span>(
-            <span class="string">&quot;Invalid forwarding state 0x{:x} 0x{:x} for object {}&quot;</span>,
+        <span class="comment">// For some policies (such as Immix), we can have interleaving such that one thread clears</span>
+        <span class="comment">// the forwarding word while another thread was stuck spinning in the above loop.</span>
+        <span class="comment">// See: https://github.com/mmtk/mmtk-core/issues/579</span>
+        <span class="macro">debug_assert!</span>(
+            <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>,
+            <span class="string">&quot;Invalid/Corrupted forwarding word {:x} for object {}&quot;</span>,
             <span class="ident">forwarding_bits</span>,
-            <span class="ident">read_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
-            <span class="ident">object</span>
-        )
+            <span class="ident">object</span>,
+        );
+        <span class="ident">object</span>
     }
 }
 
