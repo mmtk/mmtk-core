@@ -7,9 +7,9 @@ pub const DEFAULT_TRACE: u8 = u8::MAX;
 use crate::plan::TransitiveClosure;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
-use crate::util::opaque_pointer::VMWorkerThread;
+
 use crate::util::ObjectReference;
-use crate::vm::EdgeVisitor;
+
 use crate::vm::VMBinding;
 
 /// This trait defines policy-specific behavior for tracing objects.
@@ -28,17 +28,11 @@ pub trait PolicyTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Policy-specific scan object. The implementation needs to guarantee that
-    /// they will call `VM::VMScanning::scan_object()` (or `Self::vm_scan_object()`) besides any space-specific work for the object.
+    /// Policy-specific post-scan-object hook.  It is called after scanning
+    /// each object in this space.
     #[inline(always)]
-    fn scan_object<EV: EdgeVisitor>(
-        &self,
-        tls: VMWorkerThread,
-        object: ObjectReference,
-        edge_visitor: &mut EV,
-    ) {
-        use crate::vm::Scanning;
-        VM::VMScanning::scan_object(tls, object, edge_visitor)
+    fn post_scan_object(&self, _object: ObjectReference) {
+        // Do nothing.
     }
 
     /// Return whether the policy moves objects.

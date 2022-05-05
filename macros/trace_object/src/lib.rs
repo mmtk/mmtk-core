@@ -20,10 +20,10 @@ mod derive_impl;
 /// * add `#[fallback_trace]` to the parent plan if the plan is composed with other plans (or parent plans).
 ///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
 ///   with `BasePlan`.
-/// * add `#[policy_scan]` to any space field that has some policy-specific scan_object(). For objects in those spaces,
-///   `scan_object()` in the policy will be called. For other objects, directly call `VM::VMScanning::scan_object()`.
+/// * add `#[post_scan_hook]` to any space field that has some policy-specific post_scan_object(). For objects in those spaces,
+///   `post_scan_object()` in the policy will be called after `VM::VMScanning::scan_object()`.
 #[proc_macro_error]
-#[proc_macro_derive(PlanTraceObject, attributes(trace, policy_scan, fallback_trace))]
+#[proc_macro_derive(PlanTraceObject, attributes(trace, post_scan_hook, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
@@ -34,11 +34,11 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         ..
     }) = input.data {
         let spaces = util::get_fields_with_attribute(fields, "trace");
-        let scan_spaces = util::get_fields_with_attribute(fields, "policy_scan");
+        let post_scan_hook_spaces = util::get_fields_with_attribute(fields, "post_scan_hook");
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
         let trace_object_function = derive_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-        let scan_object_function = derive_impl::generate_scan_object(&scan_spaces, &ty_generics);
+        let post_scan_object_function = derive_impl::generate_post_scan_object(&post_scan_hook_spaces, &ty_generics);
         let may_move_objects_function = derive_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
@@ -46,7 +46,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
                 #trace_object_function
 
                 #[inline(always)]
-                #scan_object_function
+                #post_scan_object_function
 
                 #[inline(always)]
                 #may_move_objects_function

@@ -74,7 +74,7 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
 
 use crate::policy::gc_work::TraceKind;
 use crate::scheduler::GCWork;
-use crate::util::VMWorkerThread;
+
 use crate::vm::VMBinding;
 
 /// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
@@ -97,12 +97,7 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// Scan objects in the plan. It is expected that each object will be scanned by `VM::VMScanning::scan_object()`.
     /// If the object is in a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
     /// this method should also invoke those policy specific methods.
-    fn scan_object<EV: EdgeVisitor>(
-        &self,
-        tls: VMWorkerThread,
-        object: ObjectReference,
-        edge_visitor: &mut EV,
-    );
+    fn post_scan_object(&self, object: ObjectReference);
 
     /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
     /// return true.
@@ -226,7 +221,9 @@ impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM>
             let tls = worker.tls;
             let mut closure = ObjectsClosure::<E>::new(worker);
             for object in &self.buffer {
-                self.plan.scan_object(tls, *object, &mut closure);
+                use crate::vm::Scanning;
+                <E::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
+                self.plan.post_scan_object(*object);
             }
         }
         trace!("PlanScanObjects End");

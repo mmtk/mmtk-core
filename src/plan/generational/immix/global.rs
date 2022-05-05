@@ -38,7 +38,7 @@ pub struct GenImmix<VM: VMBinding> {
     #[fallback_trace]
     pub gen: Gen<VM>,
     /// An immix space as the mature space.
-    #[policy_scan]
+    #[post_scan_hook]
     #[trace(CopySemantics::Mature)]
     pub immix: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.

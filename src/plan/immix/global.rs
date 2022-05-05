@@ -30,7 +30,7 @@ use mmtk_macro_trace_object::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct Immix<VM: VMBinding> {
-    #[policy_scan]
+    #[post_scan_hook]
     #[trace(CopySemantics::DefaultCopy)]
     pub immix_space: ImmixSpace<VM>,
     #[fallback_trace]

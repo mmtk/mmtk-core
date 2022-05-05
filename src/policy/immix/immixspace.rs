@@ -135,13 +135,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     }
 
     #[inline(always)]
-    fn scan_object<EV: EdgeVisitor>(
-        &self,
-        tls: VMWorkerThread,
-        object: ObjectReference,
-        edge_visitor: &mut EV,
-    ) {
-        VM::VMScanning::scan_object(tls, object, edge_visitor);
+    fn post_scan_object(&self, object: ObjectReference) {
         if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY {
             debug_assert!(self.in_space(object));
             self.mark_lines(object);

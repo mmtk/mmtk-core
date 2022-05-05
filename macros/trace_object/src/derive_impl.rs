@@ -63,32 +63,27 @@ pub fn generate_trace_object<'a>(
     }
 }
 
-pub fn generate_scan_object<'a>(
-    scan_object_fields: &[&'a Field],
+pub fn generate_post_scan_object<'a>(
+    post_scan_object_fields: &[&'a Field],
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
-    let scan_field_handler = scan_object_fields.iter().map(|f| {
+    let scan_field_handler = post_scan_object_fields.iter().map(|f| {
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
 
         quote! {
             if self.#f_ident.in_space(__mmtk_objref) {
                 use crate::policy::gc_work::PolicyTraceObject;
-                <#f_ty as PolicyTraceObject #ty_generics>::scan_object::<EV>(&self.#f_ident, __mmtk_worker_tls, __mmtk_objref, __mmtk_ev);
+                <#f_ty as PolicyTraceObject #ty_generics>::post_scan_object(&self.#f_ident, __mmtk_objref);
                 return;
             }
         }
     });
 
     quote! {
-        fn scan_object<EV: crate::vm::EdgeVisitor>(&self, __mmtk_worker_tls: crate::util::opaque_pointer::VMWorkerThread, __mmtk_objref: crate::util::ObjectReference, __mmtk_ev: &mut EV) {
-            use crate::vm::Scanning;
-
-            // Plan specific
+        #[inline(always)]
+        fn post_scan_object(&self, __mmtk_objref: crate::util::ObjectReference) {
             #(#scan_field_handler)*
-
-            // Default
-            VM::VMScanning::scan_object(__mmtk_worker_tls, __mmtk_objref, __mmtk_ev);
         }
     }
 }
