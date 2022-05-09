@@ -107,13 +107,13 @@ extern void* mmtk_starting_heap_address();
 extern void* mmtk_last_heap_address();
 
 // Add a reference to the list of weak references
-extern void mmtk_add_weak_candidate(void* ref, void* referent);
+extern void mmtk_add_weak_candidate(void* ref);
 
 // Add a reference to the list of soft references
-extern void mmtk_add_soft_candidate(void* ref, void* referent);
+extern void mmtk_add_soft_candidate(void* ref);
 
 // Add a reference to the list of phantom references
-extern void mmtk_add_phantom_candidate(void* ref, void* referent);
+extern void mmtk_add_phantom_candidate(void* ref);
 
 // Generic hook to allow benchmarks to be harnessed
 extern void mmtk_harness_begin(void* tls);

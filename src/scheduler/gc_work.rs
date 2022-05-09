@@ -121,8 +121,6 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         for w in &mmtk.scheduler.workers_shared {
             w.local_work_bucket.add(ReleaseCollector);
         }
-        // TODO: Process weak references properly
-        mmtk.reference_processors.clear();
     }
 }
 
@@ -250,15 +248,15 @@ impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 /// processing of those weakrefs may be more complex. For such case, we delegate to the
 /// VM binding to process weak references.
 #[derive(Default)]
-pub struct ProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+pub struct VMProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
 
-impl<E: ProcessEdgesWork> ProcessWeakRefs<E> {
+impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
     pub fn new() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessWeakRefs<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
         <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
@@ -384,6 +382,13 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
 }
 
 /// Scan & update a list of object slots
+//
+// Note: be very careful when using this trait. process_node() will push objects
+// to the buffer, and it is expected that at the end of the operation, flush()
+// is called to create new scan work from the buffered objects. If flush()
+// is not called, we may miss the objects in the GC and have dangling pointers.
+// FIXME: We possibly want to enforce Drop on this trait, and require calling
+// flush() in Drop.
 pub trait ProcessEdgesWork:
     Send + 'static + Sized + DerefMut + Deref<Target = ProcessEdgesBase<Self::VM>>
 {

@@ -104,10 +104,6 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::Prepare]
             .add(Prepare::<MarkCompactGCWorkContext<VM>>::new(self));
 
-        // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::RefClosure]
-            .add(ProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
-
         scheduler.work_buckets[WorkBucketStage::CalculateForwarding]
             .add(CalculateForwardingAddress::<VM>::new(&self.mc_space));
         // do another trace to update references
@@ -118,17 +114,41 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::Release]
             .add(Release::<MarkCompactGCWorkContext<VM>>::new(self));
 
+        // Reference processing
+        if !*self.base().options.no_reference_types {
+            use crate::util::reference_processor::{
+                PhantomRefProcessing, SoftRefProcessing, WeakRefProcessing,
+            };
+            scheduler.work_buckets[WorkBucketStage::SoftRefClosure]
+                .add(SoftRefProcessing::<MarkingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(WeakRefProcessing::<MarkingProcessEdges<VM>>::new());
+            scheduler.work_buckets[WorkBucketStage::PhantomRefClosure]
+                .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
+
+            // VM-specific weak ref processing
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
+                .add(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new());
+
+            use crate::util::reference_processor::RefForwarding;
+            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+                .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
+
+            use crate::util::reference_processor::RefEnqueue;
+            scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());
+        }
+
         // Finalization
         if !*self.base().options.no_finalizer {
             use crate::util::finalizable_processor::{Finalization, ForwardFinalization};
             // finalization
             // treat finalizable objects as roots and perform a closure (marking)
             // must be done before calculating forwarding pointers
-            scheduler.work_buckets[WorkBucketStage::RefClosure]
+            scheduler.work_buckets[WorkBucketStage::FinalRefClosure]
                 .add(Finalization::<MarkingProcessEdges<VM>>::new());
             // update finalizable object references
             // must be done before compacting
-            scheduler.work_buckets[WorkBucketStage::RefForwarding]
+            scheduler.work_buckets[WorkBucketStage::FinalizableForwarding]
                 .add(ForwardFinalization::<ForwardingProcessEdges<VM>>::new());
         }
 

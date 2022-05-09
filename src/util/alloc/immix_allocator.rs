@@ -18,7 +18,9 @@ pub struct ImmixAllocator<VM: VMBinding> {
     cursor: Address,
     /// Limit for bump pointer
     limit: Address,
+    /// [`Space`](src/policy/space/Space) instance associated with this allocator instance.
     space: &'static ImmixSpace<VM>,
+    /// [`Plan`] instance that this allocator instance is associated with.
     plan: &'static dyn Plan<VM = VM>,
     /// *unused*
     hot: bool,
@@ -207,7 +209,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         self.space
     }
 
-    /// Large-object (larger than a line) bump alloaction.
+    /// Large-object (larger than a line) bump allocation.
     fn overflow_alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("{:?}: overflow_alloc", self.tls);
         let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
@@ -293,7 +295,12 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         match self.immix_space().get_clean_block(self.tls, self.copy) {
             None => Address::ZERO,
             Some(block) => {
-                trace!("{:?}: Acquired a new block {:?}", self.tls, block);
+                trace!(
+                    "{:?}: Acquired a new block {:?} -> {:?}",
+                    self.tls,
+                    block.start(),
+                    block.end()
+                );
                 if self.request_for_large {
                     self.large_cursor = block.start();
                     self.large_limit = adjust_thread_local_buffer_limit::<VM>(block.end());
@@ -306,54 +313,65 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         }
     }
 
-    /// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining thread local buffer size,
-    /// which should be always smaller than the bump cursor.
-    /// This method may be reentrant. We need to check before setting the values.
+    /// Set fake limits for the bump allocation for stress tests. The fake limit is the remaining
+    /// thread local buffer size, which should be always smaller than the bump cursor. This method
+    /// may be reentrant. We need to check before setting the values.
     fn set_limit_for_stress(&mut self) {
         if self.cursor < self.limit {
+            let old_limit = self.limit;
             let new_limit = unsafe { Address::from_usize(self.limit - self.cursor) };
             self.limit = new_limit;
             trace!(
-                "{:?}: set_limit_for_stress. normal {} -> {}",
+                "{:?}: set_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
-                self.limit,
-                new_limit
+                self.cursor,
+                old_limit,
+                new_limit,
             );
         }
+
         if self.large_cursor < self.large_limit {
+            let old_lg_limit = self.large_limit;
             let new_lg_limit = unsafe { Address::from_usize(self.large_limit - self.large_cursor) };
             self.large_limit = new_lg_limit;
             trace!(
-                "{:?}: set_limit_for_stress. large {} -> {}",
+                "{:?}: set_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_limit,
-                new_lg_limit
+                self.large_cursor,
+                old_lg_limit,
+                new_lg_limit,
             );
         }
     }
 
-    /// Restore the real limits for the bump allocation so we can do a properly thread local allocation.
-    /// The fake limit is the remaining thread local buffer size, and we restore the actual limit from the size and the cursor.
-    /// This method may be reentrant. We need to check before setting the values.
+    /// Restore the real limits for the bump allocation so we can properly do a thread local
+    /// allocation. The fake limit is the remaining thread local buffer size, and we restore the
+    /// actual limit from the size and the cursor. This method may be reentrant. We need to check
+    /// before setting the values.
     fn restore_limit_for_stress(&mut self) {
         if self.limit < self.cursor {
+            let old_limit = self.limit;
             let new_limit = self.cursor + self.limit.as_usize();
             self.limit = new_limit;
             trace!(
-                "{:?}: restore_limit_for_stress. normal {} -> {}",
+                "{:?}: restore_limit_for_stress. normal c {} l {} -> {}",
                 self.tls,
-                self.limit,
-                new_limit
+                self.cursor,
+                old_limit,
+                new_limit,
             );
         }
+
         if self.large_limit < self.large_cursor {
+            let old_lg_limit = self.large_limit;
             let new_lg_limit = self.large_cursor + self.large_limit.as_usize();
             self.large_limit = new_lg_limit;
             trace!(
-                "{:?}: restore_limit_for_stress. large {} -> {}",
+                "{:?}: restore_limit_for_stress. large c {} l {} -> {}",
                 self.tls,
-                self.large_limit,
-                new_lg_limit
+                self.large_cursor,
+                old_lg_limit,
+                new_lg_limit,
             );
         }
     }
