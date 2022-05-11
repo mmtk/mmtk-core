@@ -26,7 +26,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use mmtk_macro_trace_object::PlanTraceObject;
+use mmtk_macros::PlanTraceObject;
 
 /// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.

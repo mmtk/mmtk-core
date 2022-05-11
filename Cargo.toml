@@ -19,7 +19,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macro-trace-object = { path = "macros/trace_object"}
+mmtk-macros = { path = "macros/"}
 
 custom_derive = "0.1"
 enum_derive = "0.1"

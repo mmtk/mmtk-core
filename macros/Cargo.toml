@@ -1,6 +1,7 @@
 [package]
-name = "mmtk-macro-trace-object"
-version = "0.1.0"
+name = "mmtk-macros"
+# the macro crate uses the same version as mmtk-core
+version = "0.11.0"
 edition = "2021"
 
 [lib]

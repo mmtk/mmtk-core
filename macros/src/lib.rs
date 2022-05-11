@@ -11,7 +11,7 @@ use quote::quote;
 use syn::DeriveInput;
 
 mod util;
-mod derive_impl;
+mod plan_trace_object_impl;
 
 const DEBUG_MACRO_OUTPUT: bool = false;
 
@@ -42,9 +42,9 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         let post_scan_spaces = util::get_fields_with_attribute(fields, "post_scan");
         let fallback = util::get_unique_field_with_attribute(fields, "fallback_trace");
 
-        let trace_object_function = derive_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
-        let post_scan_object_function = derive_impl::generate_post_scan_object(&post_scan_spaces, &ty_generics);
-        let may_move_objects_function = derive_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
+        let trace_object_function = plan_trace_object_impl::generate_trace_object(&spaces, &fallback, &ty_generics);
+        let post_scan_object_function = plan_trace_object_impl::generate_post_scan_object(&post_scan_spaces, &ty_generics);
+        let may_move_objects_function = plan_trace_object_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
                 #trace_object_function

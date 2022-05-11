@@ -21,7 +21,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use mmtk_macro_trace_object::PlanTraceObject;
+use mmtk_macros::PlanTraceObject;
 
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.

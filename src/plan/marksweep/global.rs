@@ -25,7 +25,7 @@ use std::sync::Arc;
 
 use enum_map::EnumMap;
 
-use mmtk_macro_trace_object::PlanTraceObject;
+use mmtk_macros::PlanTraceObject;
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {

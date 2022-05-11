@@ -29,7 +29,7 @@ use std::sync::Arc;
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
 
-use mmtk_macro_trace_object::PlanTraceObject;
+use mmtk_macros::PlanTraceObject;
 
 // Modify
 // ANCHOR: plan_def
