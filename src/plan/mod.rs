@@ -25,6 +25,7 @@ pub(crate) use global::create_plan;
 pub use global::AllocationSemantics;
 pub(crate) use global::GcStatus;
 pub use global::Plan;
+pub(crate) use global::PlanTraceObject;
 
 mod mutator_context;
 pub use mutator_context::Mutator;
@@ -37,7 +38,7 @@ pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 mod tracelocal;
 pub use tracelocal::TraceLocal;
 
-pub(crate) mod transitive_closure;
+mod transitive_closure;
 pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
 
 mod generational;

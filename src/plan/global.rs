@@ -956,6 +956,43 @@ impl<VM: VMBinding> CommonPlan<VM> {
     }
 }
 
+use crate::policy::gc_work::TraceKind;
+use crate::vm::VMBinding;
+
+/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// Generally a plan does not need to manually implement this trait. Instead, we provide
+/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
+///
+/// A plan could also manually implement this trait. For the sake of performance, the implementation
+/// of this trait should mark methods as `[inline(always)]`.
+pub trait PlanTraceObject<VM: VMBinding> {
+    /// Trace objects in the plan. Generally one needs to figure out
+    /// which space an object resides in, and invokes the corresponding policy
+    /// trace object method.
+    ///
+    /// Arguments:
+    /// * `trace`: the current transitive closure
+    /// * `object`: the object to trace. This is a non-nullable object reference.
+    /// * `worker`: the GC worker that is tracing this object.
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+
+    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
+    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
+    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
+    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
+    /// this method should also invoke those policy specific methods for objects in that space.
+    fn post_scan_object(&self, object: ObjectReference);
+
+    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
+    /// return true.
+    fn may_move_objects<const KIND: TraceKind>() -> bool;
+}
+
 use enum_map::Enum;
 /// Allocation semantics that MMTk provides.
 /// Each allocation request requires a desired semantic for the object to allocate.

@@ -1,6 +1,6 @@
 use super::global::Immix;
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::TraceKind;
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::vm::VMBinding;
 
 pub(super) struct ImmixGCWorkContext<VM: VMBinding, const KIND: TraceKind>(

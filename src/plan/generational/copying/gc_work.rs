@@ -2,8 +2,8 @@ use super::global::GenCopy;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::vm::*;
 
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 
 pub struct GenCopyNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for GenCopyNurseryGCWorkContext<VM> {

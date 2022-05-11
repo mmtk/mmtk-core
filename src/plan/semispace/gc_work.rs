@@ -1,6 +1,6 @@
 use super::global::SemiSpace;
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::vm::VMBinding;
 
 pub struct SSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);

@@ -13,6 +13,8 @@ use syn::DeriveInput;
 mod util;
 mod derive_impl;
 
+const DEBUG_MACRO_OUTPUT: bool = false;
+
 /// Generally a plan needs to add these attributes in order for the macro to work. The macro will
 /// generate an implementation of `PlanTraceObject` for the plan. With `PlanTraceObject`, the plan use
 /// `PlanProcessEdges` for GC tracing. The attributes only affects code generation in the macro, thus
@@ -44,7 +46,7 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         let post_scan_object_function = derive_impl::generate_post_scan_object(&post_scan_spaces, &ty_generics);
         let may_move_objects_function = derive_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
-            impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
+            impl #impl_generics crate::plan::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
                 #trace_object_function
 
                 #post_scan_object_function
@@ -57,10 +59,10 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
     };
 
     // Debug the output - use the following code to debug the generated code (when cargo exapand is not working)
-    // {
-    //     use quote::ToTokens;
-    //     println!("{}", output.to_token_stream());
-    // }
+    if DEBUG_MACRO_OUTPUT {
+        use quote::ToTokens;
+        println!("{}", output.to_token_stream());
+    }
 
     output.into()
 }

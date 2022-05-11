@@ -1,6 +1,6 @@
 use super::global::PageProtect;
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::vm::VMBinding;
 
 pub struct PPGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);

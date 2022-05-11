@@ -1,7 +1,7 @@
 use super::global::MarkCompact;
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::markcompactspace::MarkCompactSpace;
 use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;

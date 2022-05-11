@@ -1,7 +1,7 @@
 use super::global::GenImmix;
 use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::TraceKind;
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::vm::VMBinding;
 
 pub struct GenImmixNurseryGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);

@@ -15,7 +15,7 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext<VM> {
 // ANCHOR_END: workcontext_sft
 
 // ANCHOR: workcontext_plan
-use crate::plan::transitive_closure::PlanProcessEdges;
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
 pub struct MyGCWorkContext2<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MyGCWorkContext2<VM> {

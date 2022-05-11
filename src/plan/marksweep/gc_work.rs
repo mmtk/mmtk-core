@@ -69,8 +69,8 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
 }
 
 pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
-use crate::plan::transitive_closure::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
+use crate::scheduler::gc_work::PlanProcessEdges;
 
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MSGCWorkContext<VM> {
     type VM = VM;
