@@ -118,7 +118,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -143,7 +143,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     }
 
     #[inline(always)]
-    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+    fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
         } else if KIND == TRACE_KIND_FAST {

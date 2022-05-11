@@ -87,6 +87,11 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// Trace objects in the plan. Generally one needs to figure out
     /// which space an object resides in, and invokes the corresponding policy
     /// trace object method.
+    ///
+    /// Arguments:
+    /// * `trace`: the current transitive closure
+    /// * `object`: the object to trace. This is a non-nullable object reference.
+    /// * `worker`: the GC worker that is tracing this object.
     fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
         &self,
         trace: &mut T,
@@ -115,18 +120,15 @@ use std::ops::{Deref, DerefMut};
 /// `PlanTraceObject` can use this work packet for tracing objects.
 pub struct PlanProcessEdges<
     VM: VMBinding,
-    P: 'static + Plan<VM = VM> + PlanTraceObject<VM> + Sync,
+    P: Plan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<
-        VM: VMBinding,
-        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
-        const KIND: TraceKind,
-    > ProcessEdgesWork for PlanProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> ProcessEdgesWork
+    for PlanProcessEdges<VM, P, KIND>
 {
     type VM = VM;
 
@@ -161,11 +163,8 @@ impl<
 }
 
 // Impl Deref/DerefMut to ProcessEdgesBase for PlanProcessEdges
-impl<
-        VM: VMBinding,
-        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
-        const KIND: TraceKind,
-    > Deref for PlanProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> Deref
+    for PlanProcessEdges<VM, P, KIND>
 {
     type Target = ProcessEdgesBase<VM>;
     #[inline]
@@ -174,11 +173,8 @@ impl<
     }
 }
 
-impl<
-        VM: VMBinding,
-        P: 'static + PlanTraceObject<VM> + Plan<VM = VM> + Sync,
-        const KIND: TraceKind,
-    > DerefMut for PlanProcessEdges<VM, P, KIND>
+impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKind> DerefMut
+    for PlanProcessEdges<VM, P, KIND>
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -190,10 +186,7 @@ use std::marker::PhantomData;
 
 /// This provides an implementation of scanning objects work. Each object will be scanned by calling `scan_object()`
 /// in `PlanTraceObject`.
-pub struct PlanScanObjects<
-    E: ProcessEdgesWork,
-    P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync,
-> {
+pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> {
     plan: &'static P,
     buffer: Vec<ObjectReference>,
     #[allow(dead_code)]
@@ -201,9 +194,7 @@ pub struct PlanScanObjects<
     phantom: PhantomData<E>,
 }
 
-impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync>
-    PlanScanObjects<E, P>
-{
+impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
     pub fn new(plan: &'static P, buffer: Vec<ObjectReference>, concurrent: bool) -> Self {
         Self {
             plan,
@@ -214,8 +205,8 @@ impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM>
     }
 }
 
-impl<E: ProcessEdgesWork, P: 'static + Plan<VM = E::VM> + PlanTraceObject<E::VM> + Sync>
-    GCWork<E::VM> for PlanScanObjects<E, P>
+impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E::VM>
+    for PlanScanObjects<E, P>
 {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("PlanScanObjects");

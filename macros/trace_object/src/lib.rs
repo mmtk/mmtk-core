@@ -13,7 +13,10 @@ use syn::DeriveInput;
 mod util;
 mod derive_impl;
 
-/// Generally a plan needs to add these attributes in order for the macro to work:
+/// Generally a plan needs to add these attributes in order for the macro to work. The macro will
+/// generate an implementation of `PlanTraceObject` for the plan. With `PlanTraceObject`, the plan use
+/// `PlanProcessEdges` for GC tracing. The attributes only affects code generation in the macro, thus
+/// only affects the generated `PlanTraceObject` implementation.
 /// * add `#[derive(PlanTraceObject)]` to the plan struct.
 /// * add `#[trace]` to each space field the plan struct has. If the policy is a copying policy,
 ///   it needs to further specify the copy semantic (`#[trace(CopySemantics::X)]`)
@@ -42,13 +45,10 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         let may_move_objects_function = derive_impl::generate_may_move_objects(&spaces, &fallback, &ty_generics);
         quote!{
             impl #impl_generics crate::plan::transitive_closure::PlanTraceObject #ty_generics for #ident #ty_generics #where_clause {
-                #[inline(always)]
                 #trace_object_function
 
-                #[inline(always)]
                 #post_scan_object_function
 
-                #[inline(always)]
                 #may_move_objects_function
             }
         }
@@ -56,8 +56,11 @@ pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {
         abort_call_site!("`#[derive(PlanTraceObject)]` only supports structs with named fields.")
     };
 
-    // Debug the output
-    // println!("{}", output.to_token_stream());
+    // Debug the output - use the following code to debug the generated code (when cargo exapand is not working)
+    // {
+    //     use quote::ToTokens;
+    //     println!("{}", output.to_token_stream());
+    // }
 
     output.into()
 }

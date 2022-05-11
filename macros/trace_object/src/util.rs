@@ -29,11 +29,11 @@ pub fn get_unique_field_with_attribute<'f>(
 ) -> Option<&'f Field> {
     let mut result = None;
 
-    'each_field: for field in fields.named.iter() {
+    for field in fields.named.iter() {
         if let Some(attr) = get_field_attribute(field, attr_name) {
             if result.is_none() {
                 result = Some(field);
-                continue 'each_field;
+                continue;
             } else {
                 let span = attr.path.span();
                 abort! { span, "At most one field in a struct can have the #[{}] attribute.", attr_name };

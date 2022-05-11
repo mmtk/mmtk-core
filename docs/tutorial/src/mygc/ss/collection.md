@@ -165,8 +165,8 @@ are.
 ### Approach 1: Use `SFTProcessEdges`
 
 [`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html) dispatches
-trace objects to each space through [Space Function Table (SFT)](https://www.mmtk.io/mmtk-core/mmtk/policy/space/trait.SFT.html).
-As long as all the policies in a plan provides an implementation of `sft_trace_object()` in their SFT implementation,
+the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://www.mmtk.io/mmtk-core/mmtk/policy/space/trait.SFT.html).
+As long as all the policies in a plan provide an implementation of `sft_trace_object()` in their SFT implementations,
 the plan can use `SFTProcessEdges`. Currently most policies provide an implementation for `sft_trace_object()`, except
 mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
 multiple `sft_trace_object()` for a policy.
@@ -177,7 +177,7 @@ multiple `sft_trace_object()` for a policy.
 
 `PlanProcessEdges` is another general `ProcessEdgesWork` implementation that can be used by most plans. When a plan
 implements the [`PlanTraceObject`](https://www.mmtk.io/mmtk-core/mmtk/plan/transitive_closure/trait.PlanTraceObject.html),
-they can use `PlanProcessEdges`.
+it can use `PlanProcessEdges`.
 
 You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
 and the macro will generate an implementation of `PlanTraceObject`:
@@ -202,7 +202,7 @@ Once this is done, you can specify `PlanProcessEdges` as the `ProcessEdgesWorkTy
 ### Approach 3: Implement your own `ProcessEdgesWork`
 
 Apart from the two approaches above, you can always implement your own `ProcessEdgesWork`. This is
-an overkill for simple plans like semi space, but is probably necessary for more complex plans.
+an overkill for simple plans like semi space, but might be necessary for more complex plans.
 We discuss how to implement it for `MyGC`.
 
 Create a struct `MyGCProcessEdges<VM: VMBinding>` in the `gc_work` module. It includes a reference
@@ -213,11 +213,11 @@ back to the plan, and a `ProcessEdgesBase` field:
 
 Implement `ProcessEdgesWork` for `MyGCProcessEdges`. As most methods in the trait have a default
 implemetation, we only need to implement `new()` and `trace_object()` for our plan. However, this
-may not be true when you are implement for other GC plans. It would be better to check the default
+may not be true when you implement it for other GC plans. It would be better to check the default
 implementation of `ProcessEdgesWork`.
 
 For `trace_object()`, what we do is similar to the approach above (except that we need to write the code
-ourselves rather than letting the macro to generate it for us). We try figure out
+ourselves rather than letting the macro to generate it for us). We try to figure out
 which space the object is in, and invoke `trace_object()` for the object on that space. If the
 object is not in any of the semi spaces in the plan, we forward the call to `CommonPlan`.
 ```rust

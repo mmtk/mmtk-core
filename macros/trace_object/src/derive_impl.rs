@@ -4,7 +4,7 @@ use proc_macro2::TokenStream as TokenStream2;
 
 use crate::util;
 
-pub fn generate_trace_object<'a>(
+pub(crate) fn generate_trace_object<'a>(
     space_fields: &[&'a Field],
     parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
@@ -53,6 +53,7 @@ pub fn generate_trace_object<'a>(
     };
 
     quote! {
+        #[inline(always)]
         fn trace_object<T: crate::plan::TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, __mmtk_trace: &mut T, __mmtk_objref: crate::util::ObjectReference, __mmtk_worker: &mut crate::scheduler::GCWorker<VM>) -> crate::util::ObjectReference {
             use crate::policy::space::Space;
             use crate::policy::gc_work::PolicyTraceObject;
@@ -63,7 +64,7 @@ pub fn generate_trace_object<'a>(
     }
 }
 
-pub fn generate_post_scan_object<'a>(
+pub(crate) fn generate_post_scan_object<'a>(
     post_scan_object_fields: &[&'a Field],
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
@@ -90,7 +91,7 @@ pub fn generate_post_scan_object<'a>(
 
 // The generated function needs to be inlined and constant folded. Otherwise, there will be a huge
 // performance penalty.
-pub fn generate_may_move_objects<'a>(
+pub(crate) fn generate_may_move_objects<'a>(
     space_fields: &[&'a Field],
     parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
@@ -115,6 +116,7 @@ pub fn generate_may_move_objects<'a>(
     };
 
     quote! {
+        #[inline(always)]
         fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
             use crate::policy::gc_work::PolicyTraceObject;
             use crate::plan::transitive_closure::PlanTraceObject;
