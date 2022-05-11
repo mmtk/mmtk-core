@@ -116,10 +116,10 @@ extern void mmtk_add_soft_candidate(void* ref);
 extern void mmtk_add_phantom_candidate(void* ref);
 
 // Generic hook to allow benchmarks to be harnessed
-extern void mmtk_harness_begin(void* tls);
+extern void mmtk_harness_begin_impl();
 
 // Generic hook to allow benchmarks to be harnessed
-extern void mmtk_harness_end();
+extern void mmtk_harness_end_impl();
 
 #ifdef __cplusplus
 }
