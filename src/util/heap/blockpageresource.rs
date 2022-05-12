@@ -276,8 +276,9 @@ impl<Block: Copy> BlockArray<Block> {
     /// Replace the array with a new array.
     ///
     /// Return the old array
+    #[inline(always)]
     fn replace(&self, new_array: Self) -> Self {
-        assert_eq!(self.capacity, new_array.capacity);
+        debug_assert_eq!(self.capacity, new_array.capacity);
         // Swap cursor
         let temp = self.cursor.load(Ordering::Relaxed);
         self.cursor
@@ -373,6 +374,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     }
 
     /// Flush a given thread-local queue to the global pool
+    #[inline(always)]
     fn flush(&self, id: usize) {
         if !self.worker_local_freed_blocks[id].is_empty() {
             let queue = self.worker_local_freed_blocks[id].replace(BlockArray::new());
@@ -384,6 +386,9 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
 
     /// Flush all thread-local queues to the global pool
     pub fn flush_all(&self) {
+        if self.len() == 0 {
+            return;
+        }
         for i in 0..self.worker_local_freed_blocks.len() {
             self.flush(i)
         }

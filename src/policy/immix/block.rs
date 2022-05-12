@@ -295,6 +295,12 @@ pub struct BlockList {
     num_workers: usize,
 }
 
+impl Default for BlockList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockList {
     pub fn new() -> Self {
         Self {
@@ -316,24 +322,14 @@ impl BlockList {
         self.queue.len() + self.prioritized_queue.len()
     }
 
+    /// Add a block to the list.
     #[inline(always)]
     pub fn push(&self, block: Block, live_bytes: usize) {
         if live_bytes > (Block::BYTES >> 1) {
-            self.push_prioritized(block)
+            self.prioritized_queue.push(block)
         } else {
-            self.push_normal(block)
+            self.queue.push(block)
         }
-    }
-
-    #[inline(always)]
-    pub fn push_prioritized(&self, block: Block) {
-        self.prioritized_queue.push(block)
-    }
-
-    /// Add a block to the list.
-    #[inline(always)]
-    pub fn push_normal(&self, block: Block) {
-        self.queue.push(block)
     }
 
     /// Pop a block out of the list.
