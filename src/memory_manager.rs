@@ -23,6 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
+use crate::vm::ReferenceGlue;
 use std::sync::atomic::Ordering;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
@@ -472,7 +473,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
-pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType) {
     if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
@@ -488,7 +489,7 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectRefer
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
+pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_object_for_finalization() is called when no_finalizer = true");
     }

@@ -5,6 +5,8 @@ use crate::vm::VMBinding;
 
 /// VM-specific methods for reference processing.
 pub trait ReferenceGlue<VM: VMBinding> {
+    type FinalizableType: Finalizable;
+
     /// Weak and soft references always clear the referent
     /// before enqueueing.
     ///
@@ -37,4 +39,20 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// the references slice will be cleared after this call is returned. That means
     /// MMTk will no longer keep these references alive once this method is returned.
     fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread);
+}
+
+pub trait Finalizable: Copy + std::fmt::Debug + Send {
+    fn load_reference(&self) -> ObjectReference;
+    fn set_reference(&mut self, object: ObjectReference);
+}
+
+impl Finalizable for ObjectReference {
+    #[inline(always)]
+    fn load_reference(&self) -> ObjectReference {
+        *self
+    }
+    #[inline(always)]
+    fn set_reference(&mut self, object: ObjectReference) {
+        *self = object;
+    }
 }
