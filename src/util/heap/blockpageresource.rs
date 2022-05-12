@@ -10,6 +10,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use atomic::{Atomic, Ordering};
 use spin::rwlock::RwLock;
+use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
@@ -120,7 +121,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         let mut cursor = start + block_size;
         while cursor < last_block {
             array.push_relaxed(cursor).unwrap();
-            cursor = cursor + block_size;
+            cursor += block_size;
         }
         self.block_queue.add_global_array(array);
         self.commit_pages(reserved_pages, required_pages, tls);
@@ -170,7 +171,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
 
 struct BlockArray<Block> {
     cursor: AtomicUsize,
-    data: Vec<Block>,
+    data: UnsafeCell<Vec<Block>>,
     capacity: usize,
 }
 
@@ -181,23 +182,30 @@ impl<Block: Copy> BlockArray<Block> {
     fn new() -> Self {
         let mut array = Self {
             cursor: AtomicUsize::new(0),
-            data: Vec::with_capacity(Self::LOCAL_BUFFER_SIZE),
+            data: UnsafeCell::new(Vec::with_capacity(Self::LOCAL_BUFFER_SIZE)),
             capacity: Self::LOCAL_BUFFER_SIZE,
         };
-        unsafe { array.data.set_len(Self::LOCAL_BUFFER_SIZE) }
+        unsafe { array.data.get_mut().set_len(Self::LOCAL_BUFFER_SIZE) }
         array
     }
 
     #[inline(always)]
-    fn data(&self) -> &mut Vec<Block> {
-        unsafe { &mut (*(self as *const Self as *mut Self)).data }
+    fn get_entry(&self, i: usize) -> Block {
+        unsafe { (*self.data.get())[i] }
+    }
+
+    #[inline(always)]
+    unsafe fn set_entry(&self, i: usize, block: Block) {
+        (*self.data.get())[i] = block
     }
 
     #[inline(always)]
     fn push_relaxed(&self, block: Block) -> Result<(), Block> {
         let i = self.cursor.load(Ordering::Relaxed);
         if i < self.capacity {
-            self.data()[i] = block;
+            unsafe {
+                self.set_entry(i, block);
+            }
             self.cursor.store(i + 1, Ordering::Relaxed);
             Ok(())
         } else {
@@ -217,7 +225,7 @@ impl<Block: Copy> BlockArray<Block> {
                 }
             });
         if let Ok(i) = i {
-            Some(self.data()[i - 1])
+            Some(self.get_entry(i - 1))
         } else {
             None
         }
@@ -237,7 +245,7 @@ impl<Block: Copy> BlockArray<Block> {
     fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
         let len = self.len();
         for i in 0..len {
-            f(self.data()[i])
+            f(self.get_entry(i))
         }
     }
 }
@@ -294,7 +302,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
-        if let Some(block) = head_global_freed_blocks.as_ref().map(|q| q.pop()).flatten() {
+        if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::Relaxed);
             Some(block)
         } else if let Some(blocks) = self.global_freed_blocks.write().pop() {
@@ -335,10 +343,9 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
 
     #[inline]
     pub fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
-        self.head_global_freed_blocks
-            .read()
-            .as_ref()
-            .map(|array| array.iterate_blocks(f));
+        for array in &*self.head_global_freed_blocks.read() {
+            array.iterate_blocks(f)
+        }
         for array in &*self.global_freed_blocks.read() {
             array.iterate_blocks(f);
         }
