@@ -10,6 +10,8 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::{ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
@@ -143,6 +145,11 @@ impl ChunkMap {
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
+    fn num_chunks(&self) -> usize {
+        let chunk_range = self.chunk_range.lock();
+        (chunk_range.end.start() - chunk_range.start.start()) >> Chunk::LOG_BYTES
+    }
+
     /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
@@ -164,7 +171,14 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         space.defrag.mark_histograms.lock().clear();
-        self.generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
+        let counter = Arc::new(AtomicUsize::new(self.num_chunks()));
+        self.generate_tasks(|chunk| {
+            Box::new(SweepChunk {
+                space,
+                chunk,
+                counter: counter.clone(),
+            })
+        })
     }
 }
 
@@ -178,6 +192,7 @@ impl Default for ChunkMap {
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
     chunk: Chunk,
+    counter: Arc<AtomicUsize>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
@@ -188,5 +203,8 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             self.chunk.sweep(self.space, &mut histogram);
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
+        if self.counter.fetch_sub(1, Ordering::Relaxed) == 1 {
+            self.space.pr.flush_all()
+        }
     }
 }

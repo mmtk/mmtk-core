@@ -5,12 +5,22 @@ use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
+use atomic::Atomic;
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Condvar, Mutex};
 
 const LOCALLY_CACHED_WORKS: usize = 1;
+
+thread_local! {
+    static WORKER_ID: Atomic<Option<usize>> = Atomic::new(None);
+}
+
+#[inline(always)]
+pub fn current_worker_id() -> Option<usize> {
+    WORKER_ID.with(|x| x.load(Ordering::SeqCst))
+}
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
@@ -141,6 +151,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        WORKER_ID.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         self.shared.parked.store(false, Ordering::SeqCst);

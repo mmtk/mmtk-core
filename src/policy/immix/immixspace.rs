@@ -25,7 +25,7 @@ use crate::{
     plan::TransitiveClosure,
     scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
-        heap::FreeListPageResource,
+        heap::BlockPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
     },
     MMTK,
@@ -35,7 +35,7 @@ use std::sync::{atomic::AtomicU8, Arc};
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
+    pub(super) pr: BlockPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -103,6 +103,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
+        self.pr.init(self.scheduler.num_workers());
         self.common().init(self.as_space());
     }
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -162,12 +163,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
+        assert!(!common.vmrequest.is_discontiguous());
         ImmixSpace {
-            pr: if common.vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(0, vm_map)
-            } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
-            },
+            pr: BlockPageResource::new_contiguous(
+                Block::LOG_PAGES,
+                common.start,
+                common.extent,
+                vm_map,
+            ),
             common,
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
