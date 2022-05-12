@@ -248,12 +248,27 @@ impl<Block: Copy> BlockArray<Block> {
             f(self.get_entry(i))
         }
     }
+
+    fn replace(&self, new_array: Self) -> Self {
+        assert_eq!(self.capacity, new_array.capacity);
+        // Swap cursor
+        let temp = self.cursor.load(Ordering::Relaxed);
+        self.cursor
+            .store(new_array.cursor.load(Ordering::Relaxed), Ordering::Relaxed);
+        new_array.cursor.store(temp, Ordering::Relaxed);
+        // Swap data
+        unsafe {
+            std::mem::swap(&mut *self.data.get(), &mut *new_array.data.get());
+        }
+        // Return old array
+        new_array
+    }
 }
 
 pub struct BlockQueue<Block> {
     head_global_freed_blocks: RwLock<Option<BlockArray<Block>>, spin::Yield>,
     global_freed_blocks: RwLock<Vec<BlockArray<Block>>, spin::Yield>,
-    worker_local_freed_blocks: Vec<RwLock<BlockArray<Block>, spin::Yield>>,
+    worker_local_freed_blocks: Vec<BlockArray<Block>>,
     count: AtomicUsize,
 }
 
@@ -269,7 +284,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
 
     fn init(&mut self, num_workers: usize) {
         let mut worker_local_freed_blocks = vec![];
-        worker_local_freed_blocks.resize_with(num_workers, || RwLock::new(BlockArray::new()));
+        worker_local_freed_blocks.resize_with(num_workers, || BlockArray::new());
         self.worker_local_freed_blocks = worker_local_freed_blocks;
     }
 
@@ -283,18 +298,14 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         self.count.fetch_add(1, Ordering::Relaxed);
         let id = crate::scheduler::current_worker_id().unwrap();
         let failed = self.worker_local_freed_blocks[id]
-            .read()
             .push_relaxed(block)
             .is_err();
         if failed {
-            let mut queue = BlockArray::new();
-            {
-                let mut lock = self.worker_local_freed_blocks[id].write();
-                std::mem::swap(&mut queue, &mut *lock);
-                lock.push_relaxed(block).unwrap();
-            }
-            if !queue.is_empty() {
-                self.global_freed_blocks.write().push(queue);
+            let queue = BlockArray::new();
+            queue.push_relaxed(block).unwrap();
+            let old_queue = self.worker_local_freed_blocks[id].replace(queue);
+            if !old_queue.is_empty() {
+                self.global_freed_blocks.write().push(old_queue);
             }
         }
     }
@@ -319,11 +330,8 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     }
 
     pub fn flush(&self, id: usize) {
-        let read = self.worker_local_freed_blocks[id].upgradeable_read();
-        if !read.is_empty() {
-            let mut queue = BlockArray::new();
-            let mut write = read.upgrade();
-            std::mem::swap(&mut queue, &mut *write);
+        if !self.worker_local_freed_blocks[id].is_empty() {
+            let queue = self.worker_local_freed_blocks[id].replace(BlockArray::new());
             if !queue.is_empty() {
                 self.global_freed_blocks.write().push(queue)
             }
@@ -350,7 +358,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
             array.iterate_blocks(f);
         }
         for array in &self.worker_local_freed_blocks {
-            array.read().iterate_blocks(f);
+            array.iterate_blocks(f);
         }
     }
 }
