@@ -21,11 +21,16 @@ const LOCAL_BUFFER_SIZE: usize = 128;
 
 pub struct BlockPageResource<VM: VMBinding> {
     common: CommonPageResource,
+    /// Block granularity
     log_pages: usize,
+    /// A buffer for storing all the free blocks
     block_queue: BlockQueue<Address>,
+    /// Top address of the allocated contiguous space
     highwater: Atomic<Address>,
-    sync: Mutex<()>,
+    /// Limit of the contiguous space
     limit: Address,
+    /// Slow-path allocation synchronization
+    sync: Mutex<()>,
     _p: PhantomData<VM>,
 }
 
@@ -53,7 +58,7 @@ impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
 
     #[inline(always)]
     fn adjust_for_metadata(&self, pages: usize) -> usize {
-        pages
+        pages // No legacy metadata support
     }
 }
 
@@ -69,6 +74,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         Self {
             log_pages,
             common: CommonPageResource::new(true, growable, vm_map),
+            // Highwater starts from the start address of the contiguous space
             highwater: Atomic::new(start),
             limit: (start + bytes).align_up(BYTES_IN_CHUNK),
             block_queue: BlockQueue::new(),
@@ -77,11 +83,12 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         }
     }
 
+    /// Initialize BlockPageResource. Called during `gc_init`.
     pub fn init(&mut self, num_workers: usize) {
         self.block_queue.init(num_workers);
     }
 
-    /// The caller needs to ensure this is called by only one thread.
+    /// Grow contiguous space
     #[cold]
     fn alloc_pages_slow_sync(
         &self,
@@ -99,7 +106,8 @@ impl<VM: VMBinding> BlockPageResource<VM> {
                 new_chunk: false,
             });
         }
-        // Grow space
+        // Grow space (a chunk at a time)
+        // 1. Raise highwater by chunk size
         let start: Address =
             match self
                 .highwater
@@ -114,16 +122,20 @@ impl<VM: VMBinding> BlockPageResource<VM> {
                 _ => return Result::Err(PRAllocFail),
             };
         assert!(start.is_aligned_to(BYTES_IN_CHUNK));
+        // 2. Take the first block int the chunk as the allocation result
         let first_block = start;
+        // 3. Push all remaining blocks to a block list
         let last_block = start + BYTES_IN_CHUNK;
         let block_size = 1usize << (self.log_pages + LOG_BYTES_IN_PAGE as usize);
         let array = BlockArray::new();
         let mut cursor = start + block_size;
         while cursor < last_block {
-            array.push_relaxed(cursor).unwrap();
+            unsafe { array.push_relaxed(cursor).unwrap() };
             cursor += block_size;
         }
+        // 4. Push the block list to the global pool
         self.block_queue.add_global_array(array);
+        // Finish slow-allocation
         self.commit_pages(reserved_pages, required_pages, tls);
         Result::Ok(PRAllocResult {
             start: first_block,
@@ -132,7 +144,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         })
     }
 
-    /// The caller needs to ensure this is called by only one thread.
+    /// Allocate a block
     #[inline(always)]
     fn alloc_pages_fast(
         &self,
@@ -151,6 +163,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
                 new_chunk: false,
             });
         }
+        // Slow-path：we need to grow space
         self.alloc_pages_slow_sync(reserved_pages, required_pages, tls)
     }
 
@@ -169,6 +182,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     }
 }
 
+/// A block list that supports fast lock-free push/pop operations
 struct BlockArray<Block> {
     cursor: AtomicUsize,
     data: UnsafeCell<Vec<Block>>,
@@ -178,6 +192,7 @@ struct BlockArray<Block> {
 impl<Block: Copy> BlockArray<Block> {
     const LOCAL_BUFFER_SIZE: usize = 256;
 
+    /// Create an array
     #[inline(always)]
     fn new() -> Self {
         let mut array = Self {
@@ -189,23 +204,28 @@ impl<Block: Copy> BlockArray<Block> {
         array
     }
 
+    /// Get an entry
     #[inline(always)]
     fn get_entry(&self, i: usize) -> Block {
         unsafe { (*self.data.get())[i] }
     }
 
+    /// Set an entry.
+    ///
+    /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     #[inline(always)]
     unsafe fn set_entry(&self, i: usize, block: Block) {
         (*self.data.get())[i] = block
     }
 
+    /// Non-atomically push an element.
+    ///
+    /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     #[inline(always)]
-    fn push_relaxed(&self, block: Block) -> Result<(), Block> {
+    unsafe fn push_relaxed(&self, block: Block) -> Result<(), Block> {
         let i = self.cursor.load(Ordering::Relaxed);
         if i < self.capacity {
-            unsafe {
-                self.set_entry(i, block);
-            }
+            self.set_entry(i, block);
             self.cursor.store(i + 1, Ordering::Relaxed);
             Ok(())
         } else {
@@ -213,6 +233,7 @@ impl<Block: Copy> BlockArray<Block> {
         }
     }
 
+    /// Atomically pop an element from the array.
     #[inline(always)]
     fn pop(&self) -> Option<Block> {
         let i = self
@@ -231,16 +252,19 @@ impl<Block: Copy> BlockArray<Block> {
         }
     }
 
+    /// Get array size
     #[inline(always)]
     fn len(&self) -> usize {
         self.cursor.load(Ordering::Relaxed)
     }
 
+    /// Test if the array is empty
     #[inline(always)]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Iterate all elements in the array
     #[inline]
     fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
         let len = self.len();
@@ -249,6 +273,9 @@ impl<Block: Copy> BlockArray<Block> {
         }
     }
 
+    /// Replace the array with a new array.
+    ///
+    /// Return the old array
     fn replace(&self, new_array: Self) -> Self {
         assert_eq!(self.capacity, new_array.capacity);
         // Swap cursor
@@ -265,14 +292,24 @@ impl<Block: Copy> BlockArray<Block> {
     }
 }
 
+/// A block queue which contains a global pool and a set of thread-local queues.
+///
+/// Mutator or collector threads always allocate blocks by poping from the global pool。
+///
+/// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.
 pub struct BlockQueue<Block> {
+    /// First global BlockArray for fast allocation
     head_global_freed_blocks: RwLock<Option<BlockArray<Block>>, spin::Yield>,
+    /// A list of BlockArray that is flushed to the global pool
     global_freed_blocks: RwLock<Vec<BlockArray<Block>>, spin::Yield>,
+    /// Thread-local block queues
     worker_local_freed_blocks: Vec<BlockArray<Block>>,
+    /// Total number of blocks in the whole BlockQueue
     count: AtomicUsize,
 }
 
 impl<Block: Debug + Copy> BlockQueue<Block> {
+    /// Create a BlockQueue
     pub fn new() -> Self {
         Self {
             head_global_freed_blocks: Default::default(),
@@ -282,27 +319,32 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         }
     }
 
+    /// Initialize the thread-local queues
     fn init(&mut self, num_workers: usize) {
         let mut worker_local_freed_blocks = vec![];
         worker_local_freed_blocks.resize_with(num_workers, || BlockArray::new());
         self.worker_local_freed_blocks = worker_local_freed_blocks;
     }
 
+    /// Add a BlockArray to the global pool
     fn add_global_array(&self, array: BlockArray<Block>) {
         self.count.fetch_add(array.len(), Ordering::Relaxed);
         self.global_freed_blocks.write().push(array);
     }
 
+    /// Push a block to the thread-local queue
     #[inline(always)]
     pub fn push(&self, block: Block) {
         self.count.fetch_add(1, Ordering::Relaxed);
         let id = crate::scheduler::current_worker_id().unwrap();
-        let failed = self.worker_local_freed_blocks[id]
-            .push_relaxed(block)
-            .is_err();
+        let failed = unsafe {
+            self.worker_local_freed_blocks[id]
+                .push_relaxed(block)
+                .is_err()
+        };
         if failed {
             let queue = BlockArray::new();
-            queue.push_relaxed(block).unwrap();
+            unsafe { queue.push_relaxed(block).unwrap() };
             let old_queue = self.worker_local_freed_blocks[id].replace(queue);
             if !old_queue.is_empty() {
                 self.global_freed_blocks.write().push(old_queue);
@@ -310,6 +352,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         }
     }
 
+    /// Pop a block from the global pool
     #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
@@ -329,7 +372,8 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         }
     }
 
-    pub fn flush(&self, id: usize) {
+    /// Flush a given thread-local queue to the global pool
+    fn flush(&self, id: usize) {
         if !self.worker_local_freed_blocks[id].is_empty() {
             let queue = self.worker_local_freed_blocks[id].replace(BlockArray::new());
             if !queue.is_empty() {
@@ -338,17 +382,20 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         }
     }
 
+    /// Flush all thread-local queues to the global pool
     pub fn flush_all(&self) {
         for i in 0..self.worker_local_freed_blocks.len() {
             self.flush(i)
         }
     }
 
+    /// Get total number of blocks in the whole BlockQueue
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.count.load(Ordering::Relaxed)
     }
 
+    /// Iterate all the blocks in the BlockQueue
     #[inline]
     pub fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
         for array in &*self.head_global_freed_blocks.read() {

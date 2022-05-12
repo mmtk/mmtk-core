@@ -204,6 +204,9 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         if self.counter.fetch_sub(1, Ordering::Relaxed) == 1 {
+            // We've finished releasing all the dead blocks to the BlockPageResource's thread-local queues.
+            // Now flush the BlockPageResource.
+            // Note: this is a no-op if ImmixSpace uses FreelistPageResource.
             self.space.flush_page_resource()
         }
     }
