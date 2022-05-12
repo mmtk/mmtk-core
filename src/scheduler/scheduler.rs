@@ -70,12 +70,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
             // This vec will grow for each stage we call with open_next()
-            let first_stw_stage = work_buckets
-                .iter()
-                .skip(1)
-                .next()
-                .map(|(id, _)| id)
-                .unwrap();
+            let first_stw_stage = work_buckets.iter().nth(1).map(|(id, _)| id).unwrap();
             let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
             // The rest will open after the previous stage is done.
             let stages = work_buckets
@@ -264,13 +259,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn reset_state(&self) {
-        let first_stw_stage = self
-            .work_buckets
-            .iter()
-            .skip(1)
-            .next()
-            .map(|(id, _)| id)
-            .unwrap();
+        let first_stw_stage = self.work_buckets.iter().nth(1).map(|(id, _)| id).unwrap();
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id != WorkBucketStage::Unconstrained && id != first_stw_stage {
                 bkt.deactivate();
@@ -308,9 +297,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     #[inline(always)]
     fn pop_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
         let mut retry = false;
-        match worker.shared.local_work.pop() {
-            Some(w) => return Steal::Success(w),
-            _ => {}
+        if let Some(w) = worker.shared.local_work.pop() {
+            return Steal::Success(w);
         }
         for work_bucket in self.work_buckets.values() {
             match work_bucket.poll(&worker.shared.local_work_buffer) {
@@ -319,8 +307,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 _ => {}
             }
         }
-        for (id, stealer) in &self.worker_group.stealers {
-            if *id == worker.ordinal {
+        for (id, stealer) in self.worker_group.stealers.iter().enumerate() {
+            if id == worker.ordinal {
                 continue;
             }
             match stealer.steal() {
@@ -416,7 +404,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().gc_requester.clear_request();
-        let first_stw_bucket = self.work_buckets.values().skip(1).next().unwrap();
+        let first_stw_bucket = self.work_buckets.values().nth(1).unwrap();
         debug_assert!(!first_stw_bucket.is_activated());
         first_stw_bucket.activate();
         let _guard = self.worker_monitor.0.lock().unwrap();

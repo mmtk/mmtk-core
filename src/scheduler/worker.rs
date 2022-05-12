@@ -24,6 +24,12 @@ pub struct GCWorkerShared<VM: VMBinding> {
     pub local_work_buffer: Worker<Box<dyn GCWork<VM>>>,
 }
 
+impl<VM: VMBinding> Default for GCWorkerShared<VM> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new() -> Self {
         Self {
@@ -166,7 +172,7 @@ impl<VM: VMBinding> GCWorker<VM> {
 
 pub struct WorkerGroup<VM: VMBinding> {
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-    pub stealers: Vec<(usize, Stealer<Box<dyn GCWork<VM>>>)>,
+    pub stealers: Vec<Stealer<Box<dyn GCWork<VM>>>>,
     parked_workers: AtomicUsize,
 }
 
@@ -178,8 +184,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
 
         let stealers = workers_shared
             .iter()
-            .zip(0..num_workers)
-            .map(|(w, ordinal)| (ordinal, w.local_work_buffer.stealer()))
+            .map(|worker| worker.local_work_buffer.stealer())
             .collect();
 
         Arc::new(Self {
