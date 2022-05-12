@@ -139,7 +139,7 @@ impl Defrag {
         spill_avail_histograms: &mut Histogram,
     ) -> usize {
         let mut total_available_lines = 0;
-        for block in space.reusable_blocks.get_blocks().iter() {
+        space.reusable_blocks.iterate_blocks(|block| {
             let bucket = block.get_holes();
             let unavailable_lines = match block.get_state() {
                 BlockState::Reusable { unavailable_lines } => unavailable_lines as usize,
@@ -148,7 +148,7 @@ impl Defrag {
             let available_lines = Block::LINES - unavailable_lines;
             spill_avail_histograms[bucket] += available_lines;
             total_available_lines += available_lines;
-        }
+        });
         total_available_lines
     }
 

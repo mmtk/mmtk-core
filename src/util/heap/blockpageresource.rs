@@ -320,7 +320,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     }
 
     /// Initialize the thread-local queues
-    fn init(&mut self, num_workers: usize) {
+    pub fn init(&mut self, num_workers: usize) {
         let mut worker_local_freed_blocks = vec![];
         worker_local_freed_blocks.resize_with(num_workers, || BlockArray::new());
         self.worker_local_freed_blocks = worker_local_freed_blocks;

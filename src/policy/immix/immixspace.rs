@@ -106,6 +106,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
+        self.reusable_blocks.init(self.scheduler.num_workers());
         #[cfg(target_pointer_width = "64")]
         self.pr.init(self.scheduler.num_workers());
         self.common().init(self.as_space());
@@ -185,7 +186,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            reusable_blocks: BlockList::default(),
+            reusable_blocks: BlockList::new(),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
@@ -193,6 +194,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn flush_page_resource(&self) {
+        self.reusable_blocks.flush_all();
         #[cfg(target_pointer_width = "64")]
         self.pr.flush_all()
     }

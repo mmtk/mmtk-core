@@ -3,11 +3,11 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::heap::blockpageresource::BlockQueue;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::Address;
 use crate::vm::*;
-use spin::{Mutex, MutexGuard};
 use std::sync::atomic::Ordering;
 
 /// The block allocation state.
@@ -271,7 +271,9 @@ impl Block {
                     self.set_state(BlockState::Reusable {
                         unavailable_lines: marked_lines as _,
                     });
-                    space.reusable_blocks.push(*self)
+                    space
+                        .reusable_blocks
+                        .push(*self, marked_lines << Line::LOG_BYTES)
                 } else {
                     // Clear mark state.
                     self.set_state(BlockState::Unmarked);
@@ -287,39 +289,77 @@ impl Block {
 }
 
 /// A non-block single-linked list to store blocks.
-#[derive(Default)]
 pub struct BlockList {
-    queue: Mutex<Vec<Block>>,
+    prioritized_queue: BlockQueue<Block>,
+    queue: BlockQueue<Block>,
+    num_workers: usize,
 }
 
 impl BlockList {
+    pub fn new() -> Self {
+        Self {
+            prioritized_queue: BlockQueue::new(),
+            queue: BlockQueue::new(),
+            num_workers: 0,
+        }
+    }
+
+    pub fn init(&mut self, num_workers: usize) {
+        self.prioritized_queue.init(num_workers);
+        self.queue.init(num_workers);
+        self.num_workers = num_workers;
+    }
+
     /// Get number of blocks in this list.
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.queue.lock().len()
+        self.queue.len() + self.prioritized_queue.len()
+    }
+
+    #[inline(always)]
+    pub fn push(&self, block: Block, live_bytes: usize) {
+        if live_bytes > (Block::BYTES >> 1) {
+            self.push_prioritized(block)
+        } else {
+            self.push_normal(block)
+        }
+    }
+
+    #[inline(always)]
+    pub fn push_prioritized(&self, block: Block) {
+        self.prioritized_queue.push(block)
     }
 
     /// Add a block to the list.
-    #[inline]
-    pub fn push(&self, block: Block) {
-        self.queue.lock().push(block)
+    #[inline(always)]
+    pub fn push_normal(&self, block: Block) {
+        self.queue.push(block)
     }
 
     /// Pop a block out of the list.
-    #[inline]
+    #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.lock().pop()
+        if let Some(b) = self.prioritized_queue.pop() {
+            return Some(b);
+        }
+        self.queue.pop()
     }
 
     /// Clear the list.
-    #[inline]
-    pub fn reset(&self) {
-        *self.queue.lock() = Vec::new()
+    pub fn reset(&mut self) {
+        self.prioritized_queue = BlockQueue::new();
+        self.queue = BlockQueue::new();
+        self.init(self.num_workers);
     }
 
-    /// Get an array of all reusable blocks stored in this BlockList.
     #[inline]
-    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
-        self.queue.lock()
+    pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
+        self.prioritized_queue.iterate_blocks(&mut f);
+        self.queue.iterate_blocks(&mut f);
+    }
+
+    pub fn flush_all(&self) {
+        self.prioritized_queue.flush_all();
+        self.queue.flush_all();
     }
 }
