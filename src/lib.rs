@@ -43,7 +43,7 @@ extern crate log;
 #[cfg(target = "x86_64-unknown-linux-gnu")]
 extern crate atomic;
 extern crate atomic_traits;
-extern crate crossbeam_deque;
+extern crate crossbeam;
 extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;

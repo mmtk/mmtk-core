@@ -50,8 +50,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.workers_shared {
-            w.local_work_bucket.add(PrepareCollector);
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            w.local_work.push(Box::new(PrepareCollector));
         }
     }
 }
@@ -118,8 +118,8 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.workers_shared {
-            w.local_work_bucket.add(ReleaseCollector);
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            w.local_work.push(Box::new(ReleaseCollector));
         }
     }
 }
