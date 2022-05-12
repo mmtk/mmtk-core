@@ -204,7 +204,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
         if self.counter.fetch_sub(1, Ordering::Relaxed) == 1 {
-            self.space.pr.flush_all()
+            self.space.flush_page_resource()
         }
     }
 }

@@ -24,18 +24,21 @@ use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
     scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
-    util::{
-        heap::BlockPageResource,
-        opaque_pointer::{VMThread, VMWorkerThread},
-    },
+    util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
 
+#[cfg(target_pointer_width = "32")]
+use crate::util::heap::FreeListPageResource as ImmixPageResource;
+
+#[cfg(target_pointer_width = "64")]
+use crate::util::heap::BlockPageResource as ImmixPageResource;
+
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pub(super) pr: BlockPageResource<VM>,
+    pr: ImmixPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -103,6 +106,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
+        #[cfg(target_pointer_width = "64")]
         self.pr.init(self.scheduler.num_workers());
         self.common().init(self.as_space());
     }
@@ -163,9 +167,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mmapper,
             heap,
         );
-        assert!(!common.vmrequest.is_discontiguous());
         ImmixSpace {
-            pr: BlockPageResource::new_contiguous(
+            #[cfg(target_pointer_width = "32")]
+            pr: if common.vmrequest.is_discontiguous() {
+                ImmixPageResource::new_discontiguous(0, vm_map)
+            } else {
+                ImmixPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+            },
+            #[cfg(target_pointer_width = "64")]
+            pr: ImmixPageResource::new_contiguous(
                 Block::LOG_PAGES,
                 common.start,
                 common.extent,
@@ -180,6 +190,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             mark_state: Self::UNMARKED_STATE,
             scheduler,
         }
+    }
+
+    pub fn flush_page_resource(&self) {
+        #[cfg(target_pointer_width = "64")]
+        self.pr.flush_all()
     }
 
     /// Get the number of defrag headroom pages.
