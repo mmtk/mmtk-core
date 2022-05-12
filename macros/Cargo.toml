@@ -3,6 +3,10 @@ name = "mmtk-macros"
 # the macro crate uses the same version as mmtk-core
 version = "0.11.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "MMTk macros provides procedural macros used by mmtk-core."
+homepage = "https://www.mmtk.io"
+repository = "https://github.com/mmtk/mmtk-core/tree/master/macros"
 
 [lib]
 proc-macro = true

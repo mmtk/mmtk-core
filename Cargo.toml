@@ -19,7 +19,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { path = "macros/"}
+mmtk-macros = { version = "0.11.0", path = "macros/" }
 
 custom_derive = "0.1"
 enum_derive = "0.1"
