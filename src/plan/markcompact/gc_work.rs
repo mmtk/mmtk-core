@@ -1,17 +1,16 @@
 use super::global::MarkCompact;
 use crate::policy::markcompactspace::MarkCompactSpace;
-use crate::policy::space::Space;
+use crate::policy::markcompactspace::{TRACE_KIND_FORWARD, TRACE_KIND_MARK};
+use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::util::{Address, ObjectReference};
 use crate::vm::ActivePlan;
 use crate::vm::Scanning;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
 
 /// iterate through the heap and calculate the new location of live objects
 pub struct CalculateForwardingAddress<VM: VMBinding> {
@@ -83,105 +82,10 @@ impl<VM: VMBinding> Compact<VM> {
     }
 }
 
-// Transitive closure to mark live objects
-pub struct MarkingProcessEdges<VM: VMBinding> {
-    plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<VM>,
-}
-
-impl<VM: VMBinding> MarkingProcessEdges<VM> {
-    fn markcompact(&self) -> &'static MarkCompact<VM> {
-        self.plan
-    }
-}
-
-impl<VM: VMBinding> ProcessEdgesWork for MarkingProcessEdges<VM> {
-    type VM = VM;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
-        Self { base, plan }
-    }
-
-    #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.markcompact().mc_space().in_space(object) {
-            self.markcompact()
-                .mc_space()
-                .trace_mark_object::<Self>(self, object)
-        } else {
-            self.markcompact().common.trace_object::<Self>(self, object)
-        }
-    }
-}
-
-impl<VM: VMBinding> Deref for MarkingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl<VM: VMBinding> DerefMut for MarkingProcessEdges<VM> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
-
-/// Transitive closure to update object references
-pub struct ForwardingProcessEdges<VM: VMBinding> {
-    plan: &'static MarkCompact<VM>,
-    base: ProcessEdgesBase<VM>,
-}
-
-impl<VM: VMBinding> ForwardingProcessEdges<VM> {
-    fn markcompact(&self) -> &'static MarkCompact<VM> {
-        self.plan
-    }
-}
-
-impl<VM: VMBinding> ProcessEdgesWork for ForwardingProcessEdges<VM> {
-    type VM = VM;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let plan = base.plan().downcast_ref::<MarkCompact<VM>>().unwrap();
-        Self { base, plan }
-    }
-
-    #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        if self.markcompact().mc_space().in_space(object) {
-            self.markcompact()
-                .mc_space()
-                .trace_forward_object::<Self>(self, object)
-        } else {
-            self.markcompact().common.trace_object::<Self>(self, object)
-        }
-    }
-}
-
-impl<VM: VMBinding> Deref for ForwardingProcessEdges<VM> {
-    type Target = ProcessEdgesBase<VM>;
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.base
-    }
-}
-
-impl<VM: VMBinding> DerefMut for ForwardingProcessEdges<VM> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.base
-    }
-}
+/// Marking trace
+pub type MarkingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_MARK>;
+/// Forwarding trace
+pub type ForwardingProcessEdges<VM> = PlanProcessEdges<VM, MarkCompact<VM>, TRACE_KIND_FORWARD>;
 
 pub struct MarkCompactGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::scheduler::GCWorkContext for MarkCompactGCWorkContext<VM> {

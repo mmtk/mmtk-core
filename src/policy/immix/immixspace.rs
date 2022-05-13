@@ -4,7 +4,7 @@ use super::{
     chunk::{Chunk, ChunkMap, ChunkState},
     defrag::Defrag,
 };
-use crate::plan::ObjectsClosure;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -23,7 +23,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
-    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
+    scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
@@ -32,6 +32,9 @@ use crate::{
 };
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
+
+pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
+pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -110,6 +113,44 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.")
+    }
+}
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
+    #[inline(always)]
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        copy: Option<CopySemantics>,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if KIND == TRACE_KIND_DEFRAG {
+            self.trace_object(trace, object, copy.unwrap(), worker)
+        } else if KIND == TRACE_KIND_FAST {
+            self.fast_trace_object(trace, object)
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[inline(always)]
+    fn post_scan_object(&self, object: ObjectReference) {
+        if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY {
+            debug_assert!(self.in_space(object));
+            self.mark_lines(object);
+        }
+    }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: TraceKind>() -> bool {
+        if KIND == TRACE_KIND_DEFRAG {
+            true
+        } else if KIND == TRACE_KIND_FAST {
+            false
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -598,45 +639,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
-        }
-    }
-}
-
-/// A work packet to scan the fields of each objects and mark lines.
-pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
-    buffer: Vec<ObjectReference>,
-    #[allow(unused)]
-    concurrent: bool,
-    immix_space: &'static ImmixSpace<Edges::VM>,
-}
-
-impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
-    pub fn new(
-        buffer: Vec<ObjectReference>,
-        concurrent: bool,
-        immix_space: &'static ImmixSpace<Edges::VM>,
-    ) -> Self {
-        Self {
-            buffer,
-            concurrent,
-            immix_space,
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanObjectsAndMarkLines");
-        let tls = worker.tls;
-        let mut closure = ObjectsClosure::<E>::new(worker);
-        for object in &self.buffer {
-            <E::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
-            if super::MARK_LINE_AT_SCAN_TIME
-                && !super::BLOCK_ONLY
-                && self.immix_space.in_space(*object)
-            {
-                self.immix_space.mark_lines(*object);
-            }
         }
     }
 }
