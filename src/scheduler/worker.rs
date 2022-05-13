@@ -18,9 +18,9 @@ pub struct GCWorkerShared<VM: VMBinding> {
     pub parked: AtomicBool,
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
+    /// A queue of GCWork that can only be processed by the owned thread.
     pub local_work: Worker<Box<dyn GCWork<VM>>>,
-    /// Cache of work packets created by the current worker.
-    /// May be flushed to the global pool or executed locally.
+    /// Local work packet queue.
     pub local_work_buffer: Worker<Box<dyn GCWork<VM>>>,
 }
 
@@ -107,6 +107,9 @@ impl<VM: VMBinding> GCWorker<VM> {
         }
     }
 
+    /// Add a work packet to the work queue and mark it with a higher priority.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket with a higher priority.
     #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
@@ -118,6 +121,9 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.shared.local_work_buffer.push(Box::new(work));
     }
 
+    /// Add a work packet to the work queue.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket.
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
@@ -145,6 +151,12 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
+    /// Poll a ready-to-execute work pakcet in the following order:
+    ///
+    /// 1. Any packet that should be processed only by this worker.
+    /// 2. Poll from the local work queue.
+    /// 3. Poll from activated global work-buckets
+    /// 4. Steal from other workers
     fn poll(&self) -> Box<dyn GCWork<VM>> {
         self.shared
             .local_work
@@ -158,6 +170,8 @@ impl<VM: VMBinding> GCWorker<VM> {
             .unwrap()
     }
 
+    /// Entry of the worker thread.
+    /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
@@ -170,13 +184,17 @@ impl<VM: VMBinding> GCWorker<VM> {
     }
 }
 
+/// A worker group to manage all the GC workers (except the coordinator worker).
 pub struct WorkerGroup<VM: VMBinding> {
+    /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
+    /// Handles for stealing packets from workers
     pub stealers: Vec<Stealer<Box<dyn GCWork<VM>>>>,
     parked_workers: AtomicUsize,
 }
 
 impl<VM: VMBinding> WorkerGroup<VM> {
+    /// Create a WorkerGroup
     pub fn new(num_workers: usize) -> Arc<Self> {
         let workers_shared = (0..num_workers)
             .map(|_| Arc::new(GCWorkerShared::<VM>::new()))
@@ -194,6 +212,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         })
     }
 
+    /// Spawn all the worker threads
     pub fn spawn(
         &self,
         mmtk: &'static MMTK<VM>,
@@ -214,27 +233,36 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         }
     }
 
+    /// Get the number of workers in the group
     #[inline(always)]
     pub fn worker_count(&self) -> usize {
         self.workers_shared.len()
     }
 
+    /// Increase the packed-workers counter.
+    /// Called before a worker is parked.
+    ///
+    /// Return true if all the workers are parked.
     #[inline(always)]
     pub fn inc_parked_workers(&self) -> bool {
         let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
         old + 1 == self.worker_count()
     }
 
+    /// Decrease the packed-workers counter.
+    /// Called after a worker is resumed from the parked state.
     #[inline(always)]
     pub fn dec_parked_workers(&self) {
         self.parked_workers.fetch_sub(1, Ordering::SeqCst);
     }
 
+    /// Get the number of parked workers in the group
     #[inline(always)]
     pub fn parked_workers(&self) -> usize {
         self.parked_workers.load(Ordering::SeqCst)
     }
 
+    /// Check if all the workers are packed
     #[inline(always)]
     pub fn all_parked(&self) -> bool {
         self.parked_workers() == self.worker_count()

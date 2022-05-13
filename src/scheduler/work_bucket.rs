@@ -77,9 +77,11 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     #[inline(always)]
     fn notify_one_worker(&self) {
+        // If the bucket is not activated, don't notify anyone.
         if !self.is_activated() {
             return;
         }
+        // Notify one if there're any parked workers.
         if let Some(parked) = self.parked_workers() {
             if parked > 0 {
                 let _guard = self.monitor.0.lock().unwrap();
@@ -89,20 +91,12 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     #[inline(always)]
-    pub fn force_notify_all_workers(&self) {
-        if let Some(parked) = self.parked_workers() {
-            if parked > 0 {
-                let _guard = self.monitor.0.lock().unwrap();
-                self.monitor.1.notify_all()
-            }
-        }
-    }
-
-    #[inline(always)]
     pub fn notify_all_workers(&self) {
+        // If the bucket is not activated, don't notify anyone.
         if !self.is_activated() {
             return;
         }
+        // Notify all if there're any parked workers.
         if let Some(parked) = self.parked_workers() {
             if parked > 0 {
                 let _guard = self.monitor.0.lock().unwrap();
@@ -143,6 +137,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.active.store(false, Ordering::SeqCst);
     }
 
+    /// Add a work packet to this bucket
+    /// Panic if this bucket cannot receive prioritized packets.
     #[inline(always)]
     pub fn add_prioritized(&self, work: Box<dyn GCWork<VM>>) {
         self.prioritized_queue.as_ref().unwrap().push(work);
@@ -160,6 +156,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
+    /// Add a work packet to this bucket
     #[inline(always)]
     pub fn add_dyn(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
@@ -168,6 +165,8 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
+    /// Add multiple packets with a higher priority.
+    /// Panic if this bucket cannot receive prioritized packets.
     #[inline(always)]
     pub fn bulk_add_prioritized(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         self.prioritized_queue.as_ref().unwrap().push_all(work_vec);
@@ -176,6 +175,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
         }
     }
 
+    /// Add multiple packets
     #[inline(always)]
     pub fn bulk_add(&self, work_vec: Vec<Box<dyn GCWork<VM>>>) {
         if work_vec.is_empty() {

@@ -21,7 +21,7 @@ pub enum CoordinatorMessage<VM: VMBinding> {
 pub struct GCWorkScheduler<VM: VMBinding> {
     /// Work buckets
     pub work_buckets: EnumMap<WorkBucketStage, WorkBucket<VM>>,
-    /// workers
+    /// Workers
     pub worker_group: Arc<WorkerGroup<VM>>,
     /// The shared part of the GC worker object of the controller thread
     coordinator_worker_shared: Arc<GCWorkerShared<VM>>,
@@ -233,7 +233,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets.values().all(|bucket| bucket.is_empty())
     }
 
-    /// Open buckets if their conditions are met
+    /// Open buckets if their conditions are met.
+    ///
+    /// This function should only be called after all the workers are parked.
+    /// No workers will be waked up by this function. The caller is responsible for that.
+    ///
+    /// Return true if there're any non-empty buckets updated.
     fn update_buckets(&self) -> bool {
         let mut buckets_updated = false;
         let mut new_packets = false;
@@ -284,6 +289,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             .unwrap();
     }
 
+    /// Check if all the work buckets are empty
     #[inline(always)]
     fn all_activated_buckets_are_empty(&self) -> bool {
         for bucket in self.work_buckets.values() {
@@ -294,38 +300,44 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         true
     }
 
+    /// Get a schedulable work packet without retry.
     #[inline(always)]
     fn pop_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
-        let mut retry = false;
+        let mut should_retry = false;
+        // Try find a packet that can be processed only by this worker.
         if let Some(w) = worker.shared.local_work.pop() {
             return Steal::Success(w);
         }
+        // Try get a packet from a work bucket.
         for work_bucket in self.work_buckets.values() {
             match work_bucket.poll(&worker.shared.local_work_buffer) {
                 Steal::Success(w) => return Steal::Success(w),
-                Steal::Retry => retry = true,
+                Steal::Retry => should_retry = true,
                 _ => {}
             }
         }
+        // Try steal some packets from any worker
         for (id, stealer) in self.worker_group.stealers.iter().enumerate() {
             if id == worker.ordinal {
                 continue;
             }
             match stealer.steal() {
                 Steal::Success(w) => return Steal::Success(w),
-                Steal::Retry => retry = true,
+                Steal::Retry => should_retry = true,
                 _ => {}
             }
         }
-        if retry {
+        if should_retry {
             Steal::Retry
         } else {
             Steal::Empty
         }
     }
 
+    /// Get a schedulable work packet.
     #[inline]
     fn pop_schedulable_work(&self, worker: &GCWorker<VM>) -> Option<Box<dyn GCWork<VM>>> {
+        // Loop until we successfully get a packet.
         loop {
             match self.pop_schedulable_work_once(worker) {
                 Steal::Success(w) => {
@@ -342,7 +354,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
     }
 
-    /// Get a schedulable work. Called by workers
+    /// Called by workers to get a schedulable work packet.
+    /// Park the worker if there're no available packets.
     #[inline]
     pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
         self.pop_schedulable_work(worker)
@@ -358,20 +371,24 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if let Some(work) = self.pop_schedulable_work(worker) {
                 return work;
             }
-            // Park this worker
+            // Prepare to park this worker
             let all_parked = self.worker_group.inc_parked_workers();
+            // If all workers are parked, try activate new buckets
             if all_parked {
                 if self.update_buckets() {
                     self.worker_group.dec_parked_workers();
                     // We guarantee that we can at least fetch one packet.
                     let work = self.pop_schedulable_work(worker).unwrap();
                     // Optimize for the case that a newly opened bucket only has one packet.
+                    // We only notify_all if there're motr than one packets available.
                     if !self.all_activated_buckets_are_empty() {
                         // Have more jobs in this buckets. Notify other workers.
                         self.worker_monitor.1.notify_all();
                     }
+                    // Return this packet and execute it.
                     return work;
                 }
+                // The current pause is finished if if we can't open more buckets.
                 worker.sender.send(CoordinatorMessage::Finish).unwrap();
             }
             // Wait
