@@ -139,6 +139,11 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
@@ -166,8 +171,13 @@
 
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
 
+<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MarkSweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
     <span class="ident">common</span>: <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="attribute">#[<span class="ident">trace</span>]</span>
     <span class="ident">ms</span>: <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 

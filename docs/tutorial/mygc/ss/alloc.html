@@ -231,10 +231,14 @@ This holds an instance of the common plan.</li>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub struct MyGC&lt;VM: VMBinding&gt; {
+</span>#[derive(PlanTraceObject)]
+pub struct MyGC&lt;VM: VMBinding&gt; {
     pub hi: AtomicBool,
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace&lt;VM&gt;,
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace&lt;VM&gt;,
+    #[fallback_trace]
     pub common: CommonPlan&lt;VM&gt;,
 }
 <span class="boring">}

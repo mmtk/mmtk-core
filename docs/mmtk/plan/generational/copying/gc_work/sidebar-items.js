@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["GenCopyGCWorkContext",""]]});
+initSidebarItems({"struct":[["GenCopyGCWorkContext",""],["GenCopyNurseryGCWorkContext",""]]});

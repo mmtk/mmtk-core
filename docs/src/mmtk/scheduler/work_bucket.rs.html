@@ -170,6 +170,10 @@
 <span id="168">168</span>
 <span id="169">169</span>
 <span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">enum_map::Enum</span>;
@@ -284,6 +288,10 @@
     <span class="doccomment">/// Add a work packet to this bucket, with a default priority (1000)</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span><span class="op">&lt;</span><span class="ident">W</span>: <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">work</span>: <span class="ident">W</span>) {
         <span class="self">self</span>.<span class="ident">add_with_priority</span>(<span class="ident"><span class="self">Self</span>::DEFAULT_PRIORITY</span>, <span class="ident">Box::new</span>(<span class="ident">work</span>));
+    }
+    <span class="doccomment">/// Add a boxed work packet to this bucket, with a default priority (1000)</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_boxed</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">work</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
+        <span class="self">self</span>.<span class="ident">add_with_priority</span>(<span class="ident"><span class="self">Self</span>::DEFAULT_PRIORITY</span>, <span class="ident">work</span>);
     }
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">bulk_add_with_priority</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">priority</span>: <span class="ident">usize</span>, <span class="ident">work_vec</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
         {

@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["ImmixCopyContext","Immix copy allocator"],["ImmixSpace",""],["PrepareBlockState","A work packet to prepare each block for GC. Performs the action on a range of chunks."],["ScanObjectsAndMarkLines","A work packet to scan the fields of each objects and mark lines."]]});
+initSidebarItems({"constant":[["TRACE_KIND_DEFRAG",""],["TRACE_KIND_FAST",""]],"struct":[["ImmixCopyContext","Immix copy allocator"],["ImmixSpace",""],["PrepareBlockState","A work packet to prepare each block for GC. Performs the action on a range of chunks."]]});

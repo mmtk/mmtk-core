@@ -10,15 +10,17 @@
 <span id="8"> 8</span>
 <span id="9"> 9</span>
 <span id="10">10</span>
+<span id="11">11</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::PageProtect</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::SFTProcessEdges</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::DEFAULT_TRACE</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::PlanProcessEdges</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">PPGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">std::marker::PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkContext</span> <span class="kw">for</span> <span class="ident">PPGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
     <span class="kw">type</span> <span class="ident">PlanType</span> <span class="op">=</span> <span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
-    <span class="kw">type</span> <span class="ident">ProcessEdgesWorkType</span> <span class="op">=</span> <span class="ident">SFTProcessEdges</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>;
+    <span class="kw">type</span> <span class="ident">ProcessEdgesWorkType</span> <span class="op">=</span> <span class="ident">PlanProcessEdges</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span>, <span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">DEFAULT_TRACE</span><span class="op">&gt;</span>;
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>

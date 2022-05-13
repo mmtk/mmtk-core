@@ -254,17 +254,23 @@
 <span id="252">252</span>
 <span id="253">253</span>
 <span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::immix::gc_work</span>::{<span class="ident">TRACE_KIND_DEFRAG</span>, <span class="ident">TRACE_KIND_FAST</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ImmixSpace</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix</span>::{<span class="ident">TRACE_KIND_DEFRAG</span>, <span class="ident">TRACE_KIND_FAST</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
@@ -282,14 +288,20 @@
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
+<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+
 <span class="doccomment">/// Generational immix. This implements the functionality of a two-generation copying</span>
 <span class="doccomment">/// collector where the higher generation is an immix space.</span>
 <span class="doccomment">/// See the PLDI&#39;08 paper by Blackburn and McKinley for a description</span>
 <span class="doccomment">/// of the algorithm: http://doi.acm.org/10.1145/1375581.137558.</span>
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenImmix</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Generational plan, which includes a nursery space and operations related with nursery.</span>
+    <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
     <span class="kw">pub</span> <span class="ident">gen</span>: <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// An immix space as the mature space.</span>
+    <span class="attribute">#[<span class="ident">post_scan</span>]</span>
+    <span class="attribute">#[<span class="ident">trace</span>(<span class="ident">CopySemantics::Mature</span>)]</span>
     <span class="kw">pub</span> <span class="ident">immix</span>: <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Whether the last GC was a defrag GC for the immix space.</span>
     <span class="kw">pub</span> <span class="ident">last_gc_was_defrag</span>: <span class="ident">AtomicBool</span>,
