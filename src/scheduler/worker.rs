@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
+const LOCALLY_CACHED_PACKETS: usize = 16;
+
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
@@ -113,7 +115,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
-            || !self.shared.local_work_buffer.is_empty()
+            || self.shared.local_work_buffer.len() >= LOCALLY_CACHED_PACKETS
         {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             return;
@@ -127,7 +129,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
-            || !self.shared.local_work_buffer.is_empty()
+            || self.shared.local_work_buffer.len() >= LOCALLY_CACHED_PACKETS
         {
             self.scheduler.work_buckets[bucket].add(work);
             return;

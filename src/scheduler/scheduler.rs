@@ -47,23 +47,24 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
+        let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
         let mut work_buckets = enum_map! {
-            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
-            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
-            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
         };
 
         // Set the open condition of each bucket.
@@ -103,11 +104,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new());
-
-        let worker_group = WorkerGroup::new(num_workers);
-        work_buckets.values_mut().for_each(|bucket| {
-            bucket.set_group(worker_group.clone());
-        });
 
         Arc::new(Self {
             work_buckets,
@@ -302,7 +298,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Get a schedulable work packet without retry.
     #[inline(always)]
-    fn pop_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
+    fn poll_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
         let mut should_retry = false;
         // Try find a packet that can be processed only by this worker.
         if let Some(w) = worker.shared.local_work.pop() {
@@ -336,10 +332,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Get a schedulable work packet.
     #[inline]
-    fn pop_schedulable_work(&self, worker: &GCWorker<VM>) -> Option<Box<dyn GCWork<VM>>> {
+    fn poll_schedulable_work(&self, worker: &GCWorker<VM>) -> Option<Box<dyn GCWork<VM>>> {
         // Loop until we successfully get a packet.
         loop {
-            match self.pop_schedulable_work_once(worker) {
+            match self.poll_schedulable_work_once(worker) {
                 Steal::Success(w) => {
                     return Some(w);
                 }
@@ -358,7 +354,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Park the worker if there're no available packets.
     #[inline]
     pub fn poll(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        self.pop_schedulable_work(worker)
+        self.poll_schedulable_work(worker)
             .unwrap_or_else(|| self.poll_slow(worker))
     }
 
@@ -368,7 +364,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
             debug_assert!(!worker.shared.is_parked());
-            if let Some(work) = self.pop_schedulable_work(worker) {
+            // Retry polling
+            if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
             }
             // Prepare to park this worker
@@ -376,9 +373,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             // If all workers are parked, try activate new buckets
             if all_parked {
                 if self.update_buckets() {
+                    // We're not going to sleep since a new bucket is just open.
                     self.worker_group.dec_parked_workers();
                     // We guarantee that we can at least fetch one packet.
-                    let work = self.pop_schedulable_work(worker).unwrap();
+                    let work = self.poll_schedulable_work(worker).unwrap();
                     // Optimize for the case that a newly opened bucket only has one packet.
                     // We only notify_all if there're motr than one packets available.
                     if !self.all_activated_buckets_are_empty() {

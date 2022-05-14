@@ -49,30 +49,25 @@ pub struct WorkBucket<VM: VMBinding> {
     prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
     can_open: Option<Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>>,
-    group: Option<Arc<WorkerGroup<VM>>>,
+    group: Arc<WorkerGroup<VM>>,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
     pub const DEFAULT_PRIORITY: usize = 1000;
 
-    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+    pub fn new(
+        active: bool,
+        monitor: Arc<(Mutex<()>, Condvar)>,
+        group: Arc<WorkerGroup<VM>>,
+    ) -> Self {
         Self {
             active: AtomicBool::new(active),
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
-            group: None,
+            group,
         }
-    }
-
-    pub fn set_group(&mut self, group: Arc<WorkerGroup<VM>>) {
-        self.group = Some(group)
-    }
-
-    #[inline(always)]
-    fn parked_workers(&self) -> Option<usize> {
-        Some(self.group.as_ref()?.parked_workers())
     }
 
     #[inline(always)]
@@ -82,11 +77,9 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         // Notify one if there're any parked workers.
-        if let Some(parked) = self.parked_workers() {
-            if parked > 0 {
-                let _guard = self.monitor.0.lock().unwrap();
-                self.monitor.1.notify_one()
-            }
+        if self.group.parked_workers() > 0 {
+            let _guard = self.monitor.0.lock().unwrap();
+            self.monitor.1.notify_one()
         }
     }
 
@@ -97,22 +90,20 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         // Notify all if there're any parked workers.
-        if let Some(parked) = self.parked_workers() {
-            if parked > 0 {
-                let _guard = self.monitor.0.lock().unwrap();
-                self.monitor.1.notify_all()
-            }
+        if self.group.parked_workers() > 0 {
+            let _guard = self.monitor.0.lock().unwrap();
+            self.monitor.1.notify_all()
         }
     }
 
     #[inline(always)]
     pub fn is_activated(&self) -> bool {
-        self.active.load(Ordering::SeqCst)
+        self.active.load(Ordering::Relaxed)
     }
 
     /// Enable the bucket
     pub fn activate(&self) {
-        self.active.store(true, Ordering::SeqCst);
+        self.active.store(true, Ordering::Relaxed);
     }
 
     /// Test if the bucket is drained
@@ -134,7 +125,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Disable the bucket
     pub fn deactivate(&self) {
         debug_assert!(self.queue.is_empty(), "Bucket not drained before close");
-        self.active.store(false, Ordering::SeqCst);
+        self.active.store(false, Ordering::Relaxed);
     }
 
     /// Add a work packet to this bucket
@@ -142,27 +133,21 @@ impl<VM: VMBinding> WorkBucket<VM> {
     #[inline(always)]
     pub fn add_prioritized(&self, work: Box<dyn GCWork<VM>>) {
         self.prioritized_queue.as_ref().unwrap().push(work);
-        if self.is_activated() && self.parked_workers().map(|c| c > 0).unwrap_or(true) {
-            self.notify_one_worker();
-        }
+        self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
     #[inline(always)]
     pub fn add<W: GCWork<VM>>(&self, work: W) {
         self.queue.push(Box::new(work));
-        if self.is_activated() && self.parked_workers().map(|c| c > 0).unwrap_or(true) {
-            self.notify_one_worker();
-        }
+        self.notify_one_worker();
     }
 
     /// Add a work packet to this bucket
     #[inline(always)]
     pub fn add_dyn(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
-        if self.is_activated() && self.parked_workers().map(|c| c > 0).unwrap_or(true) {
-            self.notify_one_worker();
-        }
+        self.notify_one_worker();
     }
 
     /// Add multiple packets with a higher priority.
@@ -190,7 +175,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Get a work packet from this bucket
     #[inline(always)]
     pub fn poll(&self, worker: &Worker<Box<dyn GCWork<VM>>>) -> Steal<Box<dyn GCWork<VM>>> {
-        if !self.active.load(Ordering::SeqCst) || self.is_empty() {
+        if !self.is_activated() || self.is_empty() {
             return Steal::Empty;
         }
         if let Some(prioritized_queue) = self.prioritized_queue.as_ref() {
