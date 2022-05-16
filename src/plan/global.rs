@@ -605,6 +605,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         &self,
         _trace: &mut T,
         _object: ObjectReference,
+        _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
         if self.code_space.in_space(_object) {
@@ -629,7 +630,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             trace!("trace_object: object in boot space");
             return self.vm_space.trace_object(_trace, _object);
         }
-        panic!("No special case for space in trace_object({:?})", _object);
+
+        VM::VMActivePlan::vm_trace_object::<T>(_trace, _object, _worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
@@ -907,6 +909,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self,
         trace: &mut T,
         object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.immortal.in_space(object) {
             trace!("trace_object: object in immortal space");
@@ -916,7 +919,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return self.los.trace_object(trace, object);
         }
-        self.base.trace_object::<T>(trace, object)
+        self.base.trace_object::<T>(trace, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {

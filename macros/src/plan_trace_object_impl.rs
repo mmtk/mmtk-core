@@ -48,7 +48,7 @@ pub(crate) fn generate_trace_object<'a>(
         }
     } else {
         quote! {
-            panic!("No more spaces to try")
+            <VM::VMActivePlan as crate::vm::ActivePlan<VM>>::vm_trace_object::<T>(__mmtk_trace, __mmtk_objref, __mmtk_worker)
         }
     };
 

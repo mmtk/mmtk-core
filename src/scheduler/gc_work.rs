@@ -398,6 +398,11 @@ pub trait ProcessEdgesWork:
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
+
+    /// Trace an MMTk object. The implementation should forward this call to the policy-specific
+    /// `trace_object()` methods, depending on which space this object is in.
+    /// If the object is not in any MMTk space, the implementation should forward the call to
+    /// `ActivePlan::vm_trace_object()` to let the binding handle the tracing.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 
     #[cfg(feature = "sanity")]
