@@ -7,11 +7,10 @@ use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
 use crossbeam::deque::{Stealer, Worker};
+use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-
-const LOCALLY_CACHED_PACKETS: usize = 1;
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
@@ -21,7 +20,7 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
     /// A queue of GCWork that can only be processed by the owned thread.
-    pub local_work: Worker<Box<dyn GCWork<VM>>>,
+    pub local_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Local work packet queue.
     pub local_work_buffer: Worker<Box<dyn GCWork<VM>>>,
 }
@@ -37,7 +36,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
         Self {
             parked: AtomicBool::new(true),
             stat: Default::default(),
-            local_work: Worker::new_fifo(),
+            local_work: ArrayQueue::new(16),
             local_work_buffer: Worker::new_fifo(),
         }
     }
@@ -114,13 +113,17 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// pushed to the global bucket with a higher priority.
     #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
-            || self.shared.local_work_buffer.len() >= LOCALLY_CACHED_PACKETS
-        {
+        if !self.scheduler().work_buckets[bucket].is_activated() {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             return;
         }
         self.shared.local_work_buffer.push(Box::new(work));
+        if self.shared.local_work_buffer.len() > 512 {
+            while let Some(w) = self.shared.local_work_buffer.pop() {
+                self.scheduler.work_buckets[bucket].add_dyn_no_notify(w, true);
+            }
+            self.scheduler.work_buckets[bucket].notify_all_workers();
+        }
     }
 
     /// Add a work packet to the work queue.
@@ -128,13 +131,17 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// pushed to the global bucket.
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated()
-            || self.shared.local_work_buffer.len() >= LOCALLY_CACHED_PACKETS
-        {
+        if !self.scheduler().work_buckets[bucket].is_activated() {
             self.scheduler.work_buckets[bucket].add(work);
             return;
         }
         self.shared.local_work_buffer.push(Box::new(work));
+        if self.shared.local_work_buffer.len() > 512 {
+            while let Some(w) = self.shared.local_work_buffer.pop() {
+                self.scheduler.work_buckets[bucket].add_dyn_no_notify(w, false);
+            }
+            self.scheduler.work_buckets[bucket].notify_all_workers();
+        }
     }
 
     pub fn is_coordinator(&self) -> bool {
