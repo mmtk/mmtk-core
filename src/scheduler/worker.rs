@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
-const LOCALLY_CACHED_PACKETS: usize = 16;
+const LOCALLY_CACHED_PACKETS: usize = 1;
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
