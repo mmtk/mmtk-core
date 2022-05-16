@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["The MMTk Developers <>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -19,7 +19,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.11.0", path = "macros/" }
+mmtk-macros = { version = "0.12.0", path = "macros/" }
 
 custom_derive = "0.1"
 enum_derive = "0.1"
