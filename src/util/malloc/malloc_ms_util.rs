@@ -1,27 +1,10 @@
 use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::Address;
 use crate::vm::VMBinding;
-#[cfg(feature = "malloc_jemalloc")]
-pub use jemalloc_sys::{calloc, free, malloc_usable_size, posix_memalign};
+use crate::util::malloc::library::*;
 
-#[cfg(feature = "malloc_mimalloc")]
-pub use mimalloc_sys::{
-    mi_calloc as calloc, mi_calloc_aligned, mi_free as free,
-    mi_malloc_usable_size as malloc_usable_size,
-};
-
-#[cfg(feature = "malloc_hoard")]
-pub use hoard_sys::{calloc, free, malloc_usable_size};
-
-#[cfg(not(any(
-    feature = "malloc_jemalloc",
-    feature = "malloc_mimalloc",
-    feature = "malloc_hoard",
-)))]
-pub use libc::{calloc, free, malloc_usable_size, posix_memalign};
-
-#[cfg(not(any(feature = "malloc_mimalloc", feature = "malloc_hoard",)))]
-fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
+/// Allocate with alignment. This also guarantees the memory is zero initialized.
+pub fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     let mut ptr = std::ptr::null_mut::<libc::c_void>();
     let ptr_ptr = std::ptr::addr_of_mut!(ptr);
     let result = unsafe { posix_memalign(ptr_ptr, align, size) };
@@ -31,19 +14,6 @@ fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
     let address = Address::from_mut_ptr(ptr);
     crate::util::memory::zero(address, size);
     address
-}
-
-#[cfg(feature = "malloc_mimalloc")]
-fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
-    let raw = unsafe { mi_calloc_aligned(1, size, align) };
-    Address::from_mut_ptr(raw)
-}
-
-// hoard_sys does not provide align_alloc,
-// we have to do it ourselves
-#[cfg(feature = "malloc_hoard")]
-fn align_alloc<VM: VMBinding>(size: usize, align: usize) -> Address {
-    align_offset_alloc::<VM>(size, align, 0)
 }
 
 // Beside returning the allocation result,

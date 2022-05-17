@@ -152,6 +152,109 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.plan.get_allocator_mapping()[semantics]
 }
 
+/// The standard malloc. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+#[cfg(not(feature = "malloc_counted_size"))]
+pub fn mmtk_malloc(
+    size: usize,
+) -> Address {
+    crate::util::malloc::malloc(size)
+}
+
+/// The standard malloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+#[cfg(feature = "malloc_counted_size")]
+pub fn mmtk_malloc<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    size: usize,
+) -> Address {
+    let res = crate::util::malloc::malloc(size);
+    if !res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(size);
+    }
+    return res;
+}
+
+/// The standard calloc.
+#[cfg(not(feature = "malloc_counted_size"))]
+pub fn mmtk_calloc(
+    num: usize,
+    size: usize,
+) -> Address {
+    crate::util::malloc::calloc(num, size)
+}
+
+/// The standard calloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance.
+#[cfg(feature = "malloc_counted_size")]
+pub fn mmtk_calloc<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    num: usize,
+    size: usize,
+) -> Address {
+    let res = crate::util::malloc::calloc(num, size);
+    if !res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(num * size);
+    }
+    return res;
+}
+
+/// The standard realloc.
+#[cfg(not(feature = "malloc_counted_size"))]
+pub fn mmtk_realloc(
+    addr: Address,
+    size: usize
+) -> Address {
+    crate::util::malloc::realloc(addr, size)
+}
+
+/// The standard realloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn mmtk_realloc_with_old_size<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    addr: Address,
+    size: usize,
+    old_size: usize
+) -> Address {
+    let res = crate::util::malloc::realloc(addr, size);
+
+    if !addr.is_zero() {
+        mmtk.plan.base().decrease_malloc_bytes_by(old_size);
+    }
+    if size != 0 && !res.is_zero() {
+        mmtk.plan.base().increase_malloc_bytes_by(size);
+    }
+
+    return res;
+}
+
+/// The standard free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(not(feature = "malloc_counted_size"))]
+pub fn mmtk_free(
+    addr: Address
+) {
+    crate::util::malloc::free(addr)
+}
+
+/// The standard free except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn mmtk_free_with_size<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    addr: Address,
+    old_size: usize
+) {
+    crate::util::malloc::free(addr);
+    if !addr.is_zero() {
+        mmtk.plan.base().decrease_malloc_bytes_by(old_size);
+    }
+}
+
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
 /// Arguments:
