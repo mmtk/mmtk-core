@@ -6,7 +6,6 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
-use crate::util::malloc::library::*;
 use crate::util::metadata::side_metadata::{
     bzero_metadata, SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };

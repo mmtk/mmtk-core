@@ -1,9 +1,9 @@
-pub(crate) mod malloc_ms_util;
 pub(crate) mod library;
+pub mod malloc_ms_util;
 
-use crate::MMTK;
-use crate::vm::VMBinding;
 use crate::util::Address;
+use crate::vm::VMBinding;
+use crate::MMTK;
 
 #[inline(always)]
 pub fn malloc(size: usize) -> Address {

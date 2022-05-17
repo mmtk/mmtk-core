@@ -597,7 +597,9 @@ impl<VM: VMBinding> BasePlan<VM> {
         // If we need to count malloc'd size as part of our heap, we add it here.
         #[cfg(feature = "malloc_counted_size")]
         {
-            pages += crate::util::conversions::bytes_to_pages_up(self.malloc_bytes.load(Ordering::SeqCst));
+            pages += crate::util::conversions::bytes_to_pages_up(
+                self.malloc_bytes.load(Ordering::SeqCst),
+            );
         }
 
         // The VM space may be used as an immutable boot image, in which case, we should not count
@@ -848,6 +850,10 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[cfg(feature = "malloc_counted_size")]
     pub(crate) fn decrease_malloc_bytes_by(&self, size: usize) {
         self.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
+    }
+    #[cfg(feature = "malloc_counted_size")]
+    pub fn get_malloc_bytes(&self) -> usize {
+        self.malloc_bytes.load(Ordering::SeqCst)
     }
 }
 
