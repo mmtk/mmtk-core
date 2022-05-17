@@ -1,8 +1,8 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::VMWorkerThread;
-use crate::vm::{Collection, VMBinding};
 use crate::vm::Finalizable;
+use crate::vm::{Collection, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;
 
@@ -34,10 +34,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.candidates.push(object);
     }
 
-    fn forward_finalizable_reference<E: ProcessEdgesWork>(
-        e: &mut E,
-        mut finalizable: F,
-    ) -> F {
+    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, mut finalizable: F) -> F {
         finalizable.set_reference(e.trace_object(finalizable.load_reference()));
         finalizable
     }
@@ -50,12 +47,9 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         // theoratically we could do the following loop at any time in a GC (not necessarily after closure phase).
         // But we have to iterate through candidates after closure.
         self.candidates.append(&mut self.ready_for_finalize);
+        debug_assert!(self.ready_for_finalize.is_empty());
 
-        for f in self
-            .candidates
-            .drain(start..)
-            .collect::<Vec<F>>()
-        {
+        for f in self.candidates.drain(start..).collect::<Vec<F>>() {
             let reff = f.load_reference();
             trace!("Pop {:?} for finalization", reff);
             if reff.is_live() {
@@ -65,15 +59,16 @@ impl<F: Finalizable> FinalizableProcessor<F> {
                 continue;
             }
 
-            FinalizableProcessor::<F>::forward_finalizable_reference(e, f);
+            // We should not at this point keep the object alive. A binding may register an object
+            // multiple times with different finalizer methods. If we keep the object here, and encounter
+            // the same object later, it will be considered as alive, and won't be pushed to the ready_to_finalize
+            // queue.
+            // So we simply push the object to the ready_for_finalize queue, and keep them alive later.
             self.ready_for_finalize.push(f);
-            trace!(
-                "{:?} is not live, push {:?} to ready_for_finalize",
-                reff,
-                f
-            );
         }
-        e.flush();
+
+        // Keep the finalizable objects alive.
+        self.forward_finalizable(e, nursery);
 
         self.nursery_index = self.candidates.len();
 
