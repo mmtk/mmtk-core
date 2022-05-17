@@ -34,6 +34,25 @@ pub trait Scanning<VM: VMBinding> {
         edge_visitor: &mut EV,
     );
 
+    /// Scan and object and process all edges at the same time.
+    ///
+    /// Arguments:
+    /// * `tls`: The VM-specific thread-local storage for the current worker.
+    /// * `object`: The object to be scanned.
+    /// * `trace_object`: Called back for the value held in each edge. The return value of
+    ///   `trace_object` is the new value of the edge.
+    fn scan_object_and_process_edges<F: FnMut(ObjectReference) -> ObjectReference> (
+        _tls: VMWorkerThread,
+        _object: ObjectReference,
+        _trace_object: F,
+    ) {
+        unimplemented!()
+    }
+
+    fn supports_edge_enqueuing(_tls: VMWorkerThread, _object: ObjectReference) -> bool {
+        true
+    }
+
     /// MMTk calls this method at the first time during a collection that thread's stacks
     /// have been scanned. This can be used (for example) to clean up
     /// obsolete compiled methods that are no longer being executed.
