@@ -64,12 +64,8 @@ impl ReferenceProcessors {
     /// However, for some plans like mark compact, at the point we do ref scanning, we do not know
     /// the forwarding addresses yet, thus we cannot do forwarding during scan refs. And for those
     /// plans, this separate step is required.
-    pub fn forward_refs<E: ProcessEdgesWork>(
-        &self,
-        worker: &mut GCWorker<E::VM>,
-        trace: &mut E,
-        mmtk: &'static MMTK<E::VM>,
-    ) {
+    pub fn forward_refs<E: ProcessEdgesWork>(&self, worker: &mut GCWorker<E::VM>, trace: &mut E) {
+        let mmtk = worker.mmtk;
         debug_assert!(
             mmtk.plan.constraints().needs_forward_after_liveness,
             "A plan with needs_forward_after_liveness=false does not need a separate forward step"
@@ -85,12 +81,8 @@ impl ReferenceProcessors {
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
 
     /// Scan soft references.
-    pub fn scan_soft_refs<E: ProcessEdgesWork>(
-        &self,
-        worker: &mut GCWorker<E::VM>,
-        trace: &mut E,
-        mmtk: &'static MMTK<E::VM>,
-    ) {
+    pub fn scan_soft_refs<E: ProcessEdgesWork>(&self, worker: &mut GCWorker<E::VM>, trace: &mut E) {
+        let mmtk = worker.mmtk;
         // For soft refs, it is up to the VM to decide when to reclaim this.
         // If this is not an emergency collection, we have no heap stress. We simply retain soft refs.
         if !mmtk.plan.is_emergency_collection() {
@@ -105,12 +97,8 @@ impl ReferenceProcessors {
     }
 
     /// Scan weak references.
-    pub fn scan_weak_refs<E: ProcessEdgesWork>(
-        &self,
-        worker: &mut GCWorker<E::VM>,
-        trace: &mut E,
-        mmtk: &'static MMTK<E::VM>,
-    ) {
+    pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, worker: &mut GCWorker<E::VM>, trace: &mut E) {
+        let mmtk = worker.mmtk;
         self.soft
             .scan::<E>(worker, trace, mmtk.plan.is_current_gc_nursery());
         self.weak
@@ -122,8 +110,8 @@ impl ReferenceProcessors {
         &self,
         worker: &mut GCWorker<E::VM>,
         trace: &mut E,
-        mmtk: &'static MMTK<E::VM>,
     ) {
+        let mmtk = worker.mmtk;
         self.phantom
             .scan::<E>(worker, trace, mmtk.plan.is_current_gc_nursery());
     }
@@ -532,8 +520,7 @@ pub struct SoftRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for SoftRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk);
-        mmtk.reference_processors
-            .scan_soft_refs(worker, &mut w, mmtk);
+        mmtk.reference_processors.scan_soft_refs(worker, &mut w);
         w.flush(worker);
     }
 }
@@ -548,8 +535,7 @@ pub struct WeakRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for WeakRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk);
-        mmtk.reference_processors
-            .scan_weak_refs(worker, &mut w, mmtk);
+        mmtk.reference_processors.scan_weak_refs(worker, &mut w);
         w.flush(worker);
     }
 }
@@ -564,8 +550,7 @@ pub struct PhantomRefProcessing<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for PhantomRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk);
-        mmtk.reference_processors
-            .scan_phantom_refs(worker, &mut w, mmtk);
+        mmtk.reference_processors.scan_phantom_refs(worker, &mut w);
         w.flush(worker);
     }
 }
@@ -580,7 +565,7 @@ pub struct RefForwarding<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for RefForwarding<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk);
-        mmtk.reference_processors.forward_refs(worker, &mut w, mmtk);
+        mmtk.reference_processors.forward_refs(worker, &mut w);
         w.flush(worker);
     }
 }
