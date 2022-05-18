@@ -326,9 +326,6 @@ pub struct ProcessEdgesBase<VM: VMBinding> {
     pub edges: Vec<Address>,
     pub nodes: Vec<ObjectReference>,
     mmtk: &'static MMTK<VM>,
-    // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
-    // Because a copying gc will dereference this pointer at least once for every object copy.
-    worker: *mut GCWorker<VM>,
     pub roots: bool,
 }
 
@@ -349,16 +346,8 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
             edges,
             nodes: vec![],
             mmtk,
-            worker: std::ptr::null_mut(),
             roots,
         }
-    }
-    pub fn set_worker(&mut self, worker: &mut GCWorker<VM>) {
-        self.worker = worker;
-    }
-    #[inline]
-    pub fn worker(&self) -> &'static mut GCWorker<VM> {
-        unsafe { &mut *self.worker }
     }
     #[inline]
     pub fn mmtk(&self) -> &'static MMTK<VM> {
@@ -398,7 +387,11 @@ pub trait ProcessEdgesWork:
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
+    fn trace_object(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+    ) -> ObjectReference;
 
     #[cfg(feature = "sanity")]
     fn cache_roots_for_sanity_gc(&mut self) {
@@ -424,14 +417,18 @@ pub trait ProcessEdgesWork:
     /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
     /// Otherwise, the work packet will be added the Closure work bucket and will be dispatched later by the scheduler.
     #[inline]
-    fn start_or_dispatch_scan_work(&mut self, work_packet: Box<dyn GCWork<Self::VM>>) {
+    fn start_or_dispatch_scan_work(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        work_packet: Box<dyn GCWork<Self::VM>>,
+    ) {
         if Self::SCAN_OBJECTS_IMMEDIATELY {
             // We execute this `scan_objects_work` immediately.
             // This is expected to be a useful optimization because,
             // say for _pmd_ with 200M heap, we're likely to have 50000~60000 `ScanObjects` work packets
             // being dispatched (similar amount to `ProcessEdgesWork`).
             // Executing these work packets now can remarkably reduce the global synchronization time.
-            self.worker().do_boxed_work(work_packet);
+            worker.do_boxed_work(work_packet);
         } else {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add_boxed(work_packet);
         }
@@ -449,27 +446,27 @@ pub trait ProcessEdgesWork:
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
     /// this method will simply return with no work packet created.
     #[cold]
-    fn flush(&mut self) {
+    fn flush(&mut self, worker: &mut GCWorker<Self::VM>) {
         if self.nodes.is_empty() {
             return;
         }
         let nodes = self.pop_nodes();
-        self.start_or_dispatch_scan_work(self.create_scan_work(nodes));
+        self.start_or_dispatch_scan_work(worker, self.create_scan_work(nodes));
     }
 
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, worker: &mut GCWorker<Self::VM>, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
+        let new_object = self.trace_object(worker, object);
         if Self::OVERWRITE_REFERENCE {
             unsafe { slot.store(new_object) };
         }
     }
 
     #[inline]
-    fn process_edges(&mut self) {
+    fn process_edges(&mut self, worker: &mut GCWorker<Self::VM>) {
         for i in 0..self.edges.len() {
-            self.process_edge(self.edges[i])
+            self.process_edge(worker, self.edges[i])
         }
     }
 }
@@ -478,10 +475,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for E {
     #[inline]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessEdgesWork");
-        self.set_worker(worker);
-        self.process_edges();
+        self.process_edges(worker);
         if !self.nodes.is_empty() {
-            self.flush();
+            self.flush(worker);
         }
         #[cfg(feature = "sanity")]
         if self.roots {
@@ -510,7 +506,11 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     }
 
     #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+    fn trace_object(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+    ) -> ObjectReference {
         use crate::policy::space::*;
 
         if object.is_null() {
@@ -522,7 +522,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(object);
 
         // Erase <VM> type parameter
-        let worker = GCWorkerMutRef::new(self.worker());
+        let worker = GCWorkerMutRef::new(worker);
         let trace = SFTProcessEdgesMutRef::new(self);
 
         // Invoke trace object on sft
@@ -648,18 +648,21 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     #[inline(always)]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+    fn trace_object(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+    ) -> ObjectReference {
         if object.is_null() {
             return object;
         }
-        self.plan
-            .trace_object::<Self, KIND>(self, object, self.worker())
+        self.plan.trace_object::<Self, KIND>(self, object, worker)
     }
 
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, worker: &mut GCWorker<Self::VM>, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
+        let new_object = self.trace_object(worker, object);
         if P::may_move_objects::<KIND>() {
             unsafe { slot.store(new_object) };
         }

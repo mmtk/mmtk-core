@@ -136,11 +136,11 @@ impl<VM: VMBinding> GCWorker<VM> {
         &mut self.copy
     }
 
-    pub fn do_work(&'static mut self, mut work: impl GCWork<VM>) {
+    pub fn do_work(&mut self, mut work: impl GCWork<VM>) {
         work.do_work(self, self.mmtk);
     }
 
-    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
+    pub fn do_boxed_work(&mut self, mut work: Box<dyn GCWork<VM>>) {
         work.do_work(self, self.mmtk);
     }
 

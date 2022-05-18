@@ -1,6 +1,6 @@
 use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
+use crate::scheduler::{gc_work::*, GCWorker};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
@@ -23,16 +23,20 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
         Self { gen, base }
     }
     #[inline]
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+    fn trace_object(
+        &mut self,
+        worker: &mut GCWorker<Self::VM>,
+        object: ObjectReference,
+    ) -> ObjectReference {
         if object.is_null() {
             return object;
         }
-        self.gen.trace_object_nursery(self, object, self.worker())
+        self.gen.trace_object_nursery(self, object, worker)
     }
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
+    fn process_edge(&mut self, worker: &mut GCWorker<Self::VM>, slot: Address) {
         let object = unsafe { slot.load::<ObjectReference>() };
-        let new_object = self.trace_object(object);
+        let new_object = self.trace_object(worker, object);
         debug_assert!(!self.gen.nursery.in_space(new_object));
         unsafe { slot.store(new_object) };
     }
