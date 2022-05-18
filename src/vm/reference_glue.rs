@@ -41,7 +41,7 @@ pub trait ReferenceGlue<VM: VMBinding> {
     fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread);
 }
 
-pub trait Finalizable: Copy + std::fmt::Debug + Send {
+pub trait Finalizable: std::fmt::Debug + Send {
     fn load_reference(&self) -> ObjectReference;
     fn set_reference(&mut self, object: ObjectReference);
 }

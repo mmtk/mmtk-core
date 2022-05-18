@@ -34,9 +34,8 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.candidates.push(object);
     }
 
-    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, mut finalizable: F) -> F {
+    fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, finalizable: &mut F) {
         finalizable.set_reference(e.trace_object(finalizable.load_reference()));
-        finalizable
     }
 
     pub fn scan<E: ProcessEdgesWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {
@@ -49,11 +48,11 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.candidates.append(&mut self.ready_for_finalize);
         debug_assert!(self.ready_for_finalize.is_empty());
 
-        for f in self.candidates.drain(start..).collect::<Vec<F>>() {
+        for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
             let reff = f.load_reference();
             trace!("Pop {:?} for finalization", reff);
             if reff.is_live() {
-                FinalizableProcessor::<F>::forward_finalizable_reference(e, f);
+                FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
                 trace!("{:?} is live, push {:?} back to candidates", reff, f);
                 self.candidates.push(f);
                 continue;
@@ -78,14 +77,14 @@ impl<F: Finalizable> FinalizableProcessor<F> {
     pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
         self.candidates
             .iter_mut()
-            .for_each(|f| *f = FinalizableProcessor::<F>::forward_finalizable_reference(e, *f));
+            .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
     pub fn forward_finalizable<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {
         self.ready_for_finalize
             .iter_mut()
-            .for_each(|f| *f = FinalizableProcessor::<F>::forward_finalizable_reference(e, *f));
+            .for_each(|f| FinalizableProcessor::<F>::forward_finalizable_reference(e, f));
         e.flush();
     }
 
