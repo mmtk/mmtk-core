@@ -35,7 +35,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
     }
 
     fn forward_finalizable_reference<E: ProcessEdgesWork>(e: &mut E, finalizable: &mut F) {
-        finalizable.set_reference(e.trace_object(finalizable.load_reference()));
+        finalizable.keep_alive::<E>(e);
     }
 
     pub fn scan<E: ProcessEdgesWork>(&mut self, tls: VMWorkerThread, e: &mut E, nursery: bool) {

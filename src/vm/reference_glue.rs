@@ -51,6 +51,8 @@ pub trait ReferenceGlue<VM: VMBinding> {
     fn enqueue_references(references: &[ObjectReference], tls: VMWorkerThread);
 }
 
+use crate::scheduler::gc_work::ProcessEdgesWork;
+
 /// A finalizable object for MMTk. MMTk needs to know the actual object reference in the type,
 /// while a binding can use this type to store some runtime information about finalizable objects.
 /// For example, for bindings that allows multiple finalizer methods with one object, they can define
@@ -61,6 +63,12 @@ pub trait Finalizable: std::fmt::Debug + Send {
     fn load_reference(&self) -> ObjectReference;
     /// Store the object reference.
     fn set_reference(&mut self, object: ObjectReference);
+    /// Keep the heap references in the finalizable object alive. By default, we trace the reference. However,
+    /// if the finalizable object includes other heap references, the implementation should trace them as well.
+    /// Note that trace_object() may move objects so we need to write the new reference in case that it is moved.
+    fn keep_alive<E: ProcessEdgesWork>(&mut self, trace: &mut E) {
+        self.set_reference(trace.trace_object(self.load_reference()));
+    }
 }
 
 /// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings
