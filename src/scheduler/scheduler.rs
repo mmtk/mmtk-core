@@ -47,24 +47,23 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
-        let worker_group = WorkerGroup::new(num_workers);
 
         // Create work buckets for workers.
         let mut work_buckets = enum_map! {
-            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
-            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone()),
+            WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::FinalRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::PhantomRefClosure => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::CalculateForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::SecondRoots => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::RefForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::FinalizableForwarding => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Compact => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Release => WorkBucket::new(false, worker_monitor.clone()),
+            WorkBucketStage::Final => WorkBucket::new(false, worker_monitor.clone()),
         };
 
         // Set the open condition of each bucket.
@@ -104,6 +103,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         }
 
         let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new());
+
+        let worker_group = WorkerGroup::new(num_workers);
+        work_buckets.values_mut().for_each(|bucket| {
+            bucket.set_group(worker_group.clone());
+        });
 
         Arc::new(Self {
             work_buckets,
