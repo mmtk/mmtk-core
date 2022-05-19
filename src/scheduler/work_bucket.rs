@@ -49,30 +49,25 @@ pub struct WorkBucket<VM: VMBinding> {
     prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
     can_open: Option<Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>>,
-    group: Option<Arc<WorkerGroup<VM>>>,
+    group: Arc<WorkerGroup<VM>>,
 }
 
 impl<VM: VMBinding> WorkBucket<VM> {
     pub const DEFAULT_PRIORITY: usize = 1000;
 
-    pub fn new(active: bool, monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+    pub fn new(
+        active: bool,
+        monitor: Arc<(Mutex<()>, Condvar)>,
+        group: Arc<WorkerGroup<VM>>,
+    ) -> Self {
         Self {
             active: AtomicBool::new(active),
             queue: BucketQueue::new(),
             prioritized_queue: None,
             monitor,
             can_open: None,
-            group: None,
+            group,
         }
-    }
-
-    pub fn set_group(&mut self, group: Arc<WorkerGroup<VM>>) {
-        self.group = Some(group)
-    }
-
-    #[inline(always)]
-    fn parked_workers(&self) -> usize {
-        self.group.as_ref().unwrap().parked_workers()
     }
 
     #[inline(always)]
@@ -82,7 +77,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         // Notify one if there're any parked workers.
-        if self.parked_workers() > 0 {
+        if self.group.parked_workers() > 0 {
             let _guard = self.monitor.0.lock().unwrap();
             self.monitor.1.notify_one()
         }
@@ -95,7 +90,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             return;
         }
         // Notify all if there're any parked workers.
-        if self.parked_workers() > 0 {
+        if self.group.parked_workers() > 0 {
             let _guard = self.monitor.0.lock().unwrap();
             self.monitor.1.notify_all()
         }
