@@ -27,8 +27,8 @@ pub use self::collection::Collection;
 pub use self::collection::GCThreadContext;
 pub use self::object_model::specs::*;
 pub use self::object_model::ObjectModel;
-pub use self::reference_glue::ReferenceGlue;
 pub use self::reference_glue::Finalizable;
+pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::EdgeVisitor;
 pub use self::scanning::Scanning;
 

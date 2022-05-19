@@ -1,5 +1,6 @@
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::Finalizable;
 use crate::vm::{Collection, VMBinding};
@@ -92,10 +93,33 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         self.ready_for_finalize.pop()
     }
 
-    pub fn get_added_object(&mut self) -> Option<ObjectReference> {
-        self.ready_for_finalize.pop().or_else(|| {
-            self.candidates.pop()
-        })
+    pub fn get_all_finalizers(&mut self) -> Vec<F> {
+        let mut candidates = vec![];
+        std::mem::swap(&mut self.candidates, &mut candidates);
+        let mut ready_objects = vec![];
+        std::mem::swap(&mut self.ready_for_finalize, &mut ready_objects);
+
+        candidates.extend(ready_objects);
+        candidates
+    }
+
+    pub fn get_finalizers_for(&mut self, object: ObjectReference) -> Vec<F> {
+        let drain_filter = |vec: &mut Vec<F>| -> Vec<F> {
+            let mut i = 0;
+            let mut ret = vec![];
+            while i < vec.len() {
+                if vec[i].load_reference() == object {
+                    let val = vec.remove(i);
+                    ret.push(val);
+                } else {
+                    i += 1;
+                }
+            }
+            ret
+        };
+        let mut ret: Vec<F> = drain_filter(&mut self.candidates);
+        ret.extend(drain_filter(&mut self.ready_for_finalize));
+        ret
     }
 }
 
