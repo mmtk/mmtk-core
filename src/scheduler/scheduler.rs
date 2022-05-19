@@ -393,7 +393,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             guard = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             self.worker_group.dec_parked_workers();
-            worker.shared.parked.store(false, Ordering::SeqCst);
+            worker.shared.parked.store(false, Ordering::Relaxed);
         }
     }
 

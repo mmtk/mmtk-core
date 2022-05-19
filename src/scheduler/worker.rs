@@ -74,7 +74,7 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn is_parked(&self) -> bool {
-        self.parked.load(Ordering::SeqCst)
+        self.parked.load(Ordering::Relaxed)
     }
 
     pub fn borrow_stat(&self) -> AtomicRef<WorkerLocalStat<VM>> {
@@ -184,7 +184,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        self.shared.parked.store(false, Ordering::SeqCst);
+        self.shared.parked.store(false, Ordering::Relaxed);
         loop {
             let mut work = self.poll();
             debug_assert!(!self.shared.is_parked());
@@ -254,7 +254,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Return true if all the workers are parked.
     #[inline(always)]
     pub fn inc_parked_workers(&self) -> bool {
-        let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
+        let old = self.parked_workers.fetch_add(1, Ordering::Relaxed);
         old + 1 == self.worker_count()
     }
 
@@ -262,13 +262,13 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Called after a worker is resumed from the parked state.
     #[inline(always)]
     pub fn dec_parked_workers(&self) {
-        self.parked_workers.fetch_sub(1, Ordering::SeqCst);
+        self.parked_workers.fetch_sub(1, Ordering::Relaxed);
     }
 
     /// Get the number of parked workers in the group
     #[inline(always)]
     pub fn parked_workers(&self) -> usize {
-        self.parked_workers.load(Ordering::SeqCst)
+        self.parked_workers.load(Ordering::Relaxed)
     }
 
     /// Check if all the workers are packed
