@@ -263,6 +263,60 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     }
 }
 
+struct NonMovingProcessEdgesWork<E: ProcessEdgesWork> {
+    delegate: E,
+    nodes: Vec<ObjectReference>,
+    phantom: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork> NonMovingProcessEdgesWork<E> {
+    fn new(nodes: Vec<ObjectReference>, mmtk: &'static MMTK<E::VM>) -> Self {
+        Self {
+            delegate: E::new(vec![], false, mmtk),
+            nodes,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for NonMovingProcessEdgesWork<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        for node in self.nodes.iter() {
+            let new_object = self.delegate.trace_object(*node);
+            if new_object != *node {
+                panic!("Object moved! {} -> {}", node, new_object);
+            }
+        }
+        let new_nodes = std::mem::take(&mut self.delegate.nodes);
+        let scan_objects = ScanObjects::<E>::new(new_nodes, false);
+        let bucket = WorkBucketStage::Closure;
+        worker.add_work(bucket, scan_objects);
+    }
+}
+
+struct GenericProcessRootsWorkFactory<E: ProcessEdgesWork> {
+    mmtk: &'static MMTK<E::VM>,
+}
+impl<E: ProcessEdgesWork> GenericProcessRootsWorkFactory<E> {
+    pub fn new(mmtk: &'static MMTK<E::VM>) -> Box<Self> {
+        Box::new(Self { mmtk })
+    }
+}
+
+impl<E: ProcessEdgesWork> RootsHandlerFactory for GenericProcessRootsWorkFactory<E> {
+    fn create_process_edge_roots_work(&self, edges: Vec<Address>) {
+        let bucket = WorkBucketStage::Closure;
+        let packet = E::new(edges, true, self.mmtk);
+        memory_manager::add_work_packet(self.mmtk, bucket, packet)
+    }
+
+    fn create_process_node_roots_work(&self, nodes: Vec<ObjectReference>) {
+        let bucket = WorkBucketStage::Closure;
+        let packet = NonMovingProcessEdgesWork::<E>::new(nodes, self.mmtk);
+        memory_manager::add_work_packet(self.mmtk, bucket, packet)
+    }
+}
+
 #[derive(Default)]
 pub struct ScanStackRoots<Edges: ProcessEdgesWork>(PhantomData<Edges>);
 
@@ -275,7 +329,11 @@ impl<E: ProcessEdgesWork> ScanStackRoots<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
+        let factory = GenericProcessRootsWorkFactory::<E>::new(mmtk);
+        <E::VM as VMBinding>::VMScanning::scan_threads_root(worker.tls, factory);
+
+        // FIXME: scan_threads_root is asynchronous.  Thread scanning is not complete by now!
+        // Introduce a fork-join mechanism.
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
@@ -289,15 +347,17 @@ pub struct ScanStackRoot<Edges: ProcessEdgesWork>(pub &'static mut Mutator<Edges
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
+        let factory = GenericProcessRootsWorkFactory::<E>::new(mmtk);
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(
-            unsafe { &mut *(self.0 as *mut _) },
-            worker.tls,
+        let mutator = unsafe { &mut *(self.0 as *mut _) };
+        <E::VM as VMBinding>::VMScanning::scan_thread_root(
+            worker.tls, factory, mutator,
         );
         self.0.flush();
 
         if mmtk.plan.base().inform_stack_scanned(mutators) {
+            // FIXME: It is not complete yet! Scanning::scan_thread_root is asynchronous.
             <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
                 false, worker.tls,
             );
@@ -316,9 +376,10 @@ impl<E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
-        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>();
+        let factory = GenericProcessRootsWorkFactory::<E>::new(mmtk);
+        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
 
@@ -722,4 +783,9 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E
         }
         trace!("PlanScanObjects End");
     }
+}
+
+/// Do we really need this?
+pub trait ProcessNodesWork<VM: VMBinding>: GCWork<VM> {
+    fn new(nodes: Vec<ObjectReference>, roots: bool) -> Self;
 }

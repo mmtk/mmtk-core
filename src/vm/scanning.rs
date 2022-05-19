@@ -1,5 +1,4 @@
 use crate::plan::Mutator;
-use crate::scheduler::ProcessEdgesWork;
 use crate::util::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
@@ -9,6 +8,28 @@ pub trait EdgeVisitor {
     /// Call this function for each edge.
     fn visit_edge(&mut self, edge: Address);
     // TODO: Add visit_soft_edge, visit_weak_edge, ... here.
+}
+
+/// Root-scanning methods use this trait to spawn work packets for processing roots.
+pub trait RootsHandlerFactory {
+    /// Create work packets to handle the roots represented as edges.
+    ///
+    /// The work packet may update the edge.
+    ///
+    /// Arguments:
+    /// * `edges`: A vector of edges.
+    fn create_process_edge_roots_work(&self, edges: Vec<Address>);
+
+    /// Create work packets to handle edges.
+    ///
+    /// The work packet cannot update the roots.  This is a good chance to pin the objects.
+    ///
+    /// This method is useful for conservative stack scanning, or VMs that cannot update some
+    /// of the root edges.
+    ///
+    /// Arguments:
+    /// * `nodes`: A vector of object references pointed by root edges.
+    fn create_process_node_roots_work(&self, nodes: Vec<ObjectReference>);
 }
 
 /// VM-specific methods for scanning roots/objects.
@@ -79,21 +100,28 @@ pub trait Scanning<VM: VMBinding> {
     }
 
     /// Scan all the mutators for roots.
-    fn scan_thread_roots<W: ProcessEdgesWork<VM = VM>>();
+    fn scan_threads_root(
+        tls: VMWorkerThread,
+        factory: Box<dyn RootsHandlerFactory>,
+    );
 
     /// Scan one mutator for roots.
     ///
     /// Arguments:
     /// * `mutator`: The reference to the mutator whose roots will be scanned.
     /// * `tls`: The GC thread that is performing this scanning.
-    fn scan_thread_root<W: ProcessEdgesWork<VM = VM>>(
-        mutator: &'static mut Mutator<VM>,
+    fn scan_thread_root(
         tls: VMWorkerThread,
+        factory: Box<dyn RootsHandlerFactory>,
+        mutator: &'static mut Mutator<VM>,
     );
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
-    fn scan_vm_specific_roots<W: ProcessEdgesWork<VM = VM>>();
+    fn scan_vm_specific_roots(
+        tls: VMWorkerThread,
+        factory: Box<dyn RootsHandlerFactory>,
+    );
 
     /// Return whether the VM supports return barriers. This is unused at the moment.
     fn supports_return_barrier() -> bool;
