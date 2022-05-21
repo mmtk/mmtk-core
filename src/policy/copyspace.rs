@@ -1,4 +1,4 @@
-use crate::plan::ObjectQueue;
+use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
@@ -68,13 +68,21 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.into_mut::<VM>();
+        
         let worker = worker.into_mut::<VM>();
-        self.trace_object(trace, object, self.common.copy, worker)
+        self.trace_object(queue, object, self.common.copy, worker)
+    }
+
+    fn is_reachable(&self, object: ObjectReference) -> bool {
+        self.is_live(object)
+    }
+
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
+        true
     }
 }
 
@@ -110,14 +118,14 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
     #[inline(always)]
-    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.trace_object(trace, object, copy, worker)
+        self.trace_object(queue, object, copy, worker)
     }
 
     #[inline(always)]
@@ -219,9 +227,9 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: ObjectQueue>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         semantics: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
@@ -262,7 +270,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 worker.get_copy_context_mut(),
             );
             trace!("Forwarding pointer");
-            trace.enqueue(new_object);
+            queue.enqueue(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
             new_object
         }

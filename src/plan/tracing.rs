@@ -7,19 +7,52 @@ use crate::scheduler::{GCWorker, WorkBucketStage};
 use crate::util::{Address, ObjectReference};
 use crate::vm::EdgeVisitor;
 
-/// This trait is the fundamental mechanism for performing a
-/// transitive closure over an object graph.
+/// This trait represents an object queue to enqueue objects during tracing.
 pub trait ObjectQueue {
-    // The signature of this function changes during the port
-    // because the argument `ObjectReference source` is never used in the original version
-    // See issue #5
+    /// Enqueue an object into the queue.
     fn enqueue(&mut self, object: ObjectReference);
 }
 
-impl<T: ProcessEdgesWork> ObjectQueue for T {
+/// An implementation of `ObjectQueue` using a `Vec`.
+pub struct VectorObjectQueue {
+    /// Enqueued nodes.
+    nodes: Vec<ObjectReference>,
+}
+
+impl VectorObjectQueue {
+    /// Reserve a capacity of this on first enqueue to avoid frequent resizing.
+    const CAPACITY: usize = 4096;
+
+    /// Create an empty `VectorObjectQueue`.
+    pub fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+        }
+    }
+
+    /// Return `true` if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Return the contents of the underlying vector.  It will empty the queue.
+    pub fn take(&mut self) -> Vec<ObjectReference> {
+        std::mem::take(&mut self.nodes)
+    }
+
+    /// Consume this `VectorObjectQueue` and return its underlying vector.
+    pub fn into_vec(self) -> Vec<ObjectReference> {
+        self.nodes
+    }
+}
+
+impl ObjectQueue for VectorObjectQueue {
     #[inline]
     fn enqueue(&mut self, object: ObjectReference) {
-        ProcessEdgesWork::process_node(self, object);
+        if self.nodes.is_empty() {
+            self.nodes.reserve(Self::CAPACITY);
+        }
+        self.nodes.push(object);
     }
 }
 

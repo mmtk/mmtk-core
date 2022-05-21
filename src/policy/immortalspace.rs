@@ -8,7 +8,7 @@ use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_metadata};
 use crate::util::{metadata, ObjectReference};
 
-use crate::plan::ObjectQueue;
+use crate::plan::{ObjectQueue, VectorObjectQueue};
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
@@ -80,12 +80,20 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.into_mut::<VM>();
-        self.trace_object(trace, object)
+        
+        self.trace_object(queue, object)
+    }
+
+    fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
+        None
+    }
+
+    fn is_in_space(&self, _object: ObjectReference) -> bool {
+        true
     }
 }
 
@@ -116,14 +124,14 @@ use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.trace_object(trace, object)
+        self.trace_object(queue, object)
     }
     #[inline(always)]
     fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
@@ -211,9 +219,9 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     pub fn release(&mut self) {}
 
-    pub fn trace_object<T: ObjectQueue>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
@@ -223,7 +231,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             object
         );
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
-            trace.enqueue(object);
+            queue.enqueue(object);
         }
         object
     }

@@ -1,5 +1,6 @@
 use super::metadata::*;
 use crate::plan::ObjectQueue;
+use crate::plan::VectorObjectQueue;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -97,12 +98,12 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.into_mut::<VM>();
-        self.trace_object(trace, object)
+        
+        self.trace_object(queue, object)
     }
 }
 
@@ -194,14 +195,14 @@ use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        self.trace_object(trace, object)
+        self.trace_object(queue, object)
     }
 
     #[inline(always)]
@@ -301,9 +302,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: ObjectQueue>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         if object.is_null() {
@@ -321,7 +322,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let chunk_start = conversions::chunk_align_down(address);
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             set_chunk_mark(chunk_start);
-            trace.enqueue(object);
+            queue.enqueue(object);
         }
 
         object

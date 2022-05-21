@@ -1,3 +1,4 @@
+use crate::plan::VectorObjectQueue;
 use crate::util::conversions::*;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
@@ -110,7 +111,9 @@ pub trait SFT {
     /// Immix has defrag trace and fast trace.
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        // We use concrete type for `queue` because SFT doesn't support generic parameters,
+        // and SFTProcessEdges uses `VectorObjectQueue`.
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
@@ -176,7 +179,7 @@ impl SFT for EmptySpaceSFT {
 
     fn sft_trace_object(
         &self,
-        _trace: SFTProcessEdgesMutRef,
+        _queue: &mut VectorObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {

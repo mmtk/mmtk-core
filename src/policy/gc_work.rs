@@ -20,9 +20,9 @@ use crate::vm::VMBinding;
 pub trait PolicyTraceObject<VM: VMBinding> {
     /// Trace object in the policy. If the policy copies objects, we should
     /// expect `copy` to be a `Some` value.
-    fn trace_object<T: ObjectQueue, const KIND: TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,

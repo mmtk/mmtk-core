@@ -601,9 +601,9 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<T: ObjectQueue>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        _trace: &mut T,
+        _queue: &mut Q,
         _object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
@@ -903,20 +903,20 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_used_pages()
     }
 
-    pub fn trace_object<T: ObjectQueue>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         if self.immortal.in_space(object) {
             trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(trace, object);
+            return self.immortal.trace_object(queue, object);
         }
         if self.los.in_space(object) {
             trace!("trace_object: object in los");
-            return self.los.trace_object(trace, object);
+            return self.los.trace_object(queue, object);
         }
-        self.base.trace_object::<T>(trace, object)
+        self.base.trace_object::<Q>(queue, object)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
@@ -974,9 +974,9 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// * `trace`: the current transitive closure
     /// * `object`: the object to trace. This is a non-nullable object reference.
     /// * `worker`: the GC worker that is tracing this object.
-    fn trace_object<T: ObjectQueue, const KIND: TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
