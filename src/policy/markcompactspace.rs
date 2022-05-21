@@ -11,7 +11,7 @@ use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
-use crate::{vm::*, TransitiveClosure};
+use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -105,7 +105,7 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -224,7 +224,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn release(&self) {}
 
-    pub fn trace_mark_object<T: TransitiveClosure>(
+    pub fn trace_mark_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -235,12 +235,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             object
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
-            trace.process_node(object);
+            trace.enqueue(object);
         }
         object
     }
 
-    pub fn trace_forward_object<T: TransitiveClosure>(
+    pub fn trace_forward_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -253,7 +253,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         // from this stage and onwards, mark bit is no longer needed
         // therefore, it can be reused to save one extra bit in metadata
         if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
-            trace.process_node(object);
+            trace.enqueue(object);
         }
 
         Self::get_header_forwarding_pointer(object)

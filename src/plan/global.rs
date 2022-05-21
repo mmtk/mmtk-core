@@ -4,7 +4,7 @@ use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
 use crate::plan::generational::global::Gen;
-use crate::plan::transitive_closure::TransitiveClosure;
+use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -601,7 +601,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         pages
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,
@@ -903,7 +903,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_used_pages()
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -974,7 +974,7 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// * `trace`: the current transitive closure
     /// * `object`: the object to trace. This is a non-nullable object reference.
     /// * `worker`: the GC worker that is tracing this object.
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,

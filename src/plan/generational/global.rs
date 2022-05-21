@@ -1,7 +1,7 @@
 use crate::plan::global::CommonPlan;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -178,7 +178,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
-    pub fn trace_object_full_heap<T: TransitiveClosure>(
+    pub fn trace_object_full_heap<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -196,7 +196,7 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.
-    pub fn trace_object_nursery<T: TransitiveClosure>(
+    pub fn trace_object_nursery<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,

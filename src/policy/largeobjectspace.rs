@@ -1,7 +1,7 @@
 use atomic::Ordering;
 
 use crate::plan::PlanConstraints;
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -120,7 +120,7 @@ use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -201,7 +201,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -224,7 +224,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
-                trace.process_node(object);
+                trace.enqueue(object);
             }
         }
         object

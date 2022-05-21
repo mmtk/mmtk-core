@@ -1,13 +1,13 @@
 //! Unsynchronized thread-local trace mechanism (superseded by [ProcessEdgesWork](crate::scheduler::gc_work::ProcessEdgesWork)).
 
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::util::{Address, ObjectReference};
 
 /// This trait and its global counterpart implement the core
 /// functionality for a transitive closure over the heap graph. This trait
 /// specifically implements the unsynchronized thread-local component
 /// (ie the 'fast-path') of the trace mechanism.
-pub trait TraceLocal: TransitiveClosure {
+pub trait TraceLocal: ObjectQueue {
     fn process_roots(&mut self);
     fn process_root_edge(&mut self, slot: Address, untraced: bool);
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;

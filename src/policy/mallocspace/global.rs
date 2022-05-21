@@ -1,5 +1,5 @@
 use super::metadata::*;
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -194,7 +194,7 @@ use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -301,7 +301,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -321,7 +321,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let chunk_start = conversions::chunk_align_down(address);
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             set_chunk_mark(chunk_start);
-            trace.process_node(object);
+            trace.enqueue(object);
         }
 
         object

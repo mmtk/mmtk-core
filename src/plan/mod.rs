@@ -38,8 +38,8 @@ pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 mod tracelocal;
 pub use tracelocal::TraceLocal;
 
-mod transitive_closure;
-pub use transitive_closure::{ObjectsClosure, TransitiveClosure};
+mod tracing;
+pub use tracing::{ObjectsClosure, ObjectQueue};
 
 mod generational;
 mod immix;

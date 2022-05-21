@@ -9,16 +9,16 @@ use crate::vm::EdgeVisitor;
 
 /// This trait is the fundamental mechanism for performing a
 /// transitive closure over an object graph.
-pub trait TransitiveClosure {
+pub trait ObjectQueue {
     // The signature of this function changes during the port
     // because the argument `ObjectReference source` is never used in the original version
     // See issue #5
-    fn process_node(&mut self, object: ObjectReference);
+    fn enqueue(&mut self, object: ObjectReference);
 }
 
-impl<T: ProcessEdgesWork> TransitiveClosure for T {
+impl<T: ProcessEdgesWork> ObjectQueue for T {
     #[inline]
-    fn process_node(&mut self, object: ObjectReference) {
+    fn enqueue(&mut self, object: ObjectReference) {
         ProcessEdgesWork::process_node(self, object);
     }
 }

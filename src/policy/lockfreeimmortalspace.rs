@@ -149,13 +149,13 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 }
 
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         _trace: &mut T,
         _object: ObjectReference,

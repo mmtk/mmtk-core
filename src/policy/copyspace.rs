@@ -1,4 +1,4 @@
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
@@ -110,7 +110,7 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -219,7 +219,7 @@ impl<VM: VMBinding> CopySpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -262,7 +262,7 @@ impl<VM: VMBinding> CopySpace<VM> {
                 worker.get_copy_context_mut(),
             );
             trace!("Forwarding pointer");
-            trace.process_node(new_object);
+            trace.enqueue(new_object);
             trace!("Copied [{:?} -> {:?}]", object, new_object);
             new_object
         }

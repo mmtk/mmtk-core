@@ -8,7 +8,7 @@ use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_metadata};
 use crate::util::{metadata, ObjectReference};
 
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 
 use crate::plan::PlanConstraints;
 use crate::policy::space::SpaceOptions;
@@ -116,7 +116,7 @@ use crate::util::copy::CopySemantics;
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<T: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -211,7 +211,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     pub fn release(&mut self) {}
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<T: ObjectQueue>(
         &self,
         trace: &mut T,
         object: ObjectReference,
@@ -223,7 +223,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
             object
         );
         if ImmortalSpace::<VM>::test_and_mark(object, self.mark_state) {
-            trace.process_node(object);
+            trace.enqueue(object);
         }
         object
     }
