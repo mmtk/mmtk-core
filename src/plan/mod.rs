@@ -39,7 +39,7 @@ mod tracelocal;
 pub use tracelocal::TraceLocal;
 
 mod tracing;
-pub use tracing::{ObjectsClosure, ObjectQueue, VectorObjectQueue};
+pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue};
 
 mod generational;
 mod immix;

@@ -72,7 +72,6 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        
         let worker = worker.into_mut::<VM>();
         self.trace_object(queue, object, self.common.copy, worker)
     }

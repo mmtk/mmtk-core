@@ -32,7 +32,8 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
         // TODO: `worker` should be an argument to `trace_object` itself.
         // We will refactor it later.
         let worker = self.worker();
-        self.gen.trace_object_nursery(&mut self.base.nodes, object, worker)
+        self.gen
+            .trace_object_nursery(&mut self.base.nodes, object, worker)
     }
     #[inline]
     fn process_edge(&mut self, slot: Address) {

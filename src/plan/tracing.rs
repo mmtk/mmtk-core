@@ -25,9 +25,7 @@ impl VectorObjectQueue {
 
     /// Create an empty `VectorObjectQueue`.
     pub fn new() -> Self {
-        Self {
-            nodes: Vec::new(),
-        }
+        Self { nodes: Vec::new() }
     }
 
     /// Return `true` if the queue is empty.
@@ -43,6 +41,12 @@ impl VectorObjectQueue {
     /// Consume this `VectorObjectQueue` and return its underlying vector.
     pub fn into_vec(self) -> Vec<ObjectReference> {
         self.nodes
+    }
+}
+
+impl Default for VectorObjectQueue {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

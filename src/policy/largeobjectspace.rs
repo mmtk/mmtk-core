@@ -1,7 +1,7 @@
 use atomic::Ordering;
 
-use crate::plan::PlanConstraints;
 use crate::plan::ObjectQueue;
+use crate::plan::PlanConstraints;
 use crate::plan::VectorObjectQueue;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
@@ -88,7 +88,6 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        
         self.trace_object(queue, object)
     }
 }

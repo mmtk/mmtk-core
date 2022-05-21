@@ -1,7 +1,7 @@
 use crate::plan::global::CommonPlan;
+use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::ObjectQueue;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;

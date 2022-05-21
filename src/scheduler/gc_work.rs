@@ -377,8 +377,8 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
             !self.nodes.is_empty(),
             "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
         );
-        let new_nodes = self.nodes.take();
-        new_nodes
+
+        self.nodes.take()
     }
 }
 

@@ -102,7 +102,6 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        
         self.trace_object(queue, object)
     }
 }
