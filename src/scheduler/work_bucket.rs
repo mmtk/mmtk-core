@@ -150,17 +150,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.notify_one_worker();
     }
 
-    /// Add a work packet to this bucket, but not notify any workers.
-    /// Used internally by the scheduler and workers.
-    #[inline(always)]
-    pub(super) fn add_boxed_no_notify(&self, work: Box<dyn GCWork<VM>>, prioritized: bool) {
-        if !prioritized {
-            self.queue.push(work);
-        } else {
-            self.prioritized_queue.as_ref().unwrap().push(work);
-        }
-    }
-
     /// Add multiple packets with a higher priority.
     /// Panic if this bucket cannot receive prioritized packets.
     #[inline(always)]

@@ -108,22 +108,20 @@ impl<VM: VMBinding> GCWorker<VM> {
         }
     }
 
+    const LOCALLY_CACHED_WORK_PACKETS: usize = 16;
+
     /// Add a work packet to the work queue and mark it with a higher priority.
     /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
     /// pushed to the global bucket with a higher priority.
     #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated() {
+        if !self.scheduler().work_buckets[bucket].is_activated()
+            || self.shared.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+        {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             return;
         }
         self.shared.local_work_buffer.push(Box::new(work));
-        if self.shared.local_work_buffer.len() > 512 {
-            while let Some(w) = self.shared.local_work_buffer.pop() {
-                self.scheduler.work_buckets[bucket].add_boxed_no_notify(w, true);
-            }
-            self.scheduler.work_buckets[bucket].notify_all_workers();
-        }
     }
 
     /// Add a work packet to the work queue.
@@ -131,17 +129,13 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// pushed to the global bucket.
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated() {
+        if !self.scheduler().work_buckets[bucket].is_activated()
+            || self.shared.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+        {
             self.scheduler.work_buckets[bucket].add(work);
             return;
         }
         self.shared.local_work_buffer.push(Box::new(work));
-        if self.shared.local_work_buffer.len() > 512 {
-            while let Some(w) = self.shared.local_work_buffer.pop() {
-                self.scheduler.work_buckets[bucket].add_boxed_no_notify(w, false);
-            }
-            self.scheduler.work_buckets[bucket].notify_all_workers();
-        }
     }
 
     pub fn is_coordinator(&self) -> bool {
