@@ -110,7 +110,8 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group.workers_shared {
-            w.local_work.push(Box::new(PrepareCollector));
+            let result = w.local_work.push(Box::new(PrepareCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
@@ -134,7 +135,8 @@ impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
         for w in &mmtk.scheduler.worker_group.workers_shared {
-            w.local_work.push(Box::new(ReleaseCollector));
+            let result = w.local_work.push(Box::new(ReleaseCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
