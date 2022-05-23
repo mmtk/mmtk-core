@@ -145,7 +145,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     /// Add a work packet to this bucket
     #[inline(always)]
-    pub fn add_dyn(&self, work: Box<dyn GCWork<VM>>) {
+    pub fn add_boxed(&self, work: Box<dyn GCWork<VM>>) {
         self.queue.push(work);
         self.notify_one_worker();
     }
@@ -153,7 +153,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
     /// Add a work packet to this bucket, but not notify any workers.
     /// Used internally by the scheduler and workers.
     #[inline(always)]
-    pub(super) fn add_dyn_no_notify(&self, work: Box<dyn GCWork<VM>>, prioritized: bool) {
+    pub(super) fn add_boxed_no_notify(&self, work: Box<dyn GCWork<VM>>, prioritized: bool) {
         if !prioritized {
             self.queue.push(work);
         } else {

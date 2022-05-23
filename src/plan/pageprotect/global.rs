@@ -22,7 +22,11 @@ use crate::{
 use enum_map::EnumMap;
 use std::sync::Arc;
 
+use mmtk_macros::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct PageProtect<VM: VMBinding> {
+    #[trace]
     pub space: LargeObjectSpace<VM>,
     pub common: CommonPlan<VM>,
 }

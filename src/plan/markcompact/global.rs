@@ -17,6 +17,7 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(not(feature = "global_alloc_bit"))]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
@@ -26,11 +27,17 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::opaque_pointer::*;
 use crate::util::options::UnsafeOptionsWrapper;
 use crate::vm::VMBinding;
+
 use enum_map::EnumMap;
 use std::sync::Arc;
 
+use mmtk_macros::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct MarkCompact<VM: VMBinding> {
+    #[trace(CopySemantics::DefaultCopy)]
     pub mc_space: MarkCompactSpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
 }
 

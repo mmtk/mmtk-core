@@ -120,7 +120,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.shared.local_work_buffer.push(Box::new(work));
         if self.shared.local_work_buffer.len() > 512 {
             while let Some(w) = self.shared.local_work_buffer.pop() {
-                self.scheduler.work_buckets[bucket].add_dyn_no_notify(w, true);
+                self.scheduler.work_buckets[bucket].add_boxed_no_notify(w, true);
             }
             self.scheduler.work_buckets[bucket].notify_all_workers();
         }
@@ -138,7 +138,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         self.shared.local_work_buffer.push(Box::new(work));
         if self.shared.local_work_buffer.len() > 512 {
             while let Some(w) = self.shared.local_work_buffer.pop() {
-                self.scheduler.work_buckets[bucket].add_dyn_no_notify(w, false);
+                self.scheduler.work_buckets[bucket].add_boxed_no_notify(w, false);
             }
             self.scheduler.work_buckets[bucket].notify_all_workers();
         }
@@ -177,6 +177,10 @@ impl<VM: VMBinding> GCWorker<VM> {
                     .or_else(|| Some(self.scheduler().poll(self)))
             })
             .unwrap()
+    }
+
+    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
+        work.do_work(self, self.mmtk);
     }
 
     /// Entry of the worker thread.

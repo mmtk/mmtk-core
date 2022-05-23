@@ -25,8 +25,13 @@ use std::sync::Arc;
 
 use enum_map::EnumMap;
 
+use mmtk_macros::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
+    #[fallback_trace]
     common: CommonPlan<VM>,
+    #[trace]
     ms: MallocSpace<VM>,
 }
 
