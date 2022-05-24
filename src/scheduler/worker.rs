@@ -10,7 +10,7 @@ use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
@@ -18,23 +18,17 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
     /// A queue of GCWork that can only be processed by the owned thread.
-    pub local_work: ArrayQueue<Box<dyn GCWork<VM>>>,
-    /// Local work packet queue.
-    pub local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
-}
-
-impl<VM: VMBinding> Default for GCWorkerShared<VM> {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
+    /// Handle for stealing packets from the current worker
+    pub stealer: Option<Stealer<Box<dyn GCWork<VM>>>>,
 }
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn new() -> Self {
+    pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
             stat: Default::default(),
-            local_work: ArrayQueue::new(16),
-            local_work_buffer: deque::Worker::new_fifo(),
+            designated_work: ArrayQueue::new(16),
+            stealer,
         }
     }
 }
@@ -60,6 +54,8 @@ pub struct GCWorker<VM: VMBinding> {
     is_coordinator: bool,
     /// Reference to the shared part of the GC worker.  It is used for synchronization.
     pub shared: Arc<GCWorkerShared<VM>>,
+    /// Local work packet queue.
+    pub local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GCWorkerShared<VM> {}
@@ -87,6 +83,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
         shared: Arc<GCWorkerShared<VM>>,
+        local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
         Self {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
@@ -98,6 +95,7 @@ impl<VM: VMBinding> GCWorker<VM> {
             mmtk,
             is_coordinator,
             shared,
+            local_work_buffer,
         }
     }
 
@@ -109,12 +107,12 @@ impl<VM: VMBinding> GCWorker<VM> {
     #[inline]
     pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
-            || self.shared.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+            || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             return;
         }
-        self.shared.local_work_buffer.push(Box::new(work));
+        self.local_work_buffer.push(Box::new(work));
     }
 
     /// Add a work packet to the work queue.
@@ -123,12 +121,12 @@ impl<VM: VMBinding> GCWorker<VM> {
     #[inline]
     pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
         if !self.scheduler().work_buckets[bucket].is_activated()
-            || self.shared.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+            || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
         {
             self.scheduler.work_buckets[bucket].add(work);
             return;
         }
-        self.shared.local_work_buffer.push(Box::new(work));
+        self.local_work_buffer.push(Box::new(work));
     }
 
     pub fn is_coordinator(&self) -> bool {
@@ -155,15 +153,10 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// 4. Steal from other workers
     fn poll(&self) -> Box<dyn GCWork<VM>> {
         self.shared
-            .local_work
+            .designated_work
             .pop()
-            .or_else(|| {
-                self.shared
-                    .local_work_buffer
-                    .pop()
-                    .or_else(|| Some(self.scheduler().poll(self)))
-            })
-            .unwrap()
+            .or_else(|| self.local_work_buffer.pop())
+            .unwrap_or_else(|| self.scheduler().poll(self))
     }
 
     pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
@@ -186,27 +179,29 @@ impl<VM: VMBinding> GCWorker<VM> {
 pub struct WorkerGroup<VM: VMBinding> {
     /// Shared worker data
     pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
-    /// Handles for stealing packets from workers
-    pub stealers: Vec<Stealer<Box<dyn GCWork<VM>>>>,
     parked_workers: AtomicUsize,
+    unspawned_local_work_queues: Mutex<Vec<deque::Worker<Box<dyn GCWork<VM>>>>>,
 }
 
 impl<VM: VMBinding> WorkerGroup<VM> {
     /// Create a WorkerGroup
     pub fn new(num_workers: usize) -> Arc<Self> {
-        let workers_shared = (0..num_workers)
-            .map(|_| Arc::new(GCWorkerShared::<VM>::new()))
+        let unspawned_local_work_queues = (0..num_workers)
+            .map(|_| deque::Worker::new_fifo())
             .collect::<Vec<_>>();
 
-        let stealers = workers_shared
-            .iter()
-            .map(|worker| worker.local_work_buffer.stealer())
-            .collect();
+        let workers_shared = (0..num_workers)
+            .map(|i| {
+                Arc::new(GCWorkerShared::<VM>::new(Some(
+                    unspawned_local_work_queues[i].stealer(),
+                )))
+            })
+            .collect::<Vec<_>>();
 
         Arc::new(Self {
             workers_shared,
-            stealers,
             parked_workers: Default::default(),
+            unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
         })
     }
 
@@ -217,6 +212,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
         sender: Sender<CoordinatorMessage<VM>>,
         tls: VMThread,
     ) {
+        let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();
         // Spawn each worker thread.
         for (ordinal, shared) in self.workers_shared.iter().enumerate() {
             let worker = Box::new(GCWorker::new(
@@ -226,9 +222,11 @@ impl<VM: VMBinding> WorkerGroup<VM> {
                 false,
                 sender.clone(),
                 shared.clone(),
+                unspawned_local_work_queues.pop().unwrap(),
             ));
             VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
         }
+        debug_assert!(unspawned_local_work_queues.is_empty());
     }
 
     /// Get the number of workers in the group

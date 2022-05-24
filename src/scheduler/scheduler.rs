@@ -6,7 +6,7 @@ use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
-use crossbeam::deque::Steal;
+use crossbeam::deque::{self, Steal};
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
@@ -106,7 +106,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
         }
 
-        let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new());
+        let coordinator_worker_shared = Arc::new(GCWorkerShared::<VM>::new(None));
 
         Arc::new(Self {
             work_buckets,
@@ -135,6 +135,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             true,
             sender.clone(),
             self.coordinator_worker_shared.clone(),
+            deque::Worker::new_fifo(),
         );
         let gc_controller = GCController::new(
             mmtk,
@@ -304,23 +305,23 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     fn poll_schedulable_work_once(&self, worker: &GCWorker<VM>) -> Steal<Box<dyn GCWork<VM>>> {
         let mut should_retry = false;
         // Try find a packet that can be processed only by this worker.
-        if let Some(w) = worker.shared.local_work.pop() {
+        if let Some(w) = worker.shared.designated_work.pop() {
             return Steal::Success(w);
         }
         // Try get a packet from a work bucket.
         for work_bucket in self.work_buckets.values() {
-            match work_bucket.poll(&worker.shared.local_work_buffer) {
+            match work_bucket.poll(&worker.local_work_buffer) {
                 Steal::Success(w) => return Steal::Success(w),
                 Steal::Retry => should_retry = true,
                 _ => {}
             }
         }
         // Try steal some packets from any worker
-        for (id, stealer) in self.worker_group.stealers.iter().enumerate() {
+        for (id, worker_shared) in self.worker_group.workers_shared.iter().enumerate() {
             if id == worker.ordinal {
                 continue;
             }
-            match stealer.steal() {
+            match worker_shared.stealer.as_ref().unwrap().steal() {
                 Steal::Success(w) => return Steal::Success(w),
                 Steal::Retry => should_retry = true,
                 _ => {}
