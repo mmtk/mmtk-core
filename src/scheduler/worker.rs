@@ -6,23 +6,21 @@ use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
 use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
-use crossbeam::deque::{Stealer, Worker};
+use crossbeam::deque::{self, Stealer};
 use crossbeam::queue::ArrayQueue;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
-    /// True if the GC worker is parked.
-    pub parked: AtomicBool,
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
     /// A queue of GCWork that can only be processed by the owned thread.
     pub local_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Local work packet queue.
-    pub local_work_buffer: Worker<Box<dyn GCWork<VM>>>,
+    pub local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
 }
 
 impl<VM: VMBinding> Default for GCWorkerShared<VM> {
@@ -34,10 +32,9 @@ impl<VM: VMBinding> Default for GCWorkerShared<VM> {
 impl<VM: VMBinding> GCWorkerShared<VM> {
     pub fn new() -> Self {
         Self {
-            parked: AtomicBool::new(true),
             stat: Default::default(),
             local_work: ArrayQueue::new(16),
-            local_work_buffer: Worker::new_fifo(),
+            local_work_buffer: deque::Worker::new_fifo(),
         }
     }
 }
@@ -73,10 +70,6 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
     the mutator calls harness_begin or harness_end while the GC is running.";
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn is_parked(&self) -> bool {
-        self.parked.load(Ordering::Relaxed)
-    }
-
     pub fn borrow_stat(&self) -> AtomicRef<WorkerLocalStat<VM>> {
         self.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
@@ -154,7 +147,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
-    /// Poll a ready-to-execute work pakcet in the following order:
+    /// Poll a ready-to-execute work packet in the following order:
     ///
     /// 1. Any packet that should be processed only by this worker.
     /// 2. Poll from the local work queue.
@@ -182,10 +175,8 @@ impl<VM: VMBinding> GCWorker<VM> {
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        self.shared.parked.store(false, Ordering::Relaxed);
         loop {
             let mut work = self.poll();
-            debug_assert!(!self.shared.is_parked());
             work.do_work_with_stat(self, mmtk);
         }
     }
@@ -253,6 +244,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     #[inline(always)]
     pub fn inc_parked_workers(&self) -> bool {
         let old = self.parked_workers.fetch_add(1, Ordering::Relaxed);
+        debug_assert!(old < self.worker_count());
         old + 1 == self.worker_count()
     }
 
@@ -260,7 +252,8 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Called after a worker is resumed from the parked state.
     #[inline(always)]
     pub fn dec_parked_workers(&self) {
-        self.parked_workers.fetch_sub(1, Ordering::Relaxed);
+        let old = self.parked_workers.fetch_sub(1, Ordering::Relaxed);
+        debug_assert!(old <= self.worker_count());
     }
 
     /// Get the number of parked workers in the group

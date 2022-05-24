@@ -9,12 +9,15 @@ use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::Steal;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
 
 pub enum CoordinatorMessage<VM: VMBinding> {
+    /// Send a work-packet to the coordinator thread/
     Work(Box<dyn CoordinatorWork<VM>>),
+    /// Notify the coordinator thread that all GC tasks are finished.
+    /// When sending this message, all the work buckets should be
+    /// empty, and all the workers should be parked.
     Finish,
 }
 
@@ -96,9 +99,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 open_stages.push(s);
             };
 
-            for stages in stages {
-                if stages != WorkBucketStage::Unconstrained && stages != first_stw_stage {
-                    open_next(stages);
+            for stage in stages {
+                if stage != WorkBucketStage::Unconstrained && stage != first_stw_stage {
+                    open_next(stage);
                 }
             }
         }
@@ -127,7 +130,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // Spawn the controller thread.
         let coordinator_worker = GCWorker::new(
             mmtk,
-            0,
+            usize::MAX,
             self.clone(),
             true,
             sender.clone(),
@@ -360,10 +363,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     #[cold]
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        debug_assert!(!worker.shared.is_parked());
         let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
-            debug_assert!(!worker.shared.is_parked());
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
@@ -378,7 +379,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     // We guarantee that we can at least fetch one packet.
                     let work = self.poll_schedulable_work(worker).unwrap();
                     // Optimize for the case that a newly opened bucket only has one packet.
-                    // We only notify_all if there're motr than one packets available.
+                    // We only notify_all if there're more than one packets available.
                     if !self.all_activated_buckets_are_empty() {
                         // Have more jobs in this buckets. Notify other workers.
                         self.worker_monitor.1.notify_all();
@@ -386,14 +387,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     // Return this packet and execute it.
                     return work;
                 }
-                // The current pause is finished if if we can't open more buckets.
+                // The current pause is finished if we can't open more buckets.
                 worker.sender.send(CoordinatorMessage::Finish).unwrap();
             }
             // Wait
             guard = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             self.worker_group.dec_parked_workers();
-            worker.shared.parked.store(false, Ordering::Relaxed);
         }
     }
 
