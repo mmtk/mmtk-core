@@ -7,6 +7,7 @@ use crate::util::opaque_pointer::*;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
+use enum_map::Enum;
 use enum_map::{enum_map, EnumMap};
 use std::collections::HashMap;
 use std::sync::mpsc::channel;
@@ -74,34 +75,31 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         {
             // Unconstrained is always open. Prepare will be opened at the beginning of a GC.
             // This vec will grow for each stage we call with open_next()
-            let first_stw_stage = work_buckets.iter().nth(1).map(|(id, _)| id).unwrap();
+            let first_stw_stage = WorkBucketStage::first_stw_stage();
             let mut open_stages: Vec<WorkBucketStage> = vec![first_stw_stage];
             // The rest will open after the previous stage is done.
-            let stages = work_buckets
-                .iter()
-                .map(|(stage, _)| stage)
-                .collect::<Vec<_>>();
-            let mut open_next = |s: WorkBucketStage| {
-                let cur_stages = open_stages.clone();
-                work_buckets[s].set_open_condition(move |scheduler: &GCWorkScheduler<VM>| {
-                    let should_open = scheduler.are_buckets_drained(&cur_stages);
-                    // Additional check before the `RefClosure` bucket opens.
-                    if should_open && s == crate::scheduler::work_bucket::LAST_CLOSURE_BUCKET {
-                        if let Some(closure_end) = scheduler.closure_end.lock().unwrap().as_ref() {
-                            if closure_end() {
-                                // Don't open `LAST_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.
-                                return false;
-                            }
-                        }
-                    }
-                    should_open
-                });
-                open_stages.push(s);
-            };
-
+            let stages = (0..WorkBucketStage::LENGTH).map(WorkBucketStage::from_usize);
             for stage in stages {
                 if stage != WorkBucketStage::Unconstrained && stage != first_stw_stage {
-                    open_next(stage);
+                    let cur_stages = open_stages.clone();
+                    work_buckets[stage].set_open_condition(
+                        move |scheduler: &GCWorkScheduler<VM>| {
+                            let should_open = scheduler.are_buckets_drained(&cur_stages);
+                            // Additional check before the `RefClosure` bucket opens.
+                            if should_open && stage == LAST_CLOSURE_BUCKET {
+                                if let Some(closure_end) =
+                                    scheduler.closure_end.lock().unwrap().as_ref()
+                                {
+                                    if closure_end() {
+                                        // Don't open `LAST_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.
+                                        return false;
+                                    }
+                                }
+                            }
+                            should_open
+                        },
+                    );
+                    open_stages.push(stage);
                 }
             }
         }
@@ -242,10 +240,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     fn update_buckets(&self) -> bool {
         let mut buckets_updated = false;
         let mut new_packets = false;
-        for (id, bucket) in self.work_buckets.iter() {
+        for i in 0..WorkBucketStage::LENGTH {
+            let id = WorkBucketStage::from_usize(i);
             if id == WorkBucketStage::Unconstrained {
                 continue;
             }
+            let bucket = &self.work_buckets[id];
             let bucket_opened = bucket.update(self);
             buckets_updated |= bucket_opened;
             if bucket_opened {
@@ -264,7 +264,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn reset_state(&self) {
-        let first_stw_stage = self.work_buckets.iter().nth(1).map(|(id, _)| id).unwrap();
+        let first_stw_stage = WorkBucketStage::first_stw_stage();
         self.work_buckets.iter().for_each(|(id, bkt)| {
             if id != WorkBucketStage::Unconstrained && id != first_stw_stage {
                 bkt.deactivate();
@@ -420,7 +420,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
         mmtk.plan.base().gc_requester.clear_request();
-        let first_stw_bucket = self.work_buckets.values().nth(1).unwrap();
+        let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
         first_stw_bucket.activate();
         let _guard = self.worker_monitor.0.lock().unwrap();

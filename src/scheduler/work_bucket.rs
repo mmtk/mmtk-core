@@ -222,4 +222,11 @@ pub enum WorkBucketStage {
     Final,
 }
 
+impl WorkBucketStage {
+    #[inline]
+    pub fn first_stw_stage() -> Self {
+        WorkBucketStage::from_usize(1)
+    }
+}
+
 pub const LAST_CLOSURE_BUCKET: WorkBucketStage = WorkBucketStage::PhantomRefClosure;

@@ -31,7 +31,7 @@ lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam = "0.8.1"
 num_cpus = "1.8"
-enum-map = "0.6.2"
+enum-map = "=2.1"
 downcast-rs = "1.1.1"
 atomic-traits = "0.2.0"
 atomic = "0.4.6"
