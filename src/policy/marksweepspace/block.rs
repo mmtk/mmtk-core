@@ -4,23 +4,25 @@ use std::iter::Step;
 
 use atomic::Ordering;
 
-use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{self, BYTES_IN_BLOCK, BlockList, FreeListAllocator, LOG_BYTES_IN_BLOCK}, metadata::{MetadataSpec, load_metadata, side_metadata::{
-                self, SideMetadataOffset, SideMetadataSpec, LOCAL_SIDE_METADATA_BASE_OFFSET,
-            }, store_metadata}, VMThread, alloc_bit::is_alloced}, vm::VMBinding, policy::marksweepspace::metadata::is_marked};
+use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{BlockList}, metadata::{MetadataSpec, load_metadata, side_metadata::{
+                self, SideMetadataSpec,
+            }, store_metadata}, VMThread}, vm::VMBinding};
 
-use super::{metadata::ALLOC_SIDE_METADATA_SPEC, MarkSweepSpace};
-use crate::{util::{Address, OpaquePointer, alloc::{free_list_allocator::{self, BYTES_IN_BLOCK, LOG_BYTES_IN_BLOCK}}, metadata::side_metadata::{self, LOCAL_SIDE_METADATA_BASE_OFFSET, SideMetadataOffset, SideMetadataSpec}}, vm::VMBinding};
-
-use super::{MarkSweepSpace, metadata::ALLOC_SIDE_METADATA_SPEC};
+use super::{MarkSweepSpace, chunk::Chunk};
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Block(Address);
 
 impl Block {
+
+    pub const LOG_BYTES: usize = 16;
+
+    pub const BYTES: usize = 1 << Block::LOG_BYTES;
+
     /// Align the address to a block boundary.
     pub const fn align(address: Address) -> Address {
-        address.align_down(BYTES_IN_BLOCK)
+        address.align_down(Block::BYTES)
     }
 
     /// Block mark table (side)
@@ -139,7 +141,7 @@ impl Block {
     // }
 
     pub fn load_prev_block<VM: VMBinding>(&self) -> Block {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         let prev = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -150,7 +152,7 @@ impl Block {
     }
 
     pub fn load_next_block<VM: VMBinding>(&self) -> Block {
-        assert!(!self.is_zero());
+        debug_assert!(!self.is_zero());
         let next = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -161,7 +163,7 @@ impl Block {
     }
 
     pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -172,7 +174,7 @@ impl Block {
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -183,7 +185,7 @@ impl Block {
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         store_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -194,7 +196,7 @@ impl Block {
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
-        assert!(!self.0.is_zero());
+        debug_assert!(!self.0.is_zero());
         let block_list = load_metadata::<VM>(
             &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
             unsafe { self.0.to_object_reference() },
@@ -251,7 +253,7 @@ impl Block {
     }
 
     pub fn has_free_cells<VM: VMBinding>(&self) -> bool {
-        assert!(!self.is_zero());
+        debug_assert!(!self.is_zero());
         !self.load_free_list::<VM>().is_zero()
     }
 
@@ -282,7 +284,6 @@ impl Block {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
-                let mut block_list = self.load_block_list::<VM>();
                 unsafe {
                     let block_list = loop {
                         let list = self.load_block_list::<VM>();
@@ -293,7 +294,7 @@ impl Block {
                         (*list).unlock();
                     };
                     (*block_list).remove::<VM>(self);
-                    (*block_list).release_lock();
+                    (*block_list).unlock();
                 }
                 space.release_block(self);
                 true
@@ -328,12 +329,12 @@ impl Block {
     /// The address must be block-aligned.
     #[inline(always)]
     pub const fn from(address: Address) -> Self {
-        // assert!(address.is_aligned_to(BYTES_IN_BLOCK));
+        // debug_assert!(address.is_aligned_to(BYTES_IN_BLOCK));
         Self(address)
     }
 }
 
-unsafe impl Step for Block {
+impl Step for Block {
     /// Get the number of blocks between the given two blocks.
     #[inline(always)]
     #[allow(clippy::assertions_on_constants)]
@@ -341,17 +342,17 @@ unsafe impl Step for Block {
         if start > end {
             return None;
         }
-        Some((end.start() - start.start()) >> LOG_BYTES_IN_BLOCK)
+        Some((end.start() - start.start()) >> Block::LOG_BYTES)
     }
     /// result = block_address + count * block_size
     #[inline(always)]
     fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << LOG_BYTES_IN_BLOCK))
+        Self::from(start.start() + (count << Block::LOG_BYTES))
     }
     /// result = block_address + count * block_size
     #[inline(always)]
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << LOG_BYTES_IN_BLOCK) {
+        if start.start().as_usize() > usize::MAX - (count << Block::LOG_BYTES) {
             return None;
         }
         Some(Self::forward(start, count))
@@ -359,12 +360,12 @@ unsafe impl Step for Block {
     /// result = block_address + count * block_size
     #[inline(always)]
     fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << LOG_BYTES_IN_BLOCK))
+        Self::from(start.start() - (count << Block::LOG_BYTES))
     }
     /// result = block_address - count * block_size
     #[inline(always)]
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << LOG_BYTES_IN_BLOCK) {
+        if start.start().as_usize() < (count << Block::LOG_BYTES) {
             return None;
         }
         Some(Self::backward(start, count))

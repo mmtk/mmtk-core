@@ -28,14 +28,15 @@ pub use malloc_allocator::MallocAllocator;
 pub mod immix_allocator;
 pub use self::immix_allocator::ImmixAllocator;
 
+// Free list allocator based on Mimalloc
+pub mod free_list_allocator;
+pub use free_list_allocator::FreeListAllocator;
+
 /// Mark compact allocator (actually a bump pointer allocator with an extra heade word)
 mod markcompact_allocator;
 pub use markcompact_allocator::MarkCompactAllocator;
 
 /// Embedded metadata pages
-mod free_list_allocator;
-pub use free_list_allocator::FreeListAllocator;
-
 pub(crate) mod embedded_meta_data;
 
 

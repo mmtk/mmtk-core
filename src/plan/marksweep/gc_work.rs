@@ -12,6 +12,7 @@ use crate::scheduler::WorkBucketStage;
 use crate::scheduler::gc_work::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
+#[cfg(feature="malloc")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::vm::VMBinding;
 use crate::MMTK;

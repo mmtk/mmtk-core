@@ -1,30 +1,5 @@
-use crate::{TransitiveClosure, util::{Address, ObjectReference, constants::CARD_META_PAGES_PER_REGION, heap::{FreeListPageResource, HeapMeta, VMRequest, layout::heap_layout::{Mmapper, VMMap}}, side_metadata::{SideMetadataContext, SideMetadataSpec}}, vm::VMBinding};
-
-use crate::{
-    policy::marksweepspace::{
-        block::{Block, BlockState},
-        metadata::{is_marked, set_mark_bit, unset_mark_bit, ALLOC_SIDE_METADATA_SPEC},
-    },
-    scheduler::{MMTkScheduler, WorkBucketStage},
-    util::{
-        alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK},
-        constants::LOG_BYTES_IN_PAGE,
-        heap::{
-            layout::heap_layout::{Mmapper, VMMap},
-            FreeListPageResource, HeapMeta, VMRequest,
-        },
-        metadata::{
-            self, compare_exchange_metadata, load_metadata,
-            side_metadata::{
-                SideMetadataContext, SideMetadataOffset, SideMetadataSpec,
-                LOCAL_SIDE_METADATA_BASE_ADDRESS,
-            },
-            store_metadata, MetadataSpec,
-        },
-        Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread,
-    },
-    vm::VMBinding,
-    TransitiveClosure,
+use std::{
+    sync::{Arc},
 };
 
 use atomic::Ordering;
@@ -34,7 +9,7 @@ use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockSta
             FreeListPageResource, HeapMeta, VMRequest,
         }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin}, vm::VMBinding, memory_manager::is_live_object};
 
-use super::{super::space::{CommonSpace, Space, SFT}, chunks::{ChunkMap, ChunkState}};
+use super::{super::space::{CommonSpace, Space, SFT}, chunk::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
 use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
 use std::sync::Mutex;
@@ -63,15 +38,15 @@ pub struct MarkSweepSpace<VM: VMBinding> {
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     fn name(&self) -> &str {
-        todo!()
+        "MarkSweepSpace"
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
-        todo!()
+        true
     }
 
     fn is_movable(&self) -> bool {
-        todo!()
+        false
     }
 
     #[cfg(feature = "sanity")]
@@ -80,17 +55,17 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
-        todo!()
+        // do nothing
     }
 }
 
 impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     fn as_space(&self) -> &dyn Space<VM> {
-        todo!()
+        self
     }
 
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static) {
-        todo!()
+        self
     }
 
     fn get_page_resource(&self) -> &dyn crate::util::heap::PageResource<VM> {
@@ -98,7 +73,7 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
     }
 
     fn init(&mut self, vm_map: &'static crate::util::heap::layout::heap_layout::VMMap) {
-        todo!()
+        self.common().init(self.as_space());
     }
 
     fn common(&self) -> &CommonSpace<VM> {
@@ -111,7 +86,12 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 }
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
-    fn new(
+    /// Get work packet scheduler
+    fn scheduler(&self) -> &GCWorkScheduler<VM> {
+        &self.scheduler
+    }
+
+    pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
@@ -197,7 +177,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = FreeListAllocator::<VM>::get_block(address);
+            let block = Block::from(Block::align(address));
             block.set_state(BlockState::Marked);
             trace.process_node(object);
         }
@@ -256,7 +236,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn reset(&mut self) {
-        // do nothing
         self.zero_mark_bits();
     }
 
@@ -297,31 +276,27 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 Some(Ordering::SeqCst),
             )
         }
-        bzero_alloc_bit(block.start(), BYTES_IN_BLOCK);
+        bzero_alloc_bit(block.start(), Block::BYTES);
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize) -> BlockAcquireResult {
         let bin = mi_bin(size);
 
-        // {
-        //     let mut abandoned = self.abandoned_available.lock().unwrap();
-        //     if !abandoned[bin].is_empty() {
-        //         let block = Block::from(abandoned[bin].pop::<VM>().start());
-        //         eprintln!("acquire abandoned available block {:?}", block);
-        //         return BlockAcquireResult::AbandonedAvailable(block);
-        //     }
-        // }
+        {
+            let mut abandoned = self.abandoned_available.lock().unwrap();
+            if !abandoned[bin].is_empty() {
+                let block = Block::from(abandoned[bin].pop::<VM>().start());
+                return BlockAcquireResult::AbandonedAvailable(block);
+            }
+        }
 
-        // {
-        //     let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-        //     if !abandoned_unswept[bin].is_empty() {
-        //         let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
-        //         eprintln!("acquire abandoned unswept block {:?}", block);
-        //         return BlockAcquireResult::AbandondedUnswept(block);
-        //     }
-        // }
-        let b = Block::from(self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE));
-        // eprintln!("acquire new block {:?}", b);
-        BlockAcquireResult::Fresh(b)
+        {
+            let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
+            if !abandoned_unswept[bin].is_empty() {
+                let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
+                return BlockAcquireResult::AbandondedUnswept(block);
+            }
+        }
+        BlockAcquireResult::Fresh(Block::from(self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE)))
     }
 }
