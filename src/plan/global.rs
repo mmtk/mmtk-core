@@ -33,6 +33,8 @@ use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
+use mmtk_macros::PlanTraceObject;
+
 pub fn create_mutator<VM: VMBinding>(
     tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
@@ -343,6 +345,7 @@ pub enum GcStatus {
 /**
 BasePlan should contain all plan-related state and functions that are _fundamental_ to _all_ plans.  These include VM-specific (but not plan-specific) features such as a code space or vm space, which are fundamental to all plans for a given VM.  Features that are common to _many_ (but not intrinsically _all_) plans should instead be included in CommonPlan.
 */
+#[derive(PlanTraceObject)]
 pub struct BasePlan<VM: VMBinding> {
     /// Whether MMTk is now ready for collection. This is set to true when initialize_collection() is called.
     pub initialized: AtomicBool,
@@ -382,10 +385,13 @@ pub struct BasePlan<VM: VMBinding> {
 
     // Spaces in base plan
     #[cfg(feature = "code_space")]
+    #[trace]
     pub code_space: ImmortalSpace<VM>,
     #[cfg(feature = "code_space")]
+    #[trace]
     pub code_lo_space: ImmortalSpace<VM>,
     #[cfg(feature = "ro_space")]
+    #[trace]
     pub ro_space: ImmortalSpace<VM>,
 
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
@@ -401,6 +407,7 @@ pub struct BasePlan<VM: VMBinding> {
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.
     #[cfg(feature = "vm_space")]
+    #[trace]
     pub vm_space: ImmortalSpace<VM>,
 }
 
@@ -839,9 +846,13 @@ impl<VM: VMBinding> BasePlan<VM> {
 /**
 CommonPlan is for representing state and features used by _many_ plans, but that are not fundamental to _all_ plans.  Examples include the Large Object Space and an Immortal space.  Features that are fundamental to _all_ plans must be included in BasePlan.
 */
+#[derive(PlanTraceObject)]
 pub struct CommonPlan<VM: VMBinding> {
+    #[trace]
     pub immortal: ImmortalSpace<VM>,
+    #[trace]
     pub los: LargeObjectSpace<VM>,
+    #[fallback_trace]
     pub base: BasePlan<VM>,
 }
 
@@ -948,6 +959,43 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.los
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
     }
+}
+
+use crate::policy::gc_work::TraceKind;
+use crate::vm::VMBinding;
+
+/// A plan that uses `PlanProcessEdges` needs to provide an implementation for this trait.
+/// Generally a plan does not need to manually implement this trait. Instead, we provide
+/// a procedural macro that helps generate an implementation. Please check `macros/trace_object`.
+///
+/// A plan could also manually implement this trait. For the sake of performance, the implementation
+/// of this trait should mark methods as `[inline(always)]`.
+pub trait PlanTraceObject<VM: VMBinding> {
+    /// Trace objects in the plan. Generally one needs to figure out
+    /// which space an object resides in, and invokes the corresponding policy
+    /// trace object method.
+    ///
+    /// Arguments:
+    /// * `trace`: the current transitive closure
+    /// * `object`: the object to trace. This is a non-nullable object reference.
+    /// * `worker`: the GC worker that is tracing this object.
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+
+    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
+    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
+    /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
+    /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
+    /// this method should also invoke those policy specific methods for objects in that space.
+    fn post_scan_object(&self, object: ObjectReference);
+
+    /// Whether objects in this plan may move. If any of the spaces used by the plan may move objects, this should
+    /// return true.
+    fn may_move_objects<const KIND: TraceKind>() -> bool;
 }
 
 use enum_map::Enum;

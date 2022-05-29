@@ -140,6 +140,10 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
+    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
+        work.do_work(self, self.mmtk);
+    }
+
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);

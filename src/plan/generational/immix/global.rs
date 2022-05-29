@@ -4,11 +4,11 @@ use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::immix::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -26,14 +26,20 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use mmtk_macros::PlanTraceObject;
+
 /// Generational immix. This implements the functionality of a two-generation copying
 /// collector where the higher generation is an immix space.
 /// See the PLDI'08 paper by Blackburn and McKinley for a description
 /// of the algorithm: http://doi.acm.org/10.1145/1375581.137558.
+#[derive(PlanTraceObject)]
 pub struct GenImmix<VM: VMBinding> {
     /// Generational plan, which includes a nursery space and operations related with nursery.
+    #[fallback_trace]
     pub gen: Gen<VM>,
     /// An immix space as the mature space.
+    #[post_scan]
+    #[trace(CopySemantics::Mature)]
     pub immix: ImmixSpace<VM>,
     /// Whether the last GC was a defrag GC for the immix space.
     pub last_gc_was_defrag: AtomicBool,

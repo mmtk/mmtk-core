@@ -4,7 +4,7 @@ use super::{
     chunk::{Chunk, ChunkMap, ChunkState},
     defrag::Defrag,
 };
-use crate::plan::ObjectsClosure;
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -23,7 +23,7 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
     plan::TransitiveClosure,
-    scheduler::{gc_work::ProcessEdgesWork, GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
+    scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
         opaque_pointer::{VMThread, VMWorkerThread},
@@ -32,6 +32,9 @@ use crate::{
 };
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
+
+pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
+pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -110,6 +113,44 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("We do not use SFT to trace objects for Immix. set_copy_context() cannot be used.")
+    }
+}
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
+    #[inline(always)]
+    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        copy: Option<CopySemantics>,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if KIND == TRACE_KIND_DEFRAG {
+            self.trace_object(trace, object, copy.unwrap(), worker)
+        } else if KIND == TRACE_KIND_FAST {
+            self.fast_trace_object(trace, object)
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[inline(always)]
+    fn post_scan_object(&self, object: ObjectReference) {
+        if super::MARK_LINE_AT_SCAN_TIME && !super::BLOCK_ONLY {
+            debug_assert!(self.in_space(object));
+            self.mark_lines(object);
+        }
+    }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: TraceKind>() -> bool {
+        if KIND == TRACE_KIND_DEFRAG {
+            true
+        } else if KIND == TRACE_KIND_FAST {
+            false
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -391,11 +432,44 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
-            ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status)
+            // We lost the forwarding race as some other thread has set the forwarding word; wait
+            // until the object has been forwarded by the winner. Note that the object may not
+            // necessarily get forwarded since Immix opportunistically moves objects.
+            #[allow(clippy::let_and_return)]
+            let new_object =
+                ForwardingWord::spin_and_get_forwarded_object::<VM>(object, forwarding_status);
+            #[cfg(debug_assertions)]
+            {
+                if new_object == object {
+                    debug_assert!(
+                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || Self::is_pinned(object),
+                        "Forwarded object is the same as original object {} even though it should have been copied",
+                        object,
+                    );
+                } else {
+                    // new_object != object
+                    debug_assert!(
+                        !Block::containing::<VM>(new_object).is_defrag_source(),
+                        "Block {:?} containing forwarded object {} should not be a defragmentation source",
+                        Block::containing::<VM>(new_object),
+                        new_object,
+                    );
+                }
+            }
+            new_object
         } else if self.is_marked(object, self.mark_state) {
+            // We won the forwarding race but the object is already marked so we clear the
+            // forwarding status and return the unmoved object
+            debug_assert!(
+                self.defrag.space_exhausted() || Self::is_pinned(object),
+                "Forwarded object is the same as original object {} even though it should have been copied",
+                object,
+            );
             ForwardingWord::clear_forwarding_bits::<VM>(object);
             object
         } else {
+            // We won the forwarding race; actually forward and copy the object if it is not pinned
+            // and we have sufficient space in our copy allocator
             let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
@@ -565,45 +639,6 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             block.set_state(BlockState::Unmarked);
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
-        }
-    }
-}
-
-/// A work packet to scan the fields of each objects and mark lines.
-pub struct ScanObjectsAndMarkLines<Edges: ProcessEdgesWork> {
-    buffer: Vec<ObjectReference>,
-    #[allow(unused)]
-    concurrent: bool,
-    immix_space: &'static ImmixSpace<Edges::VM>,
-}
-
-impl<Edges: ProcessEdgesWork> ScanObjectsAndMarkLines<Edges> {
-    pub fn new(
-        buffer: Vec<ObjectReference>,
-        concurrent: bool,
-        immix_space: &'static ImmixSpace<Edges::VM>,
-    ) -> Self {
-        Self {
-            buffer,
-            concurrent,
-            immix_space,
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjectsAndMarkLines<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ScanObjectsAndMarkLines");
-        let tls = worker.tls;
-        let mut closure = ObjectsClosure::<E>::new(worker);
-        for object in &self.buffer {
-            <E::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
-            if super::MARK_LINE_AT_SCAN_TIME
-                && !super::BLOCK_ONLY
-                && self.immix_space.in_space(*object)
-            {
-                self.immix_space.mark_lines(*object);
-            }
         }
     }
 }

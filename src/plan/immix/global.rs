@@ -1,5 +1,4 @@
 use super::gc_work::ImmixGCWorkContext;
-use super::gc_work::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -7,6 +6,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -26,8 +26,14 @@ use std::sync::Arc;
 use atomic::Ordering;
 use enum_map::EnumMap;
 
+use mmtk_macros::PlanTraceObject;
+
+#[derive(PlanTraceObject)]
 pub struct Immix<VM: VMBinding> {
+    #[post_scan]
+    #[trace(CopySemantics::DefaultCopy)]
     pub immix_space: ImmixSpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
     last_gc_was_defrag: AtomicBool,
 }
