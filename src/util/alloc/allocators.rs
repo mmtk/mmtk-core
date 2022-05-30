@@ -21,8 +21,6 @@ pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
 pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 1;
 pub(crate) const MAX_FREE_LIST_ALLOCATORS: usize = 1;
 pub(crate) const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
-pub(crate) const MAX_FREE_LIST_ALLOCATORS: usize = 1;
-use super::FreeListAllocator;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
 // and each plan will select part of the allocators to use.
@@ -36,7 +34,6 @@ pub struct Allocators<VM: VMBinding> {
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
     pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
     pub markcompact: [MaybeUninit<MarkCompactAllocator<VM>>; MAX_MARK_COMPACT_ALLOCATORS],
-    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
 }
 
 impl<VM: VMBinding> Allocators<VM> {
@@ -59,9 +56,6 @@ impl<VM: VMBinding> Allocators<VM> {
                 self.markcompact[index as usize].assume_init_ref()
             }
             AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
-            AllocatorSelector::Malloc(index) => {
-                self.malloc[index as usize].assume_init_ref()
-            }
         }
     }
 
@@ -78,16 +72,15 @@ impl<VM: VMBinding> Allocators<VM> {
             AllocatorSelector::LargeObject(index) => {
                 self.large_object[index as usize].assume_init_mut()
             }
+            AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
-            AllocatorSelector::Malloc(index) => {
-                self.malloc[index as usize].assume_init_mut()
-            }
             AllocatorSelector::FreeList(index) => {
                 self.free_list[index as usize].assume_init_mut()
             }
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_mut()
             }
+            AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
         }
     }
 
@@ -103,7 +96,6 @@ impl<VM: VMBinding> Allocators<VM> {
             immix: unsafe { MaybeUninit::uninit().assume_init() },
             free_list: unsafe { MaybeUninit::uninit().assume_init() },
             markcompact: unsafe { MaybeUninit::uninit().assume_init() },
-            free_list: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
         for &(selector, space) in space_mapping.iter() {
@@ -152,13 +144,6 @@ impl<VM: VMBinding> Allocators<VM> {
                     ));
                 }
                 AllocatorSelector::None => panic!("Allocator mapping is not initialized"),
-                AllocatorSelector::FreeList(index) => {
-                    ret.free_list[index as usize].write(Box::new(FreeListAllocator::new(
-                        mutator_tls.0,
-                        space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
-                        plan,
-                    )));
-                }
             }
         }
 
@@ -187,7 +172,6 @@ pub enum AllocatorSelector {
     Immix(u8),
     FreeList(u8),
     MarkCompact(u8),
-    FreeList(u8),
     None,
 }
 

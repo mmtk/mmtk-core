@@ -1,14 +1,12 @@
-// all from Wenyu's Immix
-
 use std::iter::Step;
 
 use atomic::Ordering;
 
-use crate::{util::{Address, OpaquePointer, alloc::free_list_allocator::{BlockList}, metadata::{MetadataSpec, load_metadata, side_metadata::{
-                self, SideMetadataSpec,
-            }, store_metadata}, VMThread}, vm::VMBinding};
+use crate::{util::{Address, metadata::{side_metadata::{SideMetadataSpec, self}, load_metadata, MetadataSpec, store_metadata}, alloc::free_list_allocator::BlockList, VMThread, OpaquePointer}, vm::VMBinding};
 
 use super::{MarkSweepSpace, chunk::Chunk};
+
+
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]

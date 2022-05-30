@@ -1,20 +1,14 @@
 use std::sync::atomic::AtomicBool;
-use std::mem::{size_of, size_of_val};
 
 use atomic::Ordering;
-use atomic_traits::Atomic;
 use crate::policy::marksweepspace::block::Block;
 use crate::policy::marksweepspace::metadata::is_marked;
 use crate::policy::marksweepspace::MarkSweepSpace;
-use crate::policy::space::Space;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::alloc::Allocator;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
-use crate::vm::ActivePlan;
 use crate::Plan;
-use libc::c_void;
 
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
@@ -276,7 +270,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty());
         if need_poll {
-            VM::VMActivePlan::global().poll(false, self.space);
+            self.acquire_fresh_block(0, true);
         }
         let available = self.available_blocks_stress.get_mut(bin as usize).unwrap();
         if !available.is_empty() {
@@ -465,10 +459,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 self.consumed_blocks.get_mut(bin).unwrap().push::<VM>(block);
             }
         }
-        self.acquire_block(size, stress_test)
+        self.acquire_fresh_block(size, stress_test)
     }
 
-    pub fn acquire_block(&mut self, size: usize, stress_test: bool) -> Block {
+    pub fn acquire_fresh_block(&mut self, size: usize, stress_test: bool) -> Block {
         // fresh block
         let bin = mi_bin(size);
         loop {

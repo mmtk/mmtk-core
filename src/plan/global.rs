@@ -60,7 +60,6 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkCompact => {
             crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
         }
-        PlanSelector::FreeListMarkSweep => crate::plan::freelistmarksweep::mutator::create_freelistmarksweep_mutator(tls, &*mmtk.plan)
     })
 }
 
@@ -69,7 +68,7 @@ pub fn create_plan<VM: VMBinding>(
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
     options: Arc<UnsafeOptionsWrapper>,
-    scheduler: Arc<MMTkScheduler<VM>>,
+    scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),

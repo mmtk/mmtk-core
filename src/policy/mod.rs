@@ -26,4 +26,3 @@ pub mod lockfreeimmortalspace;
 pub mod marksweepspace;
 pub mod mallocspace;
 pub mod markcompactspace;
-pub mod marksweepspace;

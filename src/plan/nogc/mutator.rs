@@ -2,7 +2,7 @@ use crate::plan::barriers::NoBarrier;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::mutator_context::{
-    create_allocator_mapping, create_space_mapping, ReservedAllocators,
+    create_allocator_mapping, ReservedAllocators,
 };
 use crate::plan::nogc::NoGC;
 use crate::plan::AllocationSemantics;

@@ -1,8 +1,7 @@
-use crate::mmtk::MMTK;
+use crate::Mutator;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::global::NoCopy;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 #[cfg(feature="malloc")]
 use crate::plan::marksweep::gc_work::MSSweepChunks;
@@ -15,14 +14,15 @@ use crate::policy::space::{Space};
 use crate::policy::marksweepspace::block::Block;
 #[cfg(not(feature="malloc"))]
 use crate::policy::marksweepspace::MarkSweepSpace;
-use crate::util::VMWorkerThread;
 #[cfg(not(feature = "global_alloc_bit"))]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 #[cfg(feature="malloc")]
 use crate::policy::mallocspace::MallocSpace;
-use crate::scheduler::{GCWorkScheduler, GCWorkerLocalPtr};
-use crate::scheduler::{GCWorkerLocal, WorkBucketStage};
+use crate::scheduler::GCWorkScheduler;
+#[cfg(feature="malloc")]
+use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
+#[cfg(feature="malloc")]
 use crate::util::constants::MAX_INT;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -34,12 +34,12 @@ use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity
 };
 use crate::util::options::UnsafeOptionsWrapper;
-#[cfg(feature = "sanity")]
-use crate::util::sanity::sanity_checker::ScheduleSanityGC;
+use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
-use crate::Mutator;
+use mmtk_macros::PlanTraceObject;
+
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
@@ -49,6 +49,7 @@ pub struct MarkSweep<VM: VMBinding> {
     #[trace]
     ms: MallocSpace<VM>,
     #[cfg(not(feature="malloc"))]
+    #[trace]
     ms: MarkSweepSpace<VM>,
 }
 
@@ -77,14 +78,8 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
 
-    fn gc_init(
-        &mut self,
-        heap_size: usize,
-        vm_map: &'static VMMap,
-        scheduler: &Arc<GCWorkScheduler<VM>>,
-    ) {
-        self.common.gc_init(heap_size, vm_map, scheduler);
-        // FIXME correctly initialize spaces based on options
+    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
+        self.common.gc_init(heap_size, vm_map);
         self.ms.init(&vm_map);
     }
 
@@ -137,7 +132,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &MS_CONSTRAINTS
     }
 
-
     #[cfg(not(feature="malloc"))]
     fn destroy_mutator(&self, mutator: &mut Mutator<VM>) {
         unsafe { 
@@ -169,7 +163,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         #[cfg(not(feature = "malloc"))]
         let res = {
             let ms = MarkSweepSpace::new(
-                "MSspace",
+                "MarkSweepSpace",
                 true,
                 VMRequest::discontiguous(),
                 // local_specs.clone(),

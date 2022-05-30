@@ -3,6 +3,7 @@ use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
@@ -27,6 +28,8 @@ use crate::policy::lockfreeimmortalspace::LockFreeImmortalSpace as NoGCImmortalS
 pub struct NoGC<VM: VMBinding> {
     pub base: BasePlan<VM>,
     pub nogc_space: NoGCImmortalSpace<VM>,
+    pub immortal: ImmortalSpace<VM>,
+    pub los: ImmortalSpace<VM>,
 }
 
 pub const NOGC_CONSTRAINTS: PlanConstraints = PlanConstraints::default();
@@ -42,7 +45,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.base.gc_init(heap_size, vm_map);
 
         // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(&vm_map);
+        self.nogc_space.init(vm_map);
     }
 
     fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
@@ -69,8 +72,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         unreachable!("GC triggered in nogc")
     }
 
-    fn get_pages_used(&self) -> usize {
+    fn get_used_pages(&self) -> usize {
         self.nogc_space.reserved_pages()
+            + self.immortal.reserved_pages()
+            + self.los.reserved_pages()
+            + self.base.get_used_pages()
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
@@ -88,9 +94,6 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         #[cfg(feature = "nogc_lock_free")]
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
-
-        let global_specs = SideMetadataContext::new_global_specs(&[]);
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
@@ -114,6 +117,26 @@ impl<VM: VMBinding> NoGC<VM> {
 
         let res = NoGC {
             nogc_space,
+            immortal: ImmortalSpace::new(
+                "immortal",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                &NOGC_CONSTRAINTS,
+            ),
+            los: ImmortalSpace::new(
+                "los",
+                true,
+                VMRequest::discontiguous(),
+                global_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                &NOGC_CONSTRAINTS,
+            ),
             base: BasePlan::new(
                 vm_map,
                 mmapper,

@@ -3,8 +3,6 @@ use crate::plan::marksweep::MarkSweep;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::Plan;
-#[cfg(feature="malloc")]
-use crate::util::alloc::MallocAllocator;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
 #[cfg(not(feature="malloc"))]
 use crate::util::alloc::FreeListAllocator;
@@ -26,23 +24,10 @@ pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     // Do nothing
 }
 
-#[cfg(not(feature="malloc"))]
-pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    let allocator = unsafe {
-        mutator
-            .allocators
-            .get_allocator_mut(mutator.config.allocator_mapping[AllocationType::Default])
-    }
-    .downcast_mut::<FreeListAllocator<VM>>()
-    .unwrap();
-    allocator.rebind(
-        mutator
-            .plan
-            .downcast_ref::<MarkSweep<VM>>()
-            .unwrap()
-            .ms_space(),
-    )
-}
+const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
+    n_malloc: 1,
+    ..ReservedAllocators::DEFAULT
+};
 
 #[cfg(not(feature="malloc"))]
 pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
@@ -61,11 +46,6 @@ pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
             .ms_space(),
     );
 }
-
-const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
-    n_malloc: 1,
-    ..ReservedAllocators::DEFAULT
-};
 
 #[cfg(feature="malloc")]
 lazy_static! {
@@ -109,11 +89,10 @@ pub fn create_ms_mutator<VM: VMBinding>(
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
-    println!("new mutator");
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: Box::new(NoBarrier),
+        barrier: box NoBarrier,
         mutator_tls,
         config,
         plan,

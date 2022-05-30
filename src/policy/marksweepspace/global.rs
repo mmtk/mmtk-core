@@ -4,7 +4,7 @@ use std::{
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions, mallocspace::metadata::is_alloced}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, heap::{
+use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::{SpaceOptions, SFTProcessEdgesMutRef, GCWorkerMutRef}}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit, is_alloced}, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
         }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin}, vm::VMBinding, memory_manager::is_live_object};
@@ -57,6 +57,15 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
         // do nothing
     }
+
+    fn sft_trace_object(
+        &self,
+        trace: SFTProcessEdgesMutRef,
+        object: ObjectReference,
+        worker: GCWorkerMutRef,
+    ) -> ObjectReference {
+        todo!()
+    }
 }
 
 impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
@@ -82,6 +91,38 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: crate::util::Address) {
         todo!()
+    }
+}
+
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        copy: Option<crate::util::copy::CopySemantics>,
+        worker: &mut crate::scheduler::GCWorker<VM>,
+    ) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        let address = object.to_address();
+        assert!(
+            self.in_space(object),
+            "Cannot mark an object {} that was not alloced by free list allocator.",
+            address,
+        );
+        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
+            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
+            let block = Block::from(Block::align(address));
+            block.set_state(BlockState::Marked);
+            trace.process_node(object);
+        }
+        object
+    }
+
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        false
     }
 }
 
@@ -160,53 +201,14 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             abandoned_consumed: Mutex::from(BLOCK_LISTS_EMPTY),
         }
     }
-
-    pub fn trace_object<T: TransitiveClosure>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-    ) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        let address = object.to_address();
-        assert!(
-            self.in_space(object),
-            "Cannot mark an object {} that was not alloced by free list allocator.",
-            address,
-        );
-        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = Block::from(Block::align(address));
-            block.set_state(BlockState::Marked);
-            trace.process_node(object);
-        }
-        object
-    }
         
+
     pub fn zero_mark_bits(&self) {
         // todo: concurrent zeroing
         use crate::vm::*;
         for chunk in self.chunk_map.all_chunks() {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
-            }
-        }
-    }
-
-    pub fn check_valid_blocklists(&self) {
-        use crate::util::alloc::free_list_allocator::MI_LARGE_OBJ_WSIZE_MAX;
-        use crate::vm::*;
-        for chunk in self.chunk_map.all_chunks() {
-            for block in chunk.blocks() {
-                if block.get_state() != BlockState::Unallocated {
-                    let block_list = block.load_block_list::<VM>();
-                    if !block_list.is_null() {
-                        unsafe {
-                            assert!((*block_list).size == block.load_block_cell_size::<VM>());
-                        }
-                    }
-                }
             }
         }
     }
