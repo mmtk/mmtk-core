@@ -532,38 +532,32 @@
 <span id="530">530</span>
 <span id="531">531</span>
 <span id="532">532</span>
-<span id="533">533</span>
-<span id="534">534</span>
-<span id="535">535</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
 <span class="kw">use</span> <span class="ident">std::cell::UnsafeCell</span>;
 <span class="kw">use</span> <span class="ident">std::default::Default</span>;
 <span class="kw">use</span> <span class="ident">std::ops::Deref</span>;
 <span class="kw">use</span> <span class="ident">std::str::FromStr</span>;
+<span class="kw">use</span> <span class="ident">strum_macros::EnumString</span>;
 
-<span class="macro">custom_derive!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">EnumFromStr</span>, <span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NurseryZeroingOptions</span> {
-        <span class="ident">Temporal</span>,
-        <span class="ident">Nontemporal</span>,
-        <span class="ident">Concurrent</span>,
-        <span class="ident">Adaptive</span>,
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">EnumString</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">NurseryZeroingOptions</span> {
+    <span class="ident">Temporal</span>,
+    <span class="ident">Nontemporal</span>,
+    <span class="ident">Concurrent</span>,
+    <span class="ident">Adaptive</span>,
 }
 
-<span class="macro">custom_derive!</span> {
-    <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">EnumFromStr</span>, <span class="ident">Debug</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PlanSelector</span> {
-        <span class="ident">NoGC</span>,
-        <span class="ident">SemiSpace</span>,
-        <span class="ident">GenCopy</span>,
-        <span class="ident">GenImmix</span>,
-        <span class="ident">MarkSweep</span>,
-        <span class="ident">PageProtect</span>,
-        <span class="ident">Immix</span>,
-        <span class="ident">MarkCompact</span>,
-    }
+<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">EnumString</span>, <span class="ident">Debug</span>)]</span>
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">PlanSelector</span> {
+    <span class="ident">NoGC</span>,
+    <span class="ident">SemiSpace</span>,
+    <span class="ident">GenCopy</span>,
+    <span class="ident">GenImmix</span>,
+    <span class="ident">MarkSweep</span>,
+    <span class="ident">PageProtect</span>,
+    <span class="ident">Immix</span>,
+    <span class="ident">MarkCompact</span>,
 }
 
 <span class="doccomment">/// MMTk option for perf events</span>

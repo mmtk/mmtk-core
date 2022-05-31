@@ -64,10 +64,6 @@
 <span id="62">62</span>
 <span id="63">63</span>
 <span id="64">64</span>
-<span id="65">65</span>
-<span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
 </pre><pre class="rust"><code><span class="comment">// TODO: We should fix missing docs for public items and turn this on (Issue #309).</span>
 <span class="comment">// #![deny(missing_docs)]</span>
 
@@ -100,12 +96,8 @@
 <span class="doccomment">//!   i.e. [the memory manager API](memory_manager/index.html) that allows a language&#39;s memory manager to use MMTk</span>
 <span class="doccomment">//!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.</span>
 
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">custom_derive</span>;
-<span class="attribute">#[<span class="ident">macro_use</span>]</span>
-<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">enum_derive</span>;
-
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">libc</span>;
+<span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">strum_macros</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">lazy_static</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
