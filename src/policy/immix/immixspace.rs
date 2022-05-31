@@ -166,6 +166,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
             ]
         } else {
             vec![
@@ -174,6 +176,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
             ]
         })
     }
