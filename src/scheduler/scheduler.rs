@@ -364,8 +364,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     #[cold]
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
-        let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
+            let guard = self.worker_monitor.0.lock().unwrap();
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
@@ -374,6 +374,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let all_parked = self.worker_group.inc_parked_workers();
             // If all workers are parked, try activate new buckets
             if all_parked {
+                // If there're any designated work, resume the workers and process them.
+                if self.worker_group.has_designated_work() {
+                    self.worker_group.dec_parked_workers();
+                    self.worker_monitor.1.notify_all();
+                    continue;
+                }
                 if self.update_buckets() {
                     // We're not going to sleep since a new bucket is just open.
                     self.worker_group.dec_parked_workers();
@@ -388,11 +394,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     // Return this packet and execute it.
                     return work;
                 }
+                debug_assert!(!self.worker_group.has_designated_work());
                 // The current pause is finished if we can't open more buckets.
                 worker.sender.send(CoordinatorMessage::Finish).unwrap();
             }
             // Wait
-            guard = self.worker_monitor.1.wait(guard).unwrap();
+            let _ = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             self.worker_group.dec_parked_workers();
         }

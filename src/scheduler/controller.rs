@@ -94,6 +94,7 @@ impl<VM: VMBinding> GCController<VM> {
                 }
             }
         }
+        debug_assert!(!self.scheduler.worker_group.has_designated_work());
         for message in self.receiver.try_iter() {
             if let CoordinatorMessage::Work(mut work) = message {
                 work.do_work_with_stat(worker, mmtk);

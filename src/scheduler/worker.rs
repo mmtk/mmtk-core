@@ -265,4 +265,11 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     pub fn all_parked(&self) -> bool {
         self.parked_workers() == self.worker_count()
     }
+
+    /// Return true if there're any pending designated work
+    pub fn has_designated_work(&self) -> bool {
+        self.workers_shared
+            .iter()
+            .any(|w| !w.designated_work.is_empty())
+    }
 }
