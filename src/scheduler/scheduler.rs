@@ -374,7 +374,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             let all_parked = self.worker_group.inc_parked_workers();
             // If all workers are parked, try activate new buckets
             if all_parked {
-                // If there're any designated work, resume the workers and process them.
+                // If there're any designated work, resume the workers and process them
                 if self.worker_group.has_designated_work() {
                     self.worker_group.dec_parked_workers();
                     self.worker_monitor.1.notify_all();
