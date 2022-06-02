@@ -122,11 +122,12 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         &self,
         trace: &mut T,
         object: ObjectReference,
+        root: bool,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if KIND == TRACE_KIND_DEFRAG {
-            self.trace_object(trace, object, copy.unwrap(), worker)
+            self.trace_object(trace, object, root, copy.unwrap(), worker)
         } else if KIND == TRACE_KIND_FAST {
             self.fast_trace_object(trace, object)
         } else {
@@ -379,6 +380,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
+        root: bool,
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
@@ -390,7 +392,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         if Block::containing::<VM>(object).is_defrag_source() {
             debug_assert!(self.in_defrag());
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker)
+            self.trace_object_with_opportunistic_copy(trace, object, root, semantics, worker)
         } else {
             self.trace_object_without_moving(trace, object)
         }
@@ -425,6 +427,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         trace: &mut impl TransitiveClosure,
         object: ObjectReference,
+        root: bool,
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
@@ -470,7 +473,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
-            let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
+            let new_object = if Self::is_pinned(object)
+                || self.defrag.space_exhausted()
+                || (cfg!(feature = "non_moving_roots_immix") && root)
+            {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);

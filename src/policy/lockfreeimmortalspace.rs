@@ -159,6 +159,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeIm
         &self,
         _trace: &mut T,
         _object: ObjectReference,
+        _root: bool,
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {

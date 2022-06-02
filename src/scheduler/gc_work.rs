@@ -653,7 +653,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
             return object;
         }
         self.plan
-            .trace_object::<Self, KIND>(self, object, self.worker())
+            .trace_object::<Self, KIND>(self, object, self.roots, self.worker())
     }
 
     #[inline]

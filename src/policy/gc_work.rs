@@ -24,6 +24,7 @@ pub trait PolicyTraceObject<VM: VMBinding> {
         &self,
         trace: &mut T,
         object: ObjectReference,
+        root: bool,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;

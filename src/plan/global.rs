@@ -973,11 +973,13 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// Arguments:
     /// * `trace`: the current transitive closure
     /// * `object`: the object to trace. This is a non-nullable object reference.
+    /// * `root`: is the object a root objecct?
     /// * `worker`: the GC worker that is tracing this object.
     fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
         &self,
         trace: &mut T,
         object: ObjectReference,
+        root: bool,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 

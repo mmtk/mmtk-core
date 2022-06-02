@@ -114,6 +114,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
         &self,
         trace: &mut T,
         object: ObjectReference,
+        _root: bool,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {

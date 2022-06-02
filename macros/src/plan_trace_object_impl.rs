@@ -34,7 +34,7 @@ pub(crate) fn generate_trace_object<'a>(
 
         quote! {
             if self.#f_ident.in_space(__mmtk_objref) {
-                return <#f_ty as PolicyTraceObject #ty_generics>::trace_object::<T, KIND>(&self.#f_ident, __mmtk_trace, __mmtk_objref, #copy, __mmtk_worker);
+                return <#f_ty as PolicyTraceObject #ty_generics>::trace_object::<T, KIND>(&self.#f_ident, __mmtk_trace, __mmtk_objref, __mmtk_root, #copy, __mmtk_worker);
             }
         }
     });
@@ -44,7 +44,7 @@ pub(crate) fn generate_trace_object<'a>(
         let f_ident = f.ident.as_ref().unwrap();
         let ref f_ty = f.ty;
         quote! {
-            <#f_ty as PlanTraceObject #ty_generics>::trace_object::<T, KIND>(&self.#f_ident, __mmtk_trace, __mmtk_objref, __mmtk_worker)
+            <#f_ty as PlanTraceObject #ty_generics>::trace_object::<T, KIND>(&self.#f_ident, __mmtk_trace, __mmtk_objref, __mmtk_root, __mmtk_worker)
         }
     } else {
         quote! {
@@ -54,7 +54,7 @@ pub(crate) fn generate_trace_object<'a>(
 
     quote! {
         #[inline(always)]
-        fn trace_object<T: crate::plan::TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, __mmtk_trace: &mut T, __mmtk_objref: crate::util::ObjectReference, __mmtk_worker: &mut crate::scheduler::GCWorker<VM>) -> crate::util::ObjectReference {
+        fn trace_object<T: crate::plan::TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(&self, __mmtk_trace: &mut T, __mmtk_objref: crate::util::ObjectReference, __mmtk_root: bool, __mmtk_worker: &mut crate::scheduler::GCWorker<VM>) -> crate::util::ObjectReference {
             use crate::policy::space::Space;
             use crate::policy::gc_work::PolicyTraceObject;
             use crate::plan::PlanTraceObject;
