@@ -399,7 +399,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 worker.sender.send(CoordinatorMessage::Finish).unwrap();
             }
             // Wait
-            let _ = self.worker_monitor.1.wait(guard).unwrap();
+            let _guard = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             self.worker_group.dec_parked_workers();
         }
