@@ -247,9 +247,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             }
             let bucket = &self.work_buckets[id];
             let bucket_opened = bucket.update(self);
-            buckets_updated |= bucket_opened;
+            buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
-                new_packets |= !bucket.is_drained();
+                new_packets = new_packets || !bucket.is_drained();
+                // Quit the loop. There'are already new packets in the newly opened buckets.
+                if new_packets {
+                    break;
+                }
             }
         }
         buckets_updated && new_packets
