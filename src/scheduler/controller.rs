@@ -71,15 +71,18 @@ impl<VM: VMBinding> GCController<VM> {
     fn process_message(&mut self, message: CoordinatorMessage<VM>) -> bool {
         let worker = &mut self.coordinator_worker;
         let mmtk = self.mmtk;
-        self.scheduler
-            .completed_messages
-            .fetch_add(1, Ordering::SeqCst);
         match message {
             CoordinatorMessage::Work(mut work) => {
                 work.do_work_with_stat(worker, mmtk);
+                self.scheduler
+                    .completed_messages
+                    .fetch_add(1, Ordering::SeqCst);
                 false
             }
             CoordinatorMessage::Finish => {
+                self.scheduler
+                    .completed_messages
+                    .fetch_add(1, Ordering::SeqCst);
                 // Quit only if all the buckets are empty.
                 // For concurrent GCs, the coordinator thread may receive this message when
                 // some buckets are still not empty. Under such case, the coordinator
