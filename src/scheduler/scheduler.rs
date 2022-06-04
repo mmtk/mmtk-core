@@ -42,10 +42,8 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     /// the `Closure` bucket multiple times to iteratively discover and process
     /// more ephemeron objects.
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
-    /// Counter for messages sent to the controller.
-    pub(super) issued_messages: AtomicUsize,
-    /// Counter for messages completed by the controller.
-    pub(super) completed_messages: AtomicUsize,
+    /// Counter for pending coordinator messages.
+    pub(super) pending_messages: AtomicUsize,
 }
 
 // FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
@@ -117,8 +115,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             coordinator_worker_shared,
             worker_monitor,
             closure_end: Mutex::new(None),
-            issued_messages: AtomicUsize::new(0),
-            completed_messages: AtomicUsize::new(0),
+            pending_messages: AtomicUsize::new(0),
         })
     }
 
@@ -228,8 +225,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
-            && self.issued_messages.load(Ordering::Relaxed)
-                == self.completed_messages.load(Ordering::Relaxed)
+            && self.pending_messages.load(Ordering::Relaxed) == 0
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
@@ -296,7 +292,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
-        self.issued_messages.fetch_add(1, Ordering::SeqCst);
+        self.pending_messages.fetch_add(1, Ordering::SeqCst);
         worker
             .sender
             .send(CoordinatorMessage::Work(Box::new(work)))
@@ -410,7 +406,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 }
                 debug_assert!(!self.worker_group.has_designated_work());
                 // The current pause is finished if we can't open more buckets.
-                self.issued_messages.fetch_add(1, Ordering::SeqCst);
+                self.pending_messages.fetch_add(1, Ordering::SeqCst);
                 worker.sender.send(CoordinatorMessage::Finish).unwrap();
             }
             // Wait

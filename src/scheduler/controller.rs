@@ -75,14 +75,14 @@ impl<VM: VMBinding> GCController<VM> {
             CoordinatorMessage::Work(mut work) => {
                 work.do_work_with_stat(worker, mmtk);
                 self.scheduler
-                    .completed_messages
-                    .fetch_add(1, Ordering::SeqCst);
+                    .pending_messages
+                    .fetch_sub(1, Ordering::SeqCst);
                 false
             }
             CoordinatorMessage::Finish => {
                 self.scheduler
-                    .completed_messages
-                    .fetch_add(1, Ordering::SeqCst);
+                    .pending_messages
+                    .fetch_sub(1, Ordering::SeqCst);
                 // Quit only if all the buckets are empty.
                 // For concurrent GCs, the coordinator thread may receive this message when
                 // some buckets are still not empty. Under such case, the coordinator
@@ -110,8 +110,8 @@ impl<VM: VMBinding> GCController<VM> {
         // Sometimes multiple finish messages will be sent. Skip them.
         for message in self.receiver.try_iter() {
             self.scheduler
-                .completed_messages
-                .fetch_add(1, Ordering::SeqCst);
+                .pending_messages
+                .fetch_sub(1, Ordering::SeqCst);
             match message {
                 CoordinatorMessage::Work(_) => unreachable!(),
                 CoordinatorMessage::Finish => {}
