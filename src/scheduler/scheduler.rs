@@ -225,7 +225,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
-            && self.pending_messages.load(Ordering::Relaxed) == 0
+            && self.pending_messages.load(Ordering::SeqCst) == 0
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {

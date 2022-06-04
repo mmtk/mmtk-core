@@ -96,12 +96,12 @@ impl<VM: VMBinding> WorkBucket<VM> {
 
     #[inline(always)]
     pub fn is_activated(&self) -> bool {
-        self.active.load(Ordering::Relaxed)
+        self.active.load(Ordering::SeqCst)
     }
 
     /// Enable the bucket
     pub fn activate(&self) {
-        self.active.store(true, Ordering::Relaxed);
+        self.active.store(true, Ordering::SeqCst);
     }
 
     /// Test if the bucket is drained

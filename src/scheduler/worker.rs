@@ -241,7 +241,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Return true if all the workers are parked.
     #[inline(always)]
     pub fn inc_parked_workers(&self) -> bool {
-        let old = self.parked_workers.fetch_add(1, Ordering::Relaxed);
+        let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
         debug_assert!(old < self.worker_count());
         old + 1 == self.worker_count()
     }
@@ -250,14 +250,14 @@ impl<VM: VMBinding> WorkerGroup<VM> {
     /// Called after a worker is resumed from the parked state.
     #[inline(always)]
     pub fn dec_parked_workers(&self) {
-        let old = self.parked_workers.fetch_sub(1, Ordering::Relaxed);
+        let old = self.parked_workers.fetch_sub(1, Ordering::SeqCst);
         debug_assert!(old <= self.worker_count());
     }
 
     /// Get the number of parked workers in the group
     #[inline(always)]
     pub fn parked_workers(&self) -> usize {
-        self.parked_workers.load(Ordering::Relaxed)
+        self.parked_workers.load(Ordering::SeqCst)
     }
 
     /// Check if all the workers are packed
