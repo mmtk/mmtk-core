@@ -12,6 +12,7 @@ use crate::scheduler::CoordinatorMessage;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use crate::MMTK;
+use atomic::Ordering;
 
 use super::{GCWork, GCWorkScheduler, GCWorker};
 
@@ -66,38 +67,51 @@ impl<VM: VMBinding> GCController<VM> {
         }
     }
 
-    /// Coordinate workers to perform GC in response to a GC request.
-    pub fn do_gc_until_completion(&mut self) {
+    /// Process a message. Return true if the GC is finished.
+    fn process_message(&mut self, message: CoordinatorMessage<VM>) -> bool {
         let worker = &mut self.coordinator_worker;
         let mmtk = self.mmtk;
+        self.scheduler
+            .completed_messages
+            .fetch_add(1, Ordering::SeqCst);
+        match message {
+            CoordinatorMessage::Work(mut work) => {
+                work.do_work_with_stat(worker, mmtk);
+                false
+            }
+            CoordinatorMessage::Finish => {
+                // Quit only if all the buckets are empty.
+                // For concurrent GCs, the coordinator thread may receive this message when
+                // some buckets are still not empty. Under such case, the coordinator
+                // should ignore the message.
+                let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
+                self.scheduler.worker_group.all_parked() && self.scheduler.all_buckets_empty()
+            }
+        }
+    }
 
+    /// Coordinate workers to perform GC in response to a GC request.
+    pub fn do_gc_until_completion(&mut self) {
         // Schedule collection.
-        ScheduleCollection.do_work_with_stat(worker, mmtk);
+        ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         // Drain the message queue and execute coordinator work.
         loop {
-            match self.receiver.recv().unwrap() {
-                CoordinatorMessage::Work(mut work) => {
-                    work.do_work_with_stat(worker, mmtk);
-                }
-                CoordinatorMessage::Finish => {
-                    // Quit only if all the buckets are empty.
-                    // For concurrent GCs, the coordinator thread may receive this message when
-                    // some buckets are still not empty. Under such case, the coordinator
-                    // should ignore the message.
-                    let _guard = self.scheduler.worker_monitor.0.lock().unwrap();
-                    if self.scheduler.worker_group.all_parked()
-                        && self.scheduler.all_buckets_empty()
-                    {
-                        break;
-                    }
-                }
+            let message = self.receiver.recv().unwrap();
+            let finished = self.process_message(message);
+            if finished {
+                break;
             }
         }
         debug_assert!(!self.scheduler.worker_group.has_designated_work());
+        // Sometimes multiple finish messages will be sent. Skip them.
         for message in self.receiver.try_iter() {
-            if let CoordinatorMessage::Work(mut work) = message {
-                work.do_work_with_stat(worker, mmtk);
+            self.scheduler
+                .completed_messages
+                .fetch_add(1, Ordering::SeqCst);
+            match message {
+                CoordinatorMessage::Work(_) => unreachable!(),
+                CoordinatorMessage::Finish => {}
             }
         }
         self.scheduler.deactivate_all();
@@ -106,7 +120,7 @@ impl<VM: VMBinding> GCController<VM> {
         //       Otherwise, for generational GCs, workers will receive and process
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
-        EndOfGC.do_work_with_stat(worker, mmtk);
+        EndOfGC.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }
