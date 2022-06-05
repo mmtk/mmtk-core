@@ -96,8 +96,6 @@ impl ReferenceProcessors {
 
     /// Scan weak references.
     pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        self.soft
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
         self.weak
             .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
     }
