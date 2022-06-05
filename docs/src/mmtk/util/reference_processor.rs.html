@@ -563,8 +563,6 @@
 <span id="561">561</span>
 <span id="562">562</span>
 <span id="563">563</span>
-<span id="564">564</span>
-<span id="565">565</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
@@ -663,8 +661,6 @@
 
     <span class="doccomment">/// Scan weak references.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_weak_refs</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">soft</span>
-            .<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
         <span class="self">self</span>.<span class="ident">weak</span>
             .<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
     }

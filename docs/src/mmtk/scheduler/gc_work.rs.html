@@ -725,6 +725,8 @@
 <span id="723">723</span>
 <span id="724">724</span>
 <span id="725">725</span>
+<span id="726">726</span>
+<span id="727">727</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -777,8 +779,9 @@
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>]
                 .<span class="ident">add</span>(<span class="ident">PrepareMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
-        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">workers_shared</span> {
-            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">PrepareCollector</span>);
+        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>.<span class="ident">workers_shared</span> {
+            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">w</span>.<span class="ident">designated_work</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">PrepareCollector</span>));
+            <span class="macro">debug_assert!</span>(<span class="ident">result</span>.<span class="ident">is_ok</span>());
         }
     }
 }
@@ -845,8 +848,9 @@
             <span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>]
                 .<span class="ident">add</span>(<span class="ident">ReleaseMutator</span>::<span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">mutator</span>));
         }
-        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">workers_shared</span> {
-            <span class="ident">w</span>.<span class="ident">local_work_bucket</span>.<span class="ident">add</span>(<span class="ident">ReleaseCollector</span>);
+        <span class="kw">for</span> <span class="ident">w</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="ident">mmtk</span>.<span class="ident">scheduler</span>.<span class="ident">worker_group</span>.<span class="ident">workers_shared</span> {
+            <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="ident">w</span>.<span class="ident">designated_work</span>.<span class="ident">push</span>(<span class="ident">Box::new</span>(<span class="ident">ReleaseCollector</span>));
+            <span class="macro">debug_assert!</span>(<span class="ident">result</span>.<span class="ident">is_ok</span>());
         }
     }
 }
