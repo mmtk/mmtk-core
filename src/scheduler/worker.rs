@@ -19,7 +19,7 @@ thread_local! {
 
 #[inline(always)]
 pub fn current_worker_id() -> Option<usize> {
-    WORKER_ID.with(|x| x.load(Ordering::SeqCst))
+    WORKER_ID.with(|x| x.load(Ordering::Relaxed))
 }
 
 /// The part shared between a GCWorker and the scheduler.
