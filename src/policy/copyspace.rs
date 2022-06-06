@@ -225,7 +225,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.load(Ordering::SeqCst)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn trace_object<Q: ObjectQueue>(
         &self,
         queue: &mut Q,

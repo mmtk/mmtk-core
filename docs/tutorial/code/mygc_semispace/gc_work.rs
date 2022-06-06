@@ -46,7 +46,7 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         Self { base, plan }
     }
 
-    #[inline]
+    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
