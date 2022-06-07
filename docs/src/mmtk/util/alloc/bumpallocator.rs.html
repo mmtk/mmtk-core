@@ -186,6 +186,10 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::object_ref_guard::adjust_thread_local_buffer_limit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -361,14 +365,18 @@
             );
             <span class="kw">if</span> <span class="op">!</span><span class="ident">stress_test</span> {
                 <span class="self">self</span>.<span class="ident">set_limit</span>(<span class="ident">acquired_start</span>, <span class="ident">acquired_start</span> <span class="op">+</span> <span class="ident">block_size</span>);
+                <span class="self">self</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
             } <span class="kw">else</span> {
                 <span class="comment">// For a stress test, we artificially make the fastpath fail by</span>
                 <span class="comment">// manipulating the limit as below.</span>
                 <span class="comment">// The assumption here is that we use an address range such that</span>
                 <span class="comment">// cursor &gt; block_size always.</span>
                 <span class="self">self</span>.<span class="ident">set_limit</span>(<span class="ident">acquired_start</span>, <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">block_size</span>) });
+                <span class="comment">// Note that we have just acquired a new block so we know that we don&#39;t have to go</span>
+                <span class="comment">// through the entire allocation sequence again, we can directly call the slow path</span>
+                <span class="comment">// allocation.</span>
+                <span class="self">self</span>.<span class="ident">alloc_slow_once_precise_stress</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="bool-val">false</span>)
             }
-            <span class="self">self</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
         }
     }
 }

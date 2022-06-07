@@ -1383,7 +1383,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="ident">stacks_prepared</span>: <span class="ident">AtomicBool</span>,
     <span class="kw">pub</span> <span class="ident">mutator_iterator_lock</span>: <span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>,
     <span class="comment">// A counter that keeps tracks of the number of bytes allocated since last stress test</span>
-    <span class="ident">allocation_bytes</span>: <span class="ident">AtomicUsize</span>,
+    <span class="kw">pub</span> <span class="ident">allocation_bytes</span>: <span class="ident">AtomicUsize</span>,
     <span class="comment">// Wrapper around analysis counters</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">analysis_manager</span>: <span class="ident">AnalysisManager</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
