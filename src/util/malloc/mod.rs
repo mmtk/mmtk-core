@@ -31,7 +31,7 @@ pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
     if !res.is_zero() {
         mmtk.plan.base().increase_malloc_bytes_by(size);
     }
-    return res;
+    res
 }
 
 #[inline(always)]
@@ -46,7 +46,7 @@ pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -
     if !res.is_zero() {
         mmtk.plan.base().increase_malloc_bytes_by(num * size);
     }
-    return res;
+    res
 }
 
 #[inline(always)]
@@ -71,7 +71,7 @@ pub fn realloc_with_old_size<VM: VMBinding>(
         mmtk.plan.base().increase_malloc_bytes_by(size);
     }
 
-    return res;
+    res
 }
 
 #[inline(always)]
