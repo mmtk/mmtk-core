@@ -1,5 +1,6 @@
 use atomic_refcell::AtomicRefCell;
 use std::sync::Once;
+use std::sync::Mutex;
 
 use mmtk::AllocationSemantics;
 use mmtk::MMTK;
@@ -16,15 +17,27 @@ pub trait FixtureContent {
 pub struct Fixture<T: FixtureContent> {
     content: AtomicRefCell<Option<Box<T>>>,
     once: Once,
+    serial_lock: Option<Mutex<()>>,
 }
 
 unsafe impl<T: FixtureContent> Sync for Fixture<T> {}
 
 impl<T: FixtureContent> Fixture<T> {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             content: AtomicRefCell::new(None),
             once: Once::new(),
+            serial_lock: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn new_serial_tests() -> Self {
+        Self {
+            content: AtomicRefCell::new(None),
+            once: Once::new(),
+            serial_lock: Some(Mutex::default()),
         }
     }
 
@@ -34,7 +47,11 @@ impl<T: FixtureContent> Fixture<T> {
             let mut borrow = self.content.borrow_mut();
             *borrow = Some(content);
         });
-        {
+        if let Some(mutex) = &self.serial_lock {
+            let _lock = mutex.lock();
+            let borrow = self.content.borrow();
+            func(borrow.as_ref().unwrap())
+        } else {
             let borrow = self.content.borrow();
             func(borrow.as_ref().unwrap())
         }
