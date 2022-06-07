@@ -373,7 +373,7 @@ pub struct BasePlan<VM: VMBinding> {
     stacks_prepared: AtomicBool,
     pub mutator_iterator_lock: Mutex<()>,
     // A counter that keeps tracks of the number of bytes allocated since last stress test
-    allocation_bytes: AtomicUsize,
+    pub allocation_bytes: AtomicUsize,
     // Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
