@@ -43,14 +43,15 @@ method `schedule_common_work()` that will add common work packets for you.
 
 To use `schedule_common_work()`, first we need to create a type `MyGCWorkContext`
 and implement the trait `GCWorkContext` for it. We create `gc_work.rs` and add the
-following implementation. Note that we do not set a specific `ProcessEdgesWorkType`
-and we will use the default [`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
+following implementation. Note that we will use the default
+[`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html),
 which is a general work packet that a plan can use to trace objects. For plans
 like semispace, `SFTProcessEdges` is sufficient. For more complex GC plans,
 one can create and write their own work packet that implements the `ProcessEdgesWork` trait.
+We will discuss about this later, and discuss the alternatives.
 
 ```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:workcontext}}
+{{#include ../../../code/mygc_semispace/gc_work.rs:workcontext_sft}}
 ```
 
 Then we implement `schedule_collection()` using `MyGCWorkContext` and `schedule_common_work()`.
@@ -111,35 +112,6 @@ there aren't any preparation steps for the mutator in this GC.
 In `create_mygc_mutator()`, find the field `prep_func` and change it from
 `mygc_mutator_noop()` to `mygc_mutator_prepare()`.
 
-
-## Scan objects
-
-Next, we'll add the code to allow the plan to collect garbage - filling out 
-functions for work packets.
-
-In `gc_work.rs`, add a new method to `ProcessEdgesWork for MyGCProcessEdges`,
-`trace_object(&mut self, object: ObjectReference)`.
-This method should return an ObjectReference, and use the 
-inline attribute.
-Check if the object passed into the function is null 
-(`object.is_null()`). If it is, return the object.
-Otherwise, check which space the object is in, and forward the call to the 
-policy-specific object tracing code. If it is in neither space, forward the 
-call to the common space and let the common space to handle object tracing in 
-its spaces (e.g. immortal or large object space):
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:trace_object}}
-```
-
-Add two new implementation blocks, `Deref` and `DerefMut` for 
-`MyGCProcessEdges`. These allow `MyGCProcessEdges` to be dereferenced to 
-`ProcessEdgesBase`, and allows easy access to fields in `ProcessEdgesBase`.
-
-```rust
-{{#include ../../../code/mygc_semispace/gc_work.rs:deref}}
-```
-
 ## Release
 
 Finally, we need to fill out the functions that are, roughly speaking, 
@@ -177,6 +149,91 @@ will then go to the new tospace.
 
 Delete `mygc_mutator_noop()`. It was a placeholder for the prepare and 
 release functions that you have now added, so it is now dead code.
+
+## ProcessEdgesWork for MyGC
+
+[`ProcessEdgesWork`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/trait.ProcessEdgesWork.html)
+is the key work packet for tracing objects in a GC. A `ProcessEdgesWork` implementation
+defines how to trace objects, and how to generate more work packets based on the current tracing
+to finish the object closure.
+
+`GCWorkContext` specifies a type
+that implements `ProcessEdgesWork`, and we used `SFTProcessEdges` earlier. In
+this section, we discuss what `SFTProcessEdges` does, and what the alternatives
+are.
+
+### Approach 1: Use `SFTProcessEdges`
+
+[`SFTProcessEdges`](https://www.mmtk.io/mmtk-core/mmtk/scheduler/gc_work/struct.SFTProcessEdges.html) dispatches
+the tracing of objects to their respective spaces through [Space Function Table (SFT)](https://www.mmtk.io/mmtk-core/mmtk/policy/space/trait.SFT.html).
+As long as all the policies in a plan provide an implementation of `sft_trace_object()` in their SFT implementations,
+the plan can use `SFTProcessEdges`. Currently most policies provide an implementation for `sft_trace_object()`, except
+mark compact and immix. Those two policies use multiple GC traces, and due to the limitation of SFT, SFT does not allow
+multiple `sft_trace_object()` for a policy.
+
+`SFTProcessEdges` is the simplest approach when all the policies support it. Fortunately, we can use it for our GC, semispace.
+
+### Approach 2: Derive `PlanTraceObject` and use `PlanProcessEdges`
+
+`PlanProcessEdges` is another general `ProcessEdgesWork` implementation that can be used by most plans. When a plan
+implements the [`PlanTraceObject`](https://www.mmtk.io/mmtk-core/mmtk/plan/transitive_closure/trait.PlanTraceObject.html),
+it can use `PlanProcessEdges`.
+
+You can manually provide an implementation of `PlanTraceObject` for `MyGC`. But you can also use the derive macro MMTK provides,
+and the macro will generate an implementation of `PlanTraceObject`:
+* add `#[derive(PlanTraceObject)]` for `MyGC` (import the macro properly: `use mmtk_macros::PlanTraceObject`)
+* add `#[trace(CopySemantics::Default)]` to both copy space fields, `copyspace0` and `copyspace1`. This tells the macro to generate
+  trace code for both spaces, and for any copying in the spaces, use `CopySemantics::DefaultCopy` that we have configured early.
+* add `#[fallback_trace]` to `common`. This tells the macro that if an object is not found in any space with `#[trace]` in ths plan,
+  try find the space for the object in the 'parent' plan. In our case, we fall back to the `CommonPlan`, as the object may be
+  in large object space or immortal space in the common plan. `CommonPlan` also implements `PlanTraceObject`, so it knows how to
+  find a space for the object and trace it in the same way.
+
+With the derive macro, your `MyGC` struct should look like this:
+```rust
+{{#include ../../../code/mygc_semispace/global.rs:plan_def}}
+```
+
+Once this is done, you can specify `PlanProcessEdges` as the `ProcessEdgesWorkType` in your GC work context:
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:workcontext_plan}}
+```
+
+### Approach 3: Implement your own `ProcessEdgesWork`
+
+Apart from the two approaches above, you can always implement your own `ProcessEdgesWork`. This is
+an overkill for simple plans like semi space, but might be necessary for more complex plans.
+We discuss how to implement it for `MyGC`.
+
+Create a struct `MyGCProcessEdges<VM: VMBinding>` in the `gc_work` module. It includes a reference
+back to the plan, and a `ProcessEdgesBase` field:
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges}}
+```
+
+Implement `ProcessEdgesWork` for `MyGCProcessEdges`. As most methods in the trait have a default
+implemetation, we only need to implement `new()` and `trace_object()` for our plan. However, this
+may not be true when you implement it for other GC plans. It would be better to check the default
+implementation of `ProcessEdgesWork`.
+
+For `trace_object()`, what we do is similar to the approach above (except that we need to write the code
+ourselves rather than letting the macro to generate it for us). We try to figure out
+which space the object is in, and invoke `trace_object()` for the object on that space. If the
+object is not in any of the semi spaces in the plan, we forward the call to `CommonPlan`.
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges_impl}}
+```
+
+We would also need to implement `Deref` and `DerefMut` to our `ProcessEdgesWork` impl to be
+dereferenced as `ProcessEdgesBase`.
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:mygc_process_edges_deref}}
+```
+
+In the end, use `MyGCProcessEdges` as `ProcessEdgesWorkType` in the `GCWorkContext`:
+```rust
+{{#include ../../../code/mygc_semispace/gc_work.rs:workcontext_mygc}}
+```
 
 ## Summary
 

@@ -1,7 +1,10 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::policy::gc_work::TraceKind;
 use crate::policy::space::*;
+use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
+use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
 use crate::util::metadata::load_metadata;
@@ -10,6 +13,9 @@ use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, TransitiveClosure};
 use atomic::Ordering;
+
+pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
+pub(crate) const TRACE_KIND_FORWARD: TraceKind = 1;
 
 pub struct MarkCompactSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -94,6 +100,35 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("markcompactspace only releases pages enmasse")
+    }
+}
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
+    #[inline(always)]
+    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        if KIND == TRACE_KIND_MARK {
+            self.trace_mark_object(trace, object)
+        } else if KIND == TRACE_KIND_FORWARD {
+            self.trace_forward_object(trace, object)
+        } else {
+            unreachable!()
+        }
+    }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        if KIND == TRACE_KIND_MARK {
+            false
+        } else if KIND == TRACE_KIND_FORWARD {
+            true
+        } else {
+            unreachable!()
+        }
     }
 }
 

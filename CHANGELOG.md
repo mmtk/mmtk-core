@@ -1,3 +1,26 @@
+0.12.0 (2022-05-13)
+===
+
+GC Plans
+---
+* Introduced `trait PlanTraceObject` and procedural macros to derive implementation for it for all the current plans.
+* Introduced a work packet type `PlanProcessEdges` that uses `PlanTraceObject`. All the current plans use this type for tracing objects.
+
+Policy
+---
+* Introduced `trait PolicyTraceObject`. Added an implementation for each policy.
+
+API
+---
+* Preliminary support for Java-style weak reference is added (set the option `no_reference_types=false` to enable it). Related APIs are slightly changed.
+* The type parameter `TransitiveClosure` in `Scanning::scan_object()/scan_objects()` is now replaced with `vm::EdgeVisitor`.
+* Minor changes to `Scanning::scan_object()/scan_objects()` so they are more consistent.
+
+Misc
+---
+* Fixed a bug in object forwarding: an object can leave the being-forwarded state without actually being forwarded, and this
+  now won't cause a panic.
+
 0.11.0 (2022-04-01)
 ===
 
