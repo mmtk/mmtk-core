@@ -23,7 +23,7 @@ enum_derive = "0.1"
 libc = "0.2"
 jemalloc-sys = {version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
 mimalloc-sys = {version = "0.1.6", optional = true }
-hoard-sys = {version = "0.1.1", optional = true, path = "/home/yilin/Code/hoard-sys" }
+hoard-sys = {version = "0.1.2", optional = true }
 lazy_static = "1.1"
 log = {version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam-deque = "0.6"
