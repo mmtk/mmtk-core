@@ -27,10 +27,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        // We get the reference to the worker on a separate line because we cannot
-        // borrow `self` twice in the call to `trace_object_nursery`.
-        // TODO: `worker` should be an argument to `trace_object` itself.
-        // We will refactor it later.
+        // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
         self.gen
             .trace_object_nursery(&mut self.base.nodes, object, worker)

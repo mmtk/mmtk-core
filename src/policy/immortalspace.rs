@@ -86,14 +86,6 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     ) -> ObjectReference {
         self.trace_object(queue, object)
     }
-
-    fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
-        None
-    }
-
-    fn is_in_space(&self, _object: ObjectReference) -> bool {
-        true
-    }
 }
 
 impl<VM: VMBinding> Space<VM> for ImmortalSpace<VM> {

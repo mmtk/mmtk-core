@@ -1,4 +1,5 @@
-//! The fundamental mechanism for performing a transitive closure over an object graph.
+//! This module contains code useful for tracing,
+//! i.e. visiting the reachable objects by traversing all or part of an object graph.
 
 use std::mem;
 
@@ -51,7 +52,7 @@ impl Default for VectorObjectQueue {
 }
 
 impl ObjectQueue for VectorObjectQueue {
-    #[inline]
+    #[inline(always)]
     fn enqueue(&mut self, object: ObjectReference) {
         if self.nodes.is_empty() {
             self.nodes.reserve(Self::CAPACITY);
