@@ -609,25 +609,25 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "code_space")]
         if self.code_space.in_space(_object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<T>(_trace, _object);
+            return self.code_space.trace_object::<Q>(_queue, _object);
         }
 
         #[cfg(feature = "code_space")]
         if self.code_lo_space.in_space(_object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<T>(_trace, _object);
+            return self.code_lo_space.trace_object::<Q>(_queue, _object);
         }
 
         #[cfg(feature = "ro_space")]
         if self.ro_space.in_space(_object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(_trace, _object);
+            return self.ro_space.trace_object(_queue, _object);
         }
 
         #[cfg(feature = "vm_space")]
         if self.vm_space.in_space(_object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(_trace, _object);
+            return self.vm_space.trace_object(_queue, _object);
         }
         panic!("No special case for space in trace_object({:?})", _object);
     }
