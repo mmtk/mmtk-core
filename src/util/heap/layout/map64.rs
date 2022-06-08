@@ -152,6 +152,14 @@ impl Map for Map64 {
         unreachable!()
     }
 
+    fn get_available_discontiguous_chunks(&self) -> usize {
+        panic!("We don't use discontiguous chunks for 64-bit!");
+    }
+
+    fn get_chunk_consumer_count(&self) -> usize {
+        panic!("We don't use discontiguous chunks for 64-bit!");
+    }
+
     fn free_all_chunks(&self, _any_chunk: Address) {
         unreachable!()
     }
