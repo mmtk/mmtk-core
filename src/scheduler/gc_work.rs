@@ -629,7 +629,7 @@ pub struct PlanProcessEdges<
     P: Plan<VM = VM> + PlanTraceObject<VM>,
     const KIND: TraceKind,
 > {
-    plan: &'static P,
+    delegate: PlanTracingDelegate<P, KIND>,
     base: ProcessEdgesBase<VM>,
 }
 
@@ -641,12 +641,17 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<P>().unwrap();
-        Self { plan, base }
+        let delegate = PlanTracingDelegate::new(plan);
+        Self { delegate, base }
     }
 
     #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>) -> Box<dyn GCWork<Self::VM>> {
-        Box::new(PlanScanObjects::<Self, P>::new(self.plan, nodes, false))
+        Box::new(PlanScanObjects::<P, KIND>::new(
+            self.delegate.clone(),
+            nodes,
+            false,
+        ))
     }
 
     #[inline(always)]
@@ -654,8 +659,10 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         if object.is_null() {
             return object;
         }
-        self.plan
-            .trace_object::<Self, KIND>(self, object, self.worker())
+        let worker = self.worker();
+        let queue = &mut self.base.nodes;
+        let delegate = &self.delegate;
+        delegate.trace_object(queue, object, worker)
     }
 
     #[inline]
@@ -690,38 +697,114 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
 
 /// This provides an implementation of scanning objects work. Each object will be scanned by calling `scan_object()`
 /// in `PlanTraceObject`.
-pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> {
-    plan: &'static P,
+pub struct PlanScanObjects<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+    delegate: PlanTracingDelegate<P, KIND>,
     buffer: Vec<ObjectReference>,
     #[allow(dead_code)]
     concurrent: bool,
-    phantom: PhantomData<E>,
 }
 
-impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
-    pub fn new(plan: &'static P, buffer: Vec<ObjectReference>, concurrent: bool) -> Self {
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanScanObjects<P, KIND> {
+    pub fn new(
+        delegate: PlanTracingDelegate<P, KIND>,
+        buffer: Vec<ObjectReference>,
+        concurrent: bool,
+    ) -> Self {
         Self {
-            plan,
+            delegate,
             buffer,
             concurrent,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> GCWork<E::VM>
-    for PlanScanObjects<E, P>
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> GCWork<P::VM>
+    for PlanScanObjects<P, KIND>
 {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<P::VM>, _mmtk: &'static MMTK<P::VM>) {
         trace!("PlanScanObjects");
         {
             let tls = worker.tls;
-            let mut closure = ObjectsClosure::<E>::new(worker);
+            let mut closure = ObjectsClosure::<PlanProcessEdges<P::VM, P, KIND>>::new(worker);
             for object in &self.buffer {
-                <E::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
-                self.plan.post_scan_object(*object);
+                <P::VM as VMBinding>::VMScanning::scan_object(tls, *object, &mut closure);
+                self.delegate.post_scan_object(*object);
             }
         }
         trace!("PlanScanObjects End");
+    }
+}
+
+pub trait TracingDelegate: 'static + Send + Clone {
+    type VM: VMBinding;
+
+    fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<Self::VM>,
+    ) -> ObjectReference;
+
+    fn may_move_objects() -> bool;
+
+    fn post_scan_object(&self, object: ObjectReference);
+}
+
+pub struct PlanTracingDelegate<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> {
+    plan: &'static P,
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> PlanTracingDelegate<P, KIND> {
+    pub fn new(plan: &'static P) -> Self {
+        Self { plan }
+    }
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> Clone
+    for PlanTracingDelegate<P, KIND>
+{
+    fn clone(&self) -> Self {
+        Self {
+            plan: self.plan.clone(),
+        }
+    }
+}
+
+impl<P: Plan + PlanTraceObject<P::VM>, const KIND: TraceKind> TracingDelegate
+    for PlanTracingDelegate<P, KIND>
+{
+    type VM = P::VM;
+
+    #[inline]
+    fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<P::VM>,
+    ) -> ObjectReference {
+        self.plan.trace_object::<T, KIND>(trace, object, worker)
+    }
+
+    #[inline(always)]
+    fn may_move_objects() -> bool {
+        P::may_move_objects::<KIND>()
+    }
+
+    #[inline]
+    fn post_scan_object(&self, object: ObjectReference) {
+        self.plan.post_scan_object(object);
+    }
+}
+
+
+const OBJECT_QUEUE_CAPACITY: usize = 4096;
+
+impl TransitiveClosure for Vec<ObjectReference> {
+    #[inline]
+    fn process_node(&mut self, object: ObjectReference) {
+        if self.is_empty() {
+            self.reserve(OBJECT_QUEUE_CAPACITY);
+        }
+        self.push(object);
     }
 }
