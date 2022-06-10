@@ -525,7 +525,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
-        let trace = SFTProcessEdgesMutRef::new(self);
+        let trace = SFTProcessEdgesMutRef::new::<VM>(&mut self.base.nodes);
 
         // Invoke trace object on sft
         let sft = crate::mmtk::SFT_MAP.get(object.to_address());
@@ -806,5 +806,68 @@ impl TransitiveClosure for Vec<ObjectReference> {
             self.reserve(OBJECT_QUEUE_CAPACITY);
         }
         self.push(object);
+    }
+}
+
+pub struct SFTTracingDelegate<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> SFTTracingDelegate<VM> {
+    pub fn new() -> Self {
+        Self { phantom_data: PhantomData }
+    }
+}
+
+impl<VM: VMBinding> Clone for SFTTracingDelegate<VM> {
+    fn clone(&self) -> Self {
+        Self { phantom_data: PhantomData }
+    }
+}
+
+impl<VM: VMBinding> TracingDelegate
+    for SFTTracingDelegate<VM>
+{
+    type VM = VM;
+
+    #[inline]
+    fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        // SFT only supports Vec<ObjectReference>.  Currently, Rust doesn't have a way to check
+        // if T is Vec<ObjectReference>.
+        let vec_object_reference: &mut Vec<ObjectReference> = unsafe { std::mem::transmute(trace) };
+
+        use crate::policy::space::*;
+
+        if object.is_null() {
+            return object;
+        }
+
+        // Make sure we have valid SFT entries for the object.
+        #[cfg(debug_assertions)]
+        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(object);
+
+        // Erase <VM> type parameter
+        let worker = GCWorkerMutRef::new(worker);
+        let trace = SFTProcessEdgesMutRef::new::<VM>(vec_object_reference);
+
+        // Invoke trace object on sft
+        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        sft.sft_trace_object(trace, object, worker)
+    }
+
+    #[inline(always)]
+    fn may_move_objects() -> bool {
+        true
+    }
+
+    #[inline]
+    fn post_scan_object(&self, object: ObjectReference) {
+        // Do nothing.  If a plan needs to do anything, it cannot use
+        // SFTTracingDelegate
     }
 }

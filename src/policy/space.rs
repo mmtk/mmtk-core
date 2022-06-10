@@ -120,7 +120,7 @@ pub trait SFT {
 // In this way, we can store the refs with <VM> in SFT (which cannot have parameters with generic type parameters)
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
-define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
+define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = Vec<ObjectReference>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
