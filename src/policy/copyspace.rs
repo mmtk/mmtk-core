@@ -75,14 +75,6 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         let worker = worker.into_mut::<VM>();
         self.trace_object(queue, object, self.common.copy, worker)
     }
-
-    fn is_reachable(&self, object: ObjectReference) -> bool {
-        self.is_live(object)
-    }
-
-    fn is_in_space(&self, _object: ObjectReference) -> bool {
-        true
-    }
 }
 
 impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
