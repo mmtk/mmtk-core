@@ -22,7 +22,7 @@ use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::{
-    plan::TransitiveClosure,
+    plan::ObjectQueue,
     scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         heap::FreeListPageResource,
@@ -83,7 +83,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        _trace: SFTProcessEdgesMutRef,
+        _queue: &mut VectorObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -118,17 +118,17 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if KIND == TRACE_KIND_DEFRAG {
-            self.trace_object(trace, object, copy.unwrap(), worker)
+            self.trace_object(queue, object, copy.unwrap(), worker)
         } else if KIND == TRACE_KIND_FAST {
-            self.fast_trace_object(trace, object)
+            self.fast_trace_object(queue, object)
         } else {
             unreachable!()
         }
@@ -367,7 +367,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     pub fn fast_trace_object(
         &self,
-        trace: &mut impl TransitiveClosure,
+        trace: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
         self.trace_object_without_moving(trace, object)
@@ -377,7 +377,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     pub fn trace_object(
         &self,
-        trace: &mut impl TransitiveClosure,
+        trace: &mut impl ObjectQueue,
         object: ObjectReference,
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
@@ -400,7 +400,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     pub fn trace_object_without_moving(
         &self,
-        trace: &mut impl TransitiveClosure,
+        queue: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
         if self.attempt_mark(object, self.mark_state) {
@@ -413,7 +413,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
             }
             // Visit node
-            trace.process_node(object);
+            queue.enqueue(object);
         }
         object
     }
@@ -423,7 +423,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     pub fn trace_object_with_opportunistic_copy(
         &self,
-        trace: &mut impl TransitiveClosure,
+        queue: &mut impl ObjectQueue,
         object: ObjectReference,
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
@@ -484,7 +484,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(new_object).get_state(),
                 BlockState::Marked
             );
-            trace.process_node(new_object);
+            queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
             new_object
         }
@@ -643,7 +643,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     }
 }
 
-use crate::plan::Plan;
+use crate::plan::{Plan, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::util::alloc::Allocator;
 use crate::util::alloc::ImmixAllocator;
