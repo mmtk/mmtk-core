@@ -351,8 +351,7 @@
 <span id="349">349</span>
 <span id="350">350</span>
 <span id="351">351</span>
-<span id="352">352</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
@@ -422,13 +421,12 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">let</span> <span class="ident">trace</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">worker</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
-        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">copy</span>, <span class="ident">worker</span>)
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">copy</span>, <span class="ident">worker</span>)
     }
 }
 
@@ -464,14 +462,14 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::PolicyTraceObject</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">copy</span>, <span class="ident">worker</span>)
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="ident">copy</span>, <span class="ident">worker</span>)
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -572,10 +570,10 @@
         <span class="self">self</span>.<span class="ident">from_space</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>)
     }
 
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -616,7 +614,7 @@
                 <span class="ident">worker</span>.<span class="ident">get_copy_context_mut</span>(),
             );
             <span class="macro">trace!</span>(<span class="string">&quot;Forwarding pointer&quot;</span>);
-            <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">new_object</span>);
+            <span class="ident">queue</span>.<span class="ident">enqueue</span>(<span class="ident">new_object</span>);
             <span class="macro">trace!</span>(<span class="string">&quot;Copied [{:?} -&gt; {:?}]&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
             <span class="ident">new_object</span>
         }

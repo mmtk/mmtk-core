@@ -1,1 +1,0 @@
-initSidebarItems({"trait":[["TraceLocal","This trait and its global counterpart implement the core functionality for a transitive closure over the heap graph. This trait specifically implements the unsynchronized thread-local component (ie the ‘fast-path’) of the trace mechanism."]]});

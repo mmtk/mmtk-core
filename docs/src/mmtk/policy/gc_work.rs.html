@@ -46,7 +46,7 @@
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFAULT_TRACE</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="ident">u8::MAX</span>;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
 
@@ -62,9 +62,9 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PolicyTraceObject</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Trace object in the policy. If the policy copies objects, we should</span>
     <span class="doccomment">/// expect `copy` to be a `Some` value.</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,

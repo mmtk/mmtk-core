@@ -745,7 +745,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{
-    <span class="ident">plan::TransitiveClosure</span>,
+    <span class="ident">plan::ObjectQueue</span>,
     <span class="ident">scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorkScheduler</span>, <span class="ident">GCWorker</span>, <span class="ident">WorkBucketStage</span>},
     <span class="ident">util</span>::{
         <span class="ident">heap::FreeListPageResource</span>,
@@ -806,7 +806,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
@@ -841,17 +841,17 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::PolicyTraceObject</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="ident">KIND</span> <span class="op">==</span> <span class="ident">TRACE_KIND_DEFRAG</span> {
-            <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>, <span class="ident">copy</span>.<span class="ident">unwrap</span>(), <span class="ident">worker</span>)
+            <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="ident">copy</span>.<span class="ident">unwrap</span>(), <span class="ident">worker</span>)
         } <span class="kw">else</span> <span class="kw">if</span> <span class="ident">KIND</span> <span class="op">==</span> <span class="ident">TRACE_KIND_FAST</span> {
-            <span class="self">self</span>.<span class="ident">fast_trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+            <span class="self">self</span>.<span class="ident">fast_trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>)
         } <span class="kw">else</span> {
             <span class="macro">unreachable!</span>()
         }
@@ -1090,7 +1090,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fast_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">ObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>.<span class="ident">trace_object_without_moving</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
@@ -1100,7 +1100,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">ObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -1123,7 +1123,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_without_moving</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">ObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">attempt_mark</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) {
@@ -1136,7 +1136,7 @@
                 <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">set_state</span>(<span class="ident">BlockState::Marked</span>);
             }
             <span class="comment">// Visit node</span>
-            <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
+            <span class="ident">queue</span>.<span class="ident">enqueue</span>(<span class="ident">object</span>);
         }
         <span class="ident">object</span>
     }
@@ -1146,7 +1146,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object_with_opportunistic_copy</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">TransitiveClosure</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">ObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">semantics</span>: <span class="ident">CopySemantics</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
@@ -1207,7 +1207,7 @@
                 <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>).<span class="ident">get_state</span>(),
                 <span class="ident">BlockState::Marked</span>
             );
-            <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">new_object</span>);
+            <span class="ident">queue</span>.<span class="ident">enqueue</span>(<span class="ident">new_object</span>);
             <span class="macro">debug_assert!</span>(<span class="ident">new_object</span>.<span class="ident">is_live</span>());
             <span class="ident">new_object</span>
         }
@@ -1366,7 +1366,7 @@
     }
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">Plan</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::ImmixAllocator</span>;

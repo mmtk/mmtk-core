@@ -254,7 +254,7 @@
     }
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
@@ -343,15 +343,15 @@
     }
 }
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::PolicyTraceObject</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LockFreeImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,

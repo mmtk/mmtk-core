@@ -1014,7 +1014,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::transitive_closure::TransitiveClosure</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::tracing::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immortalspace::ImmortalSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace</span>;
@@ -1611,33 +1611,33 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="ident">pages</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in code space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in large code space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in ro_space space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">trace_object</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">trace_object</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in boot space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">trace_object</span>(<span class="ident">_trace</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">trace_object</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
         }
         <span class="macro">panic!</span>(<span class="string">&quot;No special case for space in trace_object({:?})&quot;</span>, <span class="ident">_object</span>);
     }
@@ -1913,20 +1913,20 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_used_pages</span>()
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in immortal space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in los&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
@@ -1984,9 +1984,9 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="doccomment">/// * `trace`: the current transitive closure</span>
     <span class="doccomment">/// * `object`: the object to trace. This is a non-nullable object reference.</span>
     <span class="doccomment">/// * `worker`: the GC worker that is tracing this object.</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident">TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span>;

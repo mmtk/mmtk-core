@@ -341,8 +341,9 @@
 <span id="339">339</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::TransitiveClosure</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SFT</span>};
@@ -424,12 +425,11 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">let</span> <span class="ident">trace</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">into_mut</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
-        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>)
     }
 }
 
@@ -461,14 +461,14 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::PolicyTraceObject</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span>, <span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_copy</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">CopySemantics</span><span class="op">&gt;</span>,
         <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">trace</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>)
     }
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">may_move_objects</span><span class="op">&lt;</span><span class="kw">const</span> <span class="ident">KIND</span>: <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span><span class="op">&gt;</span>() -&gt; <span class="ident">bool</span> {
@@ -542,9 +542,9 @@
     <span class="comment">// Allow nested-if for this function to make it clear that test_and_mark() is only executed</span>
     <span class="comment">// for the outer condition is met.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::collapsible_if</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">TransitiveClosure</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">T</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
@@ -565,7 +565,7 @@
                     <span class="ident">VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC</span>
                         .<span class="ident">mark_as_unlogged</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
                 }
-                <span class="ident">trace</span>.<span class="ident">process_node</span>(<span class="ident">object</span>);
+                <span class="ident">queue</span>.<span class="ident">enqueue</span>(<span class="ident">object</span>);
             }
         }
         <span class="ident">object</span>

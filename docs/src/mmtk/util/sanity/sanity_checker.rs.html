@@ -190,10 +190,10 @@
 <span id="188">188</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
+<span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">scheduler</span>::<span class="kw-2">*</span>, <span class="ident">ObjectQueue</span>};
 <span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 <span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
@@ -371,7 +371,7 @@
             <span class="macro">assert!</span>(<span class="ident">object</span>.<span class="ident">is_sane</span>(), <span class="string">&quot;Invalid reference {:?}&quot;</span>, <span class="ident">object</span>);
             <span class="comment">// Object is not &quot;marked&quot;</span>
             <span class="ident">sanity_checker</span>.<span class="ident">refs</span>.<span class="ident">insert</span>(<span class="ident">object</span>); <span class="comment">// &quot;Mark&quot; it</span>
-            <span class="ident">ProcessEdgesWork::process_node</span>(<span class="self">self</span>, <span class="ident">object</span>);
+            <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">enqueue</span>(<span class="ident">object</span>);
         }
         <span class="ident">object</span>
     }

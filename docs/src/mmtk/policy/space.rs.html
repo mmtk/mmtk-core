@@ -816,7 +816,9 @@
 <span id="814">814</span>
 <span id="815">815</span>
 <span id="816">816</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
+<span id="817">817</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
@@ -831,7 +833,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::SFTProcessEdges</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
@@ -928,7 +929,9 @@
     <span class="doccomment">/// Immix has defrag trace and fast trace.</span>
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="comment">// We use concrete type for `queue` because SFT doesn&#39;t support generic parameters,</span>
+        <span class="comment">// and SFTProcessEdges uses `VectorObjectQueue`.</span>
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span>;
@@ -938,7 +941,6 @@
 <span class="comment">// In this way, we can store the refs with &lt;VM&gt; in SFT (which cannot have parameters with generic type parameters)</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::erase_vm::define_erased_vm_mut_ref</span>;
-<span class="macro">define_erased_vm_mut_ref!</span>(<span class="ident">SFTProcessEdgesMutRef</span> <span class="op">=</span> <span class="ident">SFTProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
 <span class="macro">define_erased_vm_mut_ref!</span>(<span class="ident">GCWorkerMutRef</span> <span class="op">=</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>);
 
 <span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
@@ -994,7 +996,7 @@
 
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_trace</span>: <span class="ident">SFTProcessEdgesMutRef</span>,
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
         <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {

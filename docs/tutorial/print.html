@@ -1221,27 +1221,29 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         Self { base, plan }
     }
 
-    #[inline]
+    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
         }
+        let worker = self.worker();
+        let queue = &amp;mut self.base.nodes;
         if self.plan.tospace().in_space(object) {
-            self.plan.tospace().trace_object::&lt;Self&gt;(
-                self,
+            self.plan.tospace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else if self.plan.fromspace().in_space(object) {
-            self.plan.fromspace().trace_object::&lt;Self&gt;(
-                self,
+            self.plan.fromspace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else {
-            self.plan.common.trace_object::&lt;Self&gt;(self, object)
+            self.plan.common.trace_object(queue, object)
         }
     }
 }
@@ -1303,27 +1305,29 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         Self { base, plan }
     }
 
-    #[inline]
+    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
         }
+        let worker = self.worker();
+        let queue = &amp;mut self.base.nodes;
         if self.plan.tospace().in_space(object) {
-            self.plan.tospace().trace_object::&lt;Self&gt;(
-                self,
+            self.plan.tospace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else if self.plan.fromspace().in_space(object) {
-            self.plan.fromspace().trace_object::&lt;Self&gt;(
-                self,
+            self.plan.fromspace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else {
-            self.plan.common.trace_object::&lt;Self&gt;(self, object)
+            self.plan.common.trace_object(queue, object)
         }
     }
 }
@@ -1583,7 +1587,8 @@ the tospace and fromspace:
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
+</span>    #[inline(always)] // Ensure this function is always inlined because it is very hot.
+    fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
         if object.is_null() {
             return object;
         }

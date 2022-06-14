@@ -63,7 +63,6 @@
 <span id="61">61</span>
 <span id="62">62</span>
 <span id="63">63</span>
-<span id="64">64</span>
 </pre><pre class="rust"><code><span class="comment">// TODO: We should fix missing docs for public items and turn this on (Issue #309).</span>
 <span class="comment">// #![deny(missing_docs)]</span>
 
@@ -124,8 +123,7 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">vm</span>;
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{
-    <span class="ident">AllocationSemantics</span>, <span class="ident">BarrierSelector</span>, <span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>, <span class="ident">Plan</span>, <span class="ident">TraceLocal</span>,
-    <span class="ident">TransitiveClosure</span>,
+    <span class="ident">AllocationSemantics</span>, <span class="ident">BarrierSelector</span>, <span class="ident">Mutator</span>, <span class="ident">MutatorContext</span>, <span class="ident">ObjectQueue</span>, <span class="ident">Plan</span>,
 };
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 </code></pre></div>
