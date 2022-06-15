@@ -4,29 +4,26 @@ use std::cell::UnsafeCell;
 use std::default::Default;
 use std::ops::Deref;
 use std::str::FromStr;
+use strum_macros::EnumString;
 
-custom_derive! {
-    #[derive(Copy, Clone, EnumFromStr, Debug)]
-    pub enum NurseryZeroingOptions {
-        Temporal,
-        Nontemporal,
-        Concurrent,
-        Adaptive,
-    }
+#[derive(Copy, Clone, EnumString, Debug)]
+pub enum NurseryZeroingOptions {
+    Temporal,
+    Nontemporal,
+    Concurrent,
+    Adaptive,
 }
 
-custom_derive! {
-    #[derive(Copy, Clone, EnumFromStr, Debug)]
-    pub enum PlanSelector {
-        NoGC,
-        SemiSpace,
-        GenCopy,
-        GenImmix,
-        MarkSweep,
-        PageProtect,
-        Immix,
-        MarkCompact,
-    }
+#[derive(Copy, Clone, EnumString, Debug)]
+pub enum PlanSelector {
+    NoGC,
+    SemiSpace,
+    GenCopy,
+    GenImmix,
+    MarkSweep,
+    PageProtect,
+    Immix,
+    MarkCompact,
 }
 
 /// MMTk option for perf events

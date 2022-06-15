@@ -1,7 +1,8 @@
 use atomic::Ordering;
 
+use crate::plan::ObjectQueue;
 use crate::plan::PlanConstraints;
-use crate::plan::TransitiveClosure;
+use crate::plan::VectorObjectQueue;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::*;
 use crate::policy::space::{CommonSpace, Space, SFT};
@@ -83,12 +84,11 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.into_mut::<VM>();
-        self.trace_object(trace, object)
+        self.trace_object(queue, object)
     }
 }
 
@@ -112,6 +112,26 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: Address) {
         self.pr.release_pages(start);
+    }
+}
+
+use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjectSpace<VM> {
+    #[inline(always)]
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.trace_object(queue, object)
+    }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        false
     }
 }
 
@@ -181,9 +201,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     // Allow nested-if for this function to make it clear that test_and_mark() is only executed
     // for the outer condition is met.
     #[allow(clippy::collapsible_if)]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
@@ -204,7 +224,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                     VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                         .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
-                trace.process_node(object);
+                queue.enqueue(object);
             }
         }
         object

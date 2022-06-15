@@ -19,5 +19,9 @@ jobs:
           override: true
       - name: Cargo login
         run: cargo login ${{ secrets.CI_CARGO_LOGIN }}
-      - name: Cargo publish
-        run: cargo publish
+      - name: Publish sub crates
+        run: |
+          cargo publish --manifest-path=macros/Cargo.toml
+      - name: Public mmtk-core
+        run: |
+          cargo publish

@@ -1,7 +1,7 @@
 use crate::plan::global::CommonPlan;
+use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::TransitiveClosure;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -21,12 +21,17 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use mmtk_macros::PlanTraceObject;
+
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
+#[derive(PlanTraceObject)]
 pub struct Gen<VM: VMBinding> {
-    /// The nursery space. Its type depends on the actual plan.
+    /// The nursery space.
+    #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
     /// The common plan.
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
     /// Is this GC full heap?
     pub gc_full_heap: AtomicBool,
@@ -160,38 +165,47 @@ impl<VM: VMBinding> Gen<VM> {
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
+        info!(
+            "{}",
+            if is_full_heap {
+                "Full heap GC"
+            } else {
+                "nursery GC"
+            }
+        );
+
         is_full_heap
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
-    pub fn trace_object_full_heap<T: TransitiveClosure>(
+    pub fn trace_object_full_heap<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T>(
-                trace,
+            return self.nursery.trace_object::<Q>(
+                queue,
                 object,
                 Some(CopySemantics::PromoteToMature),
                 worker,
             );
         }
-        self.common.trace_object::<T>(trace, object)
+        self.common.trace_object::<Q>(queue, object)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.
-    pub fn trace_object_nursery<T: TransitiveClosure>(
+    pub fn trace_object_nursery<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T>(
-                trace,
+            return self.nursery.trace_object::<Q>(
+                queue,
                 object,
                 Some(CopySemantics::PromoteToMature),
                 worker,
@@ -199,7 +213,7 @@ impl<VM: VMBinding> Gen<VM> {
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.
         if self.common.get_los().in_space(object) {
-            return self.common.get_los().trace_object::<T>(trace, object);
+            return self.common.get_los().trace_object::<Q>(queue, object);
         }
         object
     }

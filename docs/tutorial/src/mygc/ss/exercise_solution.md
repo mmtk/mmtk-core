@@ -148,6 +148,7 @@ In `gc_work.rs`:
 1. Add the youngspace to trace_object, following the same format as
  the tospace and fromspace:
     ```rust
+        #[inline(always)] // Ensure this function is always inlined because it is very hot.
         fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
             if object.is_null() {
                 return object;

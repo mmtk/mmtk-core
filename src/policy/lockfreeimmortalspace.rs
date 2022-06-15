@@ -60,7 +60,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn sft_trace_object(
         &self,
-        _trace: SFTProcessEdgesMutRef,
+        _queue: &mut VectorObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -146,6 +146,27 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+}
+
+use crate::plan::{ObjectQueue, VectorObjectQueue};
+use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeImmortalSpace<VM> {
+    #[inline(always)]
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        _queue: &mut Q,
+        _object: ObjectReference,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        unreachable!()
+    }
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        unreachable!()
     }
 }
 

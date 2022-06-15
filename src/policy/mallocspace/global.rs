@@ -1,5 +1,6 @@
 use super::metadata::*;
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
+use crate::plan::VectorObjectQueue;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
@@ -97,12 +98,11 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
-        let trace = trace.into_mut::<VM>();
-        self.trace_object(trace, object)
+        self.trace_object(queue, object)
     }
 }
 
@@ -186,6 +186,27 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     fn verify_side_metadata_sanity(&self, side_metadata_sanity_checker: &mut SideMetadataSanity) {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.metadata)
+    }
+}
+
+use crate::scheduler::GCWorker;
+use crate::util::copy::CopySemantics;
+
+impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpace<VM> {
+    #[inline(always)]
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
+    ) -> ObjectReference {
+        self.trace_object(queue, object)
+    }
+
+    #[inline(always)]
+    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
+        false
     }
 }
 
@@ -280,9 +301,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     #[inline]
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         if object.is_null() {
@@ -300,7 +321,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             let chunk_start = conversions::chunk_align_down(address);
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             set_chunk_mark(chunk_start);
-            trace.process_node(object);
+            queue.enqueue(object);
         }
 
         object

@@ -4,31 +4,31 @@ use super::*;
 use crate::mmtk::MMTK;
 use crate::util::copy::GCWorkerCopyContext;
 use crate::util::opaque_pointer::*;
-use crate::vm::VMBinding;
+use crate::vm::{Collection, GCThreadContext, VMBinding};
 use atomic_refcell::{AtomicRef, AtomicRefCell, AtomicRefMut};
-use std::sync::atomic::{AtomicBool, Ordering};
+use crossbeam::deque::{self, Stealer};
+use crossbeam::queue::ArrayQueue;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::{Arc, Condvar, Mutex};
-
-const LOCALLY_CACHED_WORKS: usize = 1;
+use std::sync::{Arc, Mutex};
 
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
-    /// True if the GC worker is parked.
-    pub parked: AtomicBool,
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
-    /// Incoming work packets to be executed by the current worker.
-    pub local_work_bucket: WorkBucket<VM>,
+    /// A queue of GCWork that can only be processed by the owned thread.
+    pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
+    /// Handle for stealing packets from the current worker
+    pub stealer: Option<Stealer<Box<dyn GCWork<VM>>>>,
 }
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn new(worker_monitor: Arc<(Mutex<()>, Condvar)>) -> Self {
+    pub fn new(stealer: Option<Stealer<Box<dyn GCWork<VM>>>>) -> Self {
         Self {
-            parked: AtomicBool::new(true),
             stat: Default::default(),
-            local_work_bucket: WorkBucket::new(true, worker_monitor),
+            designated_work: ArrayQueue::new(16),
+            stealer,
         }
     }
 }
@@ -52,11 +52,10 @@ pub struct GCWorker<VM: VMBinding> {
     /// True if this struct is the embedded GCWorker of the controller thread.
     /// False if this struct belongs to a standalone GCWorker thread.
     is_coordinator: bool,
-    /// Cache of work packets created by the current worker.
-    /// May be flushed to the global pool or executed locally.
-    local_work_buffer: Vec<(WorkBucketStage, Box<dyn GCWork<VM>>)>,
     /// Reference to the shared part of the GC worker.  It is used for synchronization.
     pub shared: Arc<GCWorkerShared<VM>>,
+    /// Local work packet queue.
+    pub local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
 }
 
 unsafe impl<VM: VMBinding> Sync for GCWorkerShared<VM> {}
@@ -67,10 +66,6 @@ const STAT_BORROWED_MSG: &str = "GCWorkerShared.stat is already borrowed.  This 
     the mutator calls harness_begin or harness_end while the GC is running.";
 
 impl<VM: VMBinding> GCWorkerShared<VM> {
-    pub fn is_parked(&self) -> bool {
-        self.parked.load(Ordering::SeqCst)
-    }
-
     pub fn borrow_stat(&self) -> AtomicRef<WorkerLocalStat<VM>> {
         self.stat.try_borrow().expect(STAT_BORROWED_MSG)
     }
@@ -88,6 +83,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
         shared: Arc<GCWorkerShared<VM>>,
+        local_work_buffer: deque::Worker<Box<dyn GCWork<VM>>>,
     ) -> Self {
         Self {
             tls: VMWorkerThread(VMThread::UNINITIALIZED),
@@ -98,30 +94,39 @@ impl<VM: VMBinding> GCWorker<VM> {
             scheduler,
             mmtk,
             is_coordinator,
-            local_work_buffer: Vec::with_capacity(LOCALLY_CACHED_WORKS),
             shared,
+            local_work_buffer,
         }
     }
 
+    const LOCALLY_CACHED_WORK_PACKETS: usize = 16;
+
+    /// Add a work packet to the work queue and mark it with a higher priority.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket with a higher priority.
     #[inline]
-    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
-        if !self.scheduler().work_buckets[bucket].is_activated() {
-            self.scheduler.work_buckets[bucket].add_with_priority(1000, Box::new(work));
+    pub fn add_work_prioritized(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
+        if !self.scheduler().work_buckets[bucket].is_activated()
+            || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+        {
+            self.scheduler.work_buckets[bucket].add_prioritized(Box::new(work));
             return;
         }
-        self.local_work_buffer.push((bucket, Box::new(work)));
-        if self.local_work_buffer.len() > LOCALLY_CACHED_WORKS {
-            self.flush();
-        }
+        self.local_work_buffer.push(Box::new(work));
     }
 
-    #[cold]
-    fn flush(&mut self) {
-        let mut buffer = Vec::with_capacity(LOCALLY_CACHED_WORKS);
-        std::mem::swap(&mut buffer, &mut self.local_work_buffer);
-        for (bucket, work) in buffer {
-            self.scheduler.work_buckets[bucket].add_with_priority(1000, work);
+    /// Add a work packet to the work queue.
+    /// If the bucket is activated, the packet will be pushed to the local queue, otherwise it will be
+    /// pushed to the global bucket.
+    #[inline]
+    pub fn add_work(&mut self, bucket: WorkBucketStage, work: impl GCWork<VM>) {
+        if !self.scheduler().work_buckets[bucket].is_activated()
+            || self.local_work_buffer.len() >= Self::LOCALLY_CACHED_WORK_PACKETS
+        {
+            self.scheduler.work_buckets[bucket].add(work);
+            return;
         }
+        self.local_work_buffer.push(Box::new(work));
     }
 
     pub fn is_coordinator(&self) -> bool {
@@ -140,18 +145,131 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
+    /// Poll a ready-to-execute work packet in the following order:
+    ///
+    /// 1. Any packet that should be processed only by this worker.
+    /// 2. Poll from the local work queue.
+    /// 3. Poll from activated global work-buckets
+    /// 4. Steal from other workers
+    fn poll(&self) -> Box<dyn GCWork<VM>> {
+        self.shared
+            .designated_work
+            .pop()
+            .or_else(|| self.local_work_buffer.pop())
+            .unwrap_or_else(|| self.scheduler().poll(self))
+    }
+
+    pub fn do_boxed_work(&'static mut self, mut work: Box<dyn GCWork<VM>>) {
+        work.do_work(self, self.mmtk);
+    }
+
+    /// Entry of the worker thread.
+    /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
-        self.shared.parked.store(false, Ordering::SeqCst);
         loop {
-            while let Some((bucket, mut work)) = self.local_work_buffer.pop() {
-                debug_assert!(self.scheduler.work_buckets[bucket].is_activated());
-                work.do_work_with_stat(self, mmtk);
-            }
-            let mut work = self.scheduler().poll(self);
-            debug_assert!(!self.shared.is_parked());
+            let mut work = self.poll();
             work.do_work_with_stat(self, mmtk);
         }
+    }
+}
+
+/// A worker group to manage all the GC workers (except the coordinator worker).
+pub struct WorkerGroup<VM: VMBinding> {
+    /// Shared worker data
+    pub workers_shared: Vec<Arc<GCWorkerShared<VM>>>,
+    parked_workers: AtomicUsize,
+    unspawned_local_work_queues: Mutex<Vec<deque::Worker<Box<dyn GCWork<VM>>>>>,
+}
+
+impl<VM: VMBinding> WorkerGroup<VM> {
+    /// Create a WorkerGroup
+    pub fn new(num_workers: usize) -> Arc<Self> {
+        let unspawned_local_work_queues = (0..num_workers)
+            .map(|_| deque::Worker::new_fifo())
+            .collect::<Vec<_>>();
+
+        let workers_shared = (0..num_workers)
+            .map(|i| {
+                Arc::new(GCWorkerShared::<VM>::new(Some(
+                    unspawned_local_work_queues[i].stealer(),
+                )))
+            })
+            .collect::<Vec<_>>();
+
+        Arc::new(Self {
+            workers_shared,
+            parked_workers: Default::default(),
+            unspawned_local_work_queues: Mutex::new(unspawned_local_work_queues),
+        })
+    }
+
+    /// Spawn all the worker threads
+    pub fn spawn(
+        &self,
+        mmtk: &'static MMTK<VM>,
+        sender: Sender<CoordinatorMessage<VM>>,
+        tls: VMThread,
+    ) {
+        let mut unspawned_local_work_queues = self.unspawned_local_work_queues.lock().unwrap();
+        // Spawn each worker thread.
+        for (ordinal, shared) in self.workers_shared.iter().enumerate() {
+            let worker = Box::new(GCWorker::new(
+                mmtk,
+                ordinal,
+                mmtk.scheduler.clone(),
+                false,
+                sender.clone(),
+                shared.clone(),
+                unspawned_local_work_queues.pop().unwrap(),
+            ));
+            VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Worker(worker));
+        }
+        debug_assert!(unspawned_local_work_queues.is_empty());
+    }
+
+    /// Get the number of workers in the group
+    #[inline(always)]
+    pub fn worker_count(&self) -> usize {
+        self.workers_shared.len()
+    }
+
+    /// Increase the packed-workers counter.
+    /// Called before a worker is parked.
+    ///
+    /// Return true if all the workers are parked.
+    #[inline(always)]
+    pub fn inc_parked_workers(&self) -> bool {
+        let old = self.parked_workers.fetch_add(1, Ordering::SeqCst);
+        debug_assert!(old < self.worker_count());
+        old + 1 == self.worker_count()
+    }
+
+    /// Decrease the packed-workers counter.
+    /// Called after a worker is resumed from the parked state.
+    #[inline(always)]
+    pub fn dec_parked_workers(&self) {
+        let old = self.parked_workers.fetch_sub(1, Ordering::SeqCst);
+        debug_assert!(old <= self.worker_count());
+    }
+
+    /// Get the number of parked workers in the group
+    #[inline(always)]
+    pub fn parked_workers(&self) -> usize {
+        self.parked_workers.load(Ordering::SeqCst)
+    }
+
+    /// Check if all the workers are packed
+    #[inline(always)]
+    pub fn all_parked(&self) -> bool {
+        self.parked_workers() == self.worker_count()
+    }
+
+    /// Return true if there're any pending designated work
+    pub fn has_designated_work(&self) -> bool {
+        self.workers_shared
+            .iter()
+            .any(|w| !w.designated_work.is_empty())
     }
 }

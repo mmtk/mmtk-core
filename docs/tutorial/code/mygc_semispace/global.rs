@@ -29,12 +29,18 @@ use std::sync::Arc;
 // Remove #[allow(unused_imports)].
 // Remove handle_user_collection_request().
 
+use mmtk_macros::PlanTraceObject;
+
 // Modify
 // ANCHOR: plan_def
+#[derive(PlanTraceObject)]
 pub struct MyGC<VM: VMBinding> {
     pub hi: AtomicBool,
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace0: CopySpace<VM>,
+    #[trace(CopySemantics::DefaultCopy)]
     pub copyspace1: CopySpace<VM>,
+    #[fallback_trace]
     pub common: CommonPlan<VM>,
 }
 // ANCHOR_END: plan_def
