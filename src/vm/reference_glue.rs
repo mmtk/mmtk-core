@@ -5,8 +5,8 @@ use crate::vm::VMBinding;
 
 /// VM-specific methods for reference processing, including weak references, and finalizers.
 /// We handle weak references and finalizers differently:
-/// * for weak references, we assume they are implemented as normal reference objects with a
-///   referent that is actually weakly reachable. This trait provides a few methods to access
+/// * for weak references, we assume they are implemented as normal reference objects (also known as weak objects)
+///   with a referent that is actually weakly reachable. This trait provides a few methods to access
 ///   the referent of such an reference object.
 /// * for finalizers, we provide a `Finalizable` trait, and require bindings to specify a type
 ///   that implements `Finalizable`. When the binding registers or pops a finalizable object
@@ -16,6 +16,8 @@ use crate::vm::VMBinding;
 pub trait ReferenceGlue<VM: VMBinding> {
     /// The type of finalizable objects. This type is used when the binding registers and pops finalizable objects.
     type FinalizableType: Finalizable;
+
+    // TODO: Should we also move the following methods about weak references to a trait (similar to the `Finalizable` trait)?
 
     /// Weak and soft references always clear the referent
     /// before enqueueing.
@@ -58,28 +60,31 @@ use crate::scheduler::gc_work::ProcessEdgesWork;
 /// For example, for bindings that allows multiple finalizer methods with one object, they can define
 /// the type as a tuple of `(object, finalize method)`, and register different finalizer methods to MMTk
 /// for the same object.
+/// The implementation should mark theird method implementations as inline for performance.
 pub trait Finalizable: std::fmt::Debug + Send {
     /// Load the object reference.
-    fn load_reference(&self) -> ObjectReference;
+    fn get_reference(&self) -> ObjectReference;
     /// Store the object reference.
     fn set_reference(&mut self, object: ObjectReference);
-    /// Keep the heap references in the finalizable object alive. By default, we trace the reference. However,
+    /// Keep the heap references in the finalizable object alive. For example, the reference itself needs to be traced. However,
     /// if the finalizable object includes other heap references, the implementation should trace them as well.
     /// Note that trace_object() may move objects so we need to write the new reference in case that it is moved.
-    fn keep_alive<E: ProcessEdgesWork>(&mut self, trace: &mut E) {
-        self.set_reference(trace.trace_object(self.load_reference()));
-    }
+    fn keep_alive<E: ProcessEdgesWork>(&mut self, trace: &mut E);
 }
 
 /// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings
 /// should be able to use `ObjectReference` as `ReferenceGlue::FinalizableType`.
 impl Finalizable for ObjectReference {
     #[inline(always)]
-    fn load_reference(&self) -> ObjectReference {
+    fn get_reference(&self) -> ObjectReference {
         *self
     }
     #[inline(always)]
     fn set_reference(&mut self, object: ObjectReference) {
         *self = object;
+    }
+    #[inline(always)]
+    fn keep_alive<E: ProcessEdgesWork>(&mut self, trace: &mut E) {
+        *self = trace.trace_object(*self);
     }
 }

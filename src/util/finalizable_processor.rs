@@ -50,7 +50,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         debug_assert!(self.ready_for_finalize.is_empty());
 
         for mut f in self.candidates.drain(start..).collect::<Vec<F>>() {
-            let reff = f.load_reference();
+            let reff = f.get_reference();
             trace!("Pop {:?} for finalization", reff);
             if reff.is_live() {
                 FinalizableProcessor::<F>::forward_finalizable_reference(e, &mut f);
@@ -94,21 +94,22 @@ impl<F: Finalizable> FinalizableProcessor<F> {
     }
 
     pub fn get_all_finalizers(&mut self) -> Vec<F> {
-        let mut candidates = vec![];
-        std::mem::swap(&mut self.candidates, &mut candidates);
-        let mut ready_objects = vec![];
-        std::mem::swap(&mut self.ready_for_finalize, &mut ready_objects);
+        let mut ret = std::mem::take(&mut self.candidates);
+        let ready_objects = std::mem::take(&mut self.ready_for_finalize);
 
-        candidates.extend(ready_objects);
-        candidates
+        ret.extend(ready_objects);
+        ret
     }
 
     pub fn get_finalizers_for(&mut self, object: ObjectReference) -> Vec<F> {
+        // Drain filter for finalizers that equal to 'object':
+        // * for elements that equal to 'object', they will be removed from the original vec, and returned.
+        // * for elements that do not equal to 'object', they will be left in the original vec.
         let drain_filter = |vec: &mut Vec<F>| -> Vec<F> {
             let mut i = 0;
             let mut ret = vec![];
             while i < vec.len() {
-                if vec[i].load_reference() == object {
+                if vec[i].get_reference() == object {
                     let val = vec.remove(i);
                     ret.push(val);
                 } else {
