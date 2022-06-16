@@ -36,6 +36,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
+    pub active_pages: AtomicUsize,
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadataContext,
@@ -87,10 +88,10 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         has_object_alloced_by_malloc(addr)
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
         let page_addr = conversions::page_align_down(object.to_address());
-        set_page_mark(page_addr);
+        self.set_page_mark(page_addr, bytes);
         set_alloc_bit(object);
     }
 
@@ -177,7 +178,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         // TODO: figure out a better way to get the total number of active pages from the metadata
-        let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
+        let data_pages = self.active_pages.load(Ordering::SeqCst);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
     }
@@ -214,6 +215,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
+            active_pages: AtomicUsize::new(0),
             chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
             chunk_addr_max: AtomicUsize::new(0),
             metadata: SideMetadataContext {
@@ -233,6 +235,26 @@ impl<VM: VMBinding> MallocSpace<VM> {
             #[cfg(debug_assertions)]
             work_live_bytes: AtomicUsize::new(0),
         }
+    }
+
+    fn set_page_mark(&self, page_addr: Address, size: usize) {
+        let mut page = page_addr;
+        while page < page_addr + size {
+            if !is_page_marked(page) {
+                set_page_mark(page);
+                self.active_pages.fetch_add(1, Ordering::SeqCst);
+            }
+
+            page += BYTES_IN_PAGE;
+        }
+    }
+
+    fn unset_page_mark(&self, page_addr: Address) {
+        if unsafe { is_page_marked_unsafe(page_addr) } {
+            self.active_pages.fetch_sub(1, Ordering::SeqCst);
+        }
+
+        unsafe { unset_page_mark_unsafe(page_addr) };
     }
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
@@ -400,6 +422,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
         unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
+
+        let mut page = chunk_start;
+        while page < chunk_start + BYTES_IN_CHUNK {
+            self.unset_page_mark(page);
+            page += BYTES_IN_PAGE;
+        }
     }
 
     /// Sweep an object if it is dead, and unset page marks for empty pages before this object.
@@ -428,7 +456,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
                 let mut page = *empty_page_start;
                 while page < current_page {
-                    unsafe { unset_page_mark_unsafe(page) };
+                    self.unset_page_mark(page);
                     page += BYTES_IN_PAGE;
                 }
             }
@@ -595,7 +623,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
             MallocObjectSize<VM>,
             false,
         >::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
-        for object in chunk_linear_scan {
+        let mut chunk_linear_scan_peek = chunk_linear_scan.peekable();
+
+        while let Some(object) = chunk_linear_scan_peek.next() {
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
@@ -623,6 +653,21 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     // Accumulate live bytes
                     let (_, _, bytes) = Self::get_malloc_addr_size(object);
                     live_bytes += bytes;
+                }
+            }
+
+            if let None = chunk_linear_scan_peek.peek() {
+                // This is for the edge case where we have a live object and then no other live
+                // objects afterwards till the end of the chunk. For example consider chunk
+                // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
+                // for 0x0-0x100 but then not unset it for the pages after 0x100. This if block
+                // will take care of this edge case
+                if !empty_page_start.is_zero() {
+                    let mut page = empty_page_start;
+                    while page < chunk_start + BYTES_IN_CHUNK {
+                        self.unset_page_mark(page);
+                        page += BYTES_IN_PAGE;
+                    }
                 }
             }
         }
