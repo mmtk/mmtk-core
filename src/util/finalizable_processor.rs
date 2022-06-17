@@ -59,11 +59,12 @@ impl<F: Finalizable> FinalizableProcessor<F> {
                 continue;
             }
 
-            // We should not at this point keep the object alive. A binding may register an object
-            // multiple times with different finalizer methods. If we keep the object here, and encounter
-            // the same object later, it will be considered as alive, and won't be pushed to the ready_to_finalize
+            // We should not at this point mark the object as live. A binding may register an object
+            // multiple times with different finalizer methods. If we mark the object as live here, and encounter
+            // the same object later in the candidates list (possibly with a different finalizer method),
+            // we will erroneously think the object never died, and won't push it to the ready_to_finalize
             // queue.
-            // So we simply push the object to the ready_for_finalize queue, and keep them alive later.
+            // So we simply push the object to the ready_for_finalize queue, and mark them as live objects later.
             self.ready_for_finalize.push(f);
         }
 
@@ -105,6 +106,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
         // Drain filter for finalizers that equal to 'object':
         // * for elements that equal to 'object', they will be removed from the original vec, and returned.
         // * for elements that do not equal to 'object', they will be left in the original vec.
+        // TODO: We should replace this with `vec.drain_filter()` when it is stablized.
         let drain_filter = |vec: &mut Vec<F>| -> Vec<F> {
             let mut i = 0;
             let mut ret = vec![];
