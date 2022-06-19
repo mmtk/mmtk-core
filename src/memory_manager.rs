@@ -22,6 +22,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -472,7 +473,10 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
-pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+pub fn add_finalizer<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
+) {
     if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
@@ -488,15 +492,57 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectRefer
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
+pub fn get_finalized_object<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_object_for_finalization() is called when no_finalizer = true");
+        warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+/// Pop all the finalizers that were registered for finalization. The returned objects may or may not be ready for
+/// finalization. After this call, MMTk's finalizer processor should have no registered finalizer any more.
+///
+/// This is useful for some VMs which require all finalizable objects to be finalized on exit.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn get_all_finalizers<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+    if *mmtk.options.no_finalizer {
+        warn!("get_all_finalizers() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_all_finalizers()
+}
+
+/// Pop finalizers that were registered and associated with a certain object. The returned objects may or may not be ready for finalization.
+/// This is useful for some VMs that may manually execute finalize method for an object.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `object`: the given object that MMTk will pop its finalizers
+pub fn get_finalizers_for<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    object: ObjectReference,
+) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+    if *mmtk.options.no_finalizer {
+        warn!("get_finalizers() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_finalizers_for(object)
 }
 
 /// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.
