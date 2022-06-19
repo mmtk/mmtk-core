@@ -115,6 +115,10 @@
 <span id="113">113</span>
 <span id="114">114</span>
 <span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
 </pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SFTMap</span>;
@@ -128,6 +132,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::ReferenceProcessors</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::sanity::sanity_checker::SanityChecker</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ReferenceGlue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::default::Default</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
@@ -160,7 +165,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">plan</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors</span>,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">finalizable_processor</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">finalizable_processor</span>:
+        <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VM::VMReferenceGlue</span> <span class="kw">as</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::FinalizableType</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
@@ -193,7 +199,9 @@
         <span class="ident">MMTK</span> {
             <span class="ident">plan</span>,
             <span class="ident">reference_processors</span>: <span class="ident">ReferenceProcessors::new</span>(),
-            <span class="ident">finalizable_processor</span>: <span class="ident">Mutex::new</span>(<span class="ident">FinalizableProcessor::new</span>()),
+            <span class="ident">finalizable_processor</span>: <span class="ident">Mutex::new</span>(<span class="ident">FinalizableProcessor</span>::<span class="op">&lt;</span>
+                <span class="op">&lt;</span><span class="ident">VM::VMReferenceGlue</span> <span class="kw">as</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::FinalizableType</span>,
+            <span class="op">&gt;</span><span class="ident">::new</span>()),
             <span class="ident">options</span>,
             <span class="ident">scheduler</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>

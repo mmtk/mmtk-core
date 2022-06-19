@@ -153,9 +153,34 @@
 <span id="151">151</span>
 <span id="152">152</span>
 <span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorker</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">ObjectReference</span>, <span class="ident">VMWorkerThread</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::Finalizable</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">Collection</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
@@ -164,18 +189,18 @@
 <span class="comment">// TODO: we should consider if we want to merge FinalizableProcessor with ReferenceProcessor,</span>
 <span class="comment">// and treat final reference as a special reference type in ReferenceProcessor.</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FinalizableProcessor</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FinalizableProcessor</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Finalizable</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Candidate objects that has finalizers with them</span>
-    <span class="ident">candidates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+    <span class="ident">candidates</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Index into candidates to record where we are up to in the last scan of the candidates.</span>
     <span class="doccomment">/// Index after nursery_index are new objects inserted after the last GC.</span>
     <span class="ident">nursery_index</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// Objects that can be finalized. They are actually dead, but we keep them alive</span>
     <span class="doccomment">/// until the binding pops them from the queue.</span>
-    <span class="ident">ready_for_finalize</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+    <span class="ident">ready_for_finalize</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">FinalizableProcessor</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Finalizable</span><span class="op">&gt;</span> <span class="ident">FinalizableProcessor</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">candidates</span>: <span class="macro">vec!</span>[],
@@ -184,22 +209,12 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">F</span>) {
         <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">push</span>(<span class="ident">object</span>);
     }
 
-    <span class="kw">fn</span> <span class="ident">get_forwarded_finalizable</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(
-        <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="ident">e</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
-    }
-
-    <span class="kw">fn</span> <span class="ident">return_for_finalize</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(
-        <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    ) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="ident">e</span>.<span class="ident">trace_object</span>(<span class="ident">object</span>)
+    <span class="kw">fn</span> <span class="ident">forward_finalizable_reference</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">finalizable</span>: <span class="kw-2">&amp;mut</span> <span class="ident">F</span>) {
+        <span class="ident">finalizable</span>.<span class="ident">keep_alive</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">e</span>);
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">nursery</span>: <span class="ident">bool</span>) {
@@ -210,29 +225,29 @@
         <span class="comment">// theoratically we could do the following loop at any time in a GC (not necessarily after closure phase).</span>
         <span class="comment">// But we have to iterate through candidates after closure.</span>
         <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">append</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">ready_for_finalize</span>);
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">ready_for_finalize</span>.<span class="ident">is_empty</span>());
 
-        <span class="kw">for</span> <span class="ident">reff</span> <span class="kw">in</span> <span class="self">self</span>
-            .<span class="ident">candidates</span>
-            .<span class="ident">drain</span>(<span class="ident">start</span>..)
-            .<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span><span class="op">&gt;</span>()
-        {
+        <span class="kw">for</span> <span class="kw-2">mut</span> <span class="ident">f</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">drain</span>(<span class="ident">start</span>..).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="op">&gt;</span>() {
+            <span class="kw">let</span> <span class="ident">reff</span> <span class="op">=</span> <span class="ident">f</span>.<span class="ident">get_reference</span>();
             <span class="macro">trace!</span>(<span class="string">&quot;Pop {:?} for finalization&quot;</span>, <span class="ident">reff</span>);
             <span class="kw">if</span> <span class="ident">reff</span>.<span class="ident">is_live</span>() {
-                <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">FinalizableProcessor::get_forwarded_finalizable</span>(<span class="ident">e</span>, <span class="ident">reff</span>);
-                <span class="macro">trace!</span>(<span class="string">&quot;{:?} is live, push {:?} back to candidates&quot;</span>, <span class="ident">reff</span>, <span class="ident">res</span>);
-                <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">push</span>(<span class="ident">res</span>);
+                <span class="ident">FinalizableProcessor</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="ident">::forward_finalizable_reference</span>(<span class="ident">e</span>, <span class="kw-2">&amp;mut</span> <span class="ident">f</span>);
+                <span class="macro">trace!</span>(<span class="string">&quot;{:?} is live, push {:?} back to candidates&quot;</span>, <span class="ident">reff</span>, <span class="ident">f</span>);
+                <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">push</span>(<span class="ident">f</span>);
                 <span class="kw">continue</span>;
             }
 
-            <span class="kw">let</span> <span class="ident">retained</span> <span class="op">=</span> <span class="ident">FinalizableProcessor::return_for_finalize</span>(<span class="ident">e</span>, <span class="ident">reff</span>);
-            <span class="self">self</span>.<span class="ident">ready_for_finalize</span>.<span class="ident">push</span>(<span class="ident">retained</span>);
-            <span class="macro">trace!</span>(
-                <span class="string">&quot;{:?} is not live, push {:?} to ready_for_finalize&quot;</span>,
-                <span class="ident">reff</span>,
-                <span class="ident">retained</span>
-            );
+            <span class="comment">// We should not at this point mark the object as live. A binding may register an object</span>
+            <span class="comment">// multiple times with different finalizer methods. If we mark the object as live here, and encounter</span>
+            <span class="comment">// the same object later in the candidates list (possibly with a different finalizer method),</span>
+            <span class="comment">// we will erroneously think the object never died, and won&#39;t push it to the ready_to_finalize</span>
+            <span class="comment">// queue.</span>
+            <span class="comment">// So we simply push the object to the ready_for_finalize queue, and mark them as live objects later.</span>
+            <span class="self">self</span>.<span class="ident">ready_for_finalize</span>.<span class="ident">push</span>(<span class="ident">f</span>);
         }
-        <span class="ident">e</span>.<span class="ident">flush</span>();
+
+        <span class="comment">// Keep the finalizable objects alive.</span>
+        <span class="self">self</span>.<span class="ident">forward_finalizable</span>(<span class="ident">e</span>, <span class="ident">nursery</span>);
 
         <span class="self">self</span>.<span class="ident">nursery_index</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">candidates</span>.<span class="ident">len</span>();
 
@@ -242,19 +257,50 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward_candidate</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">_nursery</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">candidates</span>
             .<span class="ident">iter_mut</span>()
-            .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">reff</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">reff</span> <span class="op">=</span> <span class="ident">FinalizableProcessor::get_forwarded_finalizable</span>(<span class="ident">e</span>, <span class="kw-2">*</span><span class="ident">reff</span>));
+            .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">FinalizableProcessor</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="ident">::forward_finalizable_reference</span>(<span class="ident">e</span>, <span class="ident">f</span>));
         <span class="ident">e</span>.<span class="ident">flush</span>();
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">forward_finalizable</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">e</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">_nursery</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">ready_for_finalize</span>
             .<span class="ident">iter_mut</span>()
-            .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">reff</span><span class="op">|</span> <span class="kw-2">*</span><span class="ident">reff</span> <span class="op">=</span> <span class="ident">FinalizableProcessor::get_forwarded_finalizable</span>(<span class="ident">e</span>, <span class="kw-2">*</span><span class="ident">reff</span>));
+            .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">f</span><span class="op">|</span> <span class="ident">FinalizableProcessor</span>::<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="ident">::forward_finalizable_reference</span>(<span class="ident">e</span>, <span class="ident">f</span>));
         <span class="ident">e</span>.<span class="ident">flush</span>();
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ready_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_ready_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
         <span class="self">self</span>.<span class="ident">ready_for_finalize</span>.<span class="ident">pop</span>()
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_all_finalizers</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">candidates</span>);
+        <span class="kw">let</span> <span class="ident">ready_objects</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">ready_for_finalize</span>);
+
+        <span class="ident">ret</span>.<span class="ident">extend</span>(<span class="ident">ready_objects</span>);
+        <span class="ident">ret</span>
+    }
+
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_finalizers_for</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
+        <span class="comment">// Drain filter for finalizers that equal to &#39;object&#39;:</span>
+        <span class="comment">// * for elements that equal to &#39;object&#39;, they will be removed from the original vec, and returned.</span>
+        <span class="comment">// * for elements that do not equal to &#39;object&#39;, they will be left in the original vec.</span>
+        <span class="comment">// TODO: We should replace this with `vec.drain_filter()` when it is stablized.</span>
+        <span class="kw">let</span> <span class="ident">drain_filter</span> <span class="op">=</span> <span class="op">|</span><span class="ident">vec</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span><span class="op">|</span> -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> {
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">i</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="macro">vec!</span>[];
+            <span class="kw">while</span> <span class="ident">i</span> <span class="op">&lt;</span> <span class="ident">vec</span>.<span class="ident">len</span>() {
+                <span class="kw">if</span> <span class="ident">vec</span>[<span class="ident">i</span>].<span class="ident">get_reference</span>() <span class="op">==</span> <span class="ident">object</span> {
+                    <span class="kw">let</span> <span class="ident">val</span> <span class="op">=</span> <span class="ident">vec</span>.<span class="ident">remove</span>(<span class="ident">i</span>);
+                    <span class="ident">ret</span>.<span class="ident">push</span>(<span class="ident">val</span>);
+                } <span class="kw">else</span> {
+                    <span class="ident">i</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                }
+            }
+            <span class="ident">ret</span>
+        };
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">drain_filter</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">candidates</span>);
+        <span class="ident">ret</span>.<span class="ident">extend</span>(<span class="ident">drain_filter</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">ready_for_finalize</span>));
+        <span class="ident">ret</span>
     }
 }
 

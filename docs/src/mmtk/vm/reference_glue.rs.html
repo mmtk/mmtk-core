@@ -40,13 +40,77 @@
 <span id="38">38</span>
 <span id="39">39</span>
 <span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
+<span id="89">89</span>
+<span id="90">90</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
-<span class="doccomment">/// VM-specific methods for reference processing.</span>
+<span class="doccomment">/// VM-specific methods for reference processing, including weak references, and finalizers.</span>
+<span class="doccomment">/// We handle weak references and finalizers differently:</span>
+<span class="doccomment">/// * for weak references, we assume they are implemented as normal reference objects (also known as weak objects)</span>
+<span class="doccomment">///   with a referent that is actually weakly reachable. This trait provides a few methods to access</span>
+<span class="doccomment">///   the referent of such an reference object.</span>
+<span class="doccomment">/// * for finalizers, we provide a `Finalizable` trait, and require bindings to specify a type</span>
+<span class="doccomment">///   that implements `Finalizable`. When the binding registers or pops a finalizable object</span>
+<span class="doccomment">///   from MMTk, the specified type is used for the finalizable objects. For most languages,</span>
+<span class="doccomment">///   they can just use `ObjectReference` for the finalizable type, meaning that they are registering</span>
+<span class="doccomment">///   and popping a normal object reference as finalizable objects.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// The type of finalizable objects. This type is used when the binding registers and pops finalizable objects.</span>
+    <span class="kw">type</span> <span class="ident">FinalizableType</span>: <span class="ident">Finalizable</span>;
+
+    <span class="comment">// TODO: Should we also move the following methods about weak references to a trait (similar to the `Finalizable` trait)?</span>
+
     <span class="doccomment">/// Weak and soft references always clear the referent</span>
     <span class="doccomment">/// before enqueueing.</span>
     <span class="doccomment">///</span>
@@ -58,20 +122,20 @@
         });
     }
 
-    <span class="doccomment">/// Get the referent from a reference.</span>
+    <span class="doccomment">/// Get the referent from a weak reference object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `object`: The object reference.</span>
     <span class="kw">fn</span> <span class="ident">get_referent</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
 
-    <span class="doccomment">/// Set the referent in a reference.</span>
+    <span class="doccomment">/// Set the referent in a weak reference object.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `reff`: The object reference for the reference.</span>
     <span class="doccomment">/// * `referent`: The referent object reference.</span>
     <span class="kw">fn</span> <span class="ident">set_referent</span>(<span class="ident">reff</span>: <span class="ident">ObjectReference</span>, <span class="ident">referent</span>: <span class="ident">ObjectReference</span>);
 
-    <span class="doccomment">/// For reference types, if the referent is cleared during GC, the reference</span>
+    <span class="doccomment">/// For weak reference types, if the referent is cleared during GC, the reference</span>
     <span class="doccomment">/// will be added to a queue, and MMTk will call this method to inform</span>
     <span class="doccomment">/// the VM about the changes for those references. This method is used</span>
     <span class="doccomment">/// to implement Java&#39;s ReferenceQueue.</span>
@@ -79,6 +143,42 @@
     <span class="doccomment">/// the references slice will be cleared after this call is returned. That means</span>
     <span class="doccomment">/// MMTk will no longer keep these references alive once this method is returned.</span>
     <span class="kw">fn</span> <span class="ident">enqueue_references</span>(<span class="ident">references</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>], <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+}
+
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork</span>;
+
+<span class="doccomment">/// A finalizable object for MMTk. MMTk needs to know the actual object reference in the type,</span>
+<span class="doccomment">/// while a binding can use this type to store some runtime information about finalizable objects.</span>
+<span class="doccomment">/// For example, for bindings that allows multiple finalizer methods with one object, they can define</span>
+<span class="doccomment">/// the type as a tuple of `(object, finalize method)`, and register different finalizer methods to MMTk</span>
+<span class="doccomment">/// for the same object.</span>
+<span class="doccomment">/// The implementation should mark theird method implementations as inline for performance.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Finalizable</span>: <span class="ident">std::fmt::Debug</span> <span class="op">+</span> <span class="ident">Send</span> {
+    <span class="doccomment">/// Load the object reference.</span>
+    <span class="kw">fn</span> <span class="ident">get_reference</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span>;
+    <span class="doccomment">/// Store the object reference.</span>
+    <span class="kw">fn</span> <span class="ident">set_reference</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>);
+    <span class="doccomment">/// Keep the heap references in the finalizable object alive. For example, the reference itself needs to be traced. However,</span>
+    <span class="doccomment">/// if the finalizable object includes other heap references, the implementation should trace them as well.</span>
+    <span class="doccomment">/// Note that trace_object() may move objects so we need to write the new reference in case that it is moved.</span>
+    <span class="kw">fn</span> <span class="ident">keep_alive</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>);
+}
+
+<span class="doccomment">/// This provides an implementation of `Finalizable` for `ObjectReference`. Most bindings</span>
+<span class="doccomment">/// should be able to use `ObjectReference` as `ReferenceGlue::FinalizableType`.</span>
+<span class="kw">impl</span> <span class="ident">Finalizable</span> <span class="kw">for</span> <span class="ident">ObjectReference</span> {
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">get_reference</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw-2">*</span><span class="self">self</span>
+    }
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">set_reference</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">object</span>;
+    }
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">keep_alive</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>) {
+        <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">trace</span>.<span class="ident">trace_object</span>(<span class="kw-2">*</span><span class="self">self</span>);
+    }
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
