@@ -4,7 +4,7 @@ pub(crate) type TraceKind = u8;
 
 pub const DEFAULT_TRACE: u8 = u8::MAX;
 
-use crate::plan::TransitiveClosure;
+use crate::plan::ObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::copy::CopySemantics;
 
@@ -20,9 +20,9 @@ use crate::vm::VMBinding;
 pub trait PolicyTraceObject<VM: VMBinding> {
     /// Trace object in the policy. If the policy copies objects, we should
     /// expect `copy` to be a `Some` value.
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,

@@ -11,6 +11,7 @@ use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
+use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -43,7 +44,8 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 pub struct MMTK<VM: VMBinding> {
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
-    pub(crate) finalizable_processor: Mutex<FinalizableProcessor>,
+    pub(crate) finalizable_processor:
+        Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
@@ -76,7 +78,9 @@ impl<VM: VMBinding> MMTK<VM> {
         MMTK {
             plan,
             reference_processors: ReferenceProcessors::new(),
-            finalizable_processor: Mutex::new(FinalizableProcessor::new()),
+            finalizable_processor: Mutex::new(FinalizableProcessor::<
+                <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
+            >::new()),
             options,
             scheduler,
             #[cfg(feature = "sanity")]
