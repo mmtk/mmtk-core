@@ -1,7 +1,7 @@
 use crate::plan::global::CommonPlan;
+use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::TransitiveClosure;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -178,34 +178,34 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
-    pub fn trace_object_full_heap<T: TransitiveClosure>(
+    pub fn trace_object_full_heap<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T>(
-                trace,
+            return self.nursery.trace_object::<Q>(
+                queue,
                 object,
                 Some(CopySemantics::PromoteToMature),
                 worker,
             );
         }
-        self.common.trace_object::<T>(trace, object)
+        self.common.trace_object::<Q>(queue, object)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.
-    pub fn trace_object_nursery<T: TransitiveClosure>(
+    pub fn trace_object_nursery<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         // Evacuate nursery objects
         if self.nursery.in_space(object) {
-            return self.nursery.trace_object::<T>(
-                trace,
+            return self.nursery.trace_object::<Q>(
+                queue,
                 object,
                 Some(CopySemantics::PromoteToMature),
                 worker,
@@ -213,7 +213,7 @@ impl<VM: VMBinding> Gen<VM> {
         }
         // We may alloc large object into LOS as nursery objects. Trace them here.
         if self.common.get_los().in_space(object) {
-            return self.common.get_los().trace_object::<T>(trace, object);
+            return self.common.get_los().trace_object::<Q>(queue, object);
         }
         object
     }

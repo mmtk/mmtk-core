@@ -1,3 +1,4 @@
+use crate::plan::VectorObjectQueue;
 use crate::util::conversions::*;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::Address;
@@ -13,7 +14,6 @@ use crate::util::conversions;
 use crate::util::opaque_pointer::*;
 
 use crate::mmtk::SFT_MAP;
-use crate::scheduler::gc_work::SFTProcessEdges;
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -110,7 +110,9 @@ pub trait SFT {
     /// Immix has defrag trace and fast trace.
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        // We use concrete type for `queue` because SFT doesn't support generic parameters,
+        // and SFTProcessEdges uses `VectorObjectQueue`.
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
         worker: GCWorkerMutRef,
     ) -> ObjectReference;
@@ -120,7 +122,6 @@ pub trait SFT {
 // In this way, we can store the refs with <VM> in SFT (which cannot have parameters with generic type parameters)
 
 use crate::util::erase_vm::define_erased_vm_mut_ref;
-define_erased_vm_mut_ref!(SFTProcessEdgesMutRef = SFTProcessEdges<VM>);
 define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 
 /// Print debug info for SFT. Should be false when committed.
@@ -176,7 +177,7 @@ impl SFT for EmptySpaceSFT {
 
     fn sft_trace_object(
         &self,
-        _trace: SFTProcessEdgesMutRef,
+        _queue: &mut VectorObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
