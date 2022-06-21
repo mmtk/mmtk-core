@@ -163,8 +163,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
             .add(crate::util::sanity::sanity_checker::ScheduleSanityGC::<Self>::new(self));
     }
 
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
     }
 
     fn get_used_pages(&self) -> usize {

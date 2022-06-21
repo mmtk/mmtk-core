@@ -203,7 +203,14 @@ pub trait Plan: 'static + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+    /// This method is called periodically by the allocation subsystem
+    /// (by default, each time a page is consumed), and provides the
+    /// collector with an opportunity to collect.
+    ///
+    /// Arguments:
+    /// * `space_full`: Space request failed, must recover pages within 'space'.
+    /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
+    fn poll(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -236,8 +243,12 @@ pub trait Plan: 'static + Sync + Downcast {
         false
     }
 
-    fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
-        info!("  [POLL] {}: {}", space.get_name(), message);
+    fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
+        if let Some(space) = space {
+            info!("  [POLL] {}: {}", space.get_name(), message);
+        } else {
+            info!("  [POLL] {}", message);
+        }
     }
 
     /**
@@ -248,7 +259,7 @@ pub trait Plan: 'static + Sync + Downcast {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool;
 
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
@@ -805,12 +816,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             && (self.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
     }
 
-    pub(super) fn collection_required<P: Plan>(
-        &self,
-        plan: &P,
-        space_full: bool,
-        _space: &dyn Space<VM>,
-    ) -> bool {
+    pub(super) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
         let stress_force_gc = self.should_do_stress_gc();
         if stress_force_gc {
             debug!(
