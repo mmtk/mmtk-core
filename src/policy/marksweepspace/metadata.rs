@@ -1,15 +1,12 @@
-use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, LOG_BYTES_IN_CHUNK};
+use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::metadata::side_metadata::SideMetadataOffset;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::side_metadata::GLOBAL_SIDE_METADATA_BASE_OFFSET;
-use crate::util::metadata::side_metadata::LOCAL_SIDE_METADATA_BASE_OFFSET;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::util::{constants, conversions};
+use crate::util::conversions;
 use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;

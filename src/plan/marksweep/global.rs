@@ -164,7 +164,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
         let res = {
             let ms = MarkSweepSpace::new(
                 "MarkSweepSpace",
-                true,
+                false,
                 VMRequest::discontiguous(),
                 // local_specs.clone(),
                 vm_map,

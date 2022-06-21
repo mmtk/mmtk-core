@@ -4,24 +4,13 @@ use std::{
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::{SpaceOptions, SFTProcessEdgesMutRef, GCWorkerMutRef}}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit, is_alloced}, heap::{
+use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunks::Chunk, metadata::{is_marked, set_mark_bit}}, space::SpaceOptions}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{Address, ObjectReference, OpaquePointer, VMThread, VMWorkerThread, alloc::free_list_allocator::{self, FreeListAllocator, BLOCK_LISTS_EMPTY, BYTES_IN_BLOCK}, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit}, constants::LOG_BYTES_IN_PAGE, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin}, vm::VMBinding};
+        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}}, vm::VMBinding};
 
-use super::{super::space::{CommonSpace, Space, SFT}, chunk::{ChunkMap, ChunkState}};
+use super::{super::space::{CommonSpace, Space, SFT}, chunks::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
-use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
-use std::sync::Mutex;
-use crate::util::VMThread;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
-
-pub enum BlockAcquireResult {
-    Fresh(Block),
-    AbandonedAvailable(Block),
-    AbandonedUnswept(Block),
-}
 
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
@@ -30,22 +19,19 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
-    pub abandoned_available: Mutex<BlockLists>,
-    pub abandoned_unswept: Mutex<BlockLists>,
-    pub abandoned_consumed: Mutex<BlockLists>,
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     fn name(&self) -> &str {
-        "MarkSweepSpace"
+        self.common.name
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
-        true
+        todo!()
     }
 
     fn is_movable(&self) -> bool {
-        false
+        todo!()
     }
 
     #[cfg(feature = "sanity")]
@@ -55,15 +41,6 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
         // do nothing
-    }
-
-    fn sft_trace_object(
-        &self,
-        trace: SFTProcessEdgesMutRef,
-        object: ObjectReference,
-        worker: GCWorkerMutRef,
-    ) -> ObjectReference {
-        todo!()
     }
 }
 
@@ -90,38 +67,6 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
     fn release_multiple_pages(&mut self, start: crate::util::Address) {
         todo!()
-    }
-}
-
-
-impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
-        &self,
-        trace: &mut T,
-        object: ObjectReference,
-        copy: Option<crate::util::copy::CopySemantics>,
-        worker: &mut crate::scheduler::GCWorker<VM>,
-    ) -> ObjectReference {
-        if object.is_null() {
-            return object;
-        }
-        let address = object.to_address();
-        assert!(
-            self.in_space(object),
-            "Cannot mark an object {} that was not alloced by free list allocator.",
-            address,
-        );
-        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
-            let block = Block::from(Block::align(address));
-            block.set_state(BlockState::Marked);
-            trace.process_node(object);
-        }
-        object
-    }
-
-    fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
-        false
     }
 }
 
@@ -156,8 +101,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::SIZE_TABLE),
-                // MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-                // MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+                MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
+                MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
@@ -195,13 +140,32 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             common,
             chunk_map: ChunkMap::new(),
             scheduler,
-            abandoned_available: Mutex::from(BLOCK_LISTS_EMPTY),
-            abandoned_unswept: Mutex::from(BLOCK_LISTS_EMPTY),
-            abandoned_consumed: Mutex::from(BLOCK_LISTS_EMPTY),
         }
     }
-        
 
+    pub fn trace_object<T: TransitiveClosure>(
+        &self,
+        trace: &mut T,
+        object: ObjectReference,
+    ) -> ObjectReference {
+        if object.is_null() {
+            return object;
+        }
+        let address = object.to_address();
+        assert!(
+            self.in_space(object),
+            "Cannot mark an object {} that was not alloced by free list allocator.",
+            address,
+        );
+        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
+            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
+            let block = FreeListAllocator::<VM>::get_block(address);
+            block.set_state(BlockState::Marked);
+            trace.process_node(object);
+        }
+        object
+    }
+        
     pub fn zero_mark_bits(&self) {
         // todo: concurrent zeroing
         use crate::vm::*;
@@ -212,23 +176,10 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         }
     }
 
-    pub fn block_has_no_objects(&self, block: Block) -> bool {
-        // for debugging, delete this later
-        // assumes block is allocated (has metadata)
-        let size = block.load_block_cell_size::<VM>();
-        let mut cell = block.start();
-        while cell < block.start() + Block::BYTES {
-            if is_alloced(unsafe { cell.to_object_reference() }) {
-                return false;
-            }
-            cell += size;
-        }
-        return true;
-    }
-
     pub fn record_new_block(&self, block: Block) {
         block.init();
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        // eprintln!("b > {}", block.start());
     }
 
     #[inline]
@@ -237,30 +188,22 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn reset(&mut self) {
+        // do nothing
         self.zero_mark_bits();
     }
 
     pub fn block_level_sweep(&self) {
         let space = unsafe { &*(self as *const Self) };
+        // for chunk in self.chunk_map.all_chunks() {
+        //     chunk.sweep(space);
+        // }
         let work_packets = self.chunk_map.generate_sweep_tasks(space);
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-        let mut abandoned_consumed = self.abandoned_consumed.lock().unwrap();
-        let mut i = 0;
-        while i < MI_BIN_FULL {
-            if !abandoned_consumed[i].is_empty() {
-                abandoned_consumed[i].lock();
-                abandoned_unswept[i].lock();
-                abandoned_unswept[i].append::<VM>(&mut abandoned_consumed[i]);
-                abandoned_unswept[i].unlock();
-                abandoned_consumed[i].unlock();
-            }
-            i += 1;
-        }
     }
 
     /// Release a block.
     pub fn release_block(&self, block: Block) {
+        // eprintln!("b < {}", block.start());
         self.block_clear_metadata(block);
 
         block.deinit();
@@ -277,27 +220,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 Some(Ordering::SeqCst),
             )
         }
-        bzero_alloc_bit(block.start(), Block::BYTES);
-    }
-
-    pub fn acquire_block(&self, tls: VMThread, size: usize) -> BlockAcquireResult {
-        let bin = mi_bin(size);
-
-        {
-            let mut abandoned = self.abandoned_available.lock().unwrap();
-            if !abandoned[bin].is_empty() {
-                let block = Block::from(abandoned[bin].pop::<VM>().start());
-                return BlockAcquireResult::AbandonedAvailable(block);
-            }
-        }
-
-        {
-            let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-            if !abandoned_unswept[bin].is_empty() {
-                let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
-                return BlockAcquireResult::AbandonedUnswept(block);
-            }
-        }
-        BlockAcquireResult::Fresh(Block::from(self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE)))
+        bzero_alloc_bit(block.start(), BYTES_IN_BLOCK);
     }
 }

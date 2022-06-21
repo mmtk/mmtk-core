@@ -2,8 +2,7 @@
 
 use super::block::{Block, BlockState};
 use super::MarkSweepSpace;
-use crate::util::metadata::MetadataSpec;
-use crate::util::metadata::side_metadata::{self, SideMetadataOffset, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
 use crate::{
     scheduler::*,
     util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
@@ -11,7 +10,6 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
-use std::borrow::BorrowMut;
 use std::{iter::Step, ops::Range};
 
 /// Data structure to reference a MMTk 4 MB chunk.
@@ -52,8 +50,6 @@ impl Chunk {
     /// Get a range of blocks within this chunk.
     #[inline(always)]
     pub fn blocks(&self) -> Range<Block> {
-        let a = Block::align(self.0);
-        let b = Block::from(a);
         let start = Block::from(Block::align(self.0));
         let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
         start..end

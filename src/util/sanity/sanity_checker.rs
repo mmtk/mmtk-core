@@ -182,13 +182,8 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             if !object.is_sane() {
                 panic!("Invalid reference {:?}", object);
             }
-            // // eprintln!("s {}", object.to_address());
-
-            if object.to_address().as_usize() > 0x400000000000 {
-                eprintln!("sanity {}", object.to_address());
-            }
-
-            // if !(object.to_address().as_usize() == 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst))) {
+            
+            assert!(object.to_address().as_usize() > 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst)), "{}", object);
             
                 
 

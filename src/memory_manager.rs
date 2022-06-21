@@ -118,9 +118,7 @@ pub fn alloc<VM: VMBinding>(
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
-    let r = mutator.alloc(size, align, offset, semantics);
-    // println!("alloc {}, {}, {}", r, size, align);
-    r
+    mutator.alloc(size, align, offset, semantics)
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

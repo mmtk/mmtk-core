@@ -170,8 +170,8 @@ pub enum AllocatorSelector {
     LargeObject(u8),
     Malloc(u8),
     Immix(u8),
-    FreeList(u8),
     MarkCompact(u8),
+    FreeList(u8),
     None,
 }
 

@@ -21,6 +21,8 @@ pub const MAX_BIN: usize = 48;
 const ZERO_BLOCK: Block = Block::from(unsafe { Address::zero() });
 pub type BlockLists = [BlockList; MAX_BIN + 1];
 
+
+
 // mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
     BlockList::new(1 * MI_INTPTR_SIZE),
@@ -207,8 +209,6 @@ impl BlockList {
     }
 }
 
-unsafe impl<VM: VMBinding> Send for FreeListAllocator<VM> {}
-
 impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     fn get_tls(&self) -> VMThread {
         self.tls
@@ -246,7 +246,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
-
         let block = self.find_free_block(size);
         if block.is_zero() {
             return unsafe {Address::zero()};
@@ -362,11 +361,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
 
             block = available_blocks.first;
-
         }
         
         self.acquire_block_for_size(size, false)
-
     }
 
 
@@ -497,7 +494,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
                 },
 
-                crate::policy::marksweepspace::BlockAcquireResult::AbandondedUnswept(block) => {
+                crate::policy::marksweepspace::BlockAcquireResult::AbandonedUnswept(block) => {
                     block.store_tls::<VM>(self.tls);
                     self.sweep_block(block);
                     if block.has_free_cells::<VM>() {
@@ -545,7 +542,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     pub fn sweep_block(&self, block: Block) {
-
         let cell_size = block.load_block_cell_size::<VM>();
         let mut cell = block.start();
         let mut last = unsafe { Address::zero() };
@@ -559,6 +555,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             }
             cell += cell_size;
         }
+
         block.store_free_list::<VM>(last);
     }
 
@@ -641,7 +638,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "eager_sweeping")]
     pub fn reset(&mut self) {
-
         debug!("reset");
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
@@ -678,6 +674,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn abandon_blocks(&mut self) {
         let mut abandoned = self.space.abandoned_available.lock().unwrap();
         let mut abandoned_consumed = self.space.abandoned_consumed.lock().unwrap();
+        let mut abandoned_unswept = self.space.abandoned_unswept.lock().unwrap();
         let mut i = 0;
         while i < MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
@@ -697,7 +694,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             let unswept = self.unswept_blocks.get_mut(i).unwrap();
             if !unswept.is_empty() {
-                abandoned[i].append::<VM>(unswept);
+                abandoned_unswept[i].append::<VM>(unswept);
             }
             i = i + 1;
         }
@@ -708,9 +705,7 @@ fn mi_wsize_from_size(size: usize) -> usize {
     // Align a byte size to a size in machine words
     // i.e. byte size == `wsize*sizeof(void*)`
     // adapted from _mi_wsize_from_size in mimalloc
-    let r = (size + MI_INTPTR_SIZE - 1) / MI_INTPTR_SIZE;
-    // eprintln!("mwfs {} -> {}", size, r);
-    r
+    (size + MI_INTPTR_SIZE - 1) / MI_INTPTR_SIZE
 }
 
 pub fn mi_bin(size: usize) -> usize {
@@ -730,6 +725,5 @@ pub fn mi_bin(size: usize) -> usize {
         let b = (MI_INTPTR_BITS - 1 - (u64::leading_zeros(wsize as u64)) as usize) as u8; // note: wsize != 0
         bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
     }
-    // eprintln!("mb {} -> {}", size, bin);
     bin as usize
 }
