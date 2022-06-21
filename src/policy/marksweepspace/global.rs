@@ -4,10 +4,10 @@ use std::{
 
 use atomic::Ordering;
 
-use crate::{TransitiveClosure, policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::{SpaceOptions, SFTProcessEdgesMutRef, GCWorkerMutRef}}, scheduler::{GCWorkScheduler, WorkBucketStage}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit, is_alloced}, heap::{
+use crate::{policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::{SpaceOptions, GCWorkerMutRef}}, scheduler::{GCWorkScheduler, WorkBucketStage, GCWorker}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit, is_alloced}, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin}, vm::VMBinding};
+        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin, copy::CopySemantics}, vm::VMBinding};
 
 use super::{super::space::{CommonSpace, Space, SFT}, chunk::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
@@ -16,6 +16,8 @@ use std::sync::Mutex;
 use crate::util::VMThread;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
+use crate::plan::ObjectQueue;
+use crate::plan::VectorObjectQueue;
 
 pub enum BlockAcquireResult {
     Fresh(Block),
@@ -59,9 +61,9 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn sft_trace_object(
         &self,
-        trace: SFTProcessEdgesMutRef,
+        queue: &mut VectorObjectQueue,
         object: ObjectReference,
-        worker: GCWorkerMutRef,
+        _worker: GCWorkerMutRef,
     ) -> ObjectReference {
         todo!()
     }
@@ -95,12 +97,12 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
 
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepSpace<VM> {
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
-        copy: Option<crate::util::copy::CopySemantics>,
-        worker: &mut crate::scheduler::GCWorker<VM>,
+        _copy: Option<CopySemantics>,
+        _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if object.is_null() {
             return object;
@@ -115,7 +117,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
             set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
             let block = Block::from(Block::align(address));
             block.set_state(BlockState::Marked);
-            trace.process_node(object);
+            queue.enqueue(object);
         }
         object
     }
