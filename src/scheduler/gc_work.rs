@@ -2,12 +2,12 @@ use super::work_bucket::WorkBucketStage;
 use super::*;
 use crate::plan::GcStatus;
 use crate::plan::ObjectsClosure;
+use crate::plan::VectorObjectQueue;
 use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
-use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
@@ -50,8 +50,9 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.workers_shared {
-            w.local_work_bucket.add(PrepareCollector);
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            let result = w.designated_work.push(Box::new(PrepareCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
@@ -118,8 +119,9 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.workers_shared {
-            w.local_work_bucket.add(ReleaseCollector);
+        for w in &mmtk.scheduler.worker_group.workers_shared {
+            let result = w.designated_work.push(Box::new(ReleaseCollector));
+            debug_assert!(result.is_ok());
         }
     }
 }
@@ -324,7 +326,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 
 pub struct ProcessEdgesBase<VM: VMBinding> {
     pub edges: Vec<Address>,
-    pub nodes: Vec<ObjectReference>,
+    pub nodes: VectorObjectQueue,
     mmtk: &'static MMTK<VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
     // Because a copying gc will dereference this pointer at least once for every object copy.
@@ -347,7 +349,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
         }
         Self {
             edges,
-            nodes: vec![],
+            nodes: VectorObjectQueue::new(),
             mmtk,
             worker: std::ptr::null_mut(),
             roots,
@@ -375,9 +377,8 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
             !self.nodes.is_empty(),
             "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
         );
-        let mut new_nodes = vec![];
-        mem::swap(&mut new_nodes, &mut self.nodes);
-        new_nodes
+
+        self.nodes.take()
     }
 }
 
@@ -413,17 +414,6 @@ pub trait ProcessEdgesWork:
             .lock()
             .unwrap()
             .add_roots(self.edges.clone());
-    }
-
-    #[inline]
-    fn process_node(&mut self, object: ObjectReference) {
-        if self.nodes.is_empty() {
-            self.nodes.reserve(Self::CAPACITY);
-        }
-        self.nodes.push(object);
-        // No need to flush this `nodes` local buffer to some global pool.
-        // The max length of `nodes` buffer is equal to `CAPACITY` (when every edge produces a node)
-        // So maximum 1 `ScanObjects` work can be created from `nodes` buffer
     }
 
     /// Start the a scan work packet. If SCAN_OBJECTS_IMMEDIATELY, the work packet will be executed immediately, in this method.
@@ -528,11 +518,10 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
-        let trace = SFTProcessEdgesMutRef::new(self);
 
         // Invoke trace object on sft
         let sft = crate::mmtk::SFT_MAP.get(object.to_address());
-        sft.sft_trace_object(trace, object, worker)
+        sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 }
 
@@ -657,8 +646,10 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         if object.is_null() {
             return object;
         }
+        // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
+        let worker = self.worker();
         self.plan
-            .trace_object::<Self, KIND>(self, object, self.worker())
+            .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
     }
 
     #[inline]

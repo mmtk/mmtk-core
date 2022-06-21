@@ -1,4 +1,5 @@
 use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::space::*;
 use crate::scheduler::GCWorker;
@@ -11,7 +12,7 @@ use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
-use crate::{vm::*, TransitiveClosure};
+use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
 pub(crate) const TRACE_KIND_MARK: TraceKind = 0;
@@ -67,7 +68,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     #[inline(always)]
     fn sft_trace_object(
         &self,
-        _trace: SFTProcessEdgesMutRef,
+        _queue: &mut VectorObjectQueue,
         _object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
@@ -105,17 +106,17 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
 
 impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkCompactSpace<VM> {
     #[inline(always)]
-    fn trace_object<T: TransitiveClosure, const KIND: crate::policy::gc_work::TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         _copy: Option<CopySemantics>,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if KIND == TRACE_KIND_MARK {
-            self.trace_mark_object(trace, object)
+            self.trace_mark_object(queue, object)
         } else if KIND == TRACE_KIND_FORWARD {
-            self.trace_forward_object(trace, object)
+            self.trace_forward_object(queue, object)
         } else {
             unreachable!()
         }
@@ -224,9 +225,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn release(&self) {}
 
-    pub fn trace_mark_object<T: TransitiveClosure>(
+    pub fn trace_mark_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
@@ -235,14 +236,14 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             object
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
-            trace.process_node(object);
+            queue.enqueue(object);
         }
         object
     }
 
-    pub fn trace_forward_object<T: TransitiveClosure>(
+    pub fn trace_forward_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
@@ -253,7 +254,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         // from this stage and onwards, mark bit is no longer needed
         // therefore, it can be reused to save one extra bit in metadata
         if MarkCompactSpace::<VM>::test_and_clear_mark(object) {
-            trace.process_node(object);
+            queue.enqueue(object);
         }
 
         Self::get_header_forwarding_pointer(object)

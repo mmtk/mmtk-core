@@ -46,27 +46,29 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         Self { base, plan }
     }
 
-    #[inline]
+    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         if object.is_null() {
             return object;
         }
+        let worker = self.worker();
+        let queue = &mut self.base.nodes;
         if self.plan.tospace().in_space(object) {
-            self.plan.tospace().trace_object::<Self>(
-                self,
+            self.plan.tospace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else if self.plan.fromspace().in_space(object) {
-            self.plan.fromspace().trace_object::<Self>(
-                self,
+            self.plan.fromspace().trace_object(
+                queue,
                 object,
                 Some(CopySemantics::DefaultCopy),
-                self.worker(),
+                worker,
             )
         } else {
-            self.plan.common.trace_object::<Self>(self, object, self.worker())
+            self.plan.common.trace_object(queue, object, worker)
         }
     }
 }

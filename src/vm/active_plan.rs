@@ -1,8 +1,10 @@
 use crate::plan::Mutator;
 use crate::plan::Plan;
+use crate::scheduler::GCWorker;
 use crate::util::opaque_pointer::*;
+use crate::util::ObjectReference;
 use crate::vm::VMBinding;
-use crate::{plan::TransitiveClosure, scheduler::GCWorker, util::ObjectReference};
+use crate::ObjectQueue;
 use std::marker::PhantomData;
 use std::sync::MutexGuard;
 
@@ -71,11 +73,11 @@ pub trait ActivePlan<VM: VMBinding> {
     fn number_of_mutators() -> usize;
 
     /// The fallback for object tracing.
-    fn vm_trace_object<T: TransitiveClosure>(
-        _trace: &mut T,
-        object: ObjectReference,
+    fn vm_trace_object<Q: ObjectQueue>(
+        _queue: &mut Q,
+        _object: ObjectReference,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
+        panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", _object)
     }
 }

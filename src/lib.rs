@@ -30,12 +30,8 @@
 //!   i.e. [the memory manager API](memory_manager/index.html) that allows a language's memory manager to use MMTk
 //!   and [the VMBinding trait](vm/trait.VMBinding.html) that allows MMTk to call the language implementation.
 
-#[macro_use]
-extern crate custom_derive;
-#[macro_use]
-extern crate enum_derive;
-
 extern crate libc;
+extern crate strum_macros;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -43,7 +39,7 @@ extern crate log;
 #[cfg(target = "x86_64-unknown-linux-gnu")]
 extern crate atomic;
 extern crate atomic_traits;
-extern crate crossbeam_deque;
+extern crate crossbeam;
 extern crate num_cpus;
 #[macro_use]
 extern crate downcast_rs;
@@ -62,7 +58,6 @@ pub mod util;
 pub mod vm;
 
 pub use crate::plan::{
-    AllocationSemantics, BarrierSelector, Mutator, MutatorContext, Plan, TraceLocal,
-    TransitiveClosure,
+    AllocationSemantics, BarrierSelector, Mutator, MutatorContext, ObjectQueue, Plan,
 };
 pub use crate::policy::copy_context::PolicyCopyContext;
