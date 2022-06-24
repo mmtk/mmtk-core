@@ -197,7 +197,7 @@ impl<VM: VMBinding> Gen<VM> {
                 worker,
             );
         }
-        self.common.trace_object::<Q>(queue, object)
+        self.common.trace_object::<Q>(queue, object, worker)
     }
 
     /// Trace objects for spaces in generational and common plans for a nursery GC.

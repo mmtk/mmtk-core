@@ -178,13 +178,14 @@ impl SFT for EmptySpaceSFT {
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,
-        _object: ObjectReference,
+        object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
+        // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {} (chunk {}), which maps to an empty space",
-            _object,
-            conversions::chunk_align_down(_object.to_address()),
+            "Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            object,
+            conversions::chunk_align_down(object.to_address()),
         )
     }
 }

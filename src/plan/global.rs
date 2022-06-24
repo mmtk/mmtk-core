@@ -627,33 +627,35 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub fn trace_object<Q: ObjectQueue>(
         &self,
-        _queue: &mut Q,
-        _object: ObjectReference,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
-        if self.code_space.in_space(_object) {
+        if self.code_space.in_space(object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(_queue, _object);
+            return self.code_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(_object) {
+        if self.code_lo_space.in_space(object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(_queue, _object);
+            return self.code_lo_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(_object) {
+        if self.ro_space.in_space(object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(_queue, _object);
+            return self.ro_space.trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(_object) {
+        if self.vm_space.in_space(object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(_queue, _object);
+            return self.vm_space.trace_object(queue, object);
         }
-        panic!("No special case for space in trace_object({:?})", _object);
+
+        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
@@ -939,6 +941,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self,
         queue: &mut Q,
         object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.immortal.in_space(object) {
             trace!("trace_object: object in immortal space");
@@ -948,7 +951,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return self.los.trace_object(queue, object);
         }
-        self.base.trace_object::<Q>(queue, object)
+        self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
