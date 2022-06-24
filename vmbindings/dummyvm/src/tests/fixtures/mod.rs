@@ -1,3 +1,6 @@
+// Some tests are conditionally compiled. So not all the code in this module will be used. We simply allow dead code in this module.
+#![allow(dead_code)]
+
 use atomic_refcell::AtomicRefCell;
 use std::sync::Once;
 use std::sync::Mutex;
@@ -14,30 +17,19 @@ pub trait FixtureContent {
     fn create() -> Self;
 }
 
+
 pub struct Fixture<T: FixtureContent> {
     content: AtomicRefCell<Option<Box<T>>>,
     once: Once,
-    serial_lock: Option<Mutex<()>>,
 }
 
 unsafe impl<T: FixtureContent> Sync for Fixture<T> {}
 
 impl<T: FixtureContent> Fixture<T> {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             content: AtomicRefCell::new(None),
             once: Once::new(),
-            serial_lock: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn new_serial_tests() -> Self {
-        Self {
-            content: AtomicRefCell::new(None),
-            once: Once::new(),
-            serial_lock: Some(Mutex::default()),
         }
     }
 
@@ -47,14 +39,29 @@ impl<T: FixtureContent> Fixture<T> {
             let mut borrow = self.content.borrow_mut();
             *borrow = Some(content);
         });
-        if let Some(mutex) = &self.serial_lock {
-            let _lock = mutex.lock();
-            let borrow = self.content.borrow();
-            func(borrow.as_ref().unwrap())
-        } else {
-            let borrow = self.content.borrow();
-            func(borrow.as_ref().unwrap())
+        let borrow = self.content.borrow();
+        func(borrow.as_ref().unwrap())
+    }
+}
+
+/// SerialFixture ensures all `with_fixture()` calls will be executed serially.
+pub struct SerialFixture<T: FixtureContent> {
+    content: Mutex<Option<Box<T>>>
+}
+
+impl<T: FixtureContent> SerialFixture<T> {
+    pub fn new() -> Self {
+        Self {
+            content: Mutex::new(None)
         }
+    }
+
+    pub fn with_fixture<F: Fn(&T)>(&self, func: F) {
+        let mut c = self.content.lock().unwrap();
+        if c.is_none() {
+            *c = Some(Box::new(T::create()));
+        }
+        func(c.as_ref().unwrap())
     }
 }
 

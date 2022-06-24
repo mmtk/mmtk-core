@@ -114,10 +114,14 @@ impl<VM: VMBinding> Gen<VM> {
             return true;
         }
 
-        if space_full
-            && space.is_some()
-            && space.unwrap().common().descriptor != self.nursery.common().descriptor
-        {
+        // Is the GC triggered by nursery?
+        // - if space is none, it is not. Return false immediately.
+        // - if space is some, we further check its descriptor.
+        let is_triggered_by_nursery = space.map_or(false, |s| {
+            s.common().descriptor == self.nursery.common().descriptor
+        });
+        // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
+        if space_full && !is_triggered_by_nursery {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
 
