@@ -413,6 +413,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
             // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
             // its SFT is properly set.
+            // We need to minimize the scope of this lock for performance when we have many threads (mutator threads, or GC threads with copying allocators).
+            // See: https://github.com/mmtk/mmtk-core/issues/610
             let lock = self.common().acquire_lock.lock().unwrap();
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
