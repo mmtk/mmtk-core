@@ -1,5 +1,7 @@
 //! This is for testing the assumption that RootsWorkFactory can work with embedded Box or Arc
-//! to hold or share large components in the heap.
+//! to hold or share large components in the heap.  Real-world RootsWorkFactory implementations
+//! should not be this complicated, and should probably not have shared mutable states, if they
+//! have any mutable states at all.
 
 use std::sync::{Arc, Mutex};
 
@@ -29,10 +31,12 @@ static EDGES: [Address; 3] = [
     unsafe { Address::from_usize(0x8) },
 ];
 
+/// A factory with a plain value, a boxed value and a shared data with Arc.
 #[derive(Clone)]
 struct MockFactory {
     round: i32,
     v: String,
+    #[allow(clippy::box_collection)] // for testing `Box` inside a factory
     b: Box<String>,
     a: Arc<Mutex<String>>,
 }
