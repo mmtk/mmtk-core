@@ -716,6 +716,11 @@
 <span id="714">714</span>
 <span id="715">715</span>
 <span id="716">716</span>
+<span id="717">717</span>
+<span id="718">718</span>
+<span id="719">719</span>
+<span id="720">720</span>
+<span id="721">721</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -1117,6 +1122,11 @@
     <span class="kw">const</span> <span class="ident">OVERWRITE_REFERENCE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
     <span class="kw">const</span> <span class="ident">SCAN_OBJECTS_IMMEDIATELY</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span>;
+
+    <span class="doccomment">/// Trace an MMTk object. The implementation should forward this call to the policy-specific</span>
+    <span class="doccomment">/// `trace_object()` methods, depending on which space this object is in.</span>
+    <span class="doccomment">/// If the object is not in any MMTk space, the implementation should forward the call to</span>
+    <span class="doccomment">/// `ActivePlan::vm_trace_object()` to let the binding handle the tracing.</span>
     <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>

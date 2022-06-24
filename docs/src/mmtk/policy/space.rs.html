@@ -817,6 +817,7 @@
 <span id="815">815</span>
 <span id="816">816</span>
 <span id="817">817</span>
+<span id="818">818</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
@@ -997,13 +998,14 @@
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">VectorObjectQueue</span>,
-        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">_worker</span>: <span class="ident">GCWorkerMutRef</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.</span>
         <span class="macro">panic!</span>(
-            <span class="string">&quot;Call trace_object() on {} (chunk {}), which maps to an empty space&quot;</span>,
-            <span class="ident">_object</span>,
-            <span class="ident">conversions::chunk_align_down</span>(<span class="ident">_object</span>.<span class="ident">to_address</span>()),
+            <span class="string">&quot;Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().&quot;</span>,
+            <span class="ident">object</span>,
+            <span class="ident">conversions::chunk_align_down</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()),
         )
     }
 }

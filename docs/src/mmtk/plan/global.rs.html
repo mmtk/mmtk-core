@@ -1008,6 +1008,9 @@
 <span id="1006">1006</span>
 <span id="1007">1007</span>
 <span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1613,33 +1616,35 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
-        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in code space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in large code space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in ro_space space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">trace_object</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">in_space</span>(<span class="ident">_object</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in boot space&quot;</span>);
-            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">trace_object</span>(<span class="ident">_queue</span>, <span class="ident">_object</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
-        <span class="macro">panic!</span>(<span class="string">&quot;No special case for space in trace_object({:?})&quot;</span>, <span class="ident">_object</span>);
+
+        <span class="ident">VM::VMActivePlan::vm_trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="ident">worker</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_full_heap</span>: <span class="ident">bool</span>) {
@@ -1917,6 +1922,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in immortal space&quot;</span>);
@@ -1926,7 +1932,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in los&quot;</span>);
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>)
+        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="ident">worker</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {

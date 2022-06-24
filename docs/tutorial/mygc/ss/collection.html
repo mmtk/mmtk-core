@@ -436,7 +436,7 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object)
+            self.plan.common.trace_object(queue, object, worker)
         }
     }
 }
@@ -520,7 +520,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object)
+            self.plan.common.trace_object(queue, object, worker)
         }
     }
 }

@@ -71,10 +71,25 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
 <span class="kw">use</span> <span class="ident">std::sync::MutexGuard</span>;
 
@@ -141,6 +156,15 @@
 
     <span class="doccomment">/// Return the total count of mutators.</span>
     <span class="kw">fn</span> <span class="ident">number_of_mutators</span>() -&gt; <span class="ident">usize</span>;
+
+    <span class="doccomment">/// The fallback for object tracing.</span>
+    <span class="kw">fn</span> <span class="ident">vm_trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
+        <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.&quot;</span>, <span class="ident">object</span>)
+    }
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
