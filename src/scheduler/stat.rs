@@ -45,15 +45,20 @@ impl SchedulerStat {
     /// Used during statistics printing at [`crate::memory_manager::harness_end`]
     pub fn harness_stat(&self) -> HashMap<String, String> {
         let mut stat = HashMap::new();
+        let mut counts = HashMap::<String, usize>::new();
+        let mut times = HashMap::<String, f64>::new();
         // Work counts
         let mut total_count = 0;
         for (t, c) in &self.work_counts {
             total_count += c;
             let n = self.work_id_name_map[t];
-            stat.insert(
-                format!("work.{}.count", self.work_name(n)),
-                format!("{}", c),
-            );
+            // We can have the same work names for different TypeIDs since work names strip
+            // type parameters away, while the same work packet with different type parameters
+            // are given different TypeIDs. Hence, we check if the key exists and update instead of
+            // overwrite it
+            let pkt = format!("work.{}.count", self.work_name(n));
+            let val = counts.entry(pkt).or_default();
+            *val += c;
         }
         stat.insert("total-work.count".to_owned(), format!("{}", total_count));
         // Work execution times
@@ -73,33 +78,43 @@ impl SchedulerStat {
                 // Update the overall execution time
                 duration_overall.merge_inplace(&fold);
                 let name = v.first().unwrap().name();
-                stat.insert(
-                    format!("work.{}.{}.total", self.work_name(n), name),
-                    format!("{:.2}", fold.total),
-                );
-                stat.insert(
-                    format!("work.{}.{}.min", self.work_name(n), name),
-                    format!("{:.2}", fold.min),
-                );
-                stat.insert(
-                    format!("work.{}.{}.max", self.work_name(n), name),
-                    format!("{:.2}", fold.max),
-                );
+                let pkt_total = format!("work.{}.{}.total", self.work_name(n), name);
+                let pkt_min = format!("work.{}.{}.min", self.work_name(n), name);
+                let pkt_max = format!("work.{}.{}.max", self.work_name(n), name);
+
+                // We can have the same work names for different TypeIDs since work names strip
+                // type parameters away, while the same work packet with different type parameters
+                // are given different TypeIDs. Hence, we check if the key exists and update
+                // instead of overwrite it
+                let val = times.entry(pkt_total).or_default();
+                *val += fold.total;
+                let val = times.entry(pkt_min).or_default();
+                *val = f64::min(*val, fold.min);
+                let val = times.entry(pkt_max).or_default();
+                *val = f64::max(*val, fold.max);
             }
         }
-        // Print out overall execution time
+        // Convert to ms and print out overall execution time
         stat.insert(
             "total-work.time.total".to_owned(),
-            format!("{:.2}", duration_overall.total),
+            format!("{:.3}", duration_overall.total / 1e6),
         );
         stat.insert(
             "total-work.time.min".to_owned(),
-            format!("{:.2}", duration_overall.min),
+            format!("{:.3}", duration_overall.min / 1e6),
         );
         stat.insert(
             "total-work.time.max".to_owned(),
-            format!("{:.2}", duration_overall.max),
+            format!("{:.3}", duration_overall.max / 1e6),
         );
+
+        for (pkt, count) in counts {
+            stat.insert(pkt, format!("{}", count));
+        }
+
+        for (pkt, time) in times {
+            stat.insert(pkt, format!("{:.3}", time / 1e6));
+        }
 
         stat
     }

@@ -4,7 +4,7 @@
 //! work-packet level statistics
 //!
 //! See [`crate::util::statistics`] for collecting statistics over a GC cycle
-use std::time::SystemTime;
+use std::time::Instant;
 
 /// Common struct for different work counters
 ///
@@ -92,11 +92,11 @@ impl WorkCounterBase {
 
 /// Measure the durations of work packets
 ///
-/// Timing is based on [`SystemTime`]
+/// Timing is based on [`Instant`]
 #[derive(Copy, Clone, Debug)]
 pub(super) struct WorkDuration {
     base: WorkCounterBase,
-    start_value: Option<SystemTime>,
+    start_value: Option<Instant>,
     running: bool,
 }
 
@@ -112,12 +112,12 @@ impl WorkDuration {
 
 impl WorkCounter for WorkDuration {
     fn start(&mut self) {
-        self.start_value = Some(SystemTime::now());
+        self.start_value = Some(Instant::now());
         self.running = true;
     }
 
     fn stop(&mut self) {
-        let duration = self.start_value.unwrap().elapsed().unwrap().as_nanos() as f64;
+        let duration = self.start_value.unwrap().elapsed().as_nanos() as f64;
         self.base.merge_val(duration);
     }
 
