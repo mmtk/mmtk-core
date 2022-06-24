@@ -75,9 +75,9 @@ pub trait ActivePlan<VM: VMBinding> {
     /// The fallback for object tracing.
     fn vm_trace_object<Q: ObjectQueue>(
         _queue: &mut Q,
-        _object: ObjectReference,
+        object: ObjectReference,
         _worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
-        panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", _object)
+        panic!("MMTk cannot trace object {:?} as it does not belong to any MMTk space. If the object is known to the VM, the binding can override this method and handle its tracing.", object)
     }
 }

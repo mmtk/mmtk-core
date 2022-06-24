@@ -603,35 +603,35 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     pub fn trace_object<Q: ObjectQueue>(
         &self,
-        _queue: &mut Q,
-        _object: ObjectReference,
-        _worker: &mut GCWorker<VM>,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
-        if self.code_space.in_space(_object) {
+        if self.code_space.in_space(object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<Q>(_queue, _object);
+            return self.code_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(_object) {
+        if self.code_lo_space.in_space(object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<Q>(_queue, _object);
+            return self.code_lo_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(_object) {
+        if self.ro_space.in_space(object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(_queue, _object);
+            return self.ro_space.trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(_object) {
+        if self.vm_space.in_space(object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(_queue, _object);
+            return self.vm_space.trace_object(queue, object);
         }
 
-        VM::VMActivePlan::vm_trace_object::<Q>(_queue, _object, _worker)
+        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
