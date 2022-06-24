@@ -11,14 +11,30 @@ pub trait EdgeVisitor {
 }
 
 /// Root-scanning methods use this trait to spawn work packets for processing roots.
-pub trait RootsWorkFactory: Send {
+///
+/// Notes on the required traits:
+///
+/// -   `Clone`: The VM may divide one root-scanning call (such as `scan_vm_specific_roots`) into
+///     multiple work packets to scan roots in parallel.  In this case, the factory shall be cloned
+///     to be given to multiple work packets.
+///
+///     Cloning may be expensive if a factory contains many states. If the states are immutable, a
+///     `RootsWorkFactory` implementation may hold those states in an `Arc` field so that multiple
+///     factory instances can still share the part held in the `Arc` even after cloning.
+///
+/// -   `Send` + 'static: The factory will be given to root-scanning work packets.
+///     Because work packets are distributed to and executed on different GC workers,
+///     it needs `Send` to be sent between threads.  `'static` means it must not have
+///     references to variables with limited lifetime (such as local variables), because
+///     it needs to be moved between threads.
+pub trait RootsWorkFactory: Clone + Send + 'static {
     /// Create work packets to handle the roots represented as edges.
     ///
     /// The work packet may update the edge.
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
-    fn create_process_edge_roots_work(&self, edges: Vec<Address>);
+    fn create_process_edge_roots_work(&mut self, edges: Vec<Address>);
 
     /// Create work packets to handle edges.
     ///
@@ -29,10 +45,7 @@ pub trait RootsWorkFactory: Send {
     ///
     /// Arguments:
     /// * `nodes`: A vector of object references pointed by root edges.
-    fn create_process_node_roots_work(&self, nodes: Vec<ObjectReference>);
-
-    /// Create a copy of the factory itself.
-    fn fork(&self) -> Box<dyn RootsWorkFactory>;
+    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
 /// VM-specific methods for scanning roots/objects.
@@ -84,7 +97,7 @@ pub trait Scanning<VM: VMBinding> {
     }
 
     /// Scan all the mutators for roots.
-    fn scan_thread_roots(tls: VMWorkerThread, factory: Box<dyn RootsWorkFactory>);
+    fn scan_thread_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
 
     /// Scan one mutator for roots.
     ///
@@ -94,12 +107,12 @@ pub trait Scanning<VM: VMBinding> {
     fn scan_thread_root(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<VM>,
-        factory: Box<dyn RootsWorkFactory>,
+        factory: impl RootsWorkFactory,
     );
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
-    fn scan_vm_specific_roots(tls: VMWorkerThread, factory: Box<dyn RootsWorkFactory>);
+    fn scan_vm_specific_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
 
     /// Return whether the VM supports return barriers. This is unused at the moment.
     fn supports_return_barrier() -> bool;

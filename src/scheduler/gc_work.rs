@@ -279,7 +279,7 @@ impl<E: ProcessEdgesWork> ScanStackRoots<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new_boxed(mmtk);
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
@@ -296,7 +296,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new_boxed(mmtk);
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         <E::VM as VMBinding>::VMScanning::scan_thread_root(
             worker.tls,
             unsafe { &mut *(self.0 as *mut _) },
@@ -325,7 +325,7 @@ impl<E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
-        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new_boxed(mmtk);
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
@@ -530,8 +530,14 @@ struct ProcessEdgesWorkRootsWorkFactory<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
 }
 
+impl<E: ProcessEdgesWork> Clone for ProcessEdgesWorkRootsWorkFactory<E> {
+    fn clone(&self) -> Self {
+        Self { mmtk: self.mmtk }
+    }
+}
+
 impl<E: ProcessEdgesWork> RootsWorkFactory for ProcessEdgesWorkRootsWorkFactory<E> {
-    fn create_process_edge_roots_work(&self, edges: Vec<Address>) {
+    fn create_process_edge_roots_work(&mut self, edges: Vec<Address>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
@@ -539,18 +545,14 @@ impl<E: ProcessEdgesWork> RootsWorkFactory for ProcessEdgesWorkRootsWorkFactory<
         );
     }
 
-    fn create_process_node_roots_work(&self, _nodes: Vec<ObjectReference>) {
+    fn create_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
         todo!()
-    }
-
-    fn fork(&self) -> Box<dyn RootsWorkFactory> {
-        Self::new_boxed(self.mmtk)
     }
 }
 
 impl<E: ProcessEdgesWork> ProcessEdgesWorkRootsWorkFactory<E> {
-    fn new_boxed(mmtk: &'static MMTK<E::VM>) -> Box<dyn RootsWorkFactory> {
-        Box::new(Self { mmtk })
+    fn new(mmtk: &'static MMTK<E::VM>) -> Self {
+        Self { mmtk }
     }
 }
 
