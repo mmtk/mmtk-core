@@ -651,7 +651,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::malloc_ms_util</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{
     <span class="ident">bzero_metadata</span>, <span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>, <span class="ident">SideMetadataSpec</span>,
 };
@@ -883,7 +883,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="comment">// TODO: Should refactor this and Space.acquire()</span>
-        <span class="kw">if</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="self">self</span>) {
+        <span class="kw">if</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>)) {
             <span class="macro">assert!</span>(<span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>), <span class="string">&quot;Polling in GC worker&quot;</span>);
             <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>));
             <span class="kw">return</span> <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() };

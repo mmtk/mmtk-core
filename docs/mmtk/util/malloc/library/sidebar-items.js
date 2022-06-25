@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["libc_malloc","If no malloc lib is specified, use the libc implementation"]]});

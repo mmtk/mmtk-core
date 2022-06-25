@@ -358,7 +358,7 @@
         <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">last_collection_full_heap</span>()
     }
 
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>
     <span class="kw">where</span>
         <span class="self">Self</span>: <span class="ident">Sized</span>,
     {

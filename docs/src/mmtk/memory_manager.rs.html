@@ -592,6 +592,84 @@
 <span id="590">590</span>
 <span id="591">591</span>
 <span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
+<span id="603">603</span>
+<span id="604">604</span>
+<span id="605">605</span>
+<span id="606">606</span>
+<span id="607">607</span>
+<span id="608">608</span>
+<span id="609">609</span>
+<span id="610">610</span>
+<span id="611">611</span>
+<span id="612">612</span>
+<span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
+<span id="616">616</span>
+<span id="617">617</span>
+<span id="618">618</span>
+<span id="619">619</span>
+<span id="620">620</span>
+<span id="621">621</span>
+<span id="622">622</span>
+<span id="623">623</span>
+<span id="624">624</span>
+<span id="625">625</span>
+<span id="626">626</span>
+<span id="627">627</span>
+<span id="628">628</span>
+<span id="629">629</span>
+<span id="630">630</span>
+<span id="631">631</span>
+<span id="632">632</span>
+<span id="633">633</span>
+<span id="634">634</span>
+<span id="635">635</span>
+<span id="636">636</span>
+<span id="637">637</span>
+<span id="638">638</span>
+<span id="639">639</span>
+<span id="640">640</span>
+<span id="641">641</span>
+<span id="642">642</span>
+<span id="643">643</span>
+<span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
+<span id="648">648</span>
+<span id="649">649</span>
+<span id="650">650</span>
+<span id="651">651</span>
+<span id="652">652</span>
+<span id="653">653</span>
+<span id="654">654</span>
+<span id="655">655</span>
+<span id="656">656</span>
+<span id="657">657</span>
+<span id="658">658</span>
+<span id="659">659</span>
+<span id="660">660</span>
+<span id="661">661</span>
+<span id="662">662</span>
+<span id="663">663</span>
+<span id="664">664</span>
+<span id="665">665</span>
+<span id="666">666</span>
+<span id="667">667</span>
+<span id="668">668</span>
+<span id="669">669</span>
+<span id="670">670</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -745,6 +823,84 @@
     <span class="ident">semantics</span>: <span class="ident">AllocationSemantics</span>,
 ) -&gt; <span class="ident">AllocatorSelector</span> {
     <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">get_allocator_mapping</span>()[<span class="ident">semantics</span>]
+}
+
+<span class="doccomment">/// The standard malloc. MMTk either uses its own allocator, or forward the call to a</span>
+<span class="doccomment">/// library malloc.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">malloc</span>(<span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::malloc</span>(<span class="ident">size</span>)
+}
+
+<span class="doccomment">/// The standard malloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.</span>
+<span class="doccomment">/// Thus the method requires a reference to an MMTk instance. MMTk either uses its own allocator, or forward the call to a</span>
+<span class="doccomment">/// library malloc.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">counted_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::counted_malloc</span>(<span class="ident">mmtk</span>, <span class="ident">size</span>)
+}
+
+<span class="doccomment">/// The standard calloc.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">calloc</span>(<span class="ident">num</span>: <span class="ident">usize</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::calloc</span>(<span class="ident">num</span>, <span class="ident">size</span>)
+}
+
+<span class="doccomment">/// The standard calloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.</span>
+<span class="doccomment">/// Thus the method requires a reference to an MMTk instance.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">counted_calloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">num</span>: <span class="ident">usize</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::counted_calloc</span>(<span class="ident">mmtk</span>, <span class="ident">num</span>, <span class="ident">size</span>)
+}
+
+<span class="doccomment">/// The standard realloc.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">realloc</span>(<span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::realloc</span>(<span class="ident">addr</span>, <span class="ident">size</span>)
+}
+
+<span class="doccomment">/// The standard realloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.</span>
+<span class="doccomment">/// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.</span>
+<span class="doccomment">/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">realloc_with_old_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">addr</span>: <span class="ident">Address</span>,
+    <span class="ident">size</span>: <span class="ident">usize</span>,
+    <span class="ident">old_size</span>: <span class="ident">usize</span>,
+) -&gt; <span class="ident">Address</span> {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::realloc_with_old_size</span>(<span class="ident">mmtk</span>, <span class="ident">addr</span>, <span class="ident">size</span>, <span class="ident">old_size</span>)
+}
+
+<span class="doccomment">/// The standard free.</span>
+<span class="doccomment">/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::free</span>(<span class="ident">addr</span>)
+}
+
+<span class="doccomment">/// The standard free except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.</span>
+<span class="doccomment">/// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.</span>
+<span class="doccomment">/// The `addr` in the arguments must be an address that is earlier returned from MMTk&#39;s `malloc()`, `calloc()` or `realloc()`.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_counted_size&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">free_with_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">addr</span>: <span class="ident">Address</span>, <span class="ident">old_size</span>: <span class="ident">usize</span>) {
+    <span class="ident"><span class="kw">crate</span>::util::malloc::free_with_size</span>(<span class="ident">mmtk</span>, <span class="ident">addr</span>, <span class="ident">old_size</span>)
+}
+
+<span class="doccomment">/// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block</span>
+<span class="doccomment">/// the current thread, and trigger a GC. Otherwise, it will simply return.</span>
+<span class="doccomment">/// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.</span>
+<span class="doccomment">/// However, if a binding uses counted malloc (which won&#39;t poll for GC), they may want to poll for GC manually.</span>
+<span class="doccomment">/// This function should only be used by mutator threads.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_poll</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>) {
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ActivePlan</span>, <span class="ident">Collection</span>};
+    <span class="macro">debug_assert!</span>(
+        <span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>.<span class="number">0</span>),
+        <span class="string">&quot;gc_poll() can only be called by a mutator thread.&quot;</span>
+    );
+
+    <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">get_plan</span>();
+    <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">should_trigger_gc_when_heap_is_full</span>() <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
+        <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
+        <span class="macro">assert!</span>(<span class="ident">plan</span>.<span class="ident">is_initialized</span>(), <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
+        <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">tls</span>);
+    }
 }
 
 <span class="doccomment">/// Run the main loop for the GC controller thread. This method does not return.</span>

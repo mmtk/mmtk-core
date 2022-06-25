@@ -333,8 +333,8 @@
         <span class="self">self</span>.<span class="ident">fromspace</span>().<span class="ident">release</span>();
     }
 
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">get_collection_reserved_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {

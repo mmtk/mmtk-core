@@ -419,8 +419,8 @@ in the <code>BasePlan</code>.</p>
 <pre><pre class="playground"><code class="language-rust">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn collection_required(&amp;self, space_full: bool, space: &amp;dyn Space&lt;Self::VM&gt;) -&gt; bool {
-        self.base().collection_required(self, space_full, space)
+</span>    fn collection_required(&amp;self, space_full: bool, _space: Option&lt;&amp;dyn Space&lt;Self::VM&gt;&gt;) -&gt; bool {
+        self.base().collection_required(self, space_full)
     }
 <span class="boring">}
 </span></code></pre></pre>
