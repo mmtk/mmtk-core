@@ -106,7 +106,7 @@ impl<VM: VMBinding> Gen<VM> {
         &self,
         plan: &P,
         space_full: bool,
-        space: &dyn Space<VM>,
+        space: Option<&dyn Space<VM>>,
     ) -> bool {
         let nursery_full = self.nursery.reserved_pages()
             >= (conversions::bytes_to_pages_up(*self.common.base.options.max_nursery));
@@ -114,13 +114,18 @@ impl<VM: VMBinding> Gen<VM> {
             return true;
         }
 
-        if space_full && space.common().descriptor != self.nursery.common().descriptor {
+        // Is the GC triggered by nursery?
+        // - if space is none, it is not. Return false immediately.
+        // - if space is some, we further check its descriptor.
+        let is_triggered_by_nursery = space.map_or(false, |s| {
+            s.common().descriptor == self.nursery.common().descriptor
+        });
+        // If space is full and the GC is not triggered by nursery, next GC will be full heap GC.
+        if space_full && !is_triggered_by_nursery {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
 
-        self.common
-            .base
-            .collection_required(plan, space_full, space)
+        self.common.base.collection_required(plan, space_full)
     }
 
     pub fn force_full_heap_collection(&self) {

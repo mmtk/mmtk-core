@@ -64,7 +64,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         }
     }
 
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
+    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
     where
         Self: Sized,
     {
