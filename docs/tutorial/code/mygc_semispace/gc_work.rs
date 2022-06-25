@@ -68,7 +68,7 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
                 worker,
             )
         } else {
-            self.plan.common.trace_object(queue, object)
+            self.plan.common.trace_object(queue, object, worker)
         }
     }
 }

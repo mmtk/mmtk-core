@@ -1,15 +1,22 @@
+// Some tests are conditionally compiled. So not all the code in this module will be used. We simply allow dead code in this module.
+#![allow(dead_code)]
+
 use atomic_refcell::AtomicRefCell;
 use std::sync::Once;
+use std::sync::Mutex;
 
 use mmtk::AllocationSemantics;
+use mmtk::MMTK;
 use mmtk::util::{ObjectReference, VMThread, VMMutatorThread};
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
+use crate::DummyVM;
 
 pub trait FixtureContent {
     fn create() -> Self;
 }
+
 
 pub struct Fixture<T: FixtureContent> {
     content: AtomicRefCell<Option<Box<T>>>,
@@ -32,10 +39,29 @@ impl<T: FixtureContent> Fixture<T> {
             let mut borrow = self.content.borrow_mut();
             *borrow = Some(content);
         });
-        {
-            let borrow = self.content.borrow();
-            func(borrow.as_ref().unwrap())
+        let borrow = self.content.borrow();
+        func(borrow.as_ref().unwrap())
+    }
+}
+
+/// SerialFixture ensures all `with_fixture()` calls will be executed serially.
+pub struct SerialFixture<T: FixtureContent> {
+    content: Mutex<Option<Box<T>>>
+}
+
+impl<T: FixtureContent> SerialFixture<T> {
+    pub fn new() -> Self {
+        Self {
+            content: Mutex::new(None)
         }
+    }
+
+    pub fn with_fixture<F: Fn(&T)>(&self, func: F) {
+        let mut c = self.content.lock().unwrap();
+        if c.is_none() {
+            *c = Some(Box::new(T::create()));
+        }
+        func(c.as_ref().unwrap())
     }
 }
 
@@ -64,5 +90,22 @@ impl FixtureContent for SingleObject {
         mmtk_post_alloc(handle, objref, size, semantics);
 
         SingleObject { objref }
+    }
+}
+
+pub struct MMTKSingleton {
+    pub mmtk: &'static MMTK<DummyVM>
+}
+
+impl FixtureContent for MMTKSingleton {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_gc_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+
+        MMTKSingleton {
+            mmtk: &crate::SINGLETON,
+        }
     }
 }

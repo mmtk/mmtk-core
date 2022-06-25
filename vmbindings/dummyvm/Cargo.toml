@@ -21,3 +21,4 @@ atomic_refcell = "0.1.7"
 [features]
 default = []
 is_mmtk_object = ["mmtk/is_mmtk_object"]
+malloc_counted_size = ["mmtk/malloc_counted_size"]

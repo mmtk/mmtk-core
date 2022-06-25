@@ -153,6 +153,84 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk.plan.get_allocator_mapping()[semantics]
 }
 
+/// The standard malloc. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+pub fn malloc(size: usize) -> Address {
+    crate::util::malloc::malloc(size)
+}
+
+/// The standard malloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
+    crate::util::malloc::counted_malloc(mmtk, size)
+}
+
+/// The standard calloc.
+pub fn calloc(num: usize, size: usize) -> Address {
+    crate::util::malloc::calloc(num, size)
+}
+
+/// The standard calloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance.
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -> Address {
+    crate::util::malloc::counted_calloc(mmtk, num, size)
+}
+
+/// The standard realloc.
+pub fn realloc(addr: Address, size: usize) -> Address {
+    crate::util::malloc::realloc(addr, size)
+}
+
+/// The standard realloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn realloc_with_old_size<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    addr: Address,
+    size: usize,
+    old_size: usize,
+) -> Address {
+    crate::util::malloc::realloc_with_old_size(mmtk, addr, size, old_size)
+}
+
+/// The standard free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+pub fn free(addr: Address) {
+    crate::util::malloc::free(addr)
+}
+
+/// The standard free except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
+    crate::util::malloc::free_with_size(mmtk, addr, old_size)
+}
+
+/// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block
+/// the current thread, and trigger a GC. Otherwise, it will simply return.
+/// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
+/// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
+/// This function should only be used by mutator threads.
+pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
+    use crate::vm::{ActivePlan, Collection};
+    debug_assert!(
+        VM::VMActivePlan::is_mutator(tls.0),
+        "gc_poll() can only be called by a mutator thread."
+    );
+
+    let plan = mmtk.get_plan();
+    if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
+        debug!("Collection required");
+        assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        VM::VMCollection::block_for_gc(tls);
+    }
+}
+
 /// Run the main loop for the GC controller thread. This method does not return.
 ///
 /// Arguments:
