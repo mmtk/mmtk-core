@@ -1,3 +1,31 @@
+0.13.0 (2022-06-27)
+===
+
+Allocators
+---
+* Fixed a bug that in GC stress testing, the allocator slowpath may double count the allocated bytes.
+* Fixed a bug that in GC stress testing, the Immix allocator may miss the updates to the allocated bytes in some cases.
+
+Scheduler
+---
+* Added work stealing mechanisms to the scheduler: a GC worker may steal work packets from other workers.
+* Fixed a bug that work buckets may be incorrectly opened when there is still work left in workers' local bucket.
+
+API
+---
+* Added an associate type `Finalizable` to `ReferenceGlue`, with which, a binding can define their own finalizer type.
+* Added a set of malloc APIs that allows a binding to do malloc using MMTk.
+* Added `vm_trace_object()` to `ActivePlan`. When tracing an object that is not in any of MMTk spaces, MMTk will call this method
+  and allow bindings to handle the object.
+
+Misc
+---
+* `trait TransitiveClosure` is split into two different traits: `EdgeVisitor` and `ObjectQueue`, and `TransitiveClosure` is now removed.
+* Fixed a bug that the work packet statistics were not collected correctly if different work packets used the same display name.
+* Fixed a bug that the work packet statistics and the phase statistics use different time units. Now they both use milliseconds.
+* Fixed a bug that `acquire_lock` was used to lock a larger scope than what was necessary, which caused bad performance when we have many
+  allocation threads (e.g. more than 24 threads).
+
 0.12.0 (2022-05-13)
 ===
 
