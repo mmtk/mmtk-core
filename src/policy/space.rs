@@ -395,12 +395,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // initialize_collection() has to be called so we know GC is initialized.
         let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
 
-        // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
-        // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
-        // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
-        // its SFT is properly set.
-        let lock = self.common().acquire_lock.lock().unwrap();
-
         trace!("Reserving pages");
         let pr = self.get_page_resource();
         let pages_reserved = pr.reserve_pages(pages);
@@ -411,11 +405,18 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
-            drop(lock); // drop the lock before block
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
+
+            // We need this lock: Othrewise, it is possible that one thread acquires pages in a new chunk, but not yet
+            // set SFT for it (in grow_space()), and another thread acquires pages in the same chunk, which is not
+            // a new chunk so grow_space() won't be called on it. The second thread could return a result in the chunk before
+            // its SFT is properly set.
+            // We need to minimize the scope of this lock for performance when we have many threads (mutator threads, or GC threads with copying allocators).
+            // See: https://github.com/mmtk/mmtk-core/issues/610
+            let lock = self.common().acquire_lock.lock().unwrap();
 
             match pr.get_new_pages(self.common().descriptor, pages_reserved, pages, tls) {
                 Ok(res) => {
@@ -429,6 +430,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     );
                     let bytes = conversions::pages_to_bytes(res.pages);
                     self.grow_space(res.start, bytes, res.new_chunk);
+
+                    // Once we finish grow_space, we can drop the lock.
+                    drop(lock);
+
                     // Mmap the pages and the side metadata, and handle error. In case of any error,
                     // we will either call back to the VM for OOM, or simply panic.
                     if let Err(mmap_error) = self
@@ -479,6 +484,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     res.start
                 }
                 Err(_) => {
+                    drop(lock); // drop the lock immediately
+
                     // We thought we had memory to allocate, but somehow failed the allocation. Will force a GC.
                     assert!(
                         allow_gc,
@@ -488,7 +495,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    drop(lock); // drop the lock before block
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
