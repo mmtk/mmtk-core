@@ -22,6 +22,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -150,6 +151,84 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) -> AllocatorSelector {
     mmtk.plan.get_allocator_mapping()[semantics]
+}
+
+/// The standard malloc. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+pub fn malloc(size: usize) -> Address {
+    crate::util::malloc::malloc(size)
+}
+
+/// The standard malloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance. MMTk either uses its own allocator, or forward the call to a
+/// library malloc.
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_malloc<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) -> Address {
+    crate::util::malloc::counted_malloc(mmtk, size)
+}
+
+/// The standard calloc.
+pub fn calloc(num: usize, size: usize) -> Address {
+    crate::util::malloc::calloc(num, size)
+}
+
+/// The standard calloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance.
+#[cfg(feature = "malloc_counted_size")]
+pub fn counted_calloc<VM: VMBinding>(mmtk: &MMTK<VM>, num: usize, size: usize) -> Address {
+    crate::util::malloc::counted_calloc(mmtk, num, size)
+}
+
+/// The standard realloc.
+pub fn realloc(addr: Address, size: usize) -> Address {
+    crate::util::malloc::realloc(addr, size)
+}
+
+/// The standard realloc except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the existing memory that will be reallocated.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn realloc_with_old_size<VM: VMBinding>(
+    mmtk: &MMTK<VM>,
+    addr: Address,
+    size: usize,
+    old_size: usize,
+) -> Address {
+    crate::util::malloc::realloc_with_old_size(mmtk, addr, size, old_size)
+}
+
+/// The standard free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+pub fn free(addr: Address) {
+    crate::util::malloc::free(addr)
+}
+
+/// The standard free except that with the feature `malloc_counted_size`, MMTk will count the allocated memory into its heap size.
+/// Thus the method requires a reference to an MMTk instance, and the size of the memory to free.
+/// The `addr` in the arguments must be an address that is earlier returned from MMTk's `malloc()`, `calloc()` or `realloc()`.
+#[cfg(feature = "malloc_counted_size")]
+pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: usize) {
+    crate::util::malloc::free_with_size(mmtk, addr, old_size)
+}
+
+/// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block
+/// the current thread, and trigger a GC. Otherwise, it will simply return.
+/// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
+/// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
+/// This function should only be used by mutator threads.
+pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
+    use crate::vm::{ActivePlan, Collection};
+    debug_assert!(
+        VM::VMActivePlan::is_mutator(tls.0),
+        "gc_poll() can only be called by a mutator thread."
+    );
+
+    let plan = mmtk.get_plan();
+    if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
+        debug!("Collection required");
+        assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
+        VM::VMCollection::block_for_gc(tls);
+    }
 }
 
 /// Run the main loop for the GC controller thread. This method does not return.
@@ -472,7 +551,10 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
-pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectReference) {
+pub fn add_finalizer<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
+) {
     if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
@@ -488,15 +570,57 @@ pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: ObjectRefer
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<ObjectReference> {
+pub fn get_finalized_object<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
     if *mmtk.options.no_finalizer {
-        warn!("get_object_for_finalization() is called when no_finalizer = true");
+        warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
     mmtk.finalizable_processor
         .lock()
         .unwrap()
         .get_ready_object()
+}
+
+/// Pop all the finalizers that were registered for finalization. The returned objects may or may not be ready for
+/// finalization. After this call, MMTk's finalizer processor should have no registered finalizer any more.
+///
+/// This is useful for some VMs which require all finalizable objects to be finalized on exit.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+pub fn get_all_finalizers<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+    if *mmtk.options.no_finalizer {
+        warn!("get_all_finalizers() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_all_finalizers()
+}
+
+/// Pop finalizers that were registered and associated with a certain object. The returned objects may or may not be ready for finalization.
+/// This is useful for some VMs that may manually execute finalize method for an object.
+///
+/// Arguments:
+/// * `mmtk`: A reference to an MMTk instance.
+/// * `object`: the given object that MMTk will pop its finalizers
+pub fn get_finalizers_for<VM: VMBinding>(
+    mmtk: &'static MMTK<VM>,
+    object: ObjectReference,
+) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+    if *mmtk.options.no_finalizer {
+        warn!("get_finalizers() is called when no_finalizer = true");
+    }
+
+    mmtk.finalizable_processor
+        .lock()
+        .unwrap()
+        .get_finalizers_for(object)
 }
 
 /// Get the number of workers. MMTk spawns worker threads for the 'threads' defined in the options.

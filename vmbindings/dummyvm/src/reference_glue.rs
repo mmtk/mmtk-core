@@ -6,6 +6,8 @@ use crate::DummyVM;
 pub struct VMReferenceGlue {}
 
 impl ReferenceGlue<DummyVM> for VMReferenceGlue {
+    type FinalizableType = ObjectReference;
+
     fn set_referent(_reference: ObjectReference, _referent: ObjectReference) {
         unimplemented!()
     }

@@ -6,7 +6,7 @@ use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
-use crate::util::malloc::*;
+use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
     bzero_metadata, SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
@@ -238,7 +238,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
-        if VM::VMActivePlan::global().poll(false, self) {
+        if VM::VMActivePlan::global().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
             VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };

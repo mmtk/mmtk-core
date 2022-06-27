@@ -96,7 +96,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.last_collection_full_heap()
     }
 
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool
+    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool
     where
         Self: Sized,
     {

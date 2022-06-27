@@ -48,8 +48,8 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         self.nogc_space.init(vm_map);
     }
 
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
     }
 
     fn base(&self) -> &BasePlan<VM> {

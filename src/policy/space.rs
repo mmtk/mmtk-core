@@ -178,13 +178,14 @@ impl SFT for EmptySpaceSFT {
     fn sft_trace_object(
         &self,
         _queue: &mut VectorObjectQueue,
-        _object: ObjectReference,
+        object: ObjectReference,
         _worker: GCWorkerMutRef,
     ) -> ObjectReference {
+        // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {} (chunk {}), which maps to an empty space",
-            _object,
-            conversions::chunk_align_down(_object.to_address()),
+            "Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            object,
+            conversions::chunk_align_down(object.to_address()),
         )
     }
 }
@@ -400,7 +401,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && VM::VMActivePlan::global().poll(false, self.as_space()) {
+        if should_poll && VM::VMActivePlan::global().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
@@ -491,7 +492,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         "Physical allocation failed when GC is not allowed!"
                     );
 
-                    let gc_performed = VM::VMActivePlan::global().poll(true, self.as_space());
+                    let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
