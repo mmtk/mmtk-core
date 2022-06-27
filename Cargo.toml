@@ -1,8 +1,8 @@
 [package]
 name = "mmtk"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["The MMTk Developers <>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -19,7 +19,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.12.0", path = "macros/" }
+mmtk-macros = { version = "0.13.0", path = "macros/" }
 
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
