@@ -28,12 +28,9 @@ jobs:
       # The script will retry publish for 5 times with 60 seconds between the retries.
       - name: Public mmtk-core
         run: |
-          n=0
-          until [ "$n" -ge 5 ]
-          do
+          for n in {1..5}; do
             echo "Attempt #"$n
             cargo publish && break
-            n=$((n+1))
             echo "Wait for Retry #"$n
             sleep 60
           done
