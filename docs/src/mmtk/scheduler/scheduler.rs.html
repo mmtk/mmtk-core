@@ -447,6 +447,18 @@
 <span id="445">445</span>
 <span id="446">446</span>
 <span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">GCWorkerShared</span>, <span class="ident">WorkerGroup</span>};
@@ -492,7 +504,7 @@
     <span class="doccomment">/// more ephemeron objects.</span>
     <span class="ident">closure_end</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Counter for pending coordinator messages.</span>
-    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">pending_messages</span>: <span class="ident">AtomicUsize</span>,
+    <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize</span>,
 }
 
 <span class="comment">// FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.</span>
@@ -564,7 +576,7 @@
             <span class="ident">coordinator_worker_shared</span>,
             <span class="ident">worker_monitor</span>,
             <span class="ident">closure_end</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
-            <span class="ident">pending_messages</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
+            <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
         })
     }
 
@@ -673,8 +685,11 @@
     }
 
     <span class="kw">fn</span> <span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">buckets</span>: <span class="kw-2">&amp;</span>[<span class="ident">WorkBucketStage</span>]) -&gt; <span class="ident">bool</span> {
+        <span class="macro">debug_assert!</span>(
+            <span class="self">self</span>.<span class="ident">pending_coordinator_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">0</span>,
+            <span class="string">&quot;GCWorker attempted to open buckets when there are pending coordinator work packets&quot;</span>
+        );
         <span class="ident">buckets</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">b</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">b</span>].<span class="ident">is_drained</span>())
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">0</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_closure_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span>) {
@@ -741,7 +756,8 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_coordinator_work</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">work</span>: <span class="kw">impl</span> <span class="ident">CoordinatorWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+        <span class="self">self</span>.<span class="ident">pending_coordinator_packets</span>
+            .<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
         <span class="ident">worker</span>
             .<span class="ident">sender</span>
             .<span class="ident">send</span>(<span class="ident">CoordinatorMessage::Work</span>(<span class="ident">Box::new</span>(<span class="ident">work</span>)))
@@ -823,8 +839,9 @@
 
     <span class="attribute">#[<span class="ident">cold</span>]</span>
     <span class="kw">fn</span> <span class="ident">poll_slow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="comment">// Note: The lock is released during `wait` in the loop.</span>
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="comment">// Retry polling</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>) {
                 <span class="kw">return</span> <span class="ident">work</span>;
@@ -835,31 +852,38 @@
             <span class="kw">if</span> <span class="ident">all_parked</span> {
                 <span class="comment">// If there&#39;re any designated work, resume the workers and process them</span>
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">has_designated_work</span>() {
-                    <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
+                    <span class="macro">assert!</span>(
+                        <span class="ident">worker</span>.<span class="ident">shared</span>.<span class="ident">designated_work</span>.<span class="ident">is_empty</span>(),
+                        <span class="string">&quot;The last parked worker has designated work.&quot;</span>
+                    );
                     <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
-                    <span class="kw">continue</span>;
-                }
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">update_buckets</span>() {
-                    <span class="comment">// We&#39;re not going to sleep since a new bucket is just open.</span>
-                    <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
-                    <span class="comment">// We guarantee that we can at least fetch one packet.</span>
-                    <span class="kw">let</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>).<span class="ident">unwrap</span>();
-                    <span class="comment">// Optimize for the case that a newly opened bucket only has one packet.</span>
-                    <span class="comment">// We only notify_all if there&#39;re more than one packets available.</span>
-                    <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">all_activated_buckets_are_empty</span>() {
-                        <span class="comment">// Have more jobs in this buckets. Notify other workers.</span>
-                        <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
+                    <span class="comment">// The current worker is going to wait, because the designated work is not for it.</span>
+                } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_coordinator_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">0</span> {
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">update_buckets</span>() {
+                        <span class="comment">// We&#39;re not going to sleep since a new bucket is just open.</span>
+                        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
+                        <span class="comment">// We guarantee that we can at least fetch one packet.</span>
+                        <span class="kw">let</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>).<span class="ident">unwrap</span>();
+                        <span class="comment">// Optimize for the case that a newly opened bucket only has one packet.</span>
+                        <span class="comment">// We only notify_all if there&#39;re more than one packets available.</span>
+                        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">all_activated_buckets_are_empty</span>() {
+                            <span class="comment">// Have more jobs in this buckets. Notify other workers.</span>
+                            <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
+                        }
+                        <span class="comment">// Return this packet and execute it.</span>
+                        <span class="kw">return</span> <span class="ident">work</span>;
                     }
-                    <span class="comment">// Return this packet and execute it.</span>
-                    <span class="kw">return</span> <span class="ident">work</span>;
+                    <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">has_designated_work</span>());
+                    <span class="comment">// The current pause is finished if we can&#39;t open more buckets.</span>
+                    <span class="ident">worker</span>.<span class="ident">sender</span>.<span class="ident">send</span>(<span class="ident">CoordinatorMessage::Finish</span>).<span class="ident">unwrap</span>();
                 }
-                <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">has_designated_work</span>());
-                <span class="comment">// The current pause is finished if we can&#39;t open more buckets.</span>
-                <span class="self">self</span>.<span class="ident">pending_messages</span>.<span class="ident">fetch_add</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
-                <span class="ident">worker</span>.<span class="ident">sender</span>.<span class="ident">send</span>(<span class="ident">CoordinatorMessage::Finish</span>).<span class="ident">unwrap</span>();
+                <span class="comment">// Otherwise, if there is still pending coordinator work, the last parked</span>
+                <span class="comment">// worker will wait on the monitor, too.  The coordinator will notify a</span>
+                <span class="comment">// worker (maybe not the current one) once it finishes executing all</span>
+                <span class="comment">// coordinator work packets.</span>
             }
             <span class="comment">// Wait</span>
-            <span class="kw">let</span> <span class="ident">_guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">wait</span>(<span class="ident">guard</span>).<span class="ident">unwrap</span>();
+            <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">wait</span>(<span class="ident">guard</span>).<span class="ident">unwrap</span>();
             <span class="comment">// Unpark this worker</span>
             <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
         }

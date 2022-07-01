@@ -275,6 +275,10 @@
 <span id="273">273</span>
 <span id="274">274</span>
 <span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::WorkerLocalStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
@@ -295,6 +299,10 @@
     <span class="doccomment">/// Worker-local statistics data.</span>
     <span class="ident">stat</span>: <span class="ident">AtomicRefCell</span><span class="op">&lt;</span><span class="ident">WorkerLocalStat</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// A queue of GCWork that can only be processed by the owned thread.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note: Currently, designated work cannot be added from the GC controller thread, or</span>
+    <span class="doccomment">/// there will be synchronization problems.  If it is necessary to do so, we need to</span>
+    <span class="doccomment">/// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.</span>
     <span class="kw">pub</span> <span class="ident">designated_work</span>: <span class="ident">ArrayQueue</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Handle for stealing packets from the current worker</span>
     <span class="kw">pub</span> <span class="ident">stealer</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Stealer</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
