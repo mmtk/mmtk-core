@@ -10,7 +10,7 @@ pub trait EdgeVisitor {
     // TODO: Add visit_soft_edge, visit_weak_edge, ... here.
 }
 
-/// Root-scanning methods use this trait to spawn work packets for processing roots.
+/// Root-scanning methods use this trait to create work packets for processing roots.
 ///
 /// Notes on the required traits:
 ///
@@ -28,23 +28,25 @@ pub trait EdgeVisitor {
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
 pub trait RootsWorkFactory: Clone + Send + 'static {
-    /// Create work packets to handle the roots represented as edges.
+    /// Create work packets to handle root edges.
     ///
-    /// The work packet may update the edge.
+    /// The work packet may update the edges.
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
     fn create_process_edge_roots_work(&mut self, edges: Vec<Address>);
 
-    /// Create work packets to handle edges.
+    /// Create work packets to handle nodes pointed by root edges.
     ///
-    /// The work packet cannot update the roots.  This is a good chance to pin the objects.
+    /// The work packet cannot update root edges, therefore it cannot move the objects.  This
+    /// method can only be used by GC algorithms that never moves objects, or GC algorithms that
+    /// supports object pinning.
     ///
     /// This method is useful for conservative stack scanning, or VMs that cannot update some
     /// of the root edges.
     ///
     /// Arguments:
-    /// * `nodes`: A vector of object references pointed by root edges.
+    /// * `nodes`: A vector of references to objects pointed by root edges.
     fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
 }
 
@@ -97,13 +99,18 @@ pub trait Scanning<VM: VMBinding> {
     }
 
     /// Scan all the mutators for roots.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC thread that is performing this scanning.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
     fn scan_thread_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
 
     /// Scan one mutator for roots.
     ///
     /// Arguments:
-    /// * `mutator`: The reference to the mutator whose roots will be scanned.
     /// * `tls`: The GC thread that is performing this scanning.
+    /// * `mutator`: The reference to the mutator whose roots will be scanned.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
     fn scan_thread_root(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<VM>,
@@ -112,6 +119,10 @@ pub trait Scanning<VM: VMBinding> {
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
     /// goes here.
+    ///
+    /// Arguments:
+    /// * `tls`: The GC thread that is performing this scanning.
+    /// * `factory`: The VM uses it to create work packets for scanning roots.
     fn scan_vm_specific_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
 
     /// Return whether the VM supports return barriers. This is unused at the moment.
