@@ -183,7 +183,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
-        <E::VM as VMBinding>::VMCollection::stop_all_mutators::<E>(worker.tls);
+        <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
+        });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
         if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
@@ -261,7 +263,7 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs::<E>(worker);
+        <E::VM as VMBinding>::VMCollection::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
     }
 }
 
@@ -277,7 +279,8 @@ impl<E: ProcessEdgesWork> ScanStackRoots<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots::<E>();
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
+        <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
         <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
@@ -293,9 +296,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
-        <E::VM as VMBinding>::VMScanning::scan_thread_root::<E>(
-            unsafe { &mut *(self.0 as *mut _) },
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
+        <E::VM as VMBinding>::VMScanning::scan_thread_root(
             worker.tls,
+            unsafe { &mut *(self.0 as *mut _) },
+            factory,
         );
         self.0.flush();
 
@@ -318,9 +323,10 @@ impl<E: ProcessEdgesWork> ScanVMSpecificRoots<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
-    fn do_work(&mut self, _worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
-        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots::<E>();
+        let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
+        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
     }
 }
 
@@ -522,6 +528,36 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         // Invoke trace object on sft
         let sft = crate::mmtk::SFT_MAP.get(object.to_address());
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
+    }
+}
+
+struct ProcessEdgesWorkRootsWorkFactory<E: ProcessEdgesWork> {
+    mmtk: &'static MMTK<E::VM>,
+}
+
+impl<E: ProcessEdgesWork> Clone for ProcessEdgesWorkRootsWorkFactory<E> {
+    fn clone(&self) -> Self {
+        Self { mmtk: self.mmtk }
+    }
+}
+
+impl<E: ProcessEdgesWork> RootsWorkFactory for ProcessEdgesWorkRootsWorkFactory<E> {
+    fn create_process_edge_roots_work(&mut self, edges: Vec<Address>) {
+        crate::memory_manager::add_work_packet(
+            self.mmtk,
+            WorkBucketStage::Closure,
+            E::new(edges, true, self.mmtk),
+        );
+    }
+
+    fn create_process_node_roots_work(&mut self, _nodes: Vec<ObjectReference>) {
+        todo!()
+    }
+}
+
+impl<E: ProcessEdgesWork> ProcessEdgesWorkRootsWorkFactory<E> {
+    fn new(mmtk: &'static MMTK<E::VM>) -> Self {
+        Self { mmtk }
     }
 }
 
