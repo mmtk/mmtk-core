@@ -162,8 +162,7 @@ Other copy semantics are unused in this plan. We also provide an initial space
 binding for <code>CopySpaceCopyContext</code>. However, we will flip tospace in every GC, and rebind the
 copy context to the new tospace in each GC, so it does not matter which space we use as the initial
 space here.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn create_copy_config(&amp;'static self) -&gt; CopyConfig&lt;Self::VM&gt; {
         use enum_map::enum_map;
@@ -198,8 +197,7 @@ which is a general work packet that a plan can use to trace objects. For plans
 like semispace, <code>SFTProcessEdges</code> is sufficient. For more complex GC plans,
 one can create and write their own work packet that implements the <code>ProcessEdgesWork</code> trait.
 We will discuss about this later, and discuss the alternatives.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
@@ -210,8 +208,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
 <span class="boring">}
 </span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
         self.base().set_collection_kind::&lt;Self&gt;(self);
@@ -229,8 +226,7 @@ We'll add these now.</p>
 <h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
 <p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
 call, and add the following code:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn prepare(&amp;mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
@@ -264,8 +260,7 @@ to the new tospace. We will override <code>prepare_worker()</code> in our <code>
 <code>Plan.prepare_worker()</code> is executed by each GC worker in the preparation phase of a GC. The code
 is straightforward -- we get the first <code>CopySpaceCopyContext</code>, and call <code>rebind()</code> on it with
 the new <code>tospace</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn prepare_worker(&amp;self, worker: &amp;mut GCWorker&lt;VM&gt;) {
         unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
@@ -286,8 +281,7 @@ run after each collection.</p>
 <h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
 <p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the 
 <code>unreachable!()</code> call with the following code.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn release(&amp;mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
@@ -308,8 +302,7 @@ release stage of a collection (at the end of a collection) for each mutator.
 It rebinds the allocator for the <code>Default</code> allocation semantics to the new 
 tospace. When the mutator threads resume, any new allocations for <code>Default</code> 
 will then go to the new tospace.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
     mutator: &amp;mut Mutator&lt;VM&gt;,
@@ -368,8 +361,7 @@ in large object space or immortal space in the common plan. <code>CommonPlan</co
 find a space for the object and trace it in the same way.</li>
 </ul>
 <p>With the derive macro, your <code>MyGC</code> struct should look like this:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[derive(PlanTraceObject)]
 pub struct MyGC&lt;VM: VMBinding&gt; {
@@ -384,8 +376,7 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
 <span class="boring">}
 </span></code></pre></pre>
 <p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>ProcessEdgesWorkType</code> in your GC work context:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
@@ -470,8 +461,7 @@ an overkill for simple plans like semi space, but might be necessary for more co
 We discuss how to implement it for <code>MyGC</code>.</p>
 <p>Create a struct <code>MyGCProcessEdges&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module. It includes a reference
 back to the plan, and a <code>ProcessEdgesBase</code> field:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
     plan: &amp;'static MyGC&lt;VM&gt;,
@@ -487,8 +477,7 @@ implementation of <code>ProcessEdgesWork</code>.</p>
 ourselves rather than letting the macro to generate it for us). We try to figure out
 which space the object is in, and invoke <code>trace_object()</code> for the object on that space. If the
 object is not in any of the semi spaces in the plan, we forward the call to <code>CommonPlan</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
@@ -528,8 +517,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
 </span></code></pre></pre>
 <p>We would also need to implement <code>Deref</code> and <code>DerefMut</code> to our <code>ProcessEdgesWork</code> impl to be
 dereferenced as <code>ProcessEdgesBase</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
@@ -548,8 +536,7 @@ impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
 <span class="boring">}
 </span></code></pre></pre>
 <p>In the end, use <code>MyGCProcessEdges</code> as <code>ProcessEdgesWorkType</code> in the <code>GCWorkContext</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {

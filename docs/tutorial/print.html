@@ -426,8 +426,7 @@ and then type <code>mygc</code>, and repeat for <code>NoGC</code>.</li>
 files. 
 <ol>
 <li><code>mmtk-core/src/plan/mod.rs</code>, add:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub mod mygc;
 <span class="boring">}
@@ -436,8 +435,7 @@ This adds <code>mygc</code> as a module.</li>
 <li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>. 
 This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>, 
 or an environment variable for <code>MMTK_PLAN</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[derive(Copy, Clone, EnumFromStr, Debug)]
 pub enum PlanSelector {
@@ -458,8 +456,7 @@ pub enum PlanSelector {
 <code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of 
 the existing plans. These define the location of the mutator and plan's 
 constructors. 
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// NOTE: Sections of this code snippet not relevant to this step of the 
 // tutorial (marked by &quot;// ...&quot;) have been omitted.
@@ -585,8 +582,7 @@ to be used to store an indicator of which copyspace is the tospace.</li>
 <li>Delete <code>#[allow(unused_imports)]</code>.</li>
 </ol>
 <p>Finished code (step 1):</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
@@ -627,8 +623,7 @@ and <code>pub copyspace1: CopySpace&lt;VM&gt;,</code>. These are the two copyspa
 This holds an instance of the common plan.</li>
 </ol>
 <p>Finished code (step 2):</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[derive(PlanTraceObject)]
 pub struct MyGC&lt;VM: VMBinding&gt; {
@@ -651,8 +646,7 @@ that you just defined.</p>
 Instead, we will define the two copyspaces here.</li>
 <li>Define one of the copyspaces by adding the following code: </li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>            copyspace0: CopySpace::new(
                 &quot;copyspace0&quot;,
@@ -672,8 +666,7 @@ instead of a tospace. (Hint: the definitions for
 copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 <li>Finally, replace the old MyGC initializer.</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn new(
         vm_map: &amp;'static VMMap,
@@ -724,8 +717,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 <p>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
 copyspaces, rather than the base plan and mygc_space. The contents of the 
 initializer calls are identical.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn gc_init(
         &amp;mut self,
@@ -740,8 +732,7 @@ initializer calls are identical.</p>
 </span></code></pre></pre>
 <h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
 <p>Add a new section of methods for MyGC:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; MyGC&lt;VM&gt; {
 }
@@ -755,8 +746,7 @@ and <code>fromspace()</code> returns a reference to the fromspace.</p>
 <p>We also add another two helper methods to get <code>tospace_mut(&amp;mut self)</code>
 and <code>fromspace_mut(&amp;mut self)</code>. Those will be used later when we implement
 collection for our GC plan.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    pub fn tospace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
         if self.hi.load(Ordering::SeqCst) {
@@ -794,8 +784,7 @@ collection for our GC plan.</p>
 <h4 id="other-methods-in-the-plan-trait"><a class="header" href="#other-methods-in-the-plan-trait">Other methods in the Plan trait</a></h4>
 <p>The trait <code>Plan</code> requires a <code>common()</code> method that should return a 
 reference to the common plan. Implement this method now.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn common(&amp;self) -&gt; &amp;CommonPlan&lt;VM&gt; {
         &amp;self.common
@@ -804,8 +793,7 @@ reference to the common plan. Implement this method now.</p>
 </span></code></pre></pre>
 <p>Find the helper method <code>base</code> and change it so that it calls the 
 base plan <em>through</em> the common plan.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn base(&amp;self) -&gt; &amp;BasePlan&lt;VM&gt; {
         &amp;self.common.base
@@ -815,8 +803,7 @@ base plan <em>through</em> the common plan.</p>
 <p>The trait <code>Plan</code> requires <code>collection_required()</code> method to know when
 we should trigger a collection. We can just use the implementation
 in the <code>BasePlan</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn collection_required(&amp;self, space_full: bool, _space: Option&lt;&amp;dyn Space&lt;Self::VM&gt;&gt;) -&gt; bool {
         self.base().collection_required(self, space_full)
@@ -827,8 +814,7 @@ in the <code>BasePlan</code>.</p>
 <code>self.tospace().reserved_pages() + self.common.get_pages_used()</code>, to 
 correctly count the pages contained in the tospace and the common plan 
 spaces (which will be explained later).</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn get_used_pages(&amp;self) -&gt; usize {
         self.tospace().reserved_pages() + self.common.get_used_pages()
@@ -836,8 +822,7 @@ spaces (which will be explained later).</p>
 <span class="boring">}
 </span></code></pre></pre>
 <p>Add and override the following helper function:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn get_collection_reserved_pages(&amp;self) -&gt; usize {
         self.tospace().reserved_pages()
@@ -854,8 +839,7 @@ tospace, and to the two spaces controlled by the common plan. </p>
 <li>Add <code>use crate::util::alloc::BumpAllocator;</code>.</li>
 <li>Delete <code>use crate::plan::mygc::MyGC;</code>.</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use super::MyGC; // Add
 use crate::Plan;
@@ -885,8 +869,7 @@ For example, for <code>Default</code>, we allocate using the first bump pointer 
 <li>Map the common plan allocators using <code>create_allocator_mapping</code>.</li>
 <li>Map <code>Default</code> to <code>BumpPointer(0)</code>.</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     n_bump_pointer: 1,
@@ -909,8 +892,7 @@ of tuples. For example, the first bump pointer allocator (<code>BumpPointer(0)</
 bound with <code>tospace</code>.</p>
 <p>Downcast the dynamic <code>Plan</code> type to <code>MyGC</code> so we can access specific spaces in 
 <code>MyGC</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    let mygc = plan.downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
 <span class="boring">}
@@ -922,8 +904,7 @@ bound with <code>tospace</code>.</p>
 <li>None of the above should be dereferenced (ie, they should not have
 the <code>&amp;</code> prefix).</li>
 </ol>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
@@ -969,8 +950,7 @@ Other copy semantics are unused in this plan. We also provide an initial space
 binding for <code>CopySpaceCopyContext</code>. However, we will flip tospace in every GC, and rebind the
 copy context to the new tospace in each GC, so it does not matter which space we use as the initial
 space here.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn create_copy_config(&amp;'static self) -&gt; CopyConfig&lt;Self::VM&gt; {
         use enum_map::enum_map;
@@ -1005,8 +985,7 @@ which is a general work packet that a plan can use to trace objects. For plans
 like semispace, <code>SFTProcessEdges</code> is sufficient. For more complex GC plans,
 one can create and write their own work packet that implements the <code>ProcessEdgesWork</code> trait.
 We will discuss about this later, and discuss the alternatives.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt;VM&gt; {
@@ -1017,8 +996,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
 <span class="boring">}
 </span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn schedule_collection(&amp;'static self, scheduler: &amp;GCWorkScheduler&lt;VM&gt;) {
         self.base().set_collection_kind::&lt;Self&gt;(self);
@@ -1036,8 +1014,7 @@ We'll add these now.</p>
 <h3 id="prepare-plan"><a class="header" href="#prepare-plan">Prepare plan</a></h3>
 <p>In <code>mygc/global.rs</code>, find the method <code>prepare</code>. Delete the <code>unreachable!()</code> 
 call, and add the following code:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn prepare(&amp;mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
@@ -1071,8 +1048,7 @@ to the new tospace. We will override <code>prepare_worker()</code> in our <code>
 <code>Plan.prepare_worker()</code> is executed by each GC worker in the preparation phase of a GC. The code
 is straightforward -- we get the first <code>CopySpaceCopyContext</code>, and call <code>rebind()</code> on it with
 the new <code>tospace</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn prepare_worker(&amp;self, worker: &amp;mut GCWorker&lt;VM&gt;) {
         unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
@@ -1093,8 +1069,7 @@ run after each collection.</p>
 <h3 id="release-in-plan"><a class="header" href="#release-in-plan">Release in plan</a></h3>
 <p>Find the method <code>release()</code> in <code>mygc/global.rs</code>. Replace the 
 <code>unreachable!()</code> call with the following code.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    fn release(&amp;mut self, tls: VMWorkerThread) {
         self.common.release(tls, true);
@@ -1115,8 +1090,7 @@ release stage of a collection (at the end of a collection) for each mutator.
 It rebinds the allocator for the <code>Default</code> allocation semantics to the new 
 tospace. When the mutator threads resume, any new allocations for <code>Default</code> 
 will then go to the new tospace.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn mygc_mutator_release&lt;VM: VMBinding&gt;(
     mutator: &amp;mut Mutator&lt;VM&gt;,
@@ -1175,8 +1149,7 @@ in large object space or immortal space in the common plan. <code>CommonPlan</co
 find a space for the object and trace it in the same way.</li>
 </ul>
 <p>With the derive macro, your <code>MyGC</code> struct should look like this:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[derive(PlanTraceObject)]
 pub struct MyGC&lt;VM: VMBinding&gt; {
@@ -1191,8 +1164,7 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
 <span class="boring">}
 </span></code></pre></pre>
 <p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>ProcessEdgesWorkType</code> in your GC work context:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>use crate::scheduler::gc_work::PlanProcessEdges;
 use crate::policy::gc_work::DEFAULT_TRACE;
@@ -1277,8 +1249,7 @@ an overkill for simple plans like semi space, but might be necessary for more co
 We discuss how to implement it for <code>MyGC</code>.</p>
 <p>Create a struct <code>MyGCProcessEdges&lt;VM: VMBinding&gt;</code> in the <code>gc_work</code> module. It includes a reference
 back to the plan, and a <code>ProcessEdgesBase</code> field:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
     plan: &amp;'static MyGC&lt;VM&gt;,
@@ -1294,8 +1265,7 @@ implementation of <code>ProcessEdgesWork</code>.</p>
 ourselves rather than letting the macro to generate it for us). We try to figure out
 which space the object is in, and invoke <code>trace_object()</code> for the object on that space. If the
 object is not in any of the semi spaces in the plan, we forward the call to <code>CommonPlan</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
@@ -1335,8 +1305,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
 </span></code></pre></pre>
 <p>We would also need to implement <code>Deref</code> and <code>DerefMut</code> to our <code>ProcessEdgesWork</code> impl to be
 dereferenced as <code>ProcessEdgesBase</code>.</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>impl&lt;VM: VMBinding&gt; Deref for MyGCProcessEdges&lt;VM&gt; {
     type Target = ProcessEdgesBase&lt;VM&gt;;
@@ -1355,8 +1324,7 @@ impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
 <span class="boring">}
 </span></code></pre></pre>
 <p>In the end, use <code>MyGCProcessEdges</code> as <code>ProcessEdgesWorkType</code> in the <code>GCWorkContext</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct MyGCWorkContext3&lt;VM: VMBinding&gt;(std::marker::PhantomData&lt;VM&gt;);
 impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&lt;VM&gt; {
@@ -1411,8 +1379,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 <ol>
 <li>
 <p>Add a <code>youngspace</code> field to <code>pub struct TripleSpace</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct TripleSpace&lt;VM: VMBinding&gt; {
    pub hi: AtomicBool,
@@ -1427,8 +1394,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 <li>
 <p>Define the parameters for the youngspace in <code>new()</code> in
 <code>Plan for TripleSpace</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn new(
    vm_map: &amp;'static VMMap,
@@ -1478,8 +1444,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 </li>
 <li>
 <p>Initialise the youngspace in <code>gc_init()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span> fn gc_init(
     &amp;mut self,
@@ -1497,8 +1462,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 </li>
 <li>
 <p>Prepare the youngspace (as a fromspace) in <code>prepare()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn prepare(&amp;self, tls: OpaquePointer) {
    self.common.prepare(tls, true);
@@ -1514,8 +1478,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 </li>
 <li>
 <p>Release the youngspace in <code>release()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn release(&amp;self, tls: OpaquePointer) {
    self.common.release(tls, true);
@@ -1528,8 +1491,7 @@ module by following the instructions in <a href="mygc/ss/./create.html">Create M
 <li>
 <p>Under the reference functions <code>tospace()</code> and <code>fromspace()</code>, add a similar
 reference function <code>youngspace()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn youngspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
    &amp;self.youngspace
@@ -1542,8 +1504,7 @@ reference function <code>youngspace()</code>:</p>
 <ol>
 <li>Map a bump pointer to the youngspace (replacing the one mapped to the
 tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>space_mapping: box vec![
     (AllocatorSelector::BumpPointer(0), plan.youngspace()), // Change this!
@@ -1558,8 +1519,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 </li>
 <li>Rebind the bump pointer to youngspace (rather than the tospace) in
 <code>triplespace_mutator_release()</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn triplespace_mutator_release&lt;VM: VMBinding&gt; (
     mutator: &amp;mut Mutator&lt;VM&gt;,
@@ -1584,8 +1544,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 <ol>
 <li>Add the youngspace to trace_object, following the same format as
 the tospace and fromspace:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {

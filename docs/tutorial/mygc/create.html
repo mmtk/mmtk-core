@@ -166,8 +166,7 @@ and then type <code>mygc</code>, and repeat for <code>NoGC</code>.</li>
 files. 
 <ol>
 <li><code>mmtk-core/src/plan/mod.rs</code>, add:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub mod mygc;
 <span class="boring">}
@@ -176,8 +175,7 @@ This adds <code>mygc</code> as a module.</li>
 <li><code>mmtk-core/src/util/options.rs</code>, add <code>MyGC</code> to the enum <code>PlanSelector</code>. 
 This allows MMTk to accept <code>MyGC</code> as a command line option for <code>plan</code>, 
 or an environment variable for <code>MMTK_PLAN</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>#[derive(Copy, Clone, EnumFromStr, Debug)]
 pub enum PlanSelector {
@@ -198,8 +196,7 @@ pub enum PlanSelector {
 <code>create_mutator()</code> and <code>create_plan()</code> for <code>MyGC</code>, following the pattern of 
 the existing plans. These define the location of the mutator and plan's 
 constructors. 
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>// NOTE: Sections of this code snippet not relevant to this step of the 
 // tutorial (marked by &quot;// ...&quot;) have been omitted.

@@ -152,8 +152,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 <ol>
 <li>
 <p>Add a <code>youngspace</code> field to <code>pub struct TripleSpace</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub struct TripleSpace&lt;VM: VMBinding&gt; {
    pub hi: AtomicBool,
@@ -168,8 +167,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 <li>
 <p>Define the parameters for the youngspace in <code>new()</code> in
 <code>Plan for TripleSpace</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn new(
    vm_map: &amp;'static VMMap,
@@ -219,8 +217,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 </li>
 <li>
 <p>Initialise the youngspace in <code>gc_init()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span> fn gc_init(
     &amp;mut self,
@@ -238,8 +235,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 </li>
 <li>
 <p>Prepare the youngspace (as a fromspace) in <code>prepare()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn prepare(&amp;self, tls: OpaquePointer) {
    self.common.prepare(tls, true);
@@ -255,8 +251,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 </li>
 <li>
 <p>Release the youngspace in <code>release()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>fn release(&amp;self, tls: OpaquePointer) {
    self.common.release(tls, true);
@@ -269,8 +264,7 @@ module by following the instructions in <a href="./create.html">Create MyGC</a>.
 <li>
 <p>Under the reference functions <code>tospace()</code> and <code>fromspace()</code>, add a similar
 reference function <code>youngspace()</code>:</p>
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn youngspace(&amp;self) -&gt; &amp;CopySpace&lt;VM&gt; {
    &amp;self.youngspace
@@ -283,8 +277,7 @@ reference function <code>youngspace()</code>:</p>
 <ol>
 <li>Map a bump pointer to the youngspace (replacing the one mapped to the
 tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>space_mapping: box vec![
     (AllocatorSelector::BumpPointer(0), plan.youngspace()), // Change this!
@@ -299,8 +292,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 </li>
 <li>Rebind the bump pointer to youngspace (rather than the tospace) in
 <code>triplespace_mutator_release()</code>:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>pub fn triplespace_mutator_release&lt;VM: VMBinding&gt; (
     mutator: &amp;mut Mutator&lt;VM&gt;,
@@ -325,8 +317,7 @@ tospace) in <code>space_mapping</code> in <code>create_triplespace_mutator()</co
 <ol>
 <li>Add the youngspace to trace_object, following the same format as
 the tospace and fromspace:
-<pre><pre class="playground"><code class="language-rust">
-<span class="boring">#![allow(unused)]
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>    #[inline(always)] // Ensure this function is always inlined because it is very hot.
     fn trace_object(&amp;mut self, object: ObjectReference) -&gt; ObjectReference {
