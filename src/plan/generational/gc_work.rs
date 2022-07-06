@@ -16,6 +16,7 @@ pub struct GenNurseryProcessEdges<VM: VMBinding> {
 
 impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
     type VM = VM;
+    type ScanObjectsWorkType = ScanObjects<Self>;
 
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
@@ -38,6 +39,11 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
         let new_object = self.trace_object(object);
         debug_assert!(!self.gen.nursery.in_space(new_object));
         unsafe { slot.store(new_object) };
+    }
+
+    #[inline(always)]
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, roots)
     }
 }
 
