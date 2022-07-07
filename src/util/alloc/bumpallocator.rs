@@ -173,14 +173,18 @@ impl<VM: VMBinding> BumpAllocator<VM> {
             );
             if !stress_test {
                 self.set_limit(acquired_start, acquired_start + block_size);
+                self.alloc(size, align, offset)
             } else {
                 // For a stress test, we artificially make the fastpath fail by
                 // manipulating the limit as below.
                 // The assumption here is that we use an address range such that
                 // cursor > block_size always.
                 self.set_limit(acquired_start, unsafe { Address::from_usize(block_size) });
+                // Note that we have just acquired a new block so we know that we don't have to go
+                // through the entire allocation sequence again, we can directly call the slow path
+                // allocation.
+                self.alloc_slow_once_precise_stress(size, align, offset, false)
             }
-            self.alloc(size, align, offset)
         }
     }
 }

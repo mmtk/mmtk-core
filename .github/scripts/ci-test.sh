@@ -18,7 +18,7 @@ cd vmbindings/dummyvm
 for fn in $(ls src/tests/*.rs); do
     t=$(basename -s .rs $fn)
 
-    if [[ $t == "mod.rs" ]]; then
+    if [[ $t == "mod" ]]; then
         continue
     fi
 

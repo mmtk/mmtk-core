@@ -4,7 +4,7 @@ use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
 use crate::plan::generational::global::Gen;
-use crate::plan::transitive_closure::TransitiveClosure;
+use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
@@ -203,7 +203,14 @@ pub trait Plan: 'static + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    fn poll(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
+    /// This method is called periodically by the allocation subsystem
+    /// (by default, each time a page is consumed), and provides the
+    /// collector with an opportunity to collect.
+    ///
+    /// Arguments:
+    /// * `space_full`: Space request failed, must recover pages within 'space'.
+    /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
+    fn poll(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool {
         if self.collection_required(space_full, space) {
             // FIXME
             /*if space == META_DATA_SPACE {
@@ -236,8 +243,12 @@ pub trait Plan: 'static + Sync + Downcast {
         false
     }
 
-    fn log_poll(&self, space: &dyn Space<Self::VM>, message: &'static str) {
-        info!("  [POLL] {}: {}", space.get_name(), message);
+    fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
+        if let Some(space) = space {
+            info!("  [POLL] {}: {}", space.get_name(), message);
+        } else {
+            info!("  [POLL] {}", message);
+        }
     }
 
     /**
@@ -248,7 +259,7 @@ pub trait Plan: 'static + Sync + Downcast {
      * @param space TODO
      * @return <code>true</code> if a collection is requested by the plan.
      */
-    fn collection_required(&self, space_full: bool, _space: &dyn Space<Self::VM>) -> bool;
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool;
 
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
@@ -372,9 +383,12 @@ pub struct BasePlan<VM: VMBinding> {
     /// Have we scanned all the stacks?
     stacks_prepared: AtomicBool,
     pub mutator_iterator_lock: Mutex<()>,
-    // A counter that keeps tracks of the number of bytes allocated since last stress test
+    /// A counter that keeps tracks of the number of bytes allocated since last stress test
     allocation_bytes: AtomicUsize,
-    // Wrapper around analysis counters
+    /// A counteer that keeps tracks of the number of bytes allocated by malloc
+    #[cfg(feature = "malloc_counted_size")]
+    malloc_bytes: AtomicUsize,
+    /// Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
 
@@ -518,6 +532,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             scanned_stacks: AtomicUsize::new(0),
             mutator_iterator_lock: Mutex::new(()),
             allocation_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "malloc_counted_size")]
+            malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
         }
@@ -596,40 +612,50 @@ impl<VM: VMBinding> BasePlan<VM> {
             pages += self.ro_space.reserved_pages();
         }
 
+        // If we need to count malloc'd size as part of our heap, we add it here.
+        #[cfg(feature = "malloc_counted_size")]
+        {
+            pages += crate::util::conversions::bytes_to_pages_up(
+                self.malloc_bytes.load(Ordering::SeqCst),
+            );
+        }
+
         // The VM space may be used as an immutable boot image, in which case, we should not count
         // it as part of the heap size.
         pages
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        _trace: &mut T,
-        _object: ObjectReference,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "code_space")]
-        if self.code_space.in_space(_object) {
+        if self.code_space.in_space(object) {
             trace!("trace_object: object in code space");
-            return self.code_space.trace_object::<T>(_trace, _object);
+            return self.code_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "code_space")]
-        if self.code_lo_space.in_space(_object) {
+        if self.code_lo_space.in_space(object) {
             trace!("trace_object: object in large code space");
-            return self.code_lo_space.trace_object::<T>(_trace, _object);
+            return self.code_lo_space.trace_object::<Q>(queue, object);
         }
 
         #[cfg(feature = "ro_space")]
-        if self.ro_space.in_space(_object) {
+        if self.ro_space.in_space(object) {
             trace!("trace_object: object in ro_space space");
-            return self.ro_space.trace_object(_trace, _object);
+            return self.ro_space.trace_object(queue, object);
         }
 
         #[cfg(feature = "vm_space")]
-        if self.vm_space.in_space(_object) {
+        if self.vm_space.in_space(object) {
             trace!("trace_object: object in boot space");
-            return self.vm_space.trace_object(_trace, _object);
+            return self.vm_space.trace_object(queue, object);
         }
-        panic!("No special case for space in trace_object({:?})", _object);
+
+        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
@@ -792,12 +818,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             && (self.allocation_bytes.load(Ordering::SeqCst) > *self.options.stress_factor)
     }
 
-    pub(super) fn collection_required<P: Plan>(
-        &self,
-        plan: &P,
-        space_full: bool,
-        _space: &dyn Space<VM>,
-    ) -> bool {
+    pub(super) fn collection_required<P: Plan>(&self, plan: &P, space_full: bool) -> bool {
         let stress_force_gc = self.should_do_stress_gc();
         if stress_force_gc {
             debug!(
@@ -835,6 +856,19 @@ impl<VM: VMBinding> BasePlan<VM> {
         #[cfg(feature = "vm_space")]
         self.vm_space
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
+    }
+
+    #[cfg(feature = "malloc_counted_size")]
+    pub(crate) fn increase_malloc_bytes_by(&self, size: usize) {
+        self.malloc_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+    #[cfg(feature = "malloc_counted_size")]
+    pub(crate) fn decrease_malloc_bytes_by(&self, size: usize) {
+        self.malloc_bytes.fetch_sub(size, Ordering::SeqCst);
+    }
+    #[cfg(feature = "malloc_counted_size")]
+    pub fn get_malloc_bytes(&self) -> usize {
+        self.malloc_bytes.load(Ordering::SeqCst)
     }
 }
 
@@ -903,20 +937,21 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_used_pages()
     }
 
-    pub fn trace_object<T: TransitiveClosure>(
+    pub fn trace_object<Q: ObjectQueue>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
+        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         if self.immortal.in_space(object) {
             trace!("trace_object: object in immortal space");
-            return self.immortal.trace_object(trace, object);
+            return self.immortal.trace_object(queue, object);
         }
         if self.los.in_space(object) {
             trace!("trace_object: object in los");
-            return self.los.trace_object(trace, object);
+            return self.los.trace_object(queue, object);
         }
-        self.base.trace_object::<T>(trace, object)
+        self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
@@ -974,9 +1009,9 @@ pub trait PlanTraceObject<VM: VMBinding> {
     /// * `trace`: the current transitive closure
     /// * `object`: the object to trace. This is a non-nullable object reference.
     /// * `worker`: the GC worker that is tracing this object.
-    fn trace_object<T: TransitiveClosure, const KIND: TraceKind>(
+    fn trace_object<Q: ObjectQueue, const KIND: TraceKind>(
         &self,
-        trace: &mut T,
+        queue: &mut Q,
         object: ObjectReference,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
