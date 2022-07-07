@@ -360,16 +360,26 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
         if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::Relaxed);
             Some(block)
-        } else if let Some(blocks) = self.global_freed_blocks.write().pop() {
+        } else {
+            let mut global_freed_blocks = self.global_freed_blocks.write();
+            // Retry fast-alloc
+            if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
+                self.count.fetch_sub(1, Ordering::Relaxed);
+                return Some(block);
+            }
+            // Get a new list of blocks for allocation
+            let blocks = global_freed_blocks.pop()?;
             let block = blocks.pop().unwrap();
             if !blocks.is_empty() {
                 let mut head_global_freed_blocks = head_global_freed_blocks.upgrade();
+                debug_assert!(head_global_freed_blocks
+                    .as_ref()
+                    .map(|blocks| blocks.is_empty())
+                    .unwrap_or(true));
                 *head_global_freed_blocks = Some(blocks);
             }
             self.count.fetch_sub(1, Ordering::Relaxed);
             Some(block)
-        } else {
-            None
         }
     }
 
