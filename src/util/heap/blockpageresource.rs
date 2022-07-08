@@ -238,7 +238,7 @@ impl<Block: Copy> BlockArray<Block> {
     fn pop(&self) -> Option<Block> {
         let i = self
             .cursor
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |i| {
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {
                 if i > 0 {
                     Some(i - 1)
                 } else {
@@ -255,7 +255,7 @@ impl<Block: Copy> BlockArray<Block> {
     /// Get array size
     #[inline(always)]
     fn len(&self) -> usize {
-        self.cursor.load(Ordering::Relaxed)
+        self.cursor.load(Ordering::SeqCst)
     }
 
     /// Test if the array is empty
@@ -329,14 +329,14 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
 
     /// Add a BlockArray to the global pool
     fn add_global_array(&self, array: BlockArray<Block>) {
-        self.count.fetch_add(array.len(), Ordering::Relaxed);
+        self.count.fetch_add(array.len(), Ordering::SeqCst);
         self.global_freed_blocks.write().push(array);
     }
 
     /// Push a block to the thread-local queue
     #[inline(always)]
     pub fn push(&self, block: Block) {
-        self.count.fetch_add(1, Ordering::Relaxed);
+        self.count.fetch_add(1, Ordering::SeqCst);
         let id = crate::scheduler::current_worker_id().unwrap();
         let failed = unsafe {
             self.worker_local_freed_blocks[id]
@@ -347,9 +347,8 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
             let queue = BlockArray::new();
             unsafe { queue.push_relaxed(block).unwrap() };
             let old_queue = self.worker_local_freed_blocks[id].replace(queue);
-            if !old_queue.is_empty() {
-                self.global_freed_blocks.write().push(old_queue);
-            }
+            assert!(!old_queue.is_empty());
+            self.global_freed_blocks.write().push(old_queue);
         }
     }
 
@@ -358,13 +357,13 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     pub fn pop(&self) -> Option<Block> {
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
         if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
-            self.count.fetch_sub(1, Ordering::Relaxed);
+            self.count.fetch_sub(1, Ordering::SeqCst);
             Some(block)
         } else {
             let mut global_freed_blocks = self.global_freed_blocks.write();
             // Retry fast-alloc
             if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
-                self.count.fetch_sub(1, Ordering::Relaxed);
+                self.count.fetch_sub(1, Ordering::SeqCst);
                 return Some(block);
             }
             // Get a new list of blocks for allocation
@@ -378,7 +377,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
                     .unwrap_or(true));
                 *head_global_freed_blocks = Some(blocks);
             }
-            self.count.fetch_sub(1, Ordering::Relaxed);
+            self.count.fetch_sub(1, Ordering::SeqCst);
             Some(block)
         }
     }
@@ -407,7 +406,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     /// Get total number of blocks in the whole BlockQueue
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.count.load(Ordering::Relaxed)
+        self.count.load(Ordering::SeqCst)
     }
 
     /// Iterate all the blocks in the BlockQueue
