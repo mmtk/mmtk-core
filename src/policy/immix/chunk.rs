@@ -145,11 +145,6 @@ impl ChunkMap {
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
-    fn num_chunks(&self) -> usize {
-        let chunk_range = self.chunk_range.lock();
-        (chunk_range.end.start() - chunk_range.start.start()) >> Chunk::LOG_BYTES
-    }
-
     /// Helper function to create per-chunk processing work packets.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
@@ -171,14 +166,16 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         space.defrag.mark_histograms.lock().clear();
-        let counter = Arc::new(AtomicUsize::new(self.num_chunks()));
-        self.generate_tasks(|chunk| {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let tasks = self.generate_tasks(|chunk| {
             Box::new(SweepChunk {
                 space,
                 chunk,
                 counter: counter.clone(),
             })
-        })
+        });
+        counter.store(tasks.len(), Ordering::SeqCst);
+        tasks
     }
 }
 
@@ -203,7 +200,7 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             self.chunk.sweep(self.space, &mut histogram);
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
-        if self.counter.fetch_sub(1, Ordering::Relaxed) == 1 {
+        if self.counter.fetch_sub(1, Ordering::SeqCst) == 1 {
             // We've finished releasing all the dead blocks to the BlockPageResource's thread-local queues.
             // Now flush the BlockPageResource.
             // Note: this is a no-op if ImmixSpace uses FreelistPageResource.
