@@ -271,7 +271,9 @@ impl Block {
                     self.set_state(BlockState::Reusable {
                         unavailable_lines: marked_lines as _,
                     });
-                    space.reusable_blocks.push(*self)
+                    space
+                        .reusable_blocks
+                        .push(*self, marked_lines << Line::LOG_BYTES)
                 } else {
                     // Clear mark state.
                     self.set_state(BlockState::Unmarked);
@@ -288,6 +290,7 @@ impl Block {
 
 /// A non-block single-linked list to store blocks.
 pub struct BlockList {
+    prioritized_queue: BlockQueue<Block>,
     queue: BlockQueue<Block>,
     num_workers: usize,
 }
@@ -299,14 +302,18 @@ impl Default for BlockList {
 }
 
 impl BlockList {
+    const ENABLE_PRIORITIZED_QUEUE: bool = true;
+
     pub fn new() -> Self {
         Self {
+            prioritized_queue: BlockQueue::new(),
             queue: BlockQueue::new(),
             num_workers: 0,
         }
     }
 
     pub fn init(&mut self, num_workers: usize) {
+        self.prioritized_queue.init(num_workers);
         self.queue.init(num_workers);
         self.num_workers = num_workers;
     }
@@ -314,33 +321,45 @@ impl BlockList {
     /// Get number of blocks in this list.
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.queue.len()
+        self.queue.len() + self.prioritized_queue.len()
     }
 
     /// Add a block to the list.
     #[inline(always)]
-    pub fn push(&self, block: Block) {
-        self.queue.push(block)
+    pub fn push(&self, block: Block, live_bytes: usize) {
+        if Self::ENABLE_PRIORITIZED_QUEUE && live_bytes > (Block::BYTES >> 1) {
+            self.prioritized_queue.push(block)
+        } else {
+            self.queue.push(block)
+        }
     }
 
     /// Pop a block out of the list.
     #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
+        if Self::ENABLE_PRIORITIZED_QUEUE {
+            if let Some(b) = self.prioritized_queue.pop() {
+                return Some(b);
+            }
+        }
         self.queue.pop()
     }
 
     /// Clear the list.
     pub fn reset(&mut self) {
+        self.prioritized_queue = BlockQueue::new();
         self.queue = BlockQueue::new();
         self.init(self.num_workers);
     }
 
     #[inline]
     pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
+        self.prioritized_queue.iterate_blocks(&mut f);
         self.queue.iterate_blocks(&mut f);
     }
 
     pub fn flush_all(&self) {
+        self.prioritized_queue.flush_all();
         self.queue.flush_all();
     }
 }
