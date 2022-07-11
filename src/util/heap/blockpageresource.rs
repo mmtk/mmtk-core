@@ -9,7 +9,7 @@ use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use atomic::{Atomic, Ordering};
-use spin::rwlock::RwLock;
+use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -300,9 +300,9 @@ impl<Block: Copy> BlockArray<Block> {
 /// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.
 pub struct BlockQueue<Block> {
     /// First global BlockArray for fast allocation
-    head_global_freed_blocks: RwLock<Option<BlockArray<Block>>, spin::Yield>,
+    head_global_freed_blocks: RwLock<Option<BlockArray<Block>>>,
     /// A list of BlockArray that is flushed to the global pool
-    global_freed_blocks: RwLock<Vec<BlockArray<Block>>, spin::Yield>,
+    global_freed_blocks: RwLock<Vec<BlockArray<Block>>>,
     /// Thread-local block queues
     worker_local_freed_blocks: Vec<BlockArray<Block>>,
     /// Total number of blocks in the whole BlockQueue
