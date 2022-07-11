@@ -227,7 +227,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            reusable_blocks: BlockList::new(),
+            reusable_blocks: BlockList::default(),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
