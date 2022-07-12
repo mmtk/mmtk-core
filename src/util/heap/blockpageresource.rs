@@ -19,6 +19,7 @@ use std::sync::Mutex;
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 const LOCAL_BUFFER_SIZE: usize = 128;
 
+/// A fast PageResource for fixed-size block allocation only.
 pub struct BlockPageResource<VM: VMBinding> {
     common: CommonPageResource,
     /// Block granularity
@@ -337,7 +338,7 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
     #[inline(always)]
     pub fn push(&self, block: Block) {
         self.count.fetch_add(1, Ordering::SeqCst);
-        let id = crate::scheduler::current_worker_id().unwrap();
+        let id = crate::scheduler::current_worker_ordinal().unwrap();
         let failed = unsafe {
             self.worker_local_freed_blocks[id]
                 .push_relaxed(block)

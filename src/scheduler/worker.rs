@@ -14,12 +14,14 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 thread_local! {
-    static WORKER_ID: Atomic<Option<usize>> = Atomic::new(None);
+    /// Current worker's ordinal
+    static WORKER_ORDINAL: Atomic<Option<usize>> = Atomic::new(None);
 }
 
+/// Get current worker ordinal. Return `None` if the current thread is not a worker.
 #[inline(always)]
-pub fn current_worker_id() -> Option<usize> {
-    WORKER_ID.with(|x| x.load(Ordering::Relaxed))
+pub fn current_worker_ordinal() -> Option<usize> {
+    WORKER_ORDINAL.with(|x| x.load(Ordering::Relaxed))
 }
 
 /// The part shared between a GCWorker and the scheduler.
@@ -180,7 +182,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Entry of the worker thread.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
-        WORKER_ID.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
+        WORKER_ORDINAL.with(|x| x.store(Some(self.ordinal), Ordering::SeqCst));
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         loop {

@@ -30,9 +30,11 @@ use crate::{
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
 
+// For 32-bit platforms, we still use FreeListPageResource
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::FreeListPageResource as ImmixPageResource;
 
+// BlockPageResource is for 64-bit platforms only
 #[cfg(target_pointer_width = "64")]
 use crate::util::heap::BlockPageResource as ImmixPageResource;
 
@@ -109,6 +111,7 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     }
     fn init(&mut self, _vm_map: &'static VMMap) {
         super::validate_features();
+        // Initialize the block queues in `reusable_blocks` and `pr`.
         self.reusable_blocks.init(self.scheduler.num_workers());
         #[cfg(target_pointer_width = "64")]
         self.pr.init(self.scheduler.num_workers());
@@ -234,6 +237,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
+    /// Flush the thread-local queues in BlockPageResource
     pub fn flush_page_resource(&self) {
         self.reusable_blocks.flush_all();
         #[cfg(target_pointer_width = "64")]

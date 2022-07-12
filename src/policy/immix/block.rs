@@ -299,6 +299,7 @@ impl Default for BlockList {
 }
 
 impl BlockList {
+    /// Create empty block list
     pub fn new() -> Self {
         Self {
             queue: BlockQueue::new(),
@@ -306,6 +307,7 @@ impl BlockList {
         }
     }
 
+    /// Initialize block queue
     pub fn init(&mut self, num_workers: usize) {
         self.queue.init(num_workers);
         self.num_workers = num_workers;
@@ -335,11 +337,13 @@ impl BlockList {
         self.init(self.num_workers);
     }
 
+    /// Iterate all the blocks in the queue. Call the visitor for each reported block.
     #[inline]
     pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
         self.queue.iterate_blocks(&mut f);
     }
 
+    /// Flush the block queue
     pub fn flush_all(&self) {
         self.queue.flush_all();
     }
