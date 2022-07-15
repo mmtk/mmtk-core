@@ -46,7 +46,7 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
     pub(crate) instance: MaybeUninit<MMTKInner<VM>>,
-    pub(crate) instantiated: AtomicBool,
+    pub(crate) is_initialized: AtomicBool,
 }
 
 pub struct MMTKInner<VM: VMBinding> {
@@ -101,24 +101,24 @@ impl<VM: VMBinding> MMTK<VM> {
         MMTK {
             options,
             instance: MaybeUninit::<MMTKInner<VM>>::uninit(),
-            instantiated: AtomicBool::new(false),
+            is_initialized: AtomicBool::new(false),
         }
     }
 
-    pub(crate) fn instantiate(&mut self) {
+    pub(crate) fn initialize(&mut self) {
         self.instance.write(MMTKInner::new(self.options.clone()));
-        self.instantiated.store(true, Ordering::SeqCst);
+        self.is_initialized.store(true, Ordering::SeqCst);
     }
 
     #[inline(always)]
     pub fn get(&self) -> &MMTKInner<VM> {
-        debug_assert!(self.instantiated.load(Ordering::SeqCst), "MMTK is not instantiated (is gc_init() called?)");
+        debug_assert!(self.is_initialized.load(Ordering::SeqCst), "MMTK is not initialized (is gc_init() called?)");
         unsafe { self.instance.assume_init_ref() }
     }
 
     #[inline(always)]
     pub fn get_mut(&mut self) -> &mut MMTKInner<VM> {
-        debug_assert!(self.instantiated.load(Ordering::SeqCst), "MMTK is not instantiated (is gc_init() called?)");
+        debug_assert!(self.is_initialized.load(Ordering::SeqCst), "MMTK is not initialized (is gc_init() called?)");
         unsafe { self.instance.assume_init_mut() }
     }
 

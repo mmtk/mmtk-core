@@ -303,12 +303,12 @@ macro_rules! options {
 // At some point, we may disallow this and most options can only be set by command line.
 options! {
     // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
-    plan:                  PlanSelector         [env_var: true, command_line: false] [always_valid] = PlanSelector::NoGC,
+    plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::NoGC,
     // Number of GC worker threads. (There is always one GC controller thread.)
     // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
-    threads:               usize                [env_var: true, command_line: false] [|v: &usize| *v > 0]    = num_cpus::get(),
+    threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
@@ -348,7 +348,7 @@ options! {
     // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
-    vm_space_size:         usize                [env_var: true, command_line: false] [|v: &usize| *v > 0]    = 0x7cc_cccc,
+    vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0x7cc_cccc,
     // Perf events to measure
     // Semicolons are used to separate events
     // Each event is in the format of event_name,pid,cpu (see man perf_event_open for what pid and cpu mean).

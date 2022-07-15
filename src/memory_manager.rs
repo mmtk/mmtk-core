@@ -27,8 +27,19 @@ use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
-/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
-/// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
+///
+/// We expect a binding to ininitialize MMTk in the following steps:
+///
+/// 1. Create an [MMTK](../mmtk/struct.MMTK.html) instance. Usually this is done statically, i.e. a binding holds one singleton as a static variable for MMTk.
+/// 2. Set command line options for MMTk by [process()](./fn.process.html) or [process_bulk()](./fn.process_bulk.html). At this point,
+///    other APIs should not be used, as MMTk is not yet initialized.
+/// 3. Initialize MMTk by calling this function, `gc_init()`. After this call, most MMTk APIs are avialable for use. But MMTk no longer expects
+///    new command line options. If a binding calls `process()` after this point, it may have no effect.
+/// 4. Enable garbage collection in MMTk by [enable_collection()](./fn.enable_collection.html). A binding should only call this once its
+///    thread system is ready. MMTk will not trigger garbage collection before this call.
+///
+/// Not that This method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
 /// the VM's thread system is ready to spawn GC workers.
 ///
@@ -60,11 +71,16 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         }
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.instantiate();
+    mmtk.initialize();
     mmtk.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
     info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
+}
+
+/// Is MMTk initialized? MMTk is initialized once `gc_init()` is called.
+pub fn is_gc_initialized<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> bool {
+    mmtk.is_initialized.load(Ordering::SeqCst)
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
