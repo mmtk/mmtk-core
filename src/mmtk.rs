@@ -18,6 +18,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use std::mem::MaybeUninit;
+
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
     // The considerations are:
@@ -42,25 +44,24 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
+    pub(crate) options: Arc<UnsafeOptionsWrapper>,
+    pub(crate) instance: MaybeUninit<MMTKInner<VM>>,
+    pub(crate) instantiated: AtomicBool,
+}
+
+pub struct MMTKInner<VM: VMBinding> {
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
-    pub(crate) options: Arc<UnsafeOptionsWrapper>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker>,
     inside_harness: AtomicBool,
 }
 
-impl<VM: VMBinding> MMTK<VM> {
-    pub fn new() -> Self {
-        // Initialize SFT first in case we need to use this in the constructor.
-        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        SFT_MAP.initialize_once(&SFTMap::new);
-
-        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-
+impl<VM: VMBinding> MMTKInner<VM> {
+    pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
         let num_workers = if cfg!(feature = "single_worker") {
             1
         } else {
@@ -75,35 +76,67 @@ impl<VM: VMBinding> MMTK<VM> {
             options.clone(),
             scheduler.clone(),
         );
-        MMTK {
+
+        MMTKInner {
             plan,
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
                 <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
             >::new()),
-            options,
             scheduler,
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),
             inside_harness: AtomicBool::new(false),
         }
     }
+}
+
+impl<VM: VMBinding> MMTK<VM> {
+    pub fn new() -> Self {
+        // Initialize SFT first in case we need to use this in the constructor.
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        SFT_MAP.initialize_once(&SFTMap::new);
+
+        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
+        MMTK {
+            options,
+            instance: MaybeUninit::<MMTKInner<VM>>::uninit(),
+            instantiated: AtomicBool::new(false),
+        }
+    }
+
+    pub(crate) fn instantiate(&mut self) {
+        self.instance.write(MMTKInner::new(self.options.clone()));
+        self.instantiated.store(true, Ordering::SeqCst);
+    }
+
+    #[inline(always)]
+    pub fn get(&self) -> &MMTKInner<VM> {
+        debug_assert!(self.instantiated.load(Ordering::SeqCst), "MMTK is not instantiated (is gc_init() called?)");
+        unsafe { self.instance.assume_init_ref() }
+    }
+
+    #[inline(always)]
+    pub fn get_mut(&mut self) -> &mut MMTKInner<VM> {
+        debug_assert!(self.instantiated.load(Ordering::SeqCst), "MMTK is not instantiated (is gc_init() called?)");
+        unsafe { self.instance.assume_init_mut() }
+    }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         // FIXME Do a full heap GC if we have generational GC
-        self.plan.handle_user_collection_request(tls, true);
-        self.inside_harness.store(true, Ordering::SeqCst);
-        self.plan.base().stats.start_all();
-        self.scheduler.enable_stat();
+        self.get().plan.handle_user_collection_request(tls, true);
+        self.get().inside_harness.store(true, Ordering::SeqCst);
+        self.get().plan.base().stats.start_all();
+        self.get().scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
-        self.plan.base().stats.stop_all(self);
-        self.inside_harness.store(false, Ordering::SeqCst);
+        self.get().plan.base().stats.stop_all(self);
+        self.get().inside_harness.store(false, Ordering::SeqCst);
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        self.plan.as_ref()
+        self.get().plan.as_ref()
     }
 
     #[inline(always)]

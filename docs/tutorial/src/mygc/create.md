@@ -53,15 +53,15 @@ files.
             mmtk: &'static MMTK<VM>,
         ) -> Box<Mutator<VM>> {
             Box::new(match mmtk.options.plan {
-                PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.plan),
+                PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.get().plan),
                 PlanSelector::SemiSpace => {
-                    crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.plan)
+                    crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.get().plan)
                 }
 
                 // ...
 
                 // Create MyGC mutator based on selector
-                PlanSelector::MyGC => crate::plan::mygc::mutator::create_mygc_mutator(tls, &*mmtk.plan),    })
+                PlanSelector::MyGC => crate::plan::mygc::mutator::create_mygc_mutator(tls, &*mmtk.get().plan),    })
         }
 
         pub fn create_plan<VM: VMBinding>(

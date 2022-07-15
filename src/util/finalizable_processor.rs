@@ -131,7 +131,7 @@ pub struct Finalization<E: ProcessEdgesWork>(PhantomData<E>);
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
+        let mut finalizable_processor = mmtk.get().finalizable_processor.lock().unwrap();
         debug!(
             "Finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
@@ -140,7 +140,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
 
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.scan(worker.tls, &mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.scan(worker.tls, &mut w, mmtk.get().plan.is_current_gc_nursery());
         debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
@@ -160,12 +160,12 @@ pub struct ForwardFinalization<E: ProcessEdgesWork>(PhantomData<E>);
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("Forward finalization");
-        let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
+        let mut finalizable_processor = mmtk.get().finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.forward_candidate(&mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.forward_candidate(&mut w, mmtk.get().plan.is_current_gc_nursery());
 
-        finalizable_processor.forward_finalizable(&mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.forward_finalizable(&mut w, mmtk.get().plan.is_current_gc_nursery());
         trace!("Finished forwarding finlizable");
     }
 }

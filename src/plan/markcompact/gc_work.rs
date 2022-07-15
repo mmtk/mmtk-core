@@ -41,7 +41,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         // The following needs to be done right before the second round of root scanning
         VM::VMScanning::prepare_for_roots_re_scanning();
-        mmtk.plan.base().prepare_for_stack_scanning();
+        mmtk.get().plan.base().prepare_for_stack_scanning();
         #[cfg(feature = "extreme_assertions")]
         crate::util::edge_logger::reset();
 
@@ -49,11 +49,11 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
         for mutator in VM::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
+            mmtk.get().scheduler.work_buckets[WorkBucketStage::SecondRoots]
                 .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
         }
 
-        mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
+        mmtk.get().scheduler.work_buckets[WorkBucketStage::SecondRoots]
             .add(ScanVMSpecificRoots::<ForwardingProcessEdges<VM>>::new());
     }
 }

@@ -54,7 +54,7 @@ impl<P: Plan> ScheduleSanityGC<P> {
 impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
     fn do_work(&mut self, worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         let scheduler = worker.scheduler();
-        let plan = &mmtk.plan;
+        let plan = &mmtk.get().plan;
 
         scheduler.reset_state();
 
@@ -100,16 +100,16 @@ impl<P: Plan> SanityPrepare<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        mmtk.plan.enter_sanity();
+        mmtk.get().plan.enter_sanity();
         {
             let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
         }
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
+            mmtk.get().scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<P::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.worker_group.workers_shared {
+        for w in &mmtk.get().scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(PrepareCollector));
             debug_assert!(result.is_ok());
         }
@@ -128,13 +128,13 @@ impl<P: Plan> SanityRelease<P> {
 
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
-        mmtk.plan.leave_sanity();
+        mmtk.get().plan.leave_sanity();
         mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Release]
+            mmtk.get().scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
         }
-        for w in &mmtk.scheduler.worker_group.workers_shared {
+        for w in &mmtk.get().scheduler.worker_group.workers_shared {
             let result = w.designated_work.push(Box::new(ReleaseCollector));
             debug_assert!(result.is_ok());
         }

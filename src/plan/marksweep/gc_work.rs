@@ -64,7 +64,7 @@ impl<VM: VMBinding> GCWork<VM> for MSSweepChunks<VM> {
             ms.work_live_bytes.store(0, Ordering::SeqCst);
         }
 
-        mmtk.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        mmtk.get().scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 }
 

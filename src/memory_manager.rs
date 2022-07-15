@@ -60,7 +60,8 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
         }
     }
     assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan.gc_init(heap_size, &crate::VM_MAP);
+    mmtk.instantiate();
+    mmtk.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
     info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
@@ -150,7 +151,7 @@ pub fn get_allocator_mapping<VM: VMBinding>(
     mmtk: &MMTK<VM>,
     semantics: AllocationSemantics,
 ) -> AllocatorSelector {
-    mmtk.plan.get_allocator_mapping()[semantics]
+    mmtk.get().plan.get_allocator_mapping()[semantics]
 }
 
 /// The standard malloc. MMTk either uses its own allocator, or forward the call to a
@@ -272,11 +273,11 @@ pub fn start_worker<VM: VMBinding>(
 ///   Collection::spawn_gc_thread() so that the VM knows the context.
 pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThread) {
     assert!(
-        !mmtk.plan.is_initialized(),
+        !mmtk.get().plan.is_initialized(),
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
-    mmtk.scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.plan.base().initialized.store(true, Ordering::SeqCst);
+    mmtk.get().scheduler.spawn_gc_threads(mmtk, tls);
+    mmtk.get().plan.base().initialized.store(true, Ordering::SeqCst);
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
@@ -287,10 +288,10 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        !mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        !mmtk.get().plan.should_trigger_gc_when_heap_is_full(),
         "enable_collection() is called when GC is already enabled."
     );
-    mmtk.plan
+    mmtk.get().plan
         .base()
         .trigger_gc_when_heap_is_full
         .store(true, Ordering::SeqCst);
@@ -308,10 +309,10 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
     debug_assert!(
-        mmtk.plan.should_trigger_gc_when_heap_is_full(),
+        mmtk.get().plan.should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
-    mmtk.plan
+    mmtk.get().plan
         .base()
         .trigger_gc_when_heap_is_full
         .store(false, Ordering::SeqCst);
@@ -343,7 +344,7 @@ pub fn process_bulk<VM: VMBinding>(mmtk: &'static MMTK<VM>, options: &str) -> bo
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_used_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get().plan.get_used_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Return free memory in bytes.
@@ -351,7 +352,7 @@ pub fn used_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn free_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_free_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get().plan.get_free_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Return the starting address of the heap. *Note that currently MMTk uses
@@ -371,7 +372,7 @@ pub fn last_heap_address() -> Address {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
-    mmtk.plan.get_total_pages() << LOG_BYTES_IN_PAGE
+    mmtk.get().plan.get_total_pages() << LOG_BYTES_IN_PAGE
 }
 
 /// Trigger a garbage collection as requested by the user.
@@ -380,7 +381,7 @@ pub fn total_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `tls`: The thread that triggers this collection request.
 pub fn handle_user_collection_request<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    mmtk.plan.handle_user_collection_request(tls, false);
+    mmtk.get().plan.handle_user_collection_request(tls, false);
 }
 
 /// Is the object alive?
@@ -492,7 +493,7 @@ pub fn is_mapped_address(address: Address) -> bool {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `object`: The object to check.
 pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
-    mmtk.plan.modify_check(object);
+    mmtk.get().plan.modify_check(object);
 }
 
 /// Add a reference to the list of weak references. A binding may
@@ -502,7 +503,7 @@ pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The weak reference to add.
 pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_weak_candidate::<VM>(reff);
+    mmtk.get().reference_processors.add_weak_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of soft references. A binding may
@@ -512,7 +513,7 @@ pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The soft reference to add.
 pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_soft_candidate::<VM>(reff);
+    mmtk.get().reference_processors.add_soft_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of phantom references. A binding may
@@ -522,7 +523,7 @@ pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The phantom reference to add.
 pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.reference_processors.add_phantom_candidate::<VM>(reff);
+    mmtk.get().reference_processors.add_phantom_candidate::<VM>(reff);
 }
 
 /// Generic hook to allow benchmarks to be harnessed. We do a full heap
@@ -559,7 +560,7 @@ pub fn add_finalizer<VM: VMBinding>(
         warn!("add_finalizer() is called when no_finalizer = true");
     }
 
-    mmtk.finalizable_processor.lock().unwrap().add(object);
+    mmtk.get().finalizable_processor.lock().unwrap().add(object);
 }
 
 /// Get an object that is ready for finalization. After each GC, if any registered object is not
@@ -577,7 +578,7 @@ pub fn get_finalized_object<VM: VMBinding>(
         warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
-    mmtk.finalizable_processor
+    mmtk.get().finalizable_processor
         .lock()
         .unwrap()
         .get_ready_object()
@@ -597,7 +598,7 @@ pub fn get_all_finalizers<VM: VMBinding>(
         warn!("get_all_finalizers() is called when no_finalizer = true");
     }
 
-    mmtk.finalizable_processor
+    mmtk.get().finalizable_processor
         .lock()
         .unwrap()
         .get_all_finalizers()
@@ -617,7 +618,7 @@ pub fn get_finalizers_for<VM: VMBinding>(
         warn!("get_finalizers() is called when no_finalizer = true");
     }
 
-    mmtk.finalizable_processor
+    mmtk.get().finalizable_processor
         .lock()
         .unwrap()
         .get_finalizers_for(object)
@@ -630,7 +631,7 @@ pub fn get_finalizers_for<VM: VMBinding>(
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 pub fn num_of_workers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> usize {
-    mmtk.scheduler.num_workers()
+    mmtk.get().scheduler.num_workers()
 }
 
 /// Add a work packet to the given work bucket. Note that this simply adds the work packet to the given
@@ -645,7 +646,7 @@ pub fn add_work_packet<VM: VMBinding, W: GCWork<VM>>(
     bucket: WorkBucketStage,
     packet: W,
 ) {
-    mmtk.scheduler.work_buckets[bucket].add(packet)
+    mmtk.get().scheduler.work_buckets[bucket].add(packet)
 }
 
 /// Bulk add a number of work packets to the given work bucket. Note that this simply adds the work packets
@@ -660,11 +661,11 @@ pub fn add_work_packets<VM: VMBinding>(
     bucket: WorkBucketStage,
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
-    mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
+    mmtk.get().scheduler.work_buckets[bucket].bulk_add(packets)
 }
 
 /// Add a callback to be notified after the transitive closure is finished.
 /// The callback should return true if it add more work packets to the closure bucket.
 pub fn on_closure_end<VM: VMBinding>(mmtk: &'static MMTK<VM>, f: Box<dyn Send + Fn() -> bool>) {
-    mmtk.scheduler.on_closure_end(f)
+    mmtk.get().scheduler.on_closure_end(f)
 }
