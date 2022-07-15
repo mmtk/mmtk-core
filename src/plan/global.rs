@@ -40,7 +40,9 @@ pub fn create_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
 ) -> Box<Mutator<VM>> {
     Box::new(match *mmtk.options.plan {
-        PlanSelector::NoGC => crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.get().plan),
+        PlanSelector::NoGC => {
+            crate::plan::nogc::mutator::create_nogc_mutator(tls, &*mmtk.get().plan)
+        }
         PlanSelector::SemiSpace => {
             crate::plan::semispace::mutator::create_ss_mutator(tls, &*mmtk.get().plan)
         }
@@ -53,7 +55,9 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkSweep => {
             crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.get().plan)
         }
-        PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.get().plan),
+        PlanSelector::Immix => {
+            crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.get().plan)
+        }
         PlanSelector::PageProtect => {
             crate::plan::pageprotect::mutator::create_pp_mutator(tls, &*mmtk.get().plan)
         }

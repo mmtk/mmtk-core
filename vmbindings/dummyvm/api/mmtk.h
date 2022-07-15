@@ -18,7 +18,8 @@ extern "C" {
 typedef void* MMTk_Mutator;
 
 // Initialize an MMTk instance
-extern void mmtk_gc_init(size_t heap_size);
+extern void mmtk_gc_init();
+extern void mmtk_set_heap_size(size_t size);
 
 // Request MMTk to create a new mutator for the given `tls` thread
 extern MMTk_Mutator mmtk_bind_mutator(void* tls);

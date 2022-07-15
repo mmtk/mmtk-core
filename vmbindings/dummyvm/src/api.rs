@@ -14,12 +14,17 @@ use crate::DummyVM;
 use crate::SINGLETON;
 
 #[no_mangle]
-pub extern "C" fn mmtk_gc_init(heap_size: usize) {
+pub extern "C" fn mmtk_gc_init() {
     // # Safety
     // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
     #[allow(clippy::cast_ref_to_mut)]
     let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
-    memory_manager::gc_init(singleton_mut, heap_size)
+    memory_manager::gc_init(singleton_mut)
+}
+
+#[no_mangle]
+pub extern "C" fn mmtk_set_heap_size(size: usize) {
+    memory_manager::process(&SINGLETON, "heap_size", size.to_string().as_str());
 }
 
 #[no_mangle]

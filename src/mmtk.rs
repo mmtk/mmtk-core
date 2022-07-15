@@ -45,7 +45,7 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
-    pub(crate) instance: MaybeUninit<MMTKInner<VM>>,
+    instance: MaybeUninit<MMTKInner<VM>>,
     pub(crate) is_initialized: AtomicBool,
 }
 
@@ -115,13 +115,19 @@ impl<VM: VMBinding> MMTK<VM> {
 
     #[inline(always)]
     pub fn get(&self) -> &MMTKInner<VM> {
-        debug_assert!(self.is_initialized.load(Ordering::SeqCst), "MMTK is not initialized (is gc_init() called?)");
+        debug_assert!(
+            self.is_initialized.load(Ordering::SeqCst),
+            "MMTK is not initialized (is gc_init() called?)"
+        );
         unsafe { self.instance.assume_init_ref() }
     }
 
     #[inline(always)]
     pub fn get_mut(&mut self) -> &mut MMTKInner<VM> {
-        debug_assert!(self.is_initialized.load(Ordering::SeqCst), "MMTK is not initialized (is gc_init() called?)");
+        debug_assert!(
+            self.is_initialized.load(Ordering::SeqCst),
+            "MMTK is not initialized (is gc_init() called?)"
+        );
         unsafe { self.instance.assume_init_mut() }
     }
 

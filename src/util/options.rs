@@ -223,7 +223,7 @@ macro_rules! options {
     (@verify_set_from($self: expr, $key: expr, $verify_field: ident, $($name: ident),*)) => {
         match $key {
             $(stringify!($name) => { assert!($self.$name.$verify_field, "cannot set option {} (not {})", $key, stringify!($verify_field)) }),*
-            _ => panic!("Invalid Options key")
+            _ => panic!("Invalid Options key: {}", $key)
         }
     };
 
@@ -266,7 +266,7 @@ macro_rules! options {
                         eprintln!("Warn: unable to set {}={:?}. Cant parse value. Default value will be used.", s, val);
                         false
                     })*
-                    _ => panic!("Invalid Options key")
+                    _ => panic!("Invalid Options key: {}", s)
                 }
             }
         }

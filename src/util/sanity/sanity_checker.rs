@@ -72,7 +72,7 @@ impl<P: Plan> GCWork<P::VM> for ScheduleSanityGC<P> {
         //     scheduler.work_buckets[WorkBucketStage::Prepare]
         //         .add(ScanStackRoot::<SanityGCProcessEdges<P::VM>>(mutator));
         // }
-        for roots in &mmtk.sanity_checker.lock().unwrap().roots {
+        for roots in &mmtk.get().sanity_checker.lock().unwrap().roots {
             scheduler.work_buckets[WorkBucketStage::Closure].add(
                 SanityGCProcessEdges::<P::VM>::new(roots.clone(), true, mmtk),
             );
@@ -102,7 +102,7 @@ impl<P: Plan> GCWork<P::VM> for SanityPrepare<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.get().plan.enter_sanity();
         {
-            let mut sanity_checker = mmtk.sanity_checker.lock().unwrap();
+            let mut sanity_checker = mmtk.get().sanity_checker.lock().unwrap();
             sanity_checker.refs.clear();
         }
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
@@ -129,7 +129,11 @@ impl<P: Plan> SanityRelease<P> {
 impl<P: Plan> GCWork<P::VM> for SanityRelease<P> {
     fn do_work(&mut self, _worker: &mut GCWorker<P::VM>, mmtk: &'static MMTK<P::VM>) {
         mmtk.get().plan.leave_sanity();
-        mmtk.sanity_checker.lock().unwrap().clear_roots_cache();
+        mmtk.get()
+            .sanity_checker
+            .lock()
+            .unwrap()
+            .clear_roots_cache();
         for mutator in <P::VM as VMBinding>::VMActivePlan::mutators() {
             mmtk.get().scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<P::VM>::new(mutator));
@@ -175,7 +179,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         if object.is_null() {
             return object;
         }
-        let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
+        let mut sanity_checker = self.mmtk().get().sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);

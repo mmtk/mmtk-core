@@ -4,7 +4,8 @@ use mmtk::AllocationSemantics;
 
 #[test]
 pub fn issue139_alloc_non_multiple_of_min_alignment() {
-    mmtk_gc_init(200*1024*1024);
+    mmtk_set_heap_size(200*1024*1024);
+    mmtk_gc_init();
     let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
 
     // Allocate 6 bytes with 8 bytes ailgnment required

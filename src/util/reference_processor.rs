@@ -523,7 +523,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for PhantomRefProcessing<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        mmtk.get().reference_processors.scan_phantom_refs(&mut w, mmtk);
+        mmtk.get()
+            .reference_processors
+            .scan_phantom_refs(&mut w, mmtk);
         w.flush();
     }
 }
@@ -553,7 +555,9 @@ impl<E: ProcessEdgesWork> RefForwarding<E> {
 pub struct RefEnqueue<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> GCWork<VM> for RefEnqueue<VM> {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
-        mmtk.get().reference_processors.enqueue_refs::<VM>(worker.tls);
+        mmtk.get()
+            .reference_processors
+            .enqueue_refs::<VM>(worker.tls);
     }
 }
 impl<VM: VMBinding> RefEnqueue<VM> {

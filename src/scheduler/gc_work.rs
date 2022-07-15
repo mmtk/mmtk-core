@@ -176,7 +176,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         // If the VM requires that only the coordinator thread can stop the world,
         // we delegate the work to the coordinator.
         if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
-            mmtk.get().scheduler
+            mmtk.get()
+                .scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
             return;
         }
@@ -184,7 +185,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         trace!("stop_all_mutators start");
         mmtk.get().plan.base().prepare_for_stack_scanning();
         <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
-            mmtk.get().scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
+            mmtk.get().scheduler.work_buckets[WorkBucketStage::Prepare]
+                .add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.get().scheduler.notify_mutators_paused(mmtk);
@@ -211,7 +213,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
             }
         }
-        mmtk.get().scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
+        mmtk.get().scheduler.work_buckets[WorkBucketStage::Prepare]
+            .add(ScanVMSpecificRoots::<E>::new());
     }
 }
 
@@ -285,7 +288,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
         }
-        mmtk.get().plan.common().base.set_gc_status(GcStatus::GcProper);
+        mmtk.get()
+            .plan
+            .common()
+            .base
+            .set_gc_status(GcStatus::GcProper);
     }
 }
 
@@ -416,6 +423,7 @@ pub trait ProcessEdgesWork:
     fn cache_roots_for_sanity_gc(&mut self) {
         assert!(self.roots);
         self.mmtk()
+            .get()
             .sanity_checker
             .lock()
             .unwrap()

@@ -291,7 +291,11 @@ pub fn initialize_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>, tls: VMThre
         "MMTk collection has been initialized (was initialize_collection() already called before?)"
     );
     mmtk.get().scheduler.spawn_gc_threads(mmtk, tls);
-    mmtk.get().plan.base().initialized.store(true, Ordering::SeqCst);
+    mmtk.get()
+        .plan
+        .base()
+        .initialized
+        .store(true, Ordering::SeqCst);
 }
 
 /// Allow MMTk to trigger garbage collection when heap is full. This should only be used in pair with disable_collection().
@@ -305,7 +309,8 @@ pub fn enable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         !mmtk.get().plan.should_trigger_gc_when_heap_is_full(),
         "enable_collection() is called when GC is already enabled."
     );
-    mmtk.get().plan
+    mmtk.get()
+        .plan
         .base()
         .trigger_gc_when_heap_is_full
         .store(true, Ordering::SeqCst);
@@ -326,7 +331,8 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
         mmtk.get().plan.should_trigger_gc_when_heap_is_full(),
         "disable_collection() is called when GC is not enabled."
     );
-    mmtk.get().plan
+    mmtk.get()
+        .plan
         .base()
         .trigger_gc_when_heap_is_full
         .store(false, Ordering::SeqCst);
@@ -517,7 +523,9 @@ pub fn modify_check<VM: VMBinding>(mmtk: &MMTK<VM>, object: ObjectReference) {
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The weak reference to add.
 pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.get().reference_processors.add_weak_candidate::<VM>(reff);
+    mmtk.get()
+        .reference_processors
+        .add_weak_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of soft references. A binding may
@@ -527,7 +535,9 @@ pub fn add_weak_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The soft reference to add.
 pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.get().reference_processors.add_soft_candidate::<VM>(reff);
+    mmtk.get()
+        .reference_processors
+        .add_soft_candidate::<VM>(reff);
 }
 
 /// Add a reference to the list of phantom references. A binding may
@@ -537,7 +547,9 @@ pub fn add_soft_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference)
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `reff`: The phantom reference to add.
 pub fn add_phantom_candidate<VM: VMBinding>(mmtk: &MMTK<VM>, reff: ObjectReference) {
-    mmtk.get().reference_processors.add_phantom_candidate::<VM>(reff);
+    mmtk.get()
+        .reference_processors
+        .add_phantom_candidate::<VM>(reff);
 }
 
 /// Generic hook to allow benchmarks to be harnessed. We do a full heap
@@ -592,7 +604,8 @@ pub fn get_finalized_object<VM: VMBinding>(
         warn!("get_finalized_object() is called when no_finalizer = true");
     }
 
-    mmtk.get().finalizable_processor
+    mmtk.get()
+        .finalizable_processor
         .lock()
         .unwrap()
         .get_ready_object()
@@ -612,7 +625,8 @@ pub fn get_all_finalizers<VM: VMBinding>(
         warn!("get_all_finalizers() is called when no_finalizer = true");
     }
 
-    mmtk.get().finalizable_processor
+    mmtk.get()
+        .finalizable_processor
         .lock()
         .unwrap()
         .get_all_finalizers()
@@ -632,7 +646,8 @@ pub fn get_finalizers_for<VM: VMBinding>(
         warn!("get_finalizers() is called when no_finalizer = true");
     }
 
-    mmtk.get().finalizable_processor
+    mmtk.get()
+        .finalizable_processor
         .lock()
         .unwrap()
         .get_finalizers_for(object)
