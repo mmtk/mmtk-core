@@ -108,6 +108,9 @@ impl<VM: VMBinding> MMTK<VM> {
     pub(crate) fn initialize(&mut self) {
         self.instance.write(MMTKInner::new(self.options.clone()));
         self.is_initialized.store(true, Ordering::SeqCst);
+
+        let heap_size = *self.options.heap_size;
+        self.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
     }
 
     #[inline(always)]

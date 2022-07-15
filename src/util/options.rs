@@ -302,13 +302,16 @@ macro_rules! options {
 // Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and most options can only be set by command line.
 options! {
-    // The plan to use. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    // The plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::NoGC,
     // Number of GC worker threads. (There is always one GC controller thread.)
     // FIXME: Currently we create GCWorkScheduler when MMTK is created, which is usually static.
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
+    // Heap size. Default to 512MB.
+    // TODO: We should have a default heap size related to the max physical memory.
+    heap_size:             usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 512 << 20,
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
@@ -317,9 +320,9 @@ options! {
     eager_complete_sweep:  bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Should we ignore GCs requested by the user (e.g. java.lang.System.gc)?
     ignore_system_g_c:     bool                 [env_var: true, command_line: true]  [always_valid] = false,
-    // The upper bound of nursery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    // The upper bound of nursery size.
     max_nursery:           usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0 ] = DEFAULT_MAX_NURSERY,
-    // The lower bound of nusery size. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    // The lower bound of nusery size.
     min_nursery:           usize                [env_var: true, command_line: true]  [|v: &usize| *v > 0 ] = DEFAULT_MIN_NURSERY,
     // Should a major GC be performed when a system GC is required?
     full_heap_system_gc:   bool                 [env_var: true, command_line: true]  [always_valid] = false,
@@ -345,7 +348,7 @@ options! {
     // But this should have no obvious mutator overhead, and can be used to test GC performance along with a larger stress
     // factor (e.g. tens of metabytes).
     precise_stress:        bool                 [env_var: true, command_line: true]  [always_valid] = true,
-    // The size of vmspace. This needs to be initialized before creating an MMTk instance (currently by setting env vars)
+    // The size of vmspace.
     // FIXME: This value is set for JikesRVM. We need a proper way to set options.
     //   We need to set these values programmatically in VM specific code.
     vm_space_size:         usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 0x7cc_cccc,

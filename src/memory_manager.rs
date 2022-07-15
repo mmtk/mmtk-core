@@ -46,7 +46,7 @@ use std::sync::atomic::Ordering;
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance to initialize.
 /// * `heap_size`: The heap size for the MMTk instance in bytes.
-pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
+pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>) {
     match crate::util::logger::try_init() {
         Ok(_) => debug!("MMTk initialized the logger."),
         Err(_) => debug!(
@@ -70,9 +70,7 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             }
         }
     }
-    assert!(heap_size > 0, "Invalid heap size");
     mmtk.initialize();
-    mmtk.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
     info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
