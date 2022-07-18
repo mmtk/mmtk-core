@@ -101,9 +101,10 @@ impl<E: ProcessEdgesWork> ObjectBarrier<E> {
     }
 
     #[inline(always)]
-    fn enqueue_node(&mut self, obj: ObjectReference) {
+    fn try_record_node(&mut self, obj: ObjectReference) {
         // If the objecct is unlogged, log it and push it to mod buffer
         if self.log_object(obj) {
+            // enqueue
             self.modbuf.push(obj);
             if self.modbuf.len() >= E::CAPACITY {
                 self.flush();
@@ -135,6 +136,6 @@ impl<E: ProcessEdgesWork> Barrier for ObjectBarrier<E> {
         _slot: Address,
         _target: ObjectReference,
     ) {
-        self.enqueue_node(src);
+        self.try_record_node(src);
     }
 }
