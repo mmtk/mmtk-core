@@ -44,11 +44,16 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
+    /// The options for this instance.
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
+    /// The actual instance. This field starts as uninitialized, and will be initialized in `gc_init()`. As we will use
+    /// options to initialize the instance, initializing this later allows users to set command line options before they call `gc_init()`.
     instance: MaybeUninit<MMTKInner<VM>>,
+    /// Track if the `instance` field is initialized.
     pub(crate) is_initialized: AtomicBool,
 }
 
+/// The actual MMTk instance.
 pub struct MMTKInner<VM: VMBinding> {
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
@@ -110,6 +115,8 @@ impl<VM: VMBinding> MMTK<VM> {
         self.is_initialized.store(true, Ordering::SeqCst);
 
         let heap_size = *self.options.heap_size;
+        // TODO: We should remove Plan.gc_init(). We create plan in `MMTKInner::new()`, and we
+        // should be able move whatever we do in gc_init() to Plan::new().
         self.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
     }
 
