@@ -52,6 +52,45 @@ pub trait Barrier: 'static + Send {
         _target: ObjectReference,
     ) {
     }
+
+    fn array_copy(
+        &mut self,
+        src: ObjectReference,
+        src_offset: usize,
+        dst: ObjectReference,
+        dst_offset: usize,
+        count: usize,
+    ) {
+        self.array_copy_pre(src, src_offset, dst, dst_offset, count);
+        unsafe {
+            std::ptr::copy::<ObjectReference>(
+                (src.to_address() + src_offset).to_ptr(),
+                (dst.to_address() + dst_offset).to_mut_ptr(),
+                count,
+            )
+        };
+        self.array_copy_post(src, src_offset, dst, dst_offset, count);
+    }
+
+    fn array_copy_pre(
+        &mut self,
+        _src: ObjectReference,
+        _src_offset: usize,
+        _dst: ObjectReference,
+        _dst_offset: usize,
+        _count: usize,
+    ) {
+    }
+
+    fn array_copy_post(
+        &mut self,
+        _src: ObjectReference,
+        _src_offset: usize,
+        _dst: ObjectReference,
+        _dst_offset: usize,
+        _count: usize,
+    ) {
+    }
 }
 
 pub struct NoBarrier;
@@ -137,5 +176,17 @@ impl<E: ProcessEdgesWork> Barrier for ObjectBarrier<E> {
         _target: ObjectReference,
     ) {
         self.try_record_node(src);
+    }
+
+    #[inline(always)]
+    fn array_copy_pre(
+        &mut self,
+        _src: ObjectReference,
+        _src_offset: usize,
+        dst: ObjectReference,
+        _dst_offset: usize,
+        _count: usize,
+    ) {
+        self.try_record_node(dst);
     }
 }
