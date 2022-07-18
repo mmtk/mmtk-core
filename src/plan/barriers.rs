@@ -24,20 +24,28 @@ impl BarrierSelector {
 }
 
 pub trait Barrier: 'static + Send {
-    fn flush(&mut self);
+    fn flush(&mut self) {}
+
     fn object_reference_write(
         &mut self,
         src: ObjectReference,
         slot: Address,
         target: ObjectReference,
-    );
-}
+    ) {
+        self.object_reference_write_pre(src, slot, target);
+        unsafe { slot.store(target) };
+        self.object_reference_write_post(src, slot, target);
+    }
 
-pub struct NoBarrier;
+    fn object_reference_write_pre(
+        &mut self,
+        _src: ObjectReference,
+        _slot: Address,
+        _target: ObjectReference,
+    ) {
+    }
 
-impl Barrier for NoBarrier {
-    fn flush(&mut self) {}
-    fn object_reference_write(
+    fn object_reference_write_post(
         &mut self,
         _src: ObjectReference,
         _slot: Address,
@@ -46,7 +54,11 @@ impl Barrier for NoBarrier {
     }
 }
 
-pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
+pub struct NoBarrier;
+
+impl Barrier for NoBarrier {}
+
+pub struct ObjectBarrier<E: ProcessEdgesWork> {
     mmtk: &'static MMTK<E::VM>,
     modbuf: Vec<ObjectReference>,
     /// The metadata used for log bit. Though this allows taking an arbitrary metadata spec,
@@ -54,7 +66,7 @@ pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
     meta: MetadataSpec,
 }
 
-impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
+impl<E: ProcessEdgesWork> ObjectBarrier<E> {
     #[allow(unused)]
     pub fn new(mmtk: &'static MMTK<E::VM>, meta: MetadataSpec) -> Self {
         Self {
@@ -100,7 +112,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
+impl<E: ProcessEdgesWork> Barrier for ObjectBarrier<E> {
     #[cold]
     fn flush(&mut self) {
         let mut modbuf = vec![];
@@ -117,7 +129,7 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn object_reference_write(
+    fn object_reference_write_pre(
         &mut self,
         src: ObjectReference,
         _slot: Address,
