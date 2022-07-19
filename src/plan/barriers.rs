@@ -55,39 +55,33 @@ pub trait Barrier: 'static + Send {
 
     fn array_copy(
         &mut self,
-        src: ObjectReference,
-        src_offset: usize,
-        dst: ObjectReference,
-        dst_offset: usize,
+        src_object: Option<ObjectReference>,
+        src: Address,
+        dst_object: Option<ObjectReference>,
+        dst: Address,
         count: usize,
     ) {
-        self.array_copy_pre(src, src_offset, dst, dst_offset, count);
-        unsafe {
-            std::ptr::copy::<ObjectReference>(
-                (src.to_address() + src_offset).to_ptr(),
-                (dst.to_address() + dst_offset).to_mut_ptr(),
-                count,
-            )
-        };
-        self.array_copy_post(src, src_offset, dst, dst_offset, count);
+        self.array_copy_pre(src_object, src, dst_object, dst, count);
+        unsafe { std::ptr::copy::<ObjectReference>(src.to_ptr(), dst.to_mut_ptr(), count) };
+        self.array_copy_post(src_object, src, dst_object, dst, count);
     }
 
     fn array_copy_pre(
         &mut self,
-        _src: ObjectReference,
-        _src_offset: usize,
-        _dst: ObjectReference,
-        _dst_offset: usize,
+        _src_object: Option<ObjectReference>,
+        _src: Address,
+        _dst_object: Option<ObjectReference>,
+        _dst: Address,
         _count: usize,
     ) {
     }
 
     fn array_copy_post(
         &mut self,
-        _src: ObjectReference,
-        _src_offset: usize,
-        _dst: ObjectReference,
-        _dst_offset: usize,
+        _src_object: Option<ObjectReference>,
+        _src: Address,
+        _dst_object: Option<ObjectReference>,
+        _dst: Address,
         _count: usize,
     ) {
     }
@@ -181,12 +175,12 @@ impl<E: ProcessEdgesWork> Barrier for ObjectBarrier<E> {
     #[inline(always)]
     fn array_copy_pre(
         &mut self,
-        _src: ObjectReference,
-        _src_offset: usize,
-        dst: ObjectReference,
-        _dst_offset: usize,
+        _src_object: Option<ObjectReference>,
+        _src: Address,
+        dst_object: Option<ObjectReference>,
+        _dst: Address,
         _count: usize,
     ) {
-        self.try_record_node(dst);
+        self.try_record_node(dst_object.unwrap());
     }
 }
