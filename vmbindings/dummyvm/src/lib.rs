@@ -5,6 +5,7 @@ extern crate lazy_static;
 
 use mmtk::vm::VMBinding;
 use mmtk::MMTK;
+use mmtk::MMTKBuilder;
 
 pub mod scanning;
 pub mod collection;
@@ -26,14 +27,24 @@ impl VMBinding for DummyVM {
     type VMActivePlan = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
 
-    /// Allowed maximum alignment as shift by min alignment.    
+    /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;
 
     /// Allowed maximum alignment in bytes.
     const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
 }
 
-//#[cfg(feature = "dummyvm")]
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// This is used to ensure we initialize MMTk at a specified timing.
+pub static MMTK_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
 lazy_static! {
-    pub static ref SINGLETON: MMTK<DummyVM> = MMTK::new();
+    pub static ref BUILDER: MMTKBuilder = MMTKBuilder::new();
+    pub static ref SINGLETON: MMTK<DummyVM> = {
+        debug_assert!(!MMTK_INITIALIZED.load(Ordering::Relaxed));
+        let ret = mmtk::memory_manager::gc_init(&BUILDER);
+        MMTK_INITIALIZED.store(true, std::sync::atomic::Ordering::Relaxed);
+        *ret
+    };
 }

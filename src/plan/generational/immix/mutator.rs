@@ -30,19 +30,16 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
     mutator_tls: VMMutatorThread,
     mmtk: &'static MMTK<VM>,
 ) -> Mutator<VM> {
-    let genimmix = mmtk.get().plan.downcast_ref::<GenImmix<VM>>().unwrap();
+    let genimmix = mmtk.plan.downcast_ref::<GenImmix<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: Box::new(create_gen_space_mapping(
-            &*mmtk.get().plan,
-            &genimmix.gen.nursery,
-        )),
+        space_mapping: Box::new(create_gen_space_mapping(&*mmtk.plan, &genimmix.gen.nursery)),
         prepare_func: &genimmix_mutator_prepare,
         release_func: &genimmix_mutator_release,
     };
 
     Mutator {
-        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.get().plan, &config.space_mapping),
+        allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: Box::new(ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
             mmtk,
             *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,

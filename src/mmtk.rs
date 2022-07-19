@@ -18,8 +18,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use std::mem::MaybeUninit;
-
 lazy_static! {
     // I am not sure if we should include these mmappers as part of MMTk struct.
     // The considerations are:
@@ -41,20 +39,61 @@ use crate::util::rust_util::InitializeOnce;
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
 pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 
+// MMTk builder. This is used to set options before actually creating an MMTk instance.
+pub struct MMTKBuilder {
+    /// The options for this instance.
+    options: Arc<UnsafeOptionsWrapper>,
+}
+
+impl MMTKBuilder {
+    /// Create an MMTK builder with default options
+    pub fn new() -> Self {
+        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
+        MMTKBuilder { options }
+    }
+
+    /// Set an option.
+    ///
+    /// # Safety
+    /// This method is not thread safe, as internally it acquires a mutable reference to self.
+    /// It is supposed to be used by one thread during boot time.
+    pub unsafe fn set_option(&self, name: &str, val: &str) -> bool {
+        self.options.process(name, val)
+    }
+
+    /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
+    /// such as `threads=1 stress_factor=4096`.
+    ///
+    /// # Safety
+    /// This method is not thread safe, as internally it acquires a mutable reference to self.
+    /// It is supposed to be used by one thread during boot time.
+    pub unsafe fn set_options_bulk_by_str(&self, options: &str) -> bool {
+        self.options.process_bulk(options)
+    }
+
+    /// Build an MMTk instance from the builder.
+    pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
+        let mut mmtk = MMTK::new(self.options.clone());
+
+        let heap_size = *self.options.heap_size;
+        // TODO: We should remove Plan.gc_init(). We create plan in `MMTKInner::new()`, and we
+        // should be able move whatever we do in gc_init() to Plan::new().
+        mmtk.plan.gc_init(heap_size, &crate::VM_MAP);
+
+        mmtk
+    }
+}
+
+impl Default for MMTKBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
-    /// The options for this instance.
     pub(crate) options: Arc<UnsafeOptionsWrapper>,
-    /// The actual instance. This field starts as uninitialized, and will be initialized in `gc_init()`. As we will use
-    /// options to initialize the instance, initializing this later allows users to set command line options before they call `gc_init()`.
-    instance: MaybeUninit<MMTKInner<VM>>,
-    /// Track if the `instance` field is initialized.
-    pub(crate) is_initialized: AtomicBool,
-}
-
-/// The actual MMTk instance.
-pub struct MMTKInner<VM: VMBinding> {
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
@@ -65,8 +104,12 @@ pub struct MMTKInner<VM: VMBinding> {
     inside_harness: AtomicBool,
 }
 
-impl<VM: VMBinding> MMTKInner<VM> {
+impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
+        // Initialize SFT first in case we need to use this in the constructor.
+        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
+        SFT_MAP.initialize_once(&SFTMap::new);
+
         let num_workers = if cfg!(feature = "single_worker") {
             1
         } else {
@@ -82,7 +125,8 @@ impl<VM: VMBinding> MMTKInner<VM> {
             scheduler.clone(),
         );
 
-        MMTKInner {
+        MMTK {
+            options,
             plan,
             reference_processors: ReferenceProcessors::new(),
             finalizable_processor: Mutex::new(FinalizableProcessor::<
@@ -94,75 +138,26 @@ impl<VM: VMBinding> MMTKInner<VM> {
             inside_harness: AtomicBool::new(false),
         }
     }
-}
-
-impl<VM: VMBinding> MMTK<VM> {
-    pub fn new() -> Self {
-        // Initialize SFT first in case we need to use this in the constructor.
-        // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        SFT_MAP.initialize_once(&SFTMap::new);
-
-        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        MMTK {
-            options,
-            instance: MaybeUninit::<MMTKInner<VM>>::uninit(),
-            is_initialized: AtomicBool::new(false),
-        }
-    }
-
-    pub(crate) fn initialize(&mut self) {
-        self.instance.write(MMTKInner::new(self.options.clone()));
-        self.is_initialized.store(true, Ordering::SeqCst);
-
-        let heap_size = *self.options.heap_size;
-        // TODO: We should remove Plan.gc_init(). We create plan in `MMTKInner::new()`, and we
-        // should be able move whatever we do in gc_init() to Plan::new().
-        self.get_mut().plan.gc_init(heap_size, &crate::VM_MAP);
-    }
-
-    #[inline(always)]
-    pub fn get(&self) -> &MMTKInner<VM> {
-        debug_assert!(
-            self.is_initialized.load(Ordering::SeqCst),
-            "MMTK is not initialized (is gc_init() called?)"
-        );
-        unsafe { self.instance.assume_init_ref() }
-    }
-
-    #[inline(always)]
-    pub fn get_mut(&mut self) -> &mut MMTKInner<VM> {
-        debug_assert!(
-            self.is_initialized.load(Ordering::SeqCst),
-            "MMTK is not initialized (is gc_init() called?)"
-        );
-        unsafe { self.instance.assume_init_mut() }
-    }
 
     pub fn harness_begin(&self, tls: VMMutatorThread) {
         // FIXME Do a full heap GC if we have generational GC
-        self.get().plan.handle_user_collection_request(tls, true);
-        self.get().inside_harness.store(true, Ordering::SeqCst);
-        self.get().plan.base().stats.start_all();
-        self.get().scheduler.enable_stat();
+        self.plan.handle_user_collection_request(tls, true);
+        self.inside_harness.store(true, Ordering::SeqCst);
+        self.plan.base().stats.start_all();
+        self.scheduler.enable_stat();
     }
 
     pub fn harness_end(&'static self) {
-        self.get().plan.base().stats.stop_all(self);
-        self.get().inside_harness.store(false, Ordering::SeqCst);
+        self.plan.base().stats.stop_all(self);
+        self.inside_harness.store(false, Ordering::SeqCst);
     }
 
     pub fn get_plan(&self) -> &dyn Plan<VM = VM> {
-        self.get().plan.as_ref()
+        self.plan.as_ref()
     }
 
     #[inline(always)]
     pub fn get_options(&self) -> &Options {
         &self.options
-    }
-}
-
-impl<VM: VMBinding> Default for MMTK<VM> {
-    fn default() -> Self {
-        Self::new()
     }
 }

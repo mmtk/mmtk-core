@@ -222,7 +222,7 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             let worker = Box::new(GCWorker::new(
                 mmtk,
                 ordinal,
-                mmtk.get().scheduler.clone(),
+                mmtk.scheduler.clone(),
                 false,
                 sender.clone(),
                 shared.clone(),

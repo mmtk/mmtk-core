@@ -187,7 +187,7 @@ impl Stats {
         println!(
             "============================ MMTk Statistics Totals ============================"
         );
-        let scheduler_stat = mmtk.get().scheduler.statistics();
+        let scheduler_stat = mmtk.scheduler.statistics();
         self.print_column_names(&scheduler_stat);
         print!("{}\t", self.get_phase() / 2);
         let counter = self.counters.lock().unwrap();

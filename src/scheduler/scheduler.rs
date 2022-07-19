@@ -141,7 +141,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         );
         let gc_controller = GCController::new(
             mmtk,
-            mmtk.get().plan.base().gc_requester.clone(),
+            mmtk.plan.base().gc_requester.clone(),
             self.clone(),
             receiver,
             coordinator_worker,
@@ -449,7 +449,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn notify_mutators_paused(&self, mmtk: &'static MMTK<VM>) {
-        mmtk.get().plan.base().gc_requester.clear_request();
+        mmtk.plan.base().gc_requester.clear_request();
         let first_stw_bucket = &self.work_buckets[WorkBucketStage::first_stw_stage()];
         debug_assert!(!first_stw_bucket.is_activated());
         first_stw_bucket.activate();
