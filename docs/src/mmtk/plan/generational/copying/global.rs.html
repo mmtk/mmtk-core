@@ -261,10 +261,6 @@
 <span id="259">259</span>
 <span id="260">260</span>
 <span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
@@ -286,7 +282,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
@@ -433,11 +429,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GenCopy</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
         <span class="comment">// We have no specific side metadata for copying. So just use the ones from generational.</span>
         <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>

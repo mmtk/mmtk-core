@@ -110,6 +110,8 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">memory</span>;
 <span class="doccomment">/// Opaque pointers used in MMTk, e.g. VMThread.</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">opaque_pointer</span>;
+<span class="doccomment">/// MMTk command line options.</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">options</span>;
 <span class="doccomment">/// Reference processing implementation.</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">reference_processor</span>;
 
@@ -138,8 +140,6 @@
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">metadata</span>;
 <span class="doccomment">/// Forwarding word in object copying.</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">object_forwarding</span>;
-<span class="doccomment">/// MMTk command line options.</span>
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">options</span>;
 <span class="doccomment">/// Utilities funcitons for Rust</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">rust_util</span>;
 <span class="doccomment">/// Sanity checker for GC.</span>

@@ -148,7 +148,7 @@ It is the simplest possible plan, simply allocates memory and never collects it.
 Although this appears trivial, depending on the complexity of the runtime and how well factored (or not) its internal GC interfaces are, just getting this working may be a major undertaking.
 In the case of V8, the refactoring within V8 required to get a simple NoGC plan working was substantial, touching over 100 files.
 So it’s a good idea not to underestimate the difficulty of a NoGC port!</p>
-<p>In order to implement NoGC, we only need to handle MMTk initialisation (<code>gc_init</code>), mutator initialisation (<code>bind_mutator</code>), and memory allocation (<code>alloc</code>).</p>
+<p>In order to implement NoGC, we only need to handle MMTk initialisation (<code>mmtk_init</code>), mutator initialisation (<code>bind_mutator</code>), and memory allocation (<code>alloc</code>).</p>
 <p>You may want to take the following steps.</p>
 <ol>
 <li>Set up the binding repository/directory structure:
@@ -188,8 +188,8 @@ a local repo of <code>mmtk-core</code> will help a lot in your development. So y
 </li>
 <li>Single Threaded MMTk Allocation
 <ol>
-<li>Create a <code>mmtk.h</code> header file which exposes the functions required to implement NoGC (<code>gc_init</code>, <code>alloc</code>, <code>bind_mutator</code>), and <code>include</code> it. You can use the <a href="https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h">DummyVM <code>mmtk.h</code> header file</a> as an example.</li>
-<li>Initialise MMTk by calling <code>gc_init</code>, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.</li>
+<li>Create a <code>mmtk.h</code> header file which exposes the functions required to implement NoGC (<code>mmtk_init</code>, <code>alloc</code>, <code>bind_mutator</code>), and <code>include</code> it. You can use the <a href="https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h">DummyVM <code>mmtk.h</code> header file</a> as an example.</li>
+<li>Initialise MMTk by calling <code>mmtk_init</code>, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.</li>
 <li>You can set <a href="https://www.mmtk.io/mmtk-core/mmtk/util/options/struct.Options.html">options for MMTk</a> by using <code>process</code> to pass options, or simply by setting environtment variables. For example, to
 use the NoGC plan, you can set the env var <code>MMTK_PLAN=NoGC</code>.</li>
 <li>Create a MMTk mutator instance using <code>bind_mutator</code> and pass the return value of <code>gc_init</code>.</li>

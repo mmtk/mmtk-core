@@ -230,10 +230,6 @@
 <span id="228">228</span>
 <span id="229">229</span>
 <span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
     <span class="ident">CalculateForwardingAddress</span>, <span class="ident">Compact</span>, <span class="ident">ForwardingProcessEdges</span>, <span class="ident">MarkingProcessEdges</span>,
@@ -261,7 +257,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
@@ -413,11 +409,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
         <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to</span>
         <span class="comment">// SideMetadataContext by default, so we don&#39;t need to add it here.</span>

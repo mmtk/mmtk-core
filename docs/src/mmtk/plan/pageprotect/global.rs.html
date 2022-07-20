@@ -139,10 +139,6 @@
 <span id="137">137</span>
 <span id="138">138</span>
 <span id="139">139</span>
-<span id="140">140</span>
-<span id="141">141</span>
-<span id="142">142</span>
-<span id="143">143</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::PPGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
@@ -158,7 +154,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">plan::global::BasePlan</span>, <span class="ident">vm::VMBinding</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">plan::global::CommonPlan</span>, <span class="ident">policy::largeobjectspace::LargeObjectSpace</span>,
@@ -242,11 +238,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
         <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
 

@@ -269,7 +269,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
@@ -302,7 +302,7 @@
         <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     ) -&gt; <span class="self">Self</span> {
         <span class="ident">Gen</span> {
             <span class="ident">nursery</span>: <span class="ident">CopySpace::new</span>(

@@ -603,7 +603,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -671,7 +671,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 </span>    fn new(
         vm_map: &amp;'static VMMap,
         mmapper: &amp;'static Mmapper,
-        options: Arc&lt;UnsafeOptionsWrapper&gt;,
+        options: Arc&lt;Options&gt;,
     ) -&gt; Self {
         // Modify
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);

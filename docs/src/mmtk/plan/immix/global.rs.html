@@ -196,7 +196,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">policy::immix::ImmixSpace</span>, <span class="ident">util::opaque_pointer::VMWorkerThread</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
@@ -316,7 +316,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
         <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);

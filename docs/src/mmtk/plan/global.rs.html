@@ -1067,8 +1067,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::PlanSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options</span>::{<span class="ident">Options</span>, <span class="ident">UnsafeOptionsWrapper</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::stats::Stats</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">VMMutatorThread</span>, <span class="ident">VMWorkerThread</span>};
@@ -1112,7 +1112,7 @@
     <span class="ident">plan</span>: <span class="ident">PlanSelector</span>,
     <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-    <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+    <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="ident">plan</span> {
@@ -1419,7 +1419,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">stats</span>: <span class="ident">Stats</span>,
     <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
     <span class="kw">pub</span> <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-    <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">inside_sanity</span>: <span class="ident">AtomicBool</span>,
@@ -1501,7 +1501,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
         <span class="kw-2">mut</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
         <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
         <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
@@ -1934,7 +1934,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
         <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
+        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
         <span class="kw-2">mut</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
         <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
         <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,

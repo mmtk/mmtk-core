@@ -156,10 +156,6 @@
 <span id="154">154</span>
 <span id="155">155</span>
 <span id="156">156</span>
-<span id="157">157</span>
-<span id="158">158</span>
-<span id="159">159</span>
-<span id="160">160</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::nogc::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
@@ -177,7 +173,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::UnsafeOptionsWrapper</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
@@ -247,11 +243,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">NoGC</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">UnsafeOptionsWrapper</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nogc_lock_free&quot;</span>))]</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;nogc_lock_free&quot;</span>)]</span>
