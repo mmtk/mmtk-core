@@ -2,7 +2,7 @@
 #include "mmtk.h"
 
 int main(int argc, char* argv[]){
-    mmtk_gc_init(1024*1024);
+    mmtk_init(1024*1024);
 
     MMTk_Mutator handle = mmtk_bind_mutator(0);
 
