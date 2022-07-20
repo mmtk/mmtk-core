@@ -19,7 +19,8 @@ pub extern "C" fn mmtk_init(heap_size: usize) {
     // set heap size first
     {
         let mut builder = BUILDER.lock().unwrap();
-        assert!(builder.options.heap_size.set(heap_size));
+        let success = builder.options.heap_size.set(heap_size);
+        assert!(success, "Failed to set heap size to {}", heap_size);
     }
 
     // Make sure MMTk has not yet been initialized
