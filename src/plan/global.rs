@@ -22,8 +22,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
+use crate::util::options::Options;
 use crate::util::options::PlanSelector;
-use crate::util::options::{Options, UnsafeOptionsWrapper};
 use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -67,7 +67,7 @@ pub fn create_plan<VM: VMBinding>(
     plan: PlanSelector,
     vm_map: &'static VMMap,
     mmapper: &'static Mmapper,
-    options: Arc<UnsafeOptionsWrapper>,
+    options: Arc<Options>,
     scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     match plan {
@@ -374,7 +374,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub stats: Stats,
     mmapper: &'static Mmapper,
     pub vm_map: &'static VMMap,
-    pub options: Arc<UnsafeOptionsWrapper>,
+    pub options: Arc<Options>,
     pub heap: HeapMeta,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
@@ -456,7 +456,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
@@ -889,7 +889,7 @@ impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
         mut heap: HeapMeta,
         constraints: &'static PlanConstraints,
         global_side_metadata_specs: Vec<SideMetadataSpec>,

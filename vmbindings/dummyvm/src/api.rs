@@ -22,7 +22,8 @@ pub extern "C" fn mmtk_gc_init() {
 
 #[no_mangle]
 pub extern "C" fn mmtk_set_heap_size(size: usize) {
-    memory_manager::process(&BUILDER, "heap_size", size.to_string().as_str());
+    let mut builder = BUILDER.lock().unwrap();
+    assert!(builder.options.heap_size.set(size));
 }
 
 #[no_mangle]
@@ -158,7 +159,8 @@ pub extern "C" fn mmtk_harness_end() {
 pub extern "C" fn mmtk_process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    memory_manager::process(&BUILDER, name_str.to_str().unwrap(), value_str.to_str().unwrap())
+    let mut builder = BUILDER.lock().unwrap();
+    memory_manager::process(&mut builder, name_str.to_str().unwrap(), value_str.to_str().unwrap())
 }
 
 #[no_mangle]

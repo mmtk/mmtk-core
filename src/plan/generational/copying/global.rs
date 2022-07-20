@@ -19,7 +19,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
@@ -166,11 +166,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         // We have no specific side metadata for copying. So just use the ones from generational.
         let global_metadata_specs =

@@ -1,8 +1,7 @@
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
-use std::cell::UnsafeCell;
 use std::default::Default;
-use std::ops::Deref;
+use std::fmt::Debug;
 use std::str::FromStr;
 use strum_macros::EnumString;
 
@@ -79,119 +78,6 @@ pub const DEFAULT_MIN_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
 /// This does not affect the actual space we create as nursery. It is only used in GC trigger check.
 pub const DEFAULT_MAX_NURSERY: usize = 32 << LOG_BYTES_IN_MBYTE;
 
-pub struct UnsafeOptionsWrapper(UnsafeCell<Options>);
-
-// TODO: We should carefully examine the unsync with UnsafeCell. We should be able to provide a safe implementation.
-unsafe impl Sync for UnsafeOptionsWrapper {}
-
-impl UnsafeOptionsWrapper {
-    pub const fn new(o: Options) -> UnsafeOptionsWrapper {
-        UnsafeOptionsWrapper(UnsafeCell::new(o))
-    }
-
-    /// Process option. Returns true if the key and the value are both valid.
-    ///
-    /// Arguments:
-    /// * `name`: the name of the option. See `options!` for all the valid options.
-    /// * `value`: the value of the option in string format.
-    ///
-    /// # Safety
-    /// This method is not thread safe, as internally it acquires a mutable reference to self.
-    /// It is supposed to be used by one thread during boot time.
-    pub unsafe fn process(&self, name: &str, value: &str) -> bool {
-        (*self.0.get()).set_from_command_line(name, value)
-    }
-
-    /// Bulk process options. Returns true if all the options are processed successfully.
-    /// This method returns false if the option string is invalid, or if it includes any invalid option.
-    ///
-    /// Arguments:
-    /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
-    ///
-    /// # Safety
-    /// This method is not thread safe, as internally it acquires a mutable reference to self.
-    /// It is supposed to be used by one thread during boot time.
-    pub unsafe fn process_bulk(&self, options: &str) -> bool {
-        for opt in options.split_ascii_whitespace() {
-            let kv_pair: Vec<&str> = opt.split('=').collect();
-            if kv_pair.len() != 2 {
-                return false;
-            }
-
-            let key = kv_pair[0];
-            let val = kv_pair[1];
-            if !self.process(key, val) {
-                return false;
-            }
-        }
-
-        true
-    }
-}
-impl Deref for UnsafeOptionsWrapper {
-    type Target = Options;
-    fn deref(&self) -> &Options {
-        unsafe { &*self.0.get() }
-    }
-}
-
-#[cfg(test)]
-mod process_tests {
-    use super::*;
-    use crate::util::options::Options;
-    use crate::util::test_util::serial_test;
-
-    #[test]
-    fn test_process_valid() {
-        serial_test(|| {
-            let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process("no_finalizer", "true") };
-            assert!(success);
-            assert!(*options.no_finalizer);
-        })
-    }
-
-    #[test]
-    fn test_process_invalid() {
-        serial_test(|| {
-            let options = UnsafeOptionsWrapper::new(Options::default());
-            let default_no_finalizer = *options.no_finalizer;
-            let success = unsafe { options.process("no_finalizer", "100") };
-            assert!(!success);
-            assert_eq!(*options.no_finalizer, default_no_finalizer);
-        })
-    }
-
-    #[test]
-    fn test_process_bulk_empty() {
-        serial_test(|| {
-            let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process_bulk("") };
-            assert!(success);
-        })
-    }
-
-    #[test]
-    fn test_process_bulk_valid() {
-        serial_test(|| {
-            let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process_bulk("no_finalizer=true stress_factor=42") };
-            assert!(success);
-            assert!(*options.no_finalizer);
-            assert_eq!(*options.stress_factor, 42);
-        })
-    }
-
-    #[test]
-    fn test_process_bulk_invalid() {
-        serial_test(|| {
-            let options = UnsafeOptionsWrapper::new(Options::default());
-            let success = unsafe { options.process_bulk("no_finalizer=true stress_factor=a") };
-            assert!(!success);
-        })
-    }
-}
-
 fn always_valid<T>(_: &T) -> bool {
     true
 }
@@ -199,18 +85,58 @@ fn always_valid<T>(_: &T) -> bool {
 /// An MMTk option of a given type.
 /// This type allows us to store some metadata for the option. To get the value of an option,
 /// you can simply dereference it (for example, *options.threads).
-#[derive(Debug, Clone)]
-pub struct MMTKOption<T: Clone> {
-    pub value: T,
-
+#[derive(Clone)]
+pub struct MMTKOption<T: Debug + Clone> {
+    /// The actual value for the option
+    value: T,
+    /// The validator to ensure the value is valid.
+    validator: fn(&T) -> bool,
     /// Can we set this option through env vars?
-    pub from_env_var: bool,
+    from_env_var: bool,
     /// Can we set this option through command line options/API?
-    pub from_command_line: bool,
+    from_command_line: bool,
+}
+
+impl<T: Debug + Clone> MMTKOption<T> {
+    /// Create a new MMTKOption
+    pub fn new(
+        value: T,
+        validator: fn(&T) -> bool,
+        from_env_var: bool,
+        from_command_line: bool,
+    ) -> Self {
+        // FIXME: We should enable the following check to make sure the initial value is valid.
+        // However, we cannot enable it now. For options like perf events, the validator checks
+        // if the perf event feature is enabled. So when the perf event features are not enabled,
+        // the validator will fail whatever value we try to set (including the initial value).
+        // Ideally, we conditionally compile options based on the feature. But options! marcro
+        // does not allow attributes in it, so we cannot conditionally compile options.
+        // let is_valid = validator(&value);
+        // assert!(
+        //     is_valid,
+        //     "Unable to create MMTKOption: initial value {:?} is invalid",
+        //     value
+        // );
+        MMTKOption {
+            value,
+            validator,
+            from_env_var,
+            from_command_line,
+        }
+    }
+
+    /// Set the option to the given value. Returns true if the value is valid, and we set the option to the value.
+    pub fn set(&mut self, value: T) -> bool {
+        if (self.validator)(&value) {
+            self.value = value;
+            return true;
+        }
+        false
+    }
 }
 
 // Dereference an option to get its value.
-impl<T: Clone> std::ops::Deref for MMTKOption<T> {
+impl<T: Debug + Clone> std::ops::Deref for MMTKOption<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -231,6 +157,7 @@ macro_rules! options {
         options!($($name: $type[env_var: $env_var, command_line: $command_line, mutable: $mutable][$validator] = $default),*);
     ];
     ($($name:ident: $type:ty[env_var: $env_var:expr, command_line: $command_line:expr][$validator:expr] = $default:expr),*) => [
+        #[derive(Clone)]
         pub struct Options {
             $(pub $name: MMTKOption<$type>),*
         }
@@ -247,21 +174,38 @@ macro_rules! options {
                 self.set_inner(s, val)
             }
 
+            /// Bulk process options. Returns true if all the options are processed successfully.
+            /// This method returns false if the option string is invalid, or if it includes any invalid option.
+            ///
+            /// Arguments:
+            /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
+            pub fn set_bulk_from_command_line(&mut self, options: &str) -> bool {
+                for opt in options.split_ascii_whitespace() {
+                    let kv_pair: Vec<&str> = opt.split('=').collect();
+                    if kv_pair.len() != 2 {
+                        return false;
+                    }
+
+                    let key = kv_pair[0];
+                    let val = kv_pair[1];
+                    if !self.set_from_command_line(key, val) {
+                        return false;
+                    }
+                }
+
+                true
+            }
+
             /// Set an option and run its validator for its value.
             fn set_inner(&mut self, s: &str, val: &str)->bool {
                 match s {
                     // Parse the given value from str (by env vars or by calling process()) to the right type
-                    $(stringify!($name) => if let Ok(ref val) = val.parse::<$type>() {
-                        // Validate
-                        let validate_fn = $validator;
-                        let is_valid = validate_fn(val);
-                        if is_valid {
-                            // Only set value if valid.
-                            self.$name.value = val.clone();
-                        } else {
+                    $(stringify!($name) => if let Ok(typed_val) = val.parse::<$type>() {
+                        let is_set = self.$name.set(typed_val);
+                        if !is_set {
                             eprintln!("Warn: unable to set {}={:?}. Invalid value. Default value will be used.", s, val);
                         }
-                        is_valid
+                        is_set
                     } else {
                         eprintln!("Warn: unable to set {}={:?}. Cant parse value. Default value will be used.", s, val);
                         false
@@ -273,11 +217,7 @@ macro_rules! options {
         impl Default for Options {
             fn default() -> Self {
                 let mut options = Options {
-                    $($name: MMTKOption {
-                        value: $default,
-                        from_env_var: $env_var,
-                        from_command_line: $command_line,
-                    }),*
+                    $($name: MMTKOption::new($default, $validator, $env_var,$command_line)),*
                 };
 
                 // If we have env vars that start with MMTK_ and match any option (such as MMTK_STRESS_FACTOR),
@@ -300,7 +240,7 @@ macro_rules! options {
 }
 
 // Currently we allow all the options to be set by env var for the sake of convenience.
-// At some point, we may disallow this and most options can only be set by command line.
+// At some point, we may disallow this and all the options can only be set by command line.
 options! {
     // The plan to use.
     plan:                  PlanSelector         [env_var: true, command_line: true] [always_valid] = PlanSelector::NoGC,
@@ -530,6 +470,77 @@ mod tests {
                     std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
                 },
             )
+        })
+    }
+
+    #[test]
+    fn test_process_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_from_command_line("no_finalizer", "true");
+            assert!(success);
+            assert!(*options.no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_process_invalid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let default_no_finalizer = *options.no_finalizer;
+            let success = options.set_from_command_line("no_finalizer", "100");
+            assert!(!success);
+            assert_eq!(*options.no_finalizer, default_no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_empty() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("");
+            assert!(success);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("no_finalizer=true stress_factor=42");
+            assert!(success);
+            assert!(*options.no_finalizer);
+            assert_eq!(*options.stress_factor, 42);
+        })
+    }
+
+    #[test]
+    fn test_process_bulk_invalid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.set_bulk_from_command_line("no_finalizer=true stress_factor=a");
+            assert!(!success);
+        })
+    }
+
+    #[test]
+    fn test_set_typed_option_valid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let success = options.no_finalizer.set(true);
+            assert!(success);
+            assert!(*options.no_finalizer);
+        })
+    }
+
+    #[test]
+    fn test_set_typed_option_invalid() {
+        serial_test(|| {
+            let mut options = Options::default();
+            let threads = *options.threads;
+            let success = options.threads.set(0);
+            assert!(!success);
+            assert_eq!(*options.threads, threads);
         })
     }
 }

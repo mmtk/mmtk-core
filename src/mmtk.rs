@@ -7,7 +7,7 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
 use crate::util::opaque_pointer::*;
-use crate::util::options::{Options, UnsafeOptionsWrapper};
+use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
@@ -42,38 +42,31 @@ pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
 // MMTk builder. This is used to set options before actually creating an MMTk instance.
 pub struct MMTKBuilder {
     /// The options for this instance.
-    options: Arc<UnsafeOptionsWrapper>,
+    pub options: Options,
 }
 
 impl MMTKBuilder {
     /// Create an MMTK builder with default options
     pub fn new() -> Self {
-        let options = Arc::new(UnsafeOptionsWrapper::new(Options::default()));
-        MMTKBuilder { options }
+        MMTKBuilder {
+            options: Options::default(),
+        }
     }
 
     /// Set an option.
-    ///
-    /// # Safety
-    /// This method is not thread safe, as internally it acquires a mutable reference to self.
-    /// It is supposed to be used by one thread during boot time.
-    pub unsafe fn set_option(&self, name: &str, val: &str) -> bool {
-        self.options.process(name, val)
+    pub fn set_option(&mut self, name: &str, val: &str) -> bool {
+        self.options.set_from_command_line(name, val)
     }
 
     /// Set multiple options by a string. The string should be key-value pairs separated by white spaces,
     /// such as `threads=1 stress_factor=4096`.
-    ///
-    /// # Safety
-    /// This method is not thread safe, as internally it acquires a mutable reference to self.
-    /// It is supposed to be used by one thread during boot time.
-    pub unsafe fn set_options_bulk_by_str(&self, options: &str) -> bool {
-        self.options.process_bulk(options)
+    pub fn set_options_bulk_by_str(&mut self, options: &str) -> bool {
+        self.options.set_bulk_from_command_line(options)
     }
 
     /// Build an MMTk instance from the builder.
     pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
-        let mut mmtk = MMTK::new(self.options.clone());
+        let mut mmtk = MMTK::new(Arc::new(self.options.clone()));
 
         let heap_size = *self.options.heap_size;
         // TODO: We should remove Plan.gc_init(). We create plan in `MMTKInner::new()`, and we
@@ -93,7 +86,7 @@ impl Default for MMTKBuilder {
 /// An MMTk instance. MMTk allows multiple instances to run independently, and each instance gives users a separate heap.
 /// *Note that multi-instances is not fully supported yet*
 pub struct MMTK<VM: VMBinding> {
-    pub(crate) options: Arc<UnsafeOptionsWrapper>,
+    pub(crate) options: Arc<Options>,
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
@@ -105,7 +98,7 @@ pub struct MMTK<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> MMTK<VM> {
-    pub fn new(options: Arc<UnsafeOptionsWrapper>) -> Self {
+    pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
         SFT_MAP.initialize_once(&SFTMap::new);
