@@ -6,7 +6,7 @@ Although this appears trivial, depending on the complexity of the runtime and ho
 In the case of V8, the refactoring within V8 required to get a simple NoGC plan working was substantial, touching over 100 files.
 So it’s a good idea not to underestimate the difficulty of a NoGC port!
 
-In order to implement NoGC, we only need to handle MMTk initialisation (`gc_init`), mutator initialisation (`bind_mutator`), and memory allocation (`alloc`).
+In order to implement NoGC, we only need to handle MMTk initialisation (`mmtk_init`), mutator initialisation (`bind_mutator`), and memory allocation (`alloc`).
 
 You may want to take the following steps.
  
@@ -34,8 +34,8 @@ You may want to take the following steps.
     - Change all alloc calls in the GC to calloc (https://www.tutorialspoint.com/c_standard_library/c_function_calloc.htm). Note: calloc is used instead of malloc as it zero-initialises memory.
     - The purpose of this step is simply to help you find all allocation calls.
 4. Single Threaded MMTk Allocation
-    1. Create a `mmtk.h` header file which exposes the functions required to implement NoGC (`gc_init`, `alloc`, `bind_mutator`), and `include` it. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
-    2. Initialise MMTk by calling `gc_init`, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.
+    1. Create a `mmtk.h` header file which exposes the functions required to implement NoGC (`mmtk_init`, `alloc`, `bind_mutator`), and `include` it. You can use the [DummyVM `mmtk.h` header file](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/api/mmtk.h) as an example.
+    2. Initialise MMTk by calling `mmtk_init`, with the size of the heap. In the future, you may wish to make this value configurable via a command line argument or environment variable.
     2. You can set [options for MMTk](https://www.mmtk.io/mmtk-core/mmtk/util/options/struct.Options.html) by using `process` to pass options, or simply by setting environtment variables. For example, to
        use the NoGC plan, you can set the env var `MMTK_PLAN=NoGC`.
     3. Create a MMTk mutator instance using `bind_mutator` and pass the return value of `gc_init`.

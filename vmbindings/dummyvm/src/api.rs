@@ -15,15 +15,17 @@ use crate::SINGLETON;
 use crate::BUILDER;
 
 #[no_mangle]
-pub extern "C" fn mmtk_gc_init() {
-    assert!(!crate::MMTK_INITIALIZED.load(Ordering::Relaxed));
-    lazy_static::initialize(&SINGLETON);
-}
+pub extern "C" fn mmtk_init(heap_size: usize) {
+    // set heap size first
+    {
+        let mut builder = BUILDER.lock().unwrap();
+        assert!(builder.options.heap_size.set(heap_size));
+    }
 
-#[no_mangle]
-pub extern "C" fn mmtk_set_heap_size(size: usize) {
-    let mut builder = BUILDER.lock().unwrap();
-    assert!(builder.options.heap_size.set(size));
+    // Make sure MMTk has not yet been initialized
+    assert!(!crate::MMTK_INITIALIZED.load(Ordering::SeqCst));
+    // Initialize MMTk here
+    lazy_static::initialize(&SINGLETON);
 }
 
 #[no_mangle]

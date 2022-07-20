@@ -44,8 +44,8 @@ lazy_static! {
     pub static ref BUILDER: Mutex<MMTKBuilder> = Mutex::new(MMTKBuilder::new());
     pub static ref SINGLETON: MMTK<DummyVM> = {
         let builder = BUILDER.lock().unwrap();
-        debug_assert!(!MMTK_INITIALIZED.load(Ordering::Relaxed));
-        let ret = mmtk::memory_manager::gc_init(&builder);
+        debug_assert!(!MMTK_INITIALIZED.load(Ordering::SeqCst));
+        let ret = mmtk::memory_manager::mmtk_init(&builder);
         MMTK_INITIALIZED.store(true, std::sync::atomic::Ordering::Relaxed);
         *ret
     };

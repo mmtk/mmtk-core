@@ -20,7 +20,7 @@ typedef void* MMTk_Builder;
 typedef void* MMTk;
 
 // Initialize an MMTk instance
-extern MMTk mmtk_gc_init(MMTk_Builder builder);
+extern MMTk mmtk_init(MMTk_Builder builder);
 
 // Request MMTk to create a new mutator for the given `tls` thread
 extern MMTk_Mutator mmtk_bind_mutator(void* tls);

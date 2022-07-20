@@ -5,8 +5,7 @@
 
 int main() {
     volatile uint64_t * tmp;
-    mmtk_set_heap_size(1024*1024*1024);
-    mmtk_gc_init();
+    mmtk_init24*1024*1024);
     MMTk_Mutator handle = mmtk_bind_mutator(0);
 
     for (int i=0; i<1024*1024*100; i++) {

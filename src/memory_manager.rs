@@ -34,7 +34,7 @@ use std::sync::atomic::Ordering;
 ///
 /// 1. Create an [MMTKBuilder](../mmtk/struct.MMTKBuilder.html) instance.
 /// 2. Set command line options for MMTKBuilder by [process()](./fn.process.html) or [process_bulk()](./fn.process_bulk.html).
-/// 3. Initialize MMTk by calling this function, `gc_init()`, and pass the builder earlier. This call will return an MMTK instance.
+/// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
 ///    supported. Currently we assume a binding will only need one MMTk instance.
 /// 4. Enable garbage collection in MMTk by [enable_collection()](./fn.enable_collection.html). A binding should only call this once its
@@ -52,7 +52,7 @@ use std::sync::atomic::Ordering;
 ///
 /// Arguments:
 /// * `builder`: The reference to a MMTk builder.
-pub fn gc_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
+pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     match crate::util::logger::try_init() {
         Ok(_) => debug!("MMTk initialized the logger."),
         Err(_) => debug!(
@@ -335,7 +335,6 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
-/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -346,7 +345,6 @@ pub fn process(builder: &mut MMTKBuilder, name: &str, value: &str) -> bool {
 }
 
 /// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
-/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
