@@ -548,10 +548,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    /**
-     *  Ensure this space is marked as mapped -- used when the space is already
-     *  mapped (e.g. for a vm image which is externally mmapped.)
-     */
+    /// Ensure this space is marked as mapped -- used when the space is already
+    /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
         if self
             .common()

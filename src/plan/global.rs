@@ -93,9 +93,13 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )) as Box<dyn Plan<VM = VM>>,
     };
+
+    // We have created Plan in the heap, and we won't explicitly move it. So each space
+    // now has a fixed address for its lifetime. It is safe now to initialize SFT.
     plan.get_spaces()
         .into_iter()
         .for_each(|s| s.initialize_sft());
+
     plan
 }
 
@@ -450,7 +454,10 @@ pub fn create_vm_space<VM: VMBinding>(
         heap,
         constraints,
     );
+
+    // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
     space.ensure_mapped();
+
     space
 }
 
