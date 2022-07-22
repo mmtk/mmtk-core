@@ -43,9 +43,14 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
     fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         self.base.gc_init(heap_size, vm_map);
+    }
 
-        // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.base.get_spaces();
+        ret.push(&self.nogc_space);
+        ret.push(&self.immortal);
+        ret.push(&self.los);
+        ret
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {

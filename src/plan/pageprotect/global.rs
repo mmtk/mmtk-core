@@ -56,7 +56,12 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
             }
         );
         self.common.gc_init(heap_size, vm_map);
-        self.space.init(vm_map);
+    }
+
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.space);
+        ret
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {

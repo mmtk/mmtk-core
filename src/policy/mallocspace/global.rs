@@ -123,8 +123,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        // Do nothing
+    fn initialize_sft(&self) {
+        // Do nothing - we will set sft when we get new results from malloc
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {

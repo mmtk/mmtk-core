@@ -95,8 +95,8 @@ impl<VM: VMBinding> Space<VM> for MarkCompactSpace<VM> {
         &self.common
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {

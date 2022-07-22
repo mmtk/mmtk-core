@@ -51,6 +51,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.common.gc_init(heap_size, vm_map);
     }
 
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.ms);
+        ret
+    }
+
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);

@@ -86,7 +86,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
         panic!("immortalspace only releases pages enmasse")
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
+    fn initialize_sft(&self) {
+        // It is a hack.
         let total_pages = VM::VMActivePlan::global()
             .base()
             .heap
@@ -100,7 +101,8 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             total_bytes,
             AVAILABLE_BYTES
         );
-        self.limit = AVAILABLE_START + total_bytes;
+        let mut_self: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
+        mut_self.limit = AVAILABLE_START + total_bytes;
         // Eagerly memory map the entire heap (also zero all the memory)
         crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
         if self
@@ -111,6 +113,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
+
         SFT_MAP.update(self.as_sft(), AVAILABLE_START, total_bytes);
     }
 

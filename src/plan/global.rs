@@ -70,30 +70,32 @@ pub fn create_plan<VM: VMBinding>(
     options: Arc<Options>,
     scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
-    match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
+    let plan = match plan {
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)) as Box<dyn Plan<VM = VM>>,
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
             vm_map, mmapper, options,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
             vm_map, mmapper, options,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
             vm_map, mmapper, options, scheduler,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
             vm_map, mmapper, options,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
             vm_map, mmapper, options, scheduler,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
             vm_map, mmapper, options,
-        )),
+        )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
             vm_map, mmapper, options,
-        )),
-    }
+        )) as Box<dyn Plan<VM = VM>>,
+    };
+    plan.get_spaces().into_iter().for_each(|s| s.initialize_sft());
+    plan
 }
 
 /// Create thread local GC worker.
@@ -158,6 +160,9 @@ pub trait Plan: 'static + Sync + Downcast {
 
     // unsafe because this can only be called once by the init thread
     fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap);
+
+    /// get all the spaces in the plan
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
 
@@ -549,17 +554,23 @@ impl<VM: VMBinding> BasePlan<VM> {
             .total_pages
             .store(bytes_to_pages(heap_size), Ordering::Relaxed);
 
-        #[cfg(feature = "code_space")]
-        self.code_space.init(vm_map);
-        #[cfg(feature = "code_space")]
-        self.code_lo_space.init(vm_map);
-        #[cfg(feature = "ro_space")]
-        self.ro_space.init(vm_map);
         #[cfg(feature = "vm_space")]
         {
-            self.vm_space.init(vm_map);
             self.vm_space.ensure_mapped();
         }
+    }
+
+    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
+        return vec![
+            #[cfg(feature = "code_space")]
+            &self.code_space,
+            #[cfg(feature = "code_space")]
+            &self.code_lo_space,
+            #[cfg(feature = "ro_space")]
+            &self.ro_space,
+            #[cfg(feature = "vm_space")]
+            &self.vm_space,
+        ]
     }
 
     /// The application code has requested a collection.
@@ -927,10 +938,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
         }
     }
 
+    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
+        let mut ret = self.base.get_spaces();
+        ret.push(&self.immortal);
+        ret.push(&self.los);
+        ret
+    }
+
     pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         self.base.gc_init(heap_size, vm_map);
-        self.immortal.init(vm_map);
-        self.los.init(vm_map);
     }
 
     pub fn get_used_pages(&self) -> usize {

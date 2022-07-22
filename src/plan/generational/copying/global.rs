@@ -81,8 +81,13 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         self.gen.gc_init(heap_size, vm_map);
-        self.copyspace0.init(vm_map);
-        self.copyspace1.init(vm_map);
+    }
+
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.gen.get_spaces();
+        ret.push(&self.copyspace0);
+        ret.push(&self.copyspace1);
+        ret
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {

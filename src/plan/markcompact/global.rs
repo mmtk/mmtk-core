@@ -59,7 +59,12 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 
     fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
         self.common.gc_init(heap_size, vm_map);
-        self.mc_space.init(vm_map);
+    }
+
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.mc_space);
+        ret
     }
 
     fn base(&self) -> &BasePlan<VM> {
