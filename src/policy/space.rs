@@ -777,7 +777,11 @@ impl<VM: VMBinding> CommonSpace<VM> {
         vm_map.insert(start, extent, rtn.descriptor);
 
         // For contiguous space, we know its address range so we reserve metadata memory for its range.
-        if rtn.metadata.try_map_metadata_address_range(rtn.start, rtn.extent).is_err() {
+        if rtn
+            .metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent)
+            .is_err()
+        {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }

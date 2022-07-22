@@ -4,7 +4,6 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{

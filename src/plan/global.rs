@@ -13,11 +13,9 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -71,7 +69,8 @@ pub fn create_plan<VM: VMBinding>(
     scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
     let plan = match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options))
+            as Box<dyn Plan<VM = VM>>,
         PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
             vm_map, mmapper, options,
         )) as Box<dyn Plan<VM = VM>>,
@@ -94,7 +93,9 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options,
         )) as Box<dyn Plan<VM = VM>>,
     };
-    plan.get_spaces().into_iter().for_each(|s| s.initialize_sft());
+    plan.get_spaces()
+        .into_iter()
+        .for_each(|s| s.initialize_sft());
     plan
 }
 
@@ -544,7 +545,7 @@ impl<VM: VMBinding> BasePlan<VM> {
     }
 
     pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
-        return vec![
+        vec![
             #[cfg(feature = "code_space")]
             &self.code_space,
             #[cfg(feature = "code_space")]

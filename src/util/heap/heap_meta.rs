@@ -1,7 +1,7 @@
-use crate::util::Address;
-use crate::util::options::Options;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::conversions;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::options::Options;
+use crate::util::Address;
 
 pub struct HeapMeta {
     pub heap_cursor: Address,

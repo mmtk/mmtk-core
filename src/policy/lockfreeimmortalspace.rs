@@ -6,16 +6,12 @@ use crate::util::ObjectReference;
 
 use crate::policy::space::*;
 use crate::util::conversions;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{
-    AVAILABLE_BYTES, AVAILABLE_END, AVAILABLE_START,
-};
+use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
 use crate::util::options::Options;
 use crate::vm::VMBinding;
-use crate::vm::*;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -167,6 +163,8 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             AVAILABLE_BYTES
         );
 
+        // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
+        // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),

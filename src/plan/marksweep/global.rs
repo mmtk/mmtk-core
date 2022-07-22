@@ -15,7 +15,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::options::Options;

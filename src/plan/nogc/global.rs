@@ -9,7 +9,6 @@ use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
@@ -98,6 +97,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             cfg!(not(feature = "nogc_no_zeroing")),
+            &options,
             global_specs.clone(),
         );
         #[cfg(not(feature = "nogc_lock_free"))]
