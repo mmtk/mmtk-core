@@ -13,7 +13,7 @@ use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use crate::{
     plan::global::CommonPlan, policy::largeobjectspace::LargeObjectSpace,
@@ -97,11 +97,7 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 }
 
 impl<VM: VMBinding> PageProtect<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
         let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
