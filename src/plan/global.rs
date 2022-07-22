@@ -158,9 +158,6 @@ pub trait Plan: 'static + Sync + Downcast {
         &self.base().options
     }
 
-    // unsafe because this can only be called once by the init thread
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap);
-
     /// get all the spaces in the plan
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
 
@@ -442,7 +439,7 @@ pub fn create_vm_space<VM: VMBinding>(
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
-    ImmortalSpace::new(
+    let space = ImmortalSpace::new(
         "boot",
         false,
         VMRequest::fixed_size(boot_segment_mb),
@@ -451,7 +448,9 @@ pub fn create_vm_space<VM: VMBinding>(
         mmapper,
         heap,
         constraints,
-    )
+    );
+    space.ensure_mapped();
+    space
 }
 
 impl<VM: VMBinding> BasePlan<VM> {
@@ -541,22 +540,6 @@ impl<VM: VMBinding> BasePlan<VM> {
             malloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
-        }
-    }
-
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        vm_map.boot();
-        vm_map.finalize_static_space_map(
-            self.heap.get_discontig_start(),
-            self.heap.get_discontig_end(),
-        );
-        self.heap
-            .total_pages
-            .store(bytes_to_pages(heap_size), Ordering::Relaxed);
-
-        #[cfg(feature = "vm_space")]
-        {
-            self.vm_space.ensure_mapped();
         }
     }
 
@@ -943,10 +926,6 @@ impl<VM: VMBinding> CommonPlan<VM> {
         ret.push(&self.immortal);
         ret.push(&self.los);
         ret
-    }
-
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
     }
 
     pub fn get_used_pages(&self) -> usize {

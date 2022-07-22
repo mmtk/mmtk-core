@@ -75,10 +75,6 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.common.get_spaces();
         ret.push(&self.immix_space);
@@ -145,7 +141,7 @@ impl<VM: VMBinding> Immix<VM> {
         options: Arc<Options>,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         let immix = Immix {
             immix_space: ImmixSpace::new(

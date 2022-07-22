@@ -69,10 +69,6 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.common.get_spaces();
         ret.push(&self.copyspace0);
@@ -137,7 +133,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
 impl<VM: VMBinding> SemiSpace<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         let res = SemiSpace {

@@ -1,19 +1,20 @@
 use crate::util::Address;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+use crate::util::options::Options;
+use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
+use crate::util::conversions;
 
 pub struct HeapMeta {
     pub heap_cursor: Address,
     pub heap_limit: Address,
-    pub total_pages: AtomicUsize,
+    pub total_pages: usize,
 }
 
 impl HeapMeta {
-    pub fn new(start: Address, end: Address) -> Self {
+    pub fn new(options: &Options) -> Self {
         HeapMeta {
-            heap_cursor: start,
-            heap_limit: end,
-            total_pages: AtomicUsize::new(0),
+            heap_cursor: HEAP_START,
+            heap_limit: HEAP_END,
+            total_pages: conversions::bytes_to_pages(*options.heap_size),
         }
     }
 
@@ -47,6 +48,6 @@ impl HeapMeta {
     }
 
     pub fn get_total_pages(&self) -> usize {
-        self.total_pages.load(Ordering::Relaxed)
+        self.total_pages
     }
 }

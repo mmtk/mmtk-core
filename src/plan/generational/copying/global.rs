@@ -79,10 +79,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.last_collection_full_heap()
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.gen.gc_init(heap_size, vm_map);
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.gen.get_spaces();
         ret.push(&self.copyspace0);
@@ -172,7 +168,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
 impl<VM: VMBinding> GenCopy<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         // We have no specific side metadata for copying. So just use the ones from generational.
         let global_metadata_specs =
             crate::plan::generational::new_generational_global_metadata_specs::<VM>();

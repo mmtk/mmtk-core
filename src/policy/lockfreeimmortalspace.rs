@@ -13,6 +13,7 @@ use crate::util::heap::layout::vm_layout_constants::{
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
+use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::vm::*;
 use std::marker::PhantomData;
@@ -34,6 +35,10 @@ pub struct LockFreeImmortalSpace<VM: VMBinding> {
     cursor: AtomicUsize,
     /// Heap range end
     limit: Address,
+    /// start of this space
+    start: Address,
+    /// Total bytes for the space
+    extent: usize,
     /// Zero memory after slow-path allocation
     slow_path_zeroing: bool,
     metadata: SideMetadataContext,
@@ -87,34 +92,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self) {
-        // It is a hack.
-        let total_pages = VM::VMActivePlan::global()
-            .base()
-            .heap
-            .total_pages
-            .load(Ordering::SeqCst);
-        let total_bytes = conversions::pages_to_bytes(total_pages);
-        assert!(total_pages > 0);
-        assert!(
-            total_bytes <= AVAILABLE_BYTES,
-            "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
-            total_bytes,
-            AVAILABLE_BYTES
-        );
-        let mut_self: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
-        mut_self.limit = AVAILABLE_START + total_bytes;
-        // Eagerly memory map the entire heap (also zero all the memory)
-        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
-        if self
-            .metadata
-            .try_map_metadata_space(AVAILABLE_START, total_bytes)
-            .is_err()
-        {
-            // TODO(Javad): handle meta space allocation failure
-            panic!("failed to mmap meta memory");
-        }
-
-        SFT_MAP.update(self.as_sft(), AVAILABLE_START, total_bytes);
+        SFT_MAP.update(self.as_sft(), self.start, self.extent);
     }
 
     fn reserved_pages(&self) -> usize {
@@ -178,18 +156,42 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     pub fn new(
         name: &'static str,
         slow_path_zeroing: bool,
+        options: &Options,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
-        Self {
+        let total_bytes = *options.heap_size;
+        assert!(
+            total_bytes <= AVAILABLE_BYTES,
+            "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
+            total_bytes,
+            AVAILABLE_BYTES
+        );
+
+        let space = Self {
             name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
-            limit: AVAILABLE_END,
+            limit: AVAILABLE_START + total_bytes,
+            start: AVAILABLE_START,
+            extent: total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
                 global: global_side_metadata_specs,
                 local: vec![],
             },
             phantom: PhantomData,
+        };
+
+        // Eagerly memory map the entire heap (also zero all the memory)
+        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
+        if space
+            .metadata
+            .try_map_metadata_space(AVAILABLE_START, total_bytes)
+            .is_err()
+        {
+            // TODO(Javad): handle meta space allocation failure
+            panic!("failed to mmap meta memory");
         }
+
+        space
     }
 }

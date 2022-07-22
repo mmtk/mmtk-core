@@ -41,10 +41,6 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.base.get_spaces();
         ret.push(&self.nogc_space);
@@ -92,9 +88,9 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 impl<VM: VMBinding> NoGC<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
         #[cfg(not(feature = "nogc_lock_free"))]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         #[cfg(feature = "nogc_lock_free")]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 

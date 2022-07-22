@@ -43,21 +43,6 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
         &CONSTRAINTS
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        // Warn users that the plan may fail due to maximum mapping allowed.
-        warn!(
-            "PageProtect uses a high volume of memory mappings. \
-            If you encounter failures in memory protect/unprotect in this plan,\
-            consider increase the maximum mapping allowed by the OS{}.",
-            if cfg!(target_os = "linux") {
-                " (e.g. sudo sysctl -w vm.max_map_count=655300)"
-            } else {
-                ""
-            }
-        );
-        self.common.gc_init(heap_size, vm_map);
-    }
-
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
         let mut ret = self.common.get_spaces();
         ret.push(&self.space);
@@ -103,7 +88,19 @@ impl<VM: VMBinding> Plan for PageProtect<VM> {
 
 impl<VM: VMBinding> PageProtect<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        // Warn users that the plan may fail due to maximum mapping allowed.
+        warn!(
+            "PageProtect uses a high volume of memory mappings. \
+            If you encounter failures in memory protect/unprotect in this plan,\
+            consider increase the maximum mapping allowed by the OS{}.",
+            if cfg!(target_os = "linux") {
+                " (e.g. sudo sysctl -w vm.max_map_count=655300)"
+            } else {
+                ""
+            }
+        );
+
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         let ret = PageProtect {

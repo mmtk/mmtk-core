@@ -182,7 +182,7 @@ impl<VM: VMBinding> MyGC<VM> {
         options: Arc<Options>,
     ) -> Self {
         // Modify
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         let res = MyGC {
