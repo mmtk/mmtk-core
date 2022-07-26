@@ -1,10 +1,11 @@
 use crate::mmtk::SFT_MAP;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
-use crate::policy::space::*;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::util::conversions;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::{

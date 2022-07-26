@@ -1,6 +1,6 @@
 ///! MMTk instance.
 use crate::plan::Plan;
-use crate::policy::space::SFTMap;
+use crate::policy::sft_map::SFTMap;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::finalizable_processor::FinalizableProcessor;
 use crate::util::heap::layout::heap_layout::Mmapper;

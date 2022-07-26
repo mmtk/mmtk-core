@@ -1,6 +1,7 @@
 use atomic::Ordering;
 
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
@@ -11,8 +12,8 @@ use crate::util::{metadata, ObjectReference};
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 
 use crate::plan::PlanConstraints;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};

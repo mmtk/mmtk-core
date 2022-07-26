@@ -1,7 +1,8 @@
-use super::space::{CommonSpace, Space, SpaceOptions, SFT};
+use super::sft::SFT;
+use super::space::{CommonSpace, Space, SpaceOptions};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
-use crate::policy::space::*;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;

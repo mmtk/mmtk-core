@@ -512,7 +512,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        use crate::policy::space::*;
+        use crate::policy::sft::GCWorkerMutRef;
 
         if object.is_null() {
             return object;

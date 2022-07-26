@@ -1,8 +1,9 @@
 use super::metadata::*;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
-use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
@@ -23,7 +24,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
-use crate::policy::space::*;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
