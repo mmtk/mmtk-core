@@ -132,16 +132,85 @@
 <span id="130">130</span>
 <span id="131">131</span>
 <span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
-<span class="comment">// Callback trait of scanning functions that report edges.</span>
+<span class="doccomment">/// Callback trait of scanning functions that report edges.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EdgeVisitor</span> {
     <span class="doccomment">/// Call this function for each edge.</span>
     <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">Address</span>);
-    <span class="comment">// TODO: Add visit_soft_edge, visit_weak_edge, ... here.</span>
+}
+
+<span class="doccomment">/// This lets us use closures as EdgeVisitor.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">Address</span>)<span class="op">&gt;</span> <span class="ident">EdgeVisitor</span> <span class="kw">for</span> <span class="ident">F</span> {
+    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">Address</span>) {
+        <span class="self">self</span>(<span class="ident">edge</span>)
+    }
+}
+
+<span class="doccomment">/// Callback trait of scanning functions that directly trace through edges.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTracer</span> {
+    <span class="doccomment">/// Call this function for the content of each edge,</span>
+    <span class="doccomment">/// and assign the returned value back to the edge.</span>
+    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
+}
+
+<span class="doccomment">/// This lets us use closures as ObjectTracer.</span>
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span><span class="op">&gt;</span> <span class="ident">ObjectTracer</span> <span class="kw">for</span> <span class="ident">F</span> {
+    <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="self">self</span>(<span class="ident">object</span>)
+    }
 }
 
 <span class="doccomment">/// Root-scanning methods use this trait to create work packets for processing roots.</span>
@@ -194,8 +263,30 @@
     <span class="doccomment">/// `SCAN_MUTATORS_IN_SAFEPOINT` should also be enabled</span>
     <span class="kw">const</span> <span class="ident">SINGLE_THREAD_MUTATOR_SCANNING</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
-    <span class="doccomment">/// Delegated scanning of a object, visiting each pointer field</span>
-    <span class="doccomment">/// encountered.</span>
+    <span class="doccomment">/// Return true if the given object supports edge enqueuing.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// -   If this returns true, MMTk core will call `scan_object` on the object.</span>
+    <span class="doccomment">/// -   Otherwise, MMTk core will call `scan_object_and_trace_edges` on the object.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// For maximum performance, the VM should support edge-enqueuing for as many objects as</span>
+    <span class="doccomment">/// practical.  Also note that this method is called for every object to be scanned, so it</span>
+    <span class="doccomment">/// must be fast.  The VM binding should avoid expensive checks and keep it as efficient as</span>
+    <span class="doccomment">/// possible.  Add `#[inline(always)]` to ensure it is inlined.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
+    <span class="doccomment">/// * `object`: The object to be scanned.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">support_edge_enqueuing</span>(<span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">true</span>
+    }
+
+    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM shall call `edge_visitor.visit_edge` on each reference field.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged</span>
+    <span class="doccomment">/// references, it must skip tagged reference fields which are not holding references.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
@@ -207,6 +298,29 @@
         <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
     );
 
+    <span class="doccomment">/// Delegated scanning of a object, visiting each reference field encountered, and trace the</span>
+    <span class="doccomment">/// objects pointed by each field.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM shall call `object_tracer.trace_object` on the value held in each reference field,</span>
+    <span class="doccomment">/// and assign the returned value back to the field.  If the VM uses tagged references, the</span>
+    <span class="doccomment">/// value passed to `object_tracer.trace_object` shall be the `ObjectReference` to the object</span>
+    <span class="doccomment">/// without any tag bits.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM may skip a reference field if it holds a null reference.  If the VM supports tagged</span>
+    <span class="doccomment">/// references, it must skip tagged reference fields which are not holding references.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
+    <span class="doccomment">/// * `object`: The object to be scanned.</span>
+    <span class="doccomment">/// * `object_tracer`: Called back for the content of each edge.</span>
+    <span class="kw">fn</span> <span class="ident">scan_object_and_trace_edges</span><span class="op">&lt;</span><span class="ident">OT</span>: <span class="ident">ObjectTracer</span><span class="op">&gt;</span>(
+        <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>,
+        <span class="ident">_object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">_object_tracer</span>: <span class="kw-2">&amp;mut</span> <span class="ident">OT</span>,
+    ) {
+        <span class="macro">unreachable!</span>(<span class="string">&quot;scan_object_and_trace_edges() will not be called when support_edge_enqueue() is always true.&quot;</span>)
+    }
+
     <span class="doccomment">/// MMTk calls this method at the first time during a collection that thread&#39;s stacks</span>
     <span class="doccomment">/// have been scanned. This can be used (for example) to clean up</span>
     <span class="doccomment">/// obsolete compiled methods that are no longer being executed.</span>
@@ -215,22 +329,6 @@
     <span class="doccomment">/// * `partial_scan`: Whether the scan was partial or full-heap.</span>
     <span class="doccomment">/// * `tls`: The GC thread that is performing the thread scan.</span>
     <span class="kw">fn</span> <span class="ident">notify_initial_thread_scan_complete</span>(<span class="ident">partial_scan</span>: <span class="ident">bool</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
-
-    <span class="doccomment">/// Bulk scanning of objects, processing each pointer field for each object.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
-    <span class="doccomment">/// * `objects`: The slice of object references to be scanned.</span>
-    <span class="doccomment">/// * `edge_visitor`: Called back for each edge in each object in `objects`.</span>
-    <span class="kw">fn</span> <span class="ident">scan_objects</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&gt;</span>(
-        <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-        <span class="ident">objects</span>: <span class="kw-2">&amp;</span>[<span class="ident">ObjectReference</span>],
-        <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
-    ) {
-        <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="ident">objects</span>.<span class="ident">iter</span>() {
-            <span class="ident"><span class="self">Self</span>::scan_object</span>(<span class="ident">tls</span>, <span class="kw-2">*</span><span class="ident">object</span>, <span class="ident">edge_visitor</span>);
-        }
-    }
 
     <span class="doccomment">/// Scan all the mutators for roots.</span>
     <span class="doccomment">///</span>

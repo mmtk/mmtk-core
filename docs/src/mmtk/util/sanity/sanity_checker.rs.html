@@ -188,6 +188,15 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -351,6 +360,7 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ProcessEdgesWork</span> <span class="kw">for</span> <span class="ident">SanityGCProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">type</span> <span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span>;
+    <span class="kw">type</span> <span class="ident">ScanObjectsWorkType</span> <span class="op">=</span> <span class="ident">ScanObjects</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
 
     <span class="kw">const</span> <span class="ident">OVERWRITE_REFERENCE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>, <span class="ident">roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
@@ -374,6 +384,14 @@
             <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">enqueue</span>(<span class="ident">object</span>);
         }
         <span class="ident">object</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">create_scan_work</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">nodes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+        <span class="ident">roots</span>: <span class="ident">bool</span>,
+    ) -&gt; <span class="ident"><span class="self">Self</span>::ScanObjectsWorkType</span> {
+        <span class="ident">ScanObjects</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="ident">nodes</span>, <span class="bool-val">false</span>, <span class="ident">roots</span>)
     }
 }
 </code></pre></div>

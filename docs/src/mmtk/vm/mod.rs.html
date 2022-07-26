@@ -68,6 +68,7 @@
 <span id="66">66</span>
 <span id="67">67</span>
 <span id="68">68</span>
+<span id="69">69</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
@@ -100,6 +101,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_glue::Finalizable</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::reference_glue::ReferenceGlue</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::EdgeVisitor</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::ObjectTracer</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::RootsWorkFactory</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::Scanning</span>;
 

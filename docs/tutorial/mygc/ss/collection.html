@@ -399,6 +399,8 @@ pub struct MyGCProcessEdges&lt;VM: VMBinding&gt; {
 
 impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
+    type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
+
     fn new(edges: Vec&lt;Address&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
@@ -429,6 +431,11 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
         } else {
             self.plan.common.trace_object(queue, object, worker)
         }
+    }
+
+    #[inline(always)]
+    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
+        ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
 }
 
@@ -481,6 +488,8 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
 </span><span class="boring">fn main() {
 </span>impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
+    type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
+
     fn new(edges: Vec&lt;Address&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
@@ -511,6 +520,11 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         } else {
             self.plan.common.trace_object(queue, object, worker)
         }
+    }
+
+    #[inline(always)]
+    fn create_scan_work(&amp;self, nodes: Vec&lt;ObjectReference&gt;, roots: bool) -&gt; ScanObjects&lt;Self&gt; {
+        ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
 }
 <span class="boring">}
