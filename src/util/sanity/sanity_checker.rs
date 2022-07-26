@@ -161,6 +161,7 @@ impl<VM: VMBinding> DerefMut for SanityGCProcessEdges<VM> {
 
 impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type VM = VM;
+    type ScanObjectsWorkType = ScanObjects<Self>;
 
     const OVERWRITE_REFERENCE: bool = false;
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
@@ -184,5 +185,13 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             self.nodes.enqueue(object);
         }
         object
+    }
+
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        roots: bool,
+    ) -> Self::ScanObjectsWorkType {
+        ScanObjects::<Self>::new(nodes, false, roots)
     }
 }
