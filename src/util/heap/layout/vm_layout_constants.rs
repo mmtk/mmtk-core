@@ -63,7 +63,7 @@ pub const HEAP_START: Address =
 pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
 #[cfg(target_pointer_width = "64")]
 pub const HEAP_END: Address =
-    chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) });
+    chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) });
 
 /// vm-sapce size (currently only used by jikesrvm)
 #[cfg(target_pointer_width = "32")]

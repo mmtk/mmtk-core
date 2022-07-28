@@ -103,6 +103,7 @@ pub const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 pub struct EmptySpaceSFT {}
 
 pub const EMPTY_SFT_NAME: &str = "empty";
+pub const EMPTY_SPACE_SFT: EmptySpaceSFT = EmptySpaceSFT {};
 
 impl SFT for EmptySpaceSFT {
     fn name(&self) -> &str {

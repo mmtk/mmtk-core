@@ -1,4 +1,5 @@
 use crate::mmtk::SFT_MAP;
+use crate::policy::sft_map::SFTMap;
 use crate::util::Address;
 
 /// The region size (in bytes) of the `ALLOC_BIT` side metadata.
@@ -8,5 +9,5 @@ pub const ALLOC_BIT_REGION_SIZE: usize =
 
 #[inline(always)]
 pub(crate) fn is_mmtk_object(addr: Address) -> bool {
-    SFT_MAP.is_mmtk_object(addr)
+    SFT_MAP.get(addr).is_mmtk_object(addr)
 }

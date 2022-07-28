@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
 use crate::util::heap::layout::mmapper::Mmapper;
+use crate::policy::sft_map::SFTMap;
 
 /// size in bytes
 pub type ByteSize = usize;
@@ -213,6 +214,10 @@ impl Address {
     #[inline(always)]
     pub const fn sub(self, size: usize) -> Address {
         Address(self.0 - size)
+    }
+
+    pub const fn and(self, mask: usize) -> usize {
+        self.0 & mask
     }
 
     // Perform a saturating subtract on the Address
@@ -503,7 +508,7 @@ impl ObjectReference {
     }
 
     pub fn is_in_any_space(self) -> bool {
-        SFT_MAP.is_in_any_space(self)
+        SFT_MAP.get(Address(self.0)).is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
