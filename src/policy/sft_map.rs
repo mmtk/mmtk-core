@@ -55,6 +55,7 @@ pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
 pub type SFTMapType<'a> = chunk_map::SFTChunkMap<'a>;
 
 #[allow(dead_code)]
+#[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
 mod space_map {
     use super::*;
     use crate::util::heap::layout::vm_layout_constants::{
