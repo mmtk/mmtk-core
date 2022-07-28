@@ -2,14 +2,14 @@
 
 export RUST_BACKTRACE=1
 
-for_all_features "cargo test"
+# for_all_features "cargo test"
 
-# target-specific features
-if [[ $arch == "x86_64" && $os == "linux" ]]; then
-    cargo test --features perf_counter
-fi
+# # target-specific features
+# if [[ $arch == "x86_64" && $os == "linux" ]]; then
+#     cargo test --features perf_counter
+# fi
 
-python examples/build.py
+# python examples/build.py
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | xargs | grep -o '{.*}' | grep -o '\w\+')
 
@@ -37,7 +37,12 @@ for fn in $(ls src/tests/*.rs); do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        env MMTK_PLAN=$MMTK_PLAN cargo test --features "$FEATURES" -- $t;
+        # Deal with mark sweep specially, we only have malloc mark sweep, and we need to enable the feature to make it work.
+        if [[ $MMTK_PLAN == 'MarkSweep' ]]; then
+            env MMTK_PLAN=$MMTK_PLAN cargo test --features "malloc_mark_sweep,$FEATURES" -- $t;
+        else
+            env MMTK_PLAN=$MMTK_PLAN cargo test --features "$FEATURES" -- $t;
+        fi
     done
 done
 

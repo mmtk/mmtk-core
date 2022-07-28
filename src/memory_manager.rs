@@ -449,7 +449,13 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// * `addr`: An arbitrary address.
 #[cfg(feature = "is_mmtk_object")]
 pub fn is_mmtk_object(addr: Address) -> bool {
-    crate::util::is_mmtk_object::is_mmtk_object(addr)
+    use crate::mmtk::SFT_MAP;
+    use crate::policy::sft_map::SFTMap;
+    if SFT_MAP.has_sft_entry(addr) {
+        SFT_MAP.get(addr).is_mmtk_object(addr)
+    } else {
+        false
+    }
 }
 
 /// Return true if the `object` lies in a region of memory where
@@ -481,7 +487,13 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// Arguments:
 /// * `object`: The object reference to query.
 pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
-    object.is_in_any_space()
+    use crate::mmtk::SFT_MAP;
+    use crate::policy::sft_map::SFTMap;
+    if SFT_MAP.has_sft_entry(object.to_address()) {
+        SFT_MAP.get(object.to_address()).is_in_space(object)
+    } else {
+        false
+    }
 }
 
 /// Is the address in the mapped memory? The runtime can use this function to check

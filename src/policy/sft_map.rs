@@ -1,11 +1,18 @@
+use super::sft::*;
 use crate::util::Address;
 #[cfg(debug_assertions)]
 use crate::util::ObjectReference;
 #[cfg(debug_assertions)]
 use crate::vm::VMBinding;
-use super::sft::*;
 
 pub trait SFTMap {
+    /// Check if the address has an SFT entry for it (including an empty SFT entry). This is mostly a bound check
+    /// to make sure that we won't have an index-out-of-bound error. For the sake of performance, the implementation
+    /// of other methods in this trait (such as get(), update() and clear()) does not need to do this check implicitly.
+    /// Instead, they assume the address has a valid entry in the SFT. If an address could be arbitary, they should call this
+    /// method as a pre-check before they call any other methods in the trait.
+    fn has_sft_entry(&self, addr: Address) -> bool;
+
     fn get(&self, address: Address) -> &dyn SFT;
     fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize);
     fn clear(&self, address: Address);
@@ -39,10 +46,12 @@ pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
 #[cfg(any(target_pointer_width = "32", feature = "chunk_based_sft_table"))]
 pub type SFTMapType<'a> = chunk_map::SFTChunkMap<'a>;
 
+#[allow(dead_code)]
 mod space_map {
     use super::*;
-    use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-    use crate::util::heap::layout::vm_layout_constants::{LOG_SPACE_EXTENT, MAX_SPACE_EXTENT, HEAP_START, HEAP_END};
+    use crate::util::heap::layout::vm_layout_constants::{
+        HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
+    };
 
     pub struct SFTSpaceMap<'a> {
         sft: Vec<&'a (dyn SFT + Sync + 'static)>,
@@ -51,6 +60,12 @@ mod space_map {
     unsafe impl<'a> Sync for SFTSpaceMap<'a> {}
 
     impl<'a> SFTMap for SFTSpaceMap<'a> {
+        fn has_sft_entry(&self, _addr: Address) -> bool {
+            // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
+            // So any address has an SFT entry.
+            true
+        }
+
         fn get(&self, address: Address) -> &'a dyn SFT {
             self.sft[Self::addr_to_index(address)]
         }
@@ -78,13 +93,23 @@ mod space_map {
     }
 
     impl<'a> SFTSpaceMap<'a> {
+        /// This mask extracts a few bits from address, and use it as index to the space map table.
+        /// This constant is specially picked for the current heap range (HEAP_STRAT/HEAP_END), and the space size (MAX_SPACE_EXTENT).
+        /// If any of these changes, the test `test_address_arithmetic()` may fail, and this constant will need to be updated.
+        /// Currently our spaces are using address range 0x0000_0200_0000_0000 to 0x0000_2200_0000_0000 (with a maximum of 16 spaces).
+        /// When masked with this constant, the index is 1 to 16. If we mask any arbitrary address with this mask, we will get 0 to 31 (32 entries).
         pub const ADDRESS_MASK: usize = 0x0000_3f00_0000_0000usize;
+        /// The table size for the space map.
         pub const TABLE_SIZE: usize = Self::addr_to_index(Address::MAX) + 1;
 
+        /// Create a new space map.
+        #[allow(clippy::assertions_on_constants)] // We assert to make sure the constants
         pub fn new() -> Self {
-            debug_assert!(Self::TABLE_SIZE >= MAX_SPACES);
+            debug_assert!(
+                Self::TABLE_SIZE >= crate::util::heap::layout::heap_parameters::MAX_SPACES
+            );
             Self {
-                sft: vec![&EMPTY_SPACE_SFT; Self::TABLE_SIZE]
+                sft: vec![&EMPTY_SPACE_SFT; Self::TABLE_SIZE],
             }
         }
 
@@ -105,38 +130,52 @@ mod space_map {
         }
 
         const fn index_to_space_start(i: usize) -> Address {
-            HEAP_START.add((i - 1) << LOG_SPACE_EXTENT)
+            let (start, _) = Self::index_to_space_range(i);
+            start
+        }
+
+        const fn index_to_space_range(i: usize) -> (Address, Address) {
+            if i == 0 {
+                panic!("Invalid index: there is no space for index 0")
+            } else {
+                (
+                    HEAP_START.add((i - 1) << LOG_SPACE_EXTENT),
+                    HEAP_START.add(i << LOG_SPACE_EXTENT),
+                )
+            }
         }
     }
 
-    #[cfg(test)]
+    #[cfg(tests)]
     mod tests {
         use super::*;
+        use crate::util::heap::layout::heap_parameters::MAX_SPACES;
+        use crate::util::heap::layout::vm_layout_constants::{
+            HEAP_END, HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
+        };
 
-        fn get_space_range(space_i: usize) -> (Address, Address) {
-            (HEAP_START + MAX_SPACE_EXTENT * space_i, HEAP_START + MAX_SPACE_EXTENT * (space_i + 1))
-        }
-
+        // If the test `test_address_arithmetic()` fails, it is possible due to change of our heap range, max space extent, or max number of spaces.
+        // We need to update the code and the constants for the address arithemtic.
         #[test]
-        fn test_addr_to_index() {
+        fn test_address_arithmetic() {
             // Before 1st space
             assert_eq!(SFTSpaceMap::addr_to_index(Address::ZERO), 0);
             assert_eq!(SFTSpaceMap::addr_to_index(HEAP_START - 1), 0);
 
-            let assert_space_index = |space_i: usize| {
-                let (start, end) = get_space_range(space_i);
-                println!("Space #{} = [{}, {})", space_i, start, end);
-                assert_eq!(SFTSpaceMap::addr_to_index(start), space_i + 1);
-                assert_eq!(SFTSpaceMap::addr_to_index(end - 1), space_i + 1);
+            let assert_for_index = |i: usize| {
+                let (start, end) = SFTSpaceMap::index_to_space_range(i);
+                debug!("Space: Index#{} = [{}, {})", i, start, end);
+                assert_eq!(SFTSpaceMap::addr_to_index(start), i);
+                assert_eq!(SFTSpaceMap::addr_to_index(end - 1), i);
             };
 
-            // Space 0-15 is mapped to 1-16
-            for i in 0..MAX_SPACES {
-                assert_space_index(i);
+            // Index 1 to 16 (MAX_SPACES)
+            for i in 1..=MAX_SPACES {
+                assert_for_index(i);
             }
 
             // assert space end
-            let (_, last_space_end) = get_space_range(MAX_SPACES - 1);
+            let (_, last_space_end) = SFTSpaceMap::index_to_space_range(MAX_SPACES);
             println!("Space end = {}", last_space_end);
             println!("Heap  end = {}", HEAP_END);
             assert_eq!(last_space_end, HEAP_END);
@@ -148,16 +187,13 @@ mod space_map {
     }
 }
 
+#[allow(dead_code)]
 mod chunk_map {
     use super::*;
     use crate::util::conversions;
     use crate::util::conversions::*;
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
-    #[cfg(debug_assertions)]
-    use crate::util::ObjectReference;
-    #[cfg(debug_assertions)]
-    use crate::vm::VMBinding;
 
     pub struct SFTChunkMap<'a> {
         sft: Vec<&'a (dyn SFT + Sync + 'static)>,
@@ -167,6 +203,10 @@ mod chunk_map {
     unsafe impl<'a> Sync for SFTChunkMap<'a> {}
 
     impl<'a> SFTMap for SFTChunkMap<'a> {
+        fn has_sft_entry(&self, addr: Address) -> bool {
+            addr.chunk_index() < MAX_CHUNKS
+        }
+
         fn get(&self, address: Address) -> &'a dyn SFT {
             debug_assert!(address.chunk_index() < MAX_CHUNKS);
             let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };

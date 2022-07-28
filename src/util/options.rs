@@ -22,7 +22,6 @@ pub enum PlanSelector {
     PageProtect,
     Immix,
     MarkCompact,
-    #[cfg(feature = "malloc_mark_sweep")]
     MarkSweep,
 }
 
