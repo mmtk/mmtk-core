@@ -28,26 +28,32 @@ use std::marker::PhantomData;
 pub trait SFT {
     /// The space name
     fn name(&self) -> &str;
+
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
         None
     }
+
     /// Is the object live, determined by the policy?
     fn is_live(&self, object: ObjectReference) -> bool;
+
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
     #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
         self.is_live(object)
     }
+
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
     fn is_movable(&self) -> bool;
+
     /// Is the object sane? A policy should return false if there is any abnormality about
     /// object - the sanity checker will fail if an object is not sane.
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool;
+
     /// Is the object managed by MMTk? For most cases, if we find the sft for an object, that means
     /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
     /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
@@ -56,6 +62,7 @@ pub trait SFT {
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         true
     }
+
     /// Is `addr` a valid object reference to an object allocated in this space?
     /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
@@ -73,8 +80,10 @@ pub trait SFT {
         // The `addr` is mapped. We use the global alloc bit to get the exact answer.
         alloc_bit::is_alloced_object(addr)
     }
+
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
+
     /// Trace objects through SFT. This along with [`SFTProcessEdges`](mmtk/scheduler/gc_work/SFTProcessEdges)
     /// provides an easy way for most plans to trace objects without the need to implement any plan-specific
     /// code. However, tracing objects for some policies are more complicated, and they do not provide an
@@ -99,6 +108,7 @@ define_erased_vm_mut_ref!(GCWorkerMutRef = GCWorker<VM>);
 /// Print debug info for SFT. Should be false when committed.
 pub const DEBUG_SFT: bool = cfg!(debug_assertions) && false;
 
+/// An empty entry for SFT.
 #[derive(Debug)]
 pub struct EmptySpaceSFT {}
 

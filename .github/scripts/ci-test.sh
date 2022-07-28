@@ -2,14 +2,14 @@
 
 export RUST_BACKTRACE=1
 
-# for_all_features "cargo test"
+for_all_features "cargo test"
 
-# # target-specific features
-# if [[ $arch == "x86_64" && $os == "linux" ]]; then
-#     cargo test --features perf_counter
-# fi
+# target-specific features
+if [[ $arch == "x86_64" && $os == "linux" ]]; then
+    cargo test --features perf_counter
+fi
 
-# python examples/build.py
+python examples/build.py
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | xargs | grep -o '{.*}' | grep -o '\w\+')
 

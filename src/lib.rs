@@ -3,7 +3,7 @@
 
 // Allow this for now. Clippy suggests we should use Sft, Mmtk, rather than SFT and MMTK.
 // According to its documentation (https://rust-lang.github.io/rust-clippy/master/index.html#upper_case_acronyms),
-// with upper-case-acronyms-aggressive turned on, it should also warn us about SFTChunkMap, VMBinding, GCWorker.
+// with upper-case-acronyms-aggressive turned on, it should also warn us about SFTMap, VMBinding, GCWorker.
 // However, it seems clippy does not catch all these patterns at the moment. So it would be hard for us to
 // find all the patterns and consistently change all of them. I think it would be a better idea to just allow this.
 // We may reconsider this in the future. Plus, using upper case letters for acronyms does not sound a big issue

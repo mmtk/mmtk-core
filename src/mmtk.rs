@@ -101,12 +101,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        {
-            let start = std::time::Instant::now();
-            SFT_MAP.initialize_once(&SFTMapType::new);
-            let duration = start.elapsed();
-            println!("Initializing SFT table takes {:?}", duration);
-        }
+        SFT_MAP.initialize_once(&SFTMapType::new);
 
         let num_workers = if cfg!(feature = "single_worker") {
             1

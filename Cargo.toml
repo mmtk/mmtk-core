@@ -93,9 +93,12 @@ work_packet_stats = []
 malloc_counted_size = []
 
 # Force using chunk based SFT (we do not use this for 64bits, as it will impose high memory and time overhead for initialize the SFT table)
-# But in some cases (e.g. we need to manage malloc results)
+# But in some cases (e.g. we need to manage malloc results), we will have to use this.
 chunk_based_sft_table = []
-# Use library malloc as the freelist allocator for mark sweep. This will makes mark sweep slow, and is only meant to be experimental use.
+
+# Use library malloc as the freelist allocator for mark sweep. This will makes mark sweep slower. As malloc may return addresses outside our
+# normal heap range, we will have to use chunk-based SFT table. Turning on this feature will enable `chunk_base_sft_table`, which affects all
+# the plans in the build. This is only meant to be experimental use.
 malloc_mark_sweep = ["chunk_based_sft_table"]
 
 # Do not modify the following line - ci-common.sh matches it

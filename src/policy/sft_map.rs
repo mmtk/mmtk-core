@@ -5,6 +5,8 @@ use crate::util::ObjectReference;
 #[cfg(debug_assertions)]
 use crate::vm::VMBinding;
 
+/// SFTMap manages the SFT table, and mapping between addresses with indices in the table. The trait allows
+/// us to have multiple implementations of the SFT table.
 pub trait SFTMap {
     /// Check if the address has an SFT entry for it (including an empty SFT entry). This is mostly a bound check
     /// to make sure that we won't have an index-out-of-bound error. For the sake of performance, the implementation
@@ -13,9 +15,15 @@ pub trait SFTMap {
     /// method as a pre-check before they call any other methods in the trait.
     fn has_sft_entry(&self, addr: Address) -> bool;
 
+    /// Get SFT for the address. The address must have a valid SFT entry in the table.
     fn get(&self, address: Address) -> &dyn SFT;
+
+    /// Set SFT for the address range. The address must have a valid SFT entry in the table.
     fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize);
+
+    /// Clear SFT for the address. The address must have a valid SFT entry in the table.
     fn clear(&self, address: Address);
+
     /// Make sure we have valid SFT entries for the object reference.
     #[cfg(debug_assertions)]
     fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
@@ -53,6 +61,7 @@ mod space_map {
         HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
     };
 
+    /// Space map is a small table, and it has one entry for each MMTk space.
     pub struct SFTSpaceMap<'a> {
         sft: Vec<&'a (dyn SFT + Sync + 'static)>,
     }
@@ -123,9 +132,6 @@ mod space_map {
 
         #[inline(always)]
         const fn addr_to_index(addr: Address) -> usize {
-            // println!("addr          {:64x}", addr.as_usize());
-            // println!("-mask       & {:64x}", mask);
-            // println!("-after mask = {:64x}", addr & mask);
             addr.and(Self::ADDRESS_MASK) >> LOG_SPACE_EXTENT
         }
 
@@ -195,6 +201,7 @@ mod chunk_map {
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 
+    /// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
     pub struct SFTChunkMap<'a> {
         sft: Vec<&'a (dyn SFT + Sync + 'static)>,
     }
@@ -349,20 +356,5 @@ mod chunk_map {
             }
             self_mut.sft[chunk] = sft;
         }
-
-        // pub fn is_in_any_space(&self, object: ObjectReference) -> bool {
-        //     if object.to_address().chunk_index() >= self.sft.len() {
-        //         return false;
-        //     }
-        //     self.get(object.to_address()).is_in_space(object)
-        // }
-
-        // #[cfg(feature = "is_mmtk_object")]
-        // pub fn is_mmtk_object(&self, addr: Address) -> bool {
-        //     if addr.chunk_index() >= self.sft.len() {
-        //         return false;
-        //     }
-        //     self.get(addr).is_mmtk_object(addr)
-        // }
     }
 }

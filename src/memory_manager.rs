@@ -451,6 +451,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 pub fn is_mmtk_object(addr: Address) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;
+    // The address could be arbitrary, we need to check before we access SFT map for the address.
     if SFT_MAP.has_sft_entry(addr) {
         SFT_MAP.get(addr).is_mmtk_object(addr)
     } else {
@@ -489,6 +490,7 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;
+    // The address could be arbitrary, we need to check before we access SFT map for the address.
     if SFT_MAP.has_sft_entry(object.to_address()) {
         SFT_MAP.get(object.to_address()).is_in_space(object)
     } else {

@@ -19,10 +19,10 @@ pub enum PlanSelector {
     SemiSpace,
     GenCopy,
     GenImmix,
+    MarkSweep,
     PageProtect,
     Immix,
     MarkCompact,
-    MarkSweep,
 }
 
 /// MMTk option for perf events
