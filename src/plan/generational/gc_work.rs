@@ -1,9 +1,13 @@
+use atomic::Ordering;
+
 use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
-use crate::scheduler::gc_work::*;
+use crate::scheduler::{gc_work::*, GCWork, GCWorker};
+use crate::util::metadata::{store_metadata, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
+use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 /// Process edges for a nursery GC. This type is provided if a generational plan does not use
@@ -51,5 +55,41 @@ impl<VM: VMBinding> Deref for GenNurseryProcessEdges<VM> {
 impl<VM: VMBinding> DerefMut for GenNurseryProcessEdges<VM> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
+    }
+}
+
+pub struct ProcessModBuf<E: ProcessEdgesWork> {
+    modbuf: Vec<ObjectReference>,
+    phantom: PhantomData<E>,
+    meta: MetadataSpec,
+}
+
+impl<E: ProcessEdgesWork> ProcessModBuf<E> {
+    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
+        Self {
+            modbuf,
+            meta,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
+    #[inline(always)]
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if !self.modbuf.is_empty() {
+            for obj in &self.modbuf {
+                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
+            }
+        }
+        if mmtk.plan.is_current_gc_nursery() {
+            if !self.modbuf.is_empty() {
+                let mut modbuf = vec![];
+                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
+            }
+        } else {
+            // Do nothing
+        }
     }
 }

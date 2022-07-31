@@ -106,6 +106,13 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         self.mutator_tls
     }
 
+    #[inline]
+    unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B {
+        let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
+        &mut *payload
+    }
+
+    #[inline]
     fn barrier(&mut self) -> &mut dyn Barrier {
         &mut *self.barrier
     }
@@ -135,6 +142,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     }
     fn get_tls(&self) -> VMMutatorThread;
     fn barrier(&mut self) -> &mut dyn Barrier;
+    unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B;
 }
 
 /// This is used for plans to indicate the number of allocators reserved for the plan.

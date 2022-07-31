@@ -3,13 +3,11 @@ use super::*;
 use crate::plan::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
-use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
@@ -606,42 +604,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
             <E::VM as VMBinding>::VMScanning::scan_objects(tls, &self.buffer, &mut closure);
         }
         trace!("ScanObjects End");
-    }
-}
-
-pub struct ProcessModBuf<E: ProcessEdgesWork> {
-    modbuf: Vec<ObjectReference>,
-    phantom: PhantomData<E>,
-    meta: MetadataSpec,
-}
-
-impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
-        Self {
-            modbuf,
-            meta,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline(always)]
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modbuf.is_empty() {
-            for obj in &self.modbuf {
-                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
-            }
-        }
-        if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut modbuf = vec![];
-                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
-            }
-        } else {
-            // Do nothing
-        }
     }
 }
 

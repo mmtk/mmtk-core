@@ -46,7 +46,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) reference_processors: ReferenceProcessors,
     pub(crate) finalizable_processor:
         Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
-    pub(crate) options: Arc<UnsafeOptionsWrapper>,
+    pub options: Arc<UnsafeOptionsWrapper>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker>,

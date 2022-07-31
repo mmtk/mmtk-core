@@ -14,9 +14,10 @@ pub enum NurseryZeroingOptions {
     Adaptive,
 }
 
+#[repr(u8)]
 #[derive(Copy, Clone, EnumString, Debug)]
 pub enum PlanSelector {
-    NoGC,
+    NoGC = 0,
     SemiSpace,
     GenCopy,
     GenImmix,
