@@ -166,6 +166,7 @@ impl std::hash::Hash for SideMetadataOffset {
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
+#[derive(Debug)]
 pub struct SideMetadataContext {
     // For plans
     pub global: Vec<SideMetadataSpec>,
@@ -174,17 +175,16 @@ pub struct SideMetadataContext {
 }
 
 impl SideMetadataContext {
-    #[cfg(not(feature = "global_alloc_bit"))]
+    #[allow(clippy::vec_init_then_push)] // allow this, as we conditionally push based on features.
     pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
-        ret.extend_from_slice(specs);
-        ret
-    }
 
-    #[cfg(feature = "global_alloc_bit")]
-    pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
-        let mut ret = vec![];
-        ret.extend_from_slice(&[ALLOC_SIDE_METADATA_SPEC]);
+        #[cfg(feature = "global_alloc_bit")]
+        ret.push(ALLOC_SIDE_METADATA_SPEC);
+
+        #[cfg(feature = "chunk_based_dense_sft_table")]
+        ret.push(crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX);
+
         ret.extend_from_slice(specs);
         ret
     }
@@ -339,17 +339,31 @@ impl SideMetadataContext {
     }
 }
 
+const TRACE_ENSURE_MAPPED: bool = false;
+const TRACE_METADATA_ACCESS: bool = true;
+
 // Used only for debugging
 // Panics in the required metadata for data_addr is not mapped
 pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) {
     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
-    debug!(
-        "ensure_metadata_is_mapped({}).meta_start({})",
-        data_addr, meta_start
-    );
+    if TRACE_ENSURE_MAPPED {
+        trace!(
+            "ensure_metadata_is_mapped({}).meta_start({})",
+            data_addr,
+            meta_start
+        );
+    }
 
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
+}
+
+/// Check if side metadata is mapped for the spec for the adata address.
+pub fn is_metadata_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) -> bool {
+    use crate::util::heap::layout::Mmapper;
+    use crate::MMAPPER;
+    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    MMAPPER.is_mapped_address(meta_addr)
 }
 
 #[inline(always)]
@@ -358,6 +372,14 @@ pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: 
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "load_atomic: {} load for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -400,6 +422,15 @@ pub fn store_atomic(
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "store_atomic: {} store {} for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            metadata,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -452,11 +483,10 @@ pub fn compare_exchange_atomic(
     #[cfg(feature = "extreme_assertions")]
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    debug!(
-        "compare_exchange_atomic({:?}, {}, {}, {})",
-        metadata_spec, data_addr, old_metadata, new_metadata
-    );
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!("compare_exchange_atomic: {} compare_exchange from {} to {} for data addr {} (metadata addr {})", metadata_spec.name, old_metadata, new_metadata, data_addr, meta_addr);
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -553,6 +583,15 @@ pub fn fetch_add_atomic(
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "fetch_add: {} fetch_add {} for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            val,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -612,6 +651,15 @@ pub fn fetch_sub_atomic(
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "fetch_sub: {} fetch_sub {} for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            val,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -674,6 +722,14 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "load: {} load for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }
@@ -721,6 +777,15 @@ pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metada
     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+    if TRACE_METADATA_ACCESS {
+        trace!(
+            "store: {} store {} for data addr {} (metadata addr {})",
+            metadata_spec.name,
+            metadata,
+            data_addr,
+            meta_addr
+        );
+    }
     if cfg!(debug_assertions) {
         ensure_metadata_is_mapped(metadata_spec, data_addr);
     }

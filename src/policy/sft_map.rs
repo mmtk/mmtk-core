@@ -21,6 +21,13 @@ pub trait SFTMap {
     /// Set SFT for the address range. The address must have a valid SFT entry in the table.
     fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize);
 
+    /// Eagerly initialize the SFT table. For most implementations, it could be the same as update().
+    /// However, we need this as a seprate method for SFTDenseChunkMap, as it needs to map side metadata first
+    /// before setting the table.
+    fn eager_initialize(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
+        self.update(space, start, bytes);
+    }
+
     /// Clear SFT for the address. The address must have a valid SFT entry in the table.
     fn clear(&self, address: Address);
 
@@ -47,12 +54,19 @@ pub trait SFTMap {
     }
 }
 
-// On 64bits and when chunk-based sft table is not forced, we use space map.
-#[cfg(all(target_pointer_width = "64", not(feature = "chunk_based_sft_table")))]
+// On 64bits and when chunk-based dense sft table is not forced, we use space map, which has best performance for 64bits.
+#[cfg(all(
+    target_pointer_width = "64",
+    not(feature = "chunk_based_dense_sft_table")
+))]
 pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
-// On 32bits, or when chunk-based sft table is forced, we use chunk map.
-#[cfg(any(target_pointer_width = "32", feature = "chunk_based_sft_table"))]
-pub type SFTMapType<'a> = chunk_map::SFTChunkMap<'a>;
+// On 64bits and when chunk-based dense sft table is enabled, we use the dense chunk map.
+#[cfg(all(target_pointer_width = "64", feature = "chunk_based_dense_sft_table"))]
+pub type SFTMapType<'a> = dense_chunk_map::SFTDenseChunkMap<'a>;
+
+// On 32bits, we use sparse chunk map.
+#[cfg(target_pointer_width = "32")]
+pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
 
 #[allow(dead_code)]
 #[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
@@ -195,7 +209,139 @@ mod space_map {
 }
 
 #[allow(dead_code)]
-mod chunk_map {
+mod dense_chunk_map {
+    use super::*;
+    use crate::util::conversions;
+    use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
+    use crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX;
+    use crate::util::metadata::side_metadata::*;
+    use std::collections::HashMap;
+    use std::sync::atomic::Ordering;
+
+    /// SFTDenseChunkMap is a small table. It has one entry for each space in the table, and use
+    /// side metadata to record the index for each chunk. This works for both 32 bits and 64 bits.
+    /// However, its performance is expected to be suboptimal, compared to the sparse chunk map on
+    /// 32 bits, and the space map on 64 bits. So usually we do not use this implementation. However,
+    /// it provides some flexibility so we can set SFT at chunk basis for 64bits for decent performance.
+    /// For example, when we use library malloc for mark sweep, we have no control of where the
+    /// library malloc may allocate into, so we cannot use the space map. And using a sparse chunk map
+    /// will be costly in terms of memory. In this case, the dense chunk map is a good solution.
+    pub struct SFTDenseChunkMap<'a> {
+        /// The dense table, one entry per space. We use side metadata to store the space index for each chunk.
+        /// 0 is EMPTY_SPACE_SFT.
+        sft: Vec<&'a (dyn SFT + Sync + 'static)>,
+        /// A map from space name (assuming they are unique) to their index. We use this to know whether we have
+        /// pushed &dyn SFT for a space, and to know its index.
+        index_map: HashMap<String, usize>,
+    }
+
+    unsafe impl<'a> Sync for SFTDenseChunkMap<'a> {}
+
+    impl<'a> SFTMap for SFTDenseChunkMap<'a> {
+        fn has_sft_entry(&self, addr: Address) -> bool {
+            if is_metadata_mapped(&SFT_DENSE_CHUNK_MAP_INDEX, addr) {
+                let index = Self::addr_to_index(addr);
+                index < self.sft.len()
+            } else {
+                // We haven't mapped side metadata for the chunk, so we do not have an SFT entry for the address.
+                false
+            }
+        }
+
+        fn get(&self, address: Address) -> &dyn SFT {
+            self.sft[Self::addr_to_index(address)]
+        }
+
+        fn eager_initialize(
+            &self,
+            space: &(dyn SFT + Sync + 'static),
+            start: Address,
+            bytes: usize,
+        ) {
+            let context = SideMetadataContext {
+                global: vec![SFT_DENSE_CHUNK_MAP_INDEX],
+                local: vec![],
+            };
+            if context.try_map_metadata_space(start, bytes).is_err() {
+                panic!("failed to mmap metadata memory");
+            }
+
+            self.update(space, start, bytes);
+        }
+
+        fn update(&self, space: &(dyn SFT + Sync + 'static), start: Address, bytes: usize) {
+            let mut_self = unsafe { self.mut_self() };
+
+            // Check if we have an entry in self.sft for the space. If so, get the index.
+            // If not, push the space pointer to the table and add an entry to the hahs map.
+            let index: usize = *mut_self
+                .index_map
+                .entry(space.name().to_string())
+                .or_insert_with(|| {
+                    let count = mut_self.sft.len();
+                    mut_self.sft.push(space);
+                    count
+                });
+
+            // Iterate through the chunks and record the space index in the side metadata.
+            let first_chunk = conversions::chunk_align_down(start);
+            let last_chunk = conversions::chunk_align_up(start + bytes);
+            let mut chunk = first_chunk;
+            debug!(
+                "update {} (chunk {}) to {} (chunk {})",
+                start,
+                first_chunk,
+                start + bytes,
+                last_chunk
+            );
+            while chunk < last_chunk {
+                trace!("Update {} to index {}", chunk, index);
+                store_atomic(&SFT_DENSE_CHUNK_MAP_INDEX, chunk, index, Ordering::SeqCst);
+                chunk += BYTES_IN_CHUNK;
+            }
+            debug!("update done");
+        }
+
+        fn clear(&self, address: Address) {
+            store_atomic(
+                &SFT_DENSE_CHUNK_MAP_INDEX,
+                address,
+                Self::EMPTY_SFT_INDEX,
+                Ordering::SeqCst,
+            );
+        }
+    }
+
+    impl<'a> SFTDenseChunkMap<'a> {
+        /// Empty space is at index 0
+        const EMPTY_SFT_INDEX: usize = 0;
+
+        pub fn new() -> Self {
+            Self {
+                /// Empty space is at index 0
+                sft: vec![&EMPTY_SPACE_SFT],
+                index_map: HashMap::new(),
+            }
+        }
+
+        // This is a temporary solution to allow unsafe mut reference. We do not want several occurrence
+        // of the same unsafe code.
+        // FIXME: We need a safe implementation.
+        #[allow(clippy::cast_ref_to_mut)]
+        #[allow(clippy::mut_from_ref)]
+        unsafe fn mut_self(&self) -> &mut Self {
+            &mut *(self as *const _ as *mut _)
+        }
+
+        #[inline(always)]
+        pub fn addr_to_index(addr: Address) -> usize {
+            load_atomic(&SFT_DENSE_CHUNK_MAP_INDEX, addr, Ordering::Relaxed)
+        }
+    }
+}
+
+#[allow(dead_code)]
+mod sparse_chunk_map {
     use super::*;
     use crate::util::conversions;
     use crate::util::conversions::*;
@@ -203,14 +349,13 @@ mod chunk_map {
     use crate::util::heap::layout::vm_layout_constants::MAX_CHUNKS;
 
     /// The chunk map is a sparse table. It has one entry for each chunk in the address space we may use.
-    pub struct SFTChunkMap<'a> {
+    pub struct SFTSparseChunkMap<'a> {
         sft: Vec<&'a (dyn SFT + Sync + 'static)>,
     }
 
-    // TODO: MMTK<VM> holds a reference to SFTChunkMap. We should have a safe implementation rather than use raw pointers for dyn SFT.
-    unsafe impl<'a> Sync for SFTChunkMap<'a> {}
+    unsafe impl<'a> Sync for SFTSparseChunkMap<'a> {}
 
-    impl<'a> SFTMap for SFTChunkMap<'a> {
+    impl<'a> SFTMap for SFTSparseChunkMap<'a> {
         fn has_sft_entry(&self, addr: Address) -> bool {
             addr.chunk_index() < MAX_CHUNKS
         }
@@ -262,9 +407,9 @@ mod chunk_map {
         }
     }
 
-    impl<'a> SFTChunkMap<'a> {
+    impl<'a> SFTSparseChunkMap<'a> {
         pub fn new() -> Self {
-            SFTChunkMap {
+            SFTSparseChunkMap {
                 sft: vec![&EMPTY_SPACE_SFT; MAX_CHUNKS],
             }
         }

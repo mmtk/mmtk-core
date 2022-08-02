@@ -84,24 +84,41 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         res.new_chunk
                     );
                     let bytes = conversions::pages_to_bytes(res.pages);
-                    self.grow_space(res.start, bytes, res.new_chunk);
 
-                    // Once we finish grow_space, we can drop the lock.
-                    drop(lock);
+                    let map_sidemetadata = || {
+                        // Mmap the pages and the side metadata, and handle error. In case of any error,
+                        // we will either call back to the VM for OOM, or simply panic.
+                        if let Err(mmap_error) = self
+                            .common()
+                            .mmapper
+                            .ensure_mapped(res.start, res.pages)
+                            .and(
+                                self.common()
+                                    .metadata
+                                    .try_map_metadata_space(res.start, bytes),
+                            )
+                        {
+                            memory::handle_mmap_error::<VM>(mmap_error, tls);
+                        }
+                    };
+                    let grow_space = || {
+                        self.grow_space(res.start, bytes, res.new_chunk);
+                    };
 
-                    // Mmap the pages and the side metadata, and handle error. In case of any error,
-                    // we will either call back to the VM for OOM, or simply panic.
-                    if let Err(mmap_error) = self
-                        .common()
-                        .mmapper
-                        .ensure_mapped(res.start, res.pages)
-                        .and(
-                            self.common()
-                                .metadata
-                                .try_map_metadata_space(res.start, bytes),
-                        )
-                    {
-                        memory::handle_mmap_error::<VM>(mmap_error, tls);
+                    // The scope of the lock is important in terms of performance when we have many allocator threads.
+                    if cfg!(feature = "chunk_based_dense_sft_table") {
+                        // chunk-based dense sft map will use side metadata, so we have to initialize side metadata first.
+                        map_sidemetadata();
+                        // then grow space, which will use the side metadata we mapped above
+                        grow_space();
+                        // then we can drop the lock after grow_space()
+                        drop(lock);
+                    } else {
+                        // In normal cases, we can drop lock immediately after grow_space()
+                        grow_space();
+                        drop(lock);
+                        // and map side metadata without holding the lock
+                        map_sidemetadata();
                     }
 
                     // TODO: Concurrent zeroing
@@ -441,7 +458,6 @@ impl<VM: VMBinding> CommonSpace<VM> {
     }
 
     pub fn init(&self, space: &dyn Space<VM>) {
-        // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
             if self
                 .metadata
@@ -451,7 +467,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
                 // TODO(Javad): handle meta space allocation failure
                 panic!("failed to mmap meta memory");
             }
-            SFT_MAP.update(space.as_sft(), self.start, self.extent);
+            // We have to keep this for now: if a space is contiguous, our page resource will NOT consider newly allocated chunks
+            // as new chunks (new_chunks = true). In that case, in grow_space(), we do not set SFT when new_chunks = false.
+            // We can fix this by either of these:
+            // * fix page resource, so it propelry returns new_chunk
+            // * change grow_space() so it sets SFT no matter what the new_chunks value is.
+            // FIXME: eagerly initializing SFT is not a good idea.
+            SFT_MAP.eager_initialize(space.as_sft(), self.start, self.extent);
         }
     }
 

@@ -414,12 +414,14 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+    let start = start.align_down(1 << metadata_spec.log_bytes_in_region);
+    let end = (start + size).align_up(1 << metadata_spec.log_bytes_in_region);
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             // zero entries where the key (data_addr) is in the range (start, start+size)
             for (k, v) in spec_sanity_map.iter_mut() {
                 // If the source address is in the bzero's range
-                if *k >= start && *k < start + size {
+                if *k >= start && *k < end {
                     *v = 0;
                 }
             }
@@ -444,6 +446,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
     verify_metadata_address_bound(metadata_spec, data_addr);
+    let data_addr = data_addr.align_down(1 << metadata_spec.log_bytes_in_region);
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -478,6 +481,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
     verify_metadata_address_bound(metadata_spec, data_addr);
+    let data_addr = data_addr.align_down(1 << metadata_spec.log_bytes_in_region);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -497,6 +501,7 @@ fn do_math(
     val: usize,
     math_op: MathOp,
 ) -> Result<usize> {
+    let data_addr = data_addr.align_down(1 << metadata_spec.log_bytes_in_region);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -535,6 +540,7 @@ pub fn verify_add(
     actual_old_val: usize,
 ) {
     verify_metadata_address_bound(metadata_spec, data_addr);
+    let data_addr = data_addr.align_down(1 << metadata_spec.log_bytes_in_region);
     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
         Ok(expected_old_val) => {
             assert!(
@@ -567,6 +573,7 @@ pub fn verify_sub(
     actual_old_val: usize,
 ) {
     verify_metadata_address_bound(metadata_spec, data_addr);
+    let data_addr = data_addr.align_down(1 << metadata_spec.log_bytes_in_region);
     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
         Ok(expected_old_val) => {
             assert!(
