@@ -66,14 +66,7 @@ impl MMTKBuilder {
 
     /// Build an MMTk instance from the builder.
     pub fn build<VM: VMBinding>(&self) -> MMTK<VM> {
-        let mut mmtk = MMTK::new(Arc::new(self.options.clone()));
-
-        let heap_size = *self.options.heap_size;
-        // TODO: We should remove Plan.gc_init(). We create plan in `MMTKInner::new()`, and we
-        // should be able move whatever we do in gc_init() to Plan::new().
-        mmtk.plan.gc_init(heap_size, &crate::VM_MAP);
-
-        mmtk
+        MMTK::new(Arc::new(self.options.clone()))
     }
 }
 
@@ -116,6 +109,14 @@ impl<VM: VMBinding> MMTK<VM> {
             &MMAPPER,
             options.clone(),
             scheduler.clone(),
+        );
+
+        // TODO: This probably does not work if we have multiple MMTk instances.
+        VM_MAP.boot();
+        // This needs to be called after we create Plan. It needs to use HeapMeta, which is gradually built when we create spaces.
+        VM_MAP.finalize_static_space_map(
+            plan.base().heap.get_discontig_start(),
+            plan.base().heap.get_discontig_end(),
         );
 
         MMTK {

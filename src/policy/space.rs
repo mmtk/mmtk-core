@@ -382,7 +382,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
-    fn init(&mut self, vm_map: &'static VMMap);
+
+    /// Initialize entires in SFT map for the space. This is called when the Space object
+    /// has a non-moving address, as we will use the address to set sft.
+    /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
+    fn initialize_sft(&self);
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
@@ -544,10 +548,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    /**
-     *  Ensure this space is marked as mapped -- used when the space is already
-     *  mapped (e.g. for a vm image which is externally mmapped.)
-     */
+    /// Ensure this space is marked as mapped -- used when the space is already
+    /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
         if self
             .common()
@@ -558,7 +560,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
+
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -772,6 +774,16 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // VM.memory.setHeapRange(index, start, start.plus(extent));
         vm_map.insert(start, extent, rtn.descriptor);
 
+        // For contiguous space, we know its address range so we reserve metadata memory for its range.
+        if rtn
+            .metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent)
+            .is_err()
+        {
+            // TODO(Javad): handle meta space allocation failure
+            panic!("failed to mmap meta memory");
+        }
+
         if DEBUG_SPACE {
             println!(
                 "Created space {} [{}, {}) for {} bytes",
@@ -785,18 +797,10 @@ impl<VM: VMBinding> CommonSpace<VM> {
         rtn
     }
 
-    pub fn init(&self, space: &dyn Space<VM>) {
+    pub fn initialize_sft(&self, sft: &(dyn SFT + Sync + 'static)) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if self
-                .metadata
-                .try_map_metadata_address_range(self.start, self.extent)
-                .is_err()
-            {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory");
-            }
-            SFT_MAP.update(space.as_sft(), self.start, self.extent);
+            SFT_MAP.update(sft, self.start, self.extent);
         }
     }
 

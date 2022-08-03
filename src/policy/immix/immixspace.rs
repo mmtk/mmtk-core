@@ -104,9 +104,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        super::validate_features();
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
@@ -186,6 +185,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
+        super::validate_features();
         let common = CommonSpace::new(
             SpaceOptions {
                 name,

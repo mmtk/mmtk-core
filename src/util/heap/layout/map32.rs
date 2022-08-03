@@ -160,7 +160,7 @@ impl Map for Map32 {
     }
 
     fn finalize_static_space_map(&self, from: Address, to: Address) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */
