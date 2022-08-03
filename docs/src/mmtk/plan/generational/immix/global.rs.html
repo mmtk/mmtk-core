@@ -277,7 +277,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::{<span class="ident">HEAP_END</span>, <span class="ident">HEAP_START</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
@@ -365,9 +364,10 @@
         <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">collection_required</span>(<span class="self">self</span>, <span class="ident">space_full</span>, <span class="ident">space</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>);
-        <span class="self">self</span>.<span class="ident">immix</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
+    <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_spaces</span>();
+        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immix</span>);
+        <span class="ident">ret</span>
     }
 
     <span class="comment">// GenImmixMatureProcessEdges&lt;VM, { TraceKind::Defrag }&gt; and GenImmixMatureProcessEdges&lt;VM, { TraceKind::Fast }&gt;</span>
@@ -472,7 +472,7 @@
         <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
         <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="ident">HEAP_START</span>, <span class="ident">HEAP_END</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
         <span class="comment">// We have no specific side metadata for copying. So just use the ones from generational.</span>
         <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>
             <span class="ident"><span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();

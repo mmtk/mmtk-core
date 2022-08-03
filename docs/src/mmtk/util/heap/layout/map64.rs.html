@@ -404,7 +404,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">boot</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="comment">// This is only called during boot process by a single thread calling gc_init().</span>
+        <span class="comment">// This is only called during boot process by a single thread.</span>
         <span class="comment">// It is fine to get a mutable reference.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {
@@ -417,7 +417,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">finalize_static_space_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_from</span>: <span class="ident">Address</span>, <span class="ident">_to</span>: <span class="ident">Address</span>) {
-        <span class="comment">// This is only called during boot process by a single thread calling gc_init().</span>
+        <span class="comment">// This is only called during boot process by a single thread.</span>
         <span class="comment">// It is fine to get a mutable reference.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
         <span class="kw">for</span> <span class="ident">pr</span> <span class="kw">in</span> <span class="number">0</span>..<span class="ident">MAX_SPACES</span> {

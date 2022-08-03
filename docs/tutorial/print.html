@@ -599,7 +599,6 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
@@ -674,7 +673,7 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
         options: Arc&lt;Options&gt;,
     ) -&gt; Self {
         // Modify
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&amp;options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&amp;[]);
 
         let res = MyGC {
@@ -718,17 +717,9 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 copyspaces, rather than the base plan and mygc_space. The contents of the 
 initializer calls are identical.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span><span class="boring">fn main() {
-</span>    fn gc_init(
-        &amp;mut self,
-        heap_size: usize,
-        vm_map: &amp;'static VMMap,
-    ) {
-        self.common.gc_init(heap_size, vm_map);
-        self.copyspace0.init(&amp;vm_map);
-        self.copyspace1.init(&amp;vm_map);
-    }
-<span class="boring">}
+</span>
+<span class="boring">fn main() {
+</span><span class="boring">}
 </span></code></pre></pre>
 <h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
 <p>Add a new section of methods for MyGC:</p>

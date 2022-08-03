@@ -824,6 +824,10 @@
 <span id="822">822</span>
 <span id="823">823</span>
 <span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
@@ -1208,7 +1212,11 @@
     <span class="kw">fn</span> <span class="ident">as_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
     <span class="kw">fn</span> <span class="ident">as_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>);
     <span class="kw">fn</span> <span class="ident">get_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">PageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
-    <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>);
+
+    <span class="doccomment">/// Initialize entires in SFT map for the space. This is called when the Space object</span>
+    <span class="doccomment">/// has a non-moving address, as we will use the address to set sft.</span>
+    <span class="doccomment">/// Currently after we create a boxed plan, spaces in the plan have a non-moving address.</span>
+    <span class="kw">fn</span> <span class="ident">initialize_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>);
 
     <span class="kw">fn</span> <span class="ident">acquire</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">trace!</span>(<span class="string">&quot;Space.acquire, tls={:?}&quot;</span>, <span class="ident">tls</span>);
@@ -1370,10 +1378,8 @@
         }
     }
 
-    <span class="doccomment">/**
-     *  Ensure this space is marked as mapped -- used when the space is already
-     *  mapped (e.g. for a vm image which is externally mmapped.)
-     */</span>
+    <span class="doccomment">/// Ensure this space is marked as mapped -- used when the space is already</span>
+    <span class="doccomment">/// mapped (e.g. for a vm image which is externally mmapped.)</span>
     <span class="kw">fn</span> <span class="ident">ensure_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">if</span> <span class="self">self</span>
             .<span class="ident">common</span>()
@@ -1384,7 +1390,7 @@
             <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
             <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
-        <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">extent</span>);
+
         <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::mmapper::Mmapper</span>;
         <span class="self">self</span>.<span class="ident">common</span>()
             .<span class="ident">mmapper</span>
@@ -1598,6 +1604,16 @@
         <span class="comment">// VM.memory.setHeapRange(index, start, start.plus(extent));</span>
         <span class="ident">vm_map</span>.<span class="ident">insert</span>(<span class="ident">start</span>, <span class="ident">extent</span>, <span class="ident">rtn</span>.<span class="ident">descriptor</span>);
 
+        <span class="comment">// For contiguous space, we know its address range so we reserve metadata memory for its range.</span>
+        <span class="kw">if</span> <span class="ident">rtn</span>
+            .<span class="ident">metadata</span>
+            .<span class="ident">try_map_metadata_address_range</span>(<span class="ident">rtn</span>.<span class="ident">start</span>, <span class="ident">rtn</span>.<span class="ident">extent</span>)
+            .<span class="ident">is_err</span>()
+        {
+            <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
+            <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
+        }
+
         <span class="kw">if</span> <span class="ident">DEBUG_SPACE</span> {
             <span class="macro">println!</span>(
                 <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
@@ -1611,18 +1627,10 @@
         <span class="ident">rtn</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">init</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">initialize_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">sft</span>: <span class="kw-2">&amp;</span>(<span class="kw">dyn</span> <span class="ident">SFT</span> <span class="op">+</span> <span class="ident">Sync</span> <span class="op">+</span> <span class="lifetime">&#39;static</span>)) {
         <span class="comment">// For contiguous space, we eagerly initialize SFT map based on its address range.</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contiguous</span> {
-            <span class="kw">if</span> <span class="self">self</span>
-                .<span class="ident">metadata</span>
-                .<span class="ident">try_map_metadata_address_range</span>(<span class="self">self</span>.<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">extent</span>)
-                .<span class="ident">is_err</span>()
-            {
-                <span class="comment">// TODO(Javad): handle meta space allocation failure</span>
-                <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
-            }
-            <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">space</span>.<span class="ident">as_sft</span>(), <span class="self">self</span>.<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">extent</span>);
+            <span class="ident">SFT_MAP</span>.<span class="ident">update</span>(<span class="ident">sft</span>, <span class="self">self</span>.<span class="ident">start</span>, <span class="self">self</span>.<span class="ident">extent</span>);
         }
     }
 

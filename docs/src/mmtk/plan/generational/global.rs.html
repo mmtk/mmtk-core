@@ -254,6 +254,7 @@
 <span id="252">252</span>
 <span id="253">253</span>
 <span id="254">254</span>
+<span id="255">255</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -334,10 +335,11 @@
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">verify_side_metadata_sanity</span>(<span class="ident">sanity</span>);
     }
 
-    <span class="doccomment">/// Initialize Gen. This should be called by the gc_init() API call.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>);
-        <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
+    <span class="doccomment">/// Get spaces in generation plans</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_spaces</span>();
+        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nursery</span>);
+        <span class="ident">ret</span>
     }
 
     <span class="doccomment">/// Prepare Gen. This should be called by a single thread in GC prepare work.</span>

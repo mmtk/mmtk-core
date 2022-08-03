@@ -1043,6 +1043,9 @@
 <span id="1041">1041</span>
 <span id="1042">1042</span>
 <span id="1043">1043</span>
+<span id="1044">1044</span>
+<span id="1045">1045</span>
+<span id="1046">1046</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1058,11 +1061,9 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::AnalysisManager</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::{<span class="ident">CopyConfig</span>, <span class="ident">GCWorkerCopyContext</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::map::Map</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
@@ -1115,30 +1116,39 @@
     <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="kw">match</span> <span class="ident">plan</span> {
-        <span class="ident">PlanSelector::NoGC</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::nogc::NoGC::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>)),
+    <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">plan</span> {
+        <span class="ident">PlanSelector::NoGC</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::nogc::NoGC::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>))
+            <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::SemiSpace</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::semispace::SemiSpace::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::GenCopy</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::copying::GenCopy::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::GenImmix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::immix::GenImmix::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::MarkSweep</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::marksweep::MarkSweep::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::Immix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::immix::Immix::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::PageProtect</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::pageprotect::PageProtect::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )),
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::MarkCompact</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::markcompact::MarkCompact::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )),
-    }
+        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    };
+
+    <span class="comment">// We have created Plan in the heap, and we won&#39;t explicitly move it. So each space</span>
+    <span class="comment">// now has a fixed address for its lifetime. It is safe now to initialize SFT.</span>
+    <span class="ident">plan</span>.<span class="ident">get_spaces</span>()
+        .<span class="ident">into_iter</span>()
+        .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">initialize_sft</span>());
+
+    <span class="ident">plan</span>
 }
 
 <span class="doccomment">/// Create thread local GC worker.</span>
@@ -1201,8 +1211,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">base</span>().<span class="ident">options</span>
     }
 
-    <span class="comment">// unsafe because this can only be called once by the init thread</span>
-    <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>);
+    <span class="doccomment">/// get all the spaces in the plan</span>
+    <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>;
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span>;
 
@@ -1482,7 +1492,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
     <span class="kw">let</span> <span class="ident">boot_segment_mb</span> <span class="op">=</span> <span class="ident">raw_align_up</span>(<span class="ident">boot_segment_bytes</span>, <span class="ident">BYTES_IN_CHUNK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>;
 
-    <span class="ident">ImmortalSpace::new</span>(
+    <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="ident">ImmortalSpace::new</span>(
         <span class="string">&quot;boot&quot;</span>,
         <span class="bool-val">false</span>,
         <span class="ident">VMRequest::fixed_size</span>(<span class="ident">boot_segment_mb</span>),
@@ -1491,7 +1501,12 @@ BasePlan should contain all plan-related state and functions that are _fundament
         <span class="ident">mmapper</span>,
         <span class="ident">heap</span>,
         <span class="ident">constraints</span>,
-    )
+    );
+
+    <span class="comment">// The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.</span>
+    <span class="ident">space</span>.<span class="ident">ensure_mapped</span>();
+
+    <span class="ident">space</span>
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -1584,27 +1599,17 @@ BasePlan should contain all plan-related state and functions that are _fundament
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="ident">vm_map</span>.<span class="ident">boot</span>();
-        <span class="ident">vm_map</span>.<span class="ident">finalize_static_space_map</span>(
-            <span class="self">self</span>.<span class="ident">heap</span>.<span class="ident">get_discontig_start</span>(),
-            <span class="self">self</span>.<span class="ident">heap</span>.<span class="ident">get_discontig_end</span>(),
-        );
-        <span class="self">self</span>.<span class="ident">heap</span>
-            .<span class="ident">total_pages</span>
-            .<span class="ident">store</span>(<span class="ident">bytes_to_pages</span>(<span class="ident">heap_size</span>), <span class="ident">Ordering::Relaxed</span>);
-
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-        <span class="self">self</span>.<span class="ident">code_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-        <span class="self">self</span>.<span class="ident">code_lo_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
-        <span class="self">self</span>.<span class="ident">ro_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
-        {
-            <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
-            <span class="self">self</span>.<span class="ident">vm_space</span>.<span class="ident">ensure_mapped</span>();
-        }
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="macro">vec!</span>[
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">code_space</span>,
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">code_lo_space</span>,
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ro_space</span>,
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
+            <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">vm_space</span>,
+        ]
     }
 
     <span class="doccomment">/// The application code has requested a collection.</span>
@@ -1972,10 +1977,11 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">gc_init</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">heap_size</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) {
-        <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">gc_init</span>(<span class="ident">heap_size</span>, <span class="ident">vm_map</span>);
-        <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
-        <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">init</span>(<span class="ident">vm_map</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_spaces</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_spaces</span>();
+        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immortal</span>);
+        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">los</span>);
+        <span class="ident">ret</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
