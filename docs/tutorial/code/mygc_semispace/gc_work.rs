@@ -40,6 +40,8 @@ pub struct MyGCProcessEdges<VM: VMBinding> {
 // ANCHOR: mygc_process_edges_impl
 impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
     type VM = VM;
+    type ScanObjectsWorkType = ScanObjects<Self>;
+
     fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<MyGC<VM>>().unwrap();
@@ -70,6 +72,11 @@ impl<VM:VMBinding> ProcessEdgesWork for MyGCProcessEdges<VM> {
         } else {
             self.plan.common.trace_object(queue, object, worker)
         }
+    }
+
+    #[inline(always)]
+    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, roots)
     }
 }
 // ANCHOR_END: mygc_process_edges_impl
