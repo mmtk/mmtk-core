@@ -69,6 +69,7 @@ impl<VM: VMBinding> GenObjectBarrier<VM> {
         }
     }
 
+    #[inline(always)]
     pub fn gen_object_reference_write_slow(&mut self, src: ObjectReference) {
         self.try_record_node(src)
     }
