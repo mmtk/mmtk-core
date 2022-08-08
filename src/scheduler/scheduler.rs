@@ -43,7 +43,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     /// more ephemeron objects.
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
-    pub(super) pending_messages: AtomicUsize,
+    pub(super) pending_coordinator_packets: AtomicUsize,
 }
 
 // FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
@@ -115,7 +115,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             coordinator_worker_shared,
             worker_monitor,
             closure_end: Mutex::new(None),
-            pending_messages: AtomicUsize::new(0),
+            pending_coordinator_packets: AtomicUsize::new(0),
         })
     }
 
@@ -224,8 +224,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {
+        debug_assert!(
+            self.pending_coordinator_packets.load(Ordering::SeqCst) == 0,
+            "GCWorker attempted to open buckets when there are pending coordinator work packets"
+        );
         buckets.iter().all(|&b| self.work_buckets[b].is_drained())
-            && self.pending_messages.load(Ordering::SeqCst) == 0
     }
 
     pub fn on_closure_end(&self, f: Box<dyn Send + Fn() -> bool>) {
@@ -292,7 +295,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     }
 
     pub fn add_coordinator_work(&self, work: impl CoordinatorWork<VM>, worker: &GCWorker<VM>) {
-        self.pending_messages.fetch_add(1, Ordering::SeqCst);
+        self.pending_coordinator_packets
+            .fetch_add(1, Ordering::SeqCst);
         worker
             .sender
             .send(CoordinatorMessage::Work(Box::new(work)))
@@ -374,8 +378,9 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     #[cold]
     fn poll_slow(&self, worker: &GCWorker<VM>) -> Box<dyn GCWork<VM>> {
+        // Note: The lock is released during `wait` in the loop.
+        let mut guard = self.worker_monitor.0.lock().unwrap();
         loop {
-            let guard = self.worker_monitor.0.lock().unwrap();
             // Retry polling
             if let Some(work) = self.poll_schedulable_work(worker) {
                 return work;
@@ -386,31 +391,38 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             if all_parked {
                 // If there're any designated work, resume the workers and process them
                 if self.worker_group.has_designated_work() {
-                    self.worker_group.dec_parked_workers();
+                    assert!(
+                        worker.shared.designated_work.is_empty(),
+                        "The last parked worker has designated work."
+                    );
                     self.worker_monitor.1.notify_all();
-                    continue;
-                }
-                if self.update_buckets() {
-                    // We're not going to sleep since a new bucket is just open.
-                    self.worker_group.dec_parked_workers();
-                    // We guarantee that we can at least fetch one packet.
-                    let work = self.poll_schedulable_work(worker).unwrap();
-                    // Optimize for the case that a newly opened bucket only has one packet.
-                    // We only notify_all if there're more than one packets available.
-                    if !self.all_activated_buckets_are_empty() {
-                        // Have more jobs in this buckets. Notify other workers.
-                        self.worker_monitor.1.notify_all();
+                    // The current worker is going to wait, because the designated work is not for it.
+                } else if self.pending_coordinator_packets.load(Ordering::SeqCst) == 0 {
+                    if self.update_buckets() {
+                        // We're not going to sleep since a new bucket is just open.
+                        self.worker_group.dec_parked_workers();
+                        // We guarantee that we can at least fetch one packet.
+                        let work = self.poll_schedulable_work(worker).unwrap();
+                        // Optimize for the case that a newly opened bucket only has one packet.
+                        // We only notify_all if there're more than one packets available.
+                        if !self.all_activated_buckets_are_empty() {
+                            // Have more jobs in this buckets. Notify other workers.
+                            self.worker_monitor.1.notify_all();
+                        }
+                        // Return this packet and execute it.
+                        return work;
                     }
-                    // Return this packet and execute it.
-                    return work;
+                    debug_assert!(!self.worker_group.has_designated_work());
+                    // The current pause is finished if we can't open more buckets.
+                    worker.sender.send(CoordinatorMessage::Finish).unwrap();
                 }
-                debug_assert!(!self.worker_group.has_designated_work());
-                // The current pause is finished if we can't open more buckets.
-                self.pending_messages.fetch_add(1, Ordering::SeqCst);
-                worker.sender.send(CoordinatorMessage::Finish).unwrap();
+                // Otherwise, if there is still pending coordinator work, the last parked
+                // worker will wait on the monitor, too.  The coordinator will notify a
+                // worker (maybe not the current one) once it finishes executing all
+                // coordinator work packets.
             }
             // Wait
-            let _guard = self.worker_monitor.1.wait(guard).unwrap();
+            guard = self.worker_monitor.1.wait(guard).unwrap();
             // Unpark this worker
             self.worker_group.dec_parked_workers();
         }

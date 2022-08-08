@@ -18,6 +18,10 @@ pub struct GCWorkerShared<VM: VMBinding> {
     /// Worker-local statistics data.
     stat: AtomicRefCell<WorkerLocalStat<VM>>,
     /// A queue of GCWork that can only be processed by the owned thread.
+    ///
+    /// Note: Currently, designated work cannot be added from the GC controller thread, or
+    /// there will be synchronization problems.  If it is necessary to do so, we need to
+    /// update the code in `GCWorkScheduler::poll_slow` for proper synchornization.
     pub designated_work: ArrayQueue<Box<dyn GCWork<VM>>>,
     /// Handle for stealing packets from the current worker
     pub stealer: Option<Stealer<Box<dyn GCWork<VM>>>>,

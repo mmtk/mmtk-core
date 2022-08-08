@@ -11,6 +11,7 @@
 //! it can turn the `Box` pointer to a native pointer (`*mut Mutator`), and forge a mut reference from the native
 //! pointer. Either way, the VM binding code needs to guarantee the safety.
 
+use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
 use crate::plan::{Mutator, MutatorContext};
@@ -27,15 +28,31 @@ use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
 /// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
-/// instance but before using any of the methods provided in MMTk. This method will attempt to initialize a
-/// logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
+/// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
+///
+/// We expect a binding to ininitialize MMTk in the following steps:
+///
+/// 1. Create an [MMTKBuilder](../mmtk/struct.MMTKBuilder.html) instance.
+/// 2. Set command line options for MMTKBuilder by [process()](./fn.process.html) or [process_bulk()](./fn.process_bulk.html).
+/// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
+///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
+///    supported. Currently we assume a binding will only need one MMTk instance.
+/// 4. Enable garbage collection in MMTk by [enable_collection()](./fn.enable_collection.html). A binding should only call this once its
+///    thread system is ready. MMTk will not trigger garbage collection before this call.
+///
+/// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
 /// Note that, to allow MMTk to do GC properly, `initialize_collection()` needs to be called after this call when
 /// the VM's thread system is ready to spawn GC workers.
 ///
+/// Note that this method returns a boxed pointer of MMTK, which means MMTk has a bound lifetime with the box pointer. However, some of our current APIs assume
+/// that MMTk has a static lifetime, which presents a mismatch with this API. We plan to address the lifetime issue in the future. At this point, we recommend a binding
+/// to 'expand' the lifetime for the boxed pointer to static. There could be multiple ways to achieve it: 1. `Box::leak()` will turn the box pointer to raw pointer
+/// which has static lifetime, 2. create MMTK as a lazily initialized static variable
+/// (see [what we do for our dummy binding](https://github.com/mmtk/mmtk-core/blob/master/vmbindings/dummyvm/src/lib.rs#L42))
+///
 /// Arguments:
-/// * `mmtk`: A reference to an MMTk instance to initialize.
-/// * `heap_size`: The heap size for the MMTk instance in bytes.
-pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
+/// * `builder`: The reference to a MMTk builder.
+pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     match crate::util::logger::try_init() {
         Ok(_) => debug!("MMTk initialized the logger."),
         Err(_) => debug!(
@@ -59,11 +76,11 @@ pub fn gc_init<VM: VMBinding>(mmtk: &'static mut MMTK<VM>, heap_size: usize) {
             }
         }
     }
-    assert!(heap_size > 0, "Invalid heap size");
-    mmtk.plan.gc_init(heap_size, &crate::VM_MAP);
+    let mmtk = builder.build();
     info!("Initialized MMTk with {:?}", *mmtk.options.plan);
     #[cfg(feature = "extreme_assertions")]
     warn!("The feature 'extreme_assertions' is enabled. MMTk will run expensive run-time checks. Slow performance should be expected.");
+    Box::new(mmtk)
 }
 
 /// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
@@ -318,24 +335,22 @@ pub fn disable_collection<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 }
 
 /// Process MMTk run-time options. Returns true if the option is processed successfully.
-/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `name`: The name of the option.
 /// * `value`: The value of the option (as a string).
-pub fn process<VM: VMBinding>(mmtk: &'static MMTK<VM>, name: &str, value: &str) -> bool {
-    unsafe { mmtk.options.process(name, value) }
+pub fn process(builder: &mut MMTKBuilder, name: &str, value: &str) -> bool {
+    builder.set_option(name, value)
 }
 
 /// Process multiple MMTk run-time options. Returns true if all the options are processed successfully.
-/// We expect that only one thread should call `process()` or `process_bulk()` before `gc_init()` is called.
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
 /// * `options`: a string that is key value pairs separated by white spaces, e.g. "threads=1 stress_factor=4096"
-pub fn process_bulk<VM: VMBinding>(mmtk: &'static MMTK<VM>, options: &str) -> bool {
-    unsafe { mmtk.options.process_bulk(options) }
+pub fn process_bulk(builder: &mut MMTKBuilder, options: &str) -> bool {
+    builder.set_options_bulk_by_str(options)
 }
 
 /// Return used memory in bytes.

@@ -15,11 +15,10 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
@@ -79,10 +78,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.last_collection_full_heap()
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.gen.gc_init(heap_size, vm_map);
-        self.copyspace0.init(vm_map);
-        self.copyspace1.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.gen.get_spaces();
+        ret.push(&self.copyspace0);
+        ret.push(&self.copyspace1);
+        ret
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -166,12 +166,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
+        let mut heap = HeapMeta::new(&options);
         // We have no specific side metadata for copying. So just use the ones from generational.
         let global_metadata_specs =
             crate::plan::generational::new_generational_global_metadata_specs::<VM>();

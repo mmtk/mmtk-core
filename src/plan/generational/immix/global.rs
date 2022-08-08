@@ -15,9 +15,8 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 
@@ -103,9 +102,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.gen.gc_init(heap_size, vm_map);
-        self.immix.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.gen.get_spaces();
+        ret.push(&self.immix);
+        ret
     }
 
     // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
@@ -207,10 +207,10 @@ impl<VM: VMBinding> GenImmix<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         // We have no specific side metadata for copying. So just use the ones from generational.
         let global_metadata_specs =
             crate::plan::generational::new_generational_global_metadata_specs::<VM>();

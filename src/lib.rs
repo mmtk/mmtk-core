@@ -45,9 +45,9 @@ extern crate num_cpus;
 extern crate downcast_rs;
 
 mod mmtk;
+pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
-pub(crate) use mmtk::VM_MAP;
 
 mod policy;
 

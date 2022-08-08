@@ -13,11 +13,10 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
@@ -75,9 +74,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         }
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-        self.immix_space.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.immix_space);
+        ret
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -137,10 +137,10 @@ impl<VM: VMBinding> Immix<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         let immix = Immix {
             immix_space: ImmixSpace::new(

@@ -23,6 +23,8 @@ pub mod linear_scan;
 pub mod memory;
 /// Opaque pointers used in MMTk, e.g. VMThread.
 pub mod opaque_pointer;
+/// MMTk command line options.
+pub mod options;
 /// Reference processing implementation.
 pub mod reference_processor;
 
@@ -51,8 +53,6 @@ pub mod malloc;
 pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
-/// MMTk command line options.
-pub(crate) mod options;
 /// Utilities funcitons for Rust
 pub(crate) mod rust_util;
 /// Sanity checker for GC.

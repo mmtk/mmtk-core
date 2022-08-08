@@ -9,13 +9,12 @@ use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::Arc;
@@ -41,11 +40,12 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
         &NOGC_CONSTRAINTS
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.base.gc_init(heap_size, vm_map);
-
-        // FIXME correctly initialize spaces based on options
-        self.nogc_space.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.base.get_spaces();
+        ret.push(&self.nogc_space);
+        ret.push(&self.immortal);
+        ret.push(&self.los);
+        ret
     }
 
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
@@ -85,15 +85,11 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 }
 
 impl<VM: VMBinding> NoGC<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
         #[cfg(not(feature = "nogc_lock_free"))]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         #[cfg(feature = "nogc_lock_free")]
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
 
         let global_specs = SideMetadataContext::new_global_specs(&[]);
 
@@ -101,6 +97,7 @@ impl<VM: VMBinding> NoGC<VM> {
         let nogc_space = NoGCImmortalSpace::new(
             "nogc_space",
             cfg!(not(feature = "nogc_no_zeroing")),
+            &options,
             global_specs.clone(),
         );
         #[cfg(not(feature = "nogc_lock_free"))]

@@ -161,7 +161,7 @@ impl Map for Map64 {
     }
 
     fn boot(&self) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
@@ -174,7 +174,7 @@ impl Map for Map64 {
     }
 
     fn finalize_static_space_map(&self, _from: Address, _to: Address) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
