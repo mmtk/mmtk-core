@@ -78,10 +78,11 @@ impl<VM: VMBinding> Gen<VM> {
         self.nursery.verify_side_metadata_sanity(sanity);
     }
 
-    /// Initialize Gen. This should be called by the gc_init() API call.
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-        self.nursery.init(vm_map);
+    /// Get spaces in generation plans
+    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.nursery);
+        ret
     }
 
     /// Prepare Gen. This should be called by a single thread in GC prepare work.

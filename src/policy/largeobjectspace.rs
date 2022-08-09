@@ -103,8 +103,9 @@ impl<VM: VMBinding> Space<VM> for LargeObjectSpace<VM> {
     fn get_page_resource(&self) -> &dyn PageResource<VM> {
         &self.pr
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        self.common().init(self.as_space());
+
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
 
     fn common(&self) -> &CommonSpace<VM> {
