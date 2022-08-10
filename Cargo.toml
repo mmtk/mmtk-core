@@ -92,6 +92,9 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
+# Count arbitrary VM-specific allocated memory into the heap size
+vm_alloc_counter = []
+
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
 # Only one feature from each group can be provided. Otherwise build will fail.

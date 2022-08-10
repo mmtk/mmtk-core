@@ -228,10 +228,35 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
     crate::util::malloc::free_with_size(mmtk, addr, old_size)
 }
 
+/// Increase the counter for the number of bytes by VM-specific allocation by `size`.
+/// This counter is counted as part of the heap size.
+/// This operation is atomic, and can be called by multiple threads simultaneously.
+#[cfg(feature = "vm_alloc_counter")]
+pub fn increase_vm_alloc_bytes_by<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) {
+    mmtk.plan.base().increase_vm_alloc_bytes_by(size);
+}
+
+/// Decrease the counter for the number of bytes by VM-specific allocation by `size`.
+/// This counter is counted as part of the heap size.
+/// This operation is atomic, and can be called by multiple threads simultaneously.
+/// If it underflows due to inexact accounting on the VM side, it will saturate at 0.
+#[cfg(feature = "vm_alloc_counter")]
+pub fn decrease_vm_alloc_bytes_by<VM: VMBinding>(mmtk: &MMTK<VM>, size: usize) {
+    mmtk.plan.base().decrease_vm_alloc_bytes_by(size);
+}
+
+/// Get the current value of the counter for the number of bytes by VM-specific allocation.
+/// This operation is atomic, and can be called by multiple threads simultaneously.
+#[cfg(feature = "vm_alloc_counter")]
+pub fn get_vm_alloc_bytes<VM: VMBinding>(mmtk: &MMTK<VM>) -> usize {
+    mmtk.plan.base().get_vm_alloc_bytes()
+}
+
 /// Poll for GC. MMTk will decide if a GC is needed. If so, this call will block
 /// the current thread, and trigger a GC. Otherwise, it will simply return.
 /// Usually a binding does not need to call this function. MMTk will poll for GC during its allocation.
-/// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
+/// However, if a binding uses counted malloc or VM-specific allocations (which won't poll for GC),
+/// they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
 pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     use crate::vm::{ActivePlan, Collection};

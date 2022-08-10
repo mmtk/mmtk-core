@@ -390,11 +390,15 @@ pub struct BasePlan<VM: VMBinding> {
     /// Have we scanned all the stacks?
     stacks_prepared: AtomicBool,
     pub mutator_iterator_lock: Mutex<()>,
-    /// A counter that keeps tracks of the number of bytes allocated since last stress test
+    /// A counter that keeps track of the number of bytes allocated since last stress test
     allocation_bytes: AtomicUsize,
-    /// A counteer that keeps tracks of the number of bytes allocated by malloc
+    /// A counter that keeps track of the number of bytes allocated by malloc
     #[cfg(feature = "malloc_counted_size")]
     malloc_bytes: AtomicUsize,
+    /// A counter that keeps track of the number of bytes allocated by any vm-specific off-heap
+    /// allocation.  This counter is tolerant to inexact increments and decrements from the VM.
+    #[cfg(feature = "vm_alloc_counter")]
+    vm_alloc_bytes: AtomicUsize,
     /// Wrapper around analysis counters
     #[cfg(feature = "analysis")]
     pub analysis_manager: AnalysisManager<VM>,
@@ -546,6 +550,8 @@ impl<VM: VMBinding> BasePlan<VM> {
             allocation_bytes: AtomicUsize::new(0),
             #[cfg(feature = "malloc_counted_size")]
             malloc_bytes: AtomicUsize::new(0),
+            #[cfg(feature = "vm_alloc_counter")]
+            vm_alloc_bytes: AtomicUsize::new(0),
             #[cfg(feature = "analysis")]
             analysis_manager,
         }
@@ -619,6 +625,14 @@ impl<VM: VMBinding> BasePlan<VM> {
         {
             pages += crate::util::conversions::bytes_to_pages_up(
                 self.malloc_bytes.load(Ordering::SeqCst),
+            );
+        }
+
+        // If we need to count VM-specific allocation as part of our heap, we add it here.
+        #[cfg(feature = "vm_alloc_counter")]
+        {
+            pages += crate::util::conversions::bytes_to_pages_up(
+                self.vm_alloc_bytes.load(Ordering::SeqCst),
             );
         }
 
@@ -871,6 +885,24 @@ impl<VM: VMBinding> BasePlan<VM> {
     #[cfg(feature = "malloc_counted_size")]
     pub fn get_malloc_bytes(&self) -> usize {
         self.malloc_bytes.load(Ordering::SeqCst)
+    }
+
+    #[cfg(feature = "vm_alloc_counter")]
+    pub(crate) fn increase_vm_alloc_bytes_by(&self, size: usize) {
+        self.vm_alloc_bytes.fetch_add(size, Ordering::SeqCst);
+    }
+    #[cfg(feature = "vm_alloc_counter")]
+    pub(crate) fn decrease_vm_alloc_bytes_by(&self, size: usize) {
+        let old = self.vm_alloc_bytes.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |old| {
+            Some(old.saturating_sub(size))
+        }).unwrap();
+        if size > old {
+            error!("vm_alloc_bytes underflowed. old: {}, decrement: {}", old, size);
+        }
+    }
+    #[cfg(feature = "vm_alloc_counter")]
+    pub fn get_vm_alloc_bytes(&self) -> usize {
+        self.vm_alloc_bytes.load(Ordering::SeqCst)
     }
 }
 
