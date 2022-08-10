@@ -89,11 +89,16 @@ lazy_static! {
     /// Git version such as a96e8f991c91a81df51e7975849441f52fdbcdcc, or a96e8f991c91a81df51e7975849441f52fdbcdcc-dirty, or unknown-git-version if MMTk
     /// is not built from a git repo.
     pub static ref MMTK_GIT_VERSION: &'static str = &MMTK_GIT_VERSION_STRING;
-
     // Owned string
     static ref MMTK_GIT_VERSION_STRING: String = if raw::GIT_COMMIT_HASH.is_some() {
         format!("{}{}", raw::GIT_COMMIT_HASH.unwrap(), if raw::GIT_DIRTY.unwrap() { "-dirty" } else { "" })
     } else {
         "unknown-git-version".to_string()
     };
+
+    /// Full build info, including MMTk's name, version, git, and features in the build,
+    /// such as MMTk 0.14.0 (43e0ce8f32fbbc84e19be8d7e79f125c7d13babc-dirty, DEFAULT, EXTREME_ASSERTIONS)
+    pub static ref MMTK_FULL_BUILD_INFO: &'static str = &MMTK_FULL_BUILD_INFO_STRING;
+    // Owned string
+    static ref MMTK_FULL_BUILD_INFO_STRING: String = format!("MMTk {} ({}, {})", MMTK_PKG_VERSION, *MMTK_GIT_VERSION, MMTK_FEATURES);
 }
