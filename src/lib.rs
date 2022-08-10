@@ -51,6 +51,7 @@ pub use mmtk::MMTK;
 
 mod policy;
 
+pub mod build_info;
 pub mod memory_manager;
 pub mod plan;
 pub mod scheduler;
