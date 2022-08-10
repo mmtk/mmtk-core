@@ -45,7 +45,7 @@ jobs:
 
       # Setup Environments
       - name: Setup Environments
-        run: ./.github/scripts/ci-setup.sh
+        run: ./.github/scripts/ci-setup-${{ matrix.target.triple }}.sh
 
       # Build
       - name: Build
