@@ -80,10 +80,10 @@ mod raw {
 }
 
 /// MMTk crate version such as 0.14.0
-pub const MMTK_PKG_VERSION: &'static str = raw::PKG_VERSION;
+pub const MMTK_PKG_VERSION: &str = raw::PKG_VERSION;
 
 /// Comma separated features enabled for this build
-pub const MMTK_FEATURES: &'static str = raw::FEATURES_STR;
+pub const MMTK_FEATURES: &str = raw::FEATURES_STR;
 
 lazy_static! {
     /// Git version such as a96e8f991c91a81df51e7975849441f52fdbcdcc, or a96e8f991c91a81df51e7975849441f52fdbcdcc-dirty, or unknown-git-version if MMTk
