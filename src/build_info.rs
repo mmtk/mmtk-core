@@ -17,7 +17,7 @@ lazy_static! {
     // Owned string
     static ref MMTK_GIT_VERSION_STRING: String = match (raw::GIT_COMMIT_HASH, raw::GIT_DIRTY) {
         (Some(hash), Some(dirty)) => format!("{}{}", hash.split_at(7).0, if dirty { "-dirty" } else { "" }),
-        (None, None) => format!("unknown-git-version"),
+        (None, None) => "unknown-git-version".to_string(),
         x => unreachable!("Unexpected GIT_COMMIT_HASH and GIT_DIRTY: {:?}", x)
     };
 
