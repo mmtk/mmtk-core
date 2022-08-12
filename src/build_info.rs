@@ -27,3 +27,29 @@ lazy_static! {
     // Owned string
     static ref MMTK_FULL_BUILD_INFO_STRING: String = format!("MMTk {} ({}, {})", MMTK_PKG_VERSION, *MMTK_GIT_VERSION, MMTK_FEATURES);
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_git_version() {
+        println!("Git version: {}", *crate::build_info::MMTK_GIT_VERSION);
+    }
+
+    #[test]
+    fn test_full_build_version() {
+        println!(
+            "Full build version: {}",
+            *crate::build_info::MMTK_FULL_BUILD_INFO
+        );
+    }
+
+    #[test]
+    fn test_pkg_version() {
+        println!("Package version: {}", crate::build_info::MMTK_PKG_VERSION);
+    }
+
+    #[test]
+    fn test_features() {
+        println!("Features: {}", crate::build_info::MMTK_FEATURES);
+    }
+}
