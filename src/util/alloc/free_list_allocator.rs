@@ -1,5 +1,6 @@
-use std::sync::atomic::AtomicBool;
+// This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
+use std::sync::atomic::AtomicBool;
 use atomic::Ordering;
 use crate::policy::marksweepspace::block::Block;
 use crate::policy::marksweepspace::metadata::is_marked;
@@ -21,9 +22,6 @@ pub const MAX_BIN: usize = 48;
 const ZERO_BLOCK: Block = Block::from(unsafe { Address::zero() });
 pub type BlockLists = [BlockList; MAX_BIN + 1];
 
-
-
-// mimalloc init.c:46
 pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
     BlockList::new(1 * MI_INTPTR_SIZE),
     BlockList::new(1 * MI_INTPTR_SIZE),
@@ -76,18 +74,19 @@ pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
     BlockList::new(8192 * MI_INTPTR_SIZE), /* 48 */
 ];
 
-
+// Free list allocator
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
     pub tls: VMThread,
     space: &'static MarkSweepSpace<VM>,
     plan: &'static dyn Plan<VM = VM>,
-    pub available_blocks: BlockLists, // = pages in mimalloc
-    pub available_blocks_stress: BlockLists,
-    pub unswept_blocks: BlockLists,
-    pub consumed_blocks: BlockLists,
+    pub available_blocks: BlockLists, // blocks with free space (no stress GC)
+    pub available_blocks_stress: BlockLists, // blocks with free space (with stress GC)
+    pub unswept_blocks: BlockLists, // blocks that are marked, not swept
+    pub consumed_blocks: BlockLists, // full blocks
 }
 
+// List of blocks owned by the allocator
 #[derive(Debug)]
 #[repr(C)]
 pub struct BlockList {
@@ -107,10 +106,12 @@ impl BlockList {
         }
     }
 
+    // List has no blocks
     pub fn is_empty(&self) -> bool {
         self.first.is_zero()
     }
 
+    // Remove a block from the list
     pub fn remove<VM: VMBinding>(&mut self, block: Block) {
         let prev = block.load_prev_block::<VM>();
         let next = block.load_next_block::<VM>();
@@ -136,6 +137,7 @@ impl BlockList {
         }
     }
 
+    // Pop the first block in the list
     pub fn pop<VM: VMBinding>(&mut self) -> Block {
         let rtn = self.first;
         if rtn.is_zero() {
@@ -155,6 +157,7 @@ impl BlockList {
         rtn
     }
 
+    // Push block to the front of the list
     fn push<VM: VMBinding>(&mut self, block: Block) {
         if self.is_empty() {
             block.store_next_block::<VM>(ZERO_BLOCK);
@@ -170,6 +173,8 @@ impl BlockList {
         block.store_block_list::<VM>(self);
     }
     
+    // Append one block list to another
+    // The second block list left empty
     pub fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
         if !list.is_empty() {
             debug_assert!(list.first.load_prev_block::<VM>().is_zero(), "{} -> {}", list.first.load_prev_block::<VM>().start(), list.first.start());
@@ -191,11 +196,13 @@ impl BlockList {
         }
     }
 
+    // Remove all blocks
     fn reset(&mut self) {
         self.first = ZERO_BLOCK;
         self.last = ZERO_BLOCK;
     }
 
+    // Lock list
     pub fn lock(&mut self) {
         debug_assert!(self.size <= MI_LARGE_OBJ_SIZE_MAX, "{:?} {}", self as *mut _, self.size);
         let mut success = false;
@@ -204,6 +211,7 @@ impl BlockList {
         }
     }
 
+    // Unlock list
     pub fn unlock(&mut self) {
         self.lock.store(false, Ordering::SeqCst);
     }
@@ -222,9 +230,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         self.plan
     }
 
+    // Find a block with free space and allocate to it
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
         trace!("alloc s={}", size);
-        // see mi_heap_malloc_small
         debug_assert!(
             size <= Block::BYTES,
             "Alloc request for {} bytes is too big.",
@@ -241,9 +249,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         } else {
             addr
         }
-
-
     }
+
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block = self.find_free_block(size);
@@ -316,6 +323,8 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 }
 
 impl<VM: VMBinding> FreeListAllocator<VM> {
+
+    // New free list allcoator
     pub fn new(
         tls: VMThread,
         space: &'static MarkSweepSpace<VM>,
@@ -332,6 +341,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
     }
 
+    // Find a free cell within a given block
     pub fn block_alloc(&mut self, block: Block, size: usize, align: usize, offset: isize) -> Address {
         if block.is_zero() {
             return unsafe { Address::zero() }
@@ -344,6 +354,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         cell
     }
 
+    // Find an available block
+    // This will usually be the first block on the available list. If all available blocks are found
+    // to be full, other lists are searched
     fn find_free_block(&mut self, size: usize) -> Block {
         let bin = mi_bin(size);
         debug_assert!(bin <= MAX_BIN);
@@ -365,6 +378,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         
         self.acquire_block_for_size(size, false)
     }
+
+    // These functions are not necessary in a GC context. 
 
 
     // pub fn block_thread_free_collect(&self, block: Address) {
@@ -559,6 +574,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_free_list::<VM>(last);
     }
 
+    // alloc bit required for non GC context
+    // pub fn sweep_block(&self, block: Block) {
         // let cell_size = block.load_block_cell_size::<VM>();
         // debug_assert!(cell_size != 0);
         // let mut cell = block.start();

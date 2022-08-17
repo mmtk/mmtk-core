@@ -1,4 +1,4 @@
-// all from Wenyu's Immix
+// adapted from Immix
 
 use super::block::{Block, BlockState};
 use super::MarkSweepSpace;

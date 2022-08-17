@@ -1,3 +1,5 @@
+// adapted from Immix
+
 use std::iter::Step;
 
 use atomic::Ordering;
@@ -35,7 +37,8 @@ impl Block {
 
     pub const FREE_LIST_TABLE: SideMetadataSpec = 
         crate::util::metadata::side_metadata::spec_defs::MS_FREE;
-        
+    
+    // needed for non GC context
     // pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = 
     //     crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
