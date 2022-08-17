@@ -287,7 +287,7 @@ pub trait Plan: 'static + Sync + Downcast {
     /// should always be positive or 0.
     fn get_available_pages(&self) -> usize {
         // It is possible that the reserved pages is larger than the total pages so we are doing
-        // a saturating substraction to make sure we return a non-negative number.
+        // a saturating subtraction to make sure we return a non-negative number.
         // For example,
         // 1. our GC trigger checks if reserved pages is more than total pages.
         // 2. when the heap is almost full of live objects (such as in the case of an OOM) and we are doing a copying GC, it is possible
@@ -296,6 +296,12 @@ pub trait Plan: 'static + Sync + Downcast {
         //    buffers for copy allocators).
         self.get_total_pages()
             .saturating_sub(self.get_reserved_pages())
+    }
+
+    /// Return the number of pages available for allocation into the mature space. Only
+    /// generational plans have to implement this function.
+    fn get_mature_physical_pages_available(&self) -> usize {
+        panic!("This is not a generational plan.")
     }
 
     /// Get the number of pages that are reserved for collection. By default, we return 0.
@@ -566,7 +572,7 @@ impl<VM: VMBinding> BasePlan<VM> {
 
     /// The application code has requested a collection.
     pub fn handle_user_collection_request(&self, tls: VMMutatorThread, force: bool) {
-        if force || !*self.options.ignore_system_g_c {
+        if force || !*self.options.ignore_system_gc {
             info!("User triggering collection");
             self.user_triggered_collection
                 .store(true, Ordering::Relaxed);

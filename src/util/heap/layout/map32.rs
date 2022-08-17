@@ -133,6 +133,14 @@ impl Map for Map32 {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
+    fn get_available_discontiguous_chunks(&self) -> usize {
+        self.total_available_discontiguous_chunks
+    }
+
+    fn get_chunk_consumer_count(&self) -> usize {
+        self.shared_discontig_fl_count
+    }
+
     fn free_all_chunks(&self, any_chunk: Address) {
         debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
