@@ -255,6 +255,40 @@
 <span id="253">253</span>
 <span id="254">254</span>
 <span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -271,12 +305,13 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::counter::EventCounter</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Arc</span>, <span class="ident">Mutex</span>};
 
 <span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 
@@ -294,6 +329,7 @@
     <span class="kw">pub</span> <span class="ident">gc_full_heap</span>: <span class="ident">AtomicBool</span>,
     <span class="doccomment">/// Is next GC full heap?</span>
     <span class="kw">pub</span> <span class="ident">next_gc_full_heap</span>: <span class="ident">AtomicBool</span>,
+    <span class="kw">pub</span> <span class="ident">full_heap_gc_count</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">EventCounter</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -305,27 +341,33 @@
         <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
         <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     ) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">nursery</span> <span class="op">=</span> <span class="ident">CopySpace::new</span>(
+            <span class="string">&quot;nursery&quot;</span>,
+            <span class="bool-val">false</span>,
+            <span class="bool-val">true</span>,
+            <span class="ident">VMRequest::fixed_extent</span>(<span class="ident">options</span>.<span class="ident">get_max_nursery</span>(), <span class="bool-val">false</span>),
+            <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
+            <span class="ident">vm_map</span>,
+            <span class="ident">mmapper</span>,
+            <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
+        );
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonPlan::new</span>(
+            <span class="ident">vm_map</span>,
+            <span class="ident">mmapper</span>,
+            <span class="ident">options</span>,
+            <span class="ident">heap</span>,
+            <span class="ident">constraints</span>,
+            <span class="ident">global_metadata_specs</span>,
+        );
+
+        <span class="kw">let</span> <span class="ident">full_heap_gc_count</span> <span class="op">=</span> <span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">stats</span>.<span class="ident">new_event_counter</span>(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
+
         <span class="ident">Gen</span> {
-            <span class="ident">nursery</span>: <span class="ident">CopySpace::new</span>(
-                <span class="string">&quot;nursery&quot;</span>,
-                <span class="bool-val">false</span>,
-                <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::fixed_extent</span>(<span class="ident"><span class="kw">crate</span>::util::options::NURSERY_SIZE</span>, <span class="bool-val">false</span>),
-                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-            ),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-                <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-                <span class="ident">global_metadata_specs</span>,
-            ),
+            <span class="ident">nursery</span>,
+            <span class="ident">common</span>,
             <span class="ident">gc_full_heap</span>: <span class="ident">AtomicBool::default</span>(),
             <span class="ident">next_gc_full_heap</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            <span class="ident">full_heap_gc_count</span>,
         }
     }
 
@@ -345,6 +387,9 @@
     <span class="doccomment">/// Prepare Gen. This should be called by a single thread in GC prepare work.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="kw">let</span> <span class="ident">full_heap</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_current_gc_nursery</span>();
+        <span class="kw">if</span> <span class="ident">full_heap</span> {
+            <span class="self">self</span>.<span class="ident">full_heap_gc_count</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">inc</span>();
+        }
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">prepare</span>(<span class="bool-val">true</span>);
         <span class="self">self</span>.<span class="ident">nursery</span>
@@ -358,6 +403,18 @@
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">release</span>();
     }
 
+    <span class="doccomment">/// Independent of how many pages remain in the page budget (a function of heap size), we must</span>
+    <span class="doccomment">/// ensure we never exhaust virtual memory. Therefore we must never let the nursery grow to the</span>
+    <span class="doccomment">/// extent that it can&#39;t be copied into the mature space.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns `true` if the nursery has grown to the extent that it may not be able to be copied</span>
+    <span class="doccomment">/// into the mature space.</span>
+    <span class="kw">fn</span> <span class="ident">virtual_memory_exhausted</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="ident">P</span>) -&gt; <span class="ident">bool</span> {
+        ((<span class="ident">plan</span>.<span class="ident">get_collection_reserved_pages</span>() <span class="kw">as</span> <span class="ident">f64</span>
+            <span class="op">*</span> <span class="ident">VM::VMObjectModel::VM_WORST_CASE_COPY_EXPANSION</span>) <span class="kw">as</span> <span class="ident">usize</span>)
+            <span class="op">&gt;</span> <span class="ident">plan</span>.<span class="ident">get_mature_physical_pages_available</span>()
+    }
+
     <span class="doccomment">/// Check if we need a GC based on the nursery space usage. This method may mark</span>
     <span class="doccomment">/// the following GC as a full heap GC.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">collection_required</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(
@@ -367,8 +424,13 @@
         <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">bool</span> {
         <span class="kw">let</span> <span class="ident">nursery_full</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">reserved_pages</span>()
-            <span class="op">&gt;</span><span class="op">=</span> (<span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">max_nursery</span>));
+            <span class="op">&gt;</span><span class="op">=</span> (<span class="ident">conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">options</span>.<span class="ident">get_max_nursery</span>()));
+
         <span class="kw">if</span> <span class="ident">nursery_full</span> {
+            <span class="kw">return</span> <span class="bool-val">true</span>;
+        }
+
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">virtual_memory_exhausted</span>(<span class="ident">plan</span>) {
             <span class="kw">return</span> <span class="bool-val">true</span>;
         }
 
@@ -396,7 +458,7 @@
 
     <span class="doccomment">/// Check if we should do a full heap GC. It returns true if we should have a full heap GC.</span>
     <span class="doccomment">/// It also sets gc_full_heap based on the result.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">request_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">total_pages</span>: <span class="ident">usize</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">requires_full_heap_collection</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="ident">P</span>) -&gt; <span class="ident">bool</span> {
         <span class="comment">// Allow the same &#39;true&#39; block for if-else.</span>
         <span class="comment">// The conditions are complex, and it is easier to read if we put them to separate if blocks.</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>)]</span>
@@ -422,8 +484,10 @@
         {
             <span class="comment">// Forces full heap collection</span>
             <span class="bool-val">true</span>
+        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">virtual_memory_exhausted</span>(<span class="ident">plan</span>) {
+            <span class="bool-val">true</span>
         } <span class="kw">else</span> {
-            <span class="ident">total_pages</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">reserved_pages</span>
+            <span class="ident">plan</span>.<span class="ident">get_total_pages</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>()
         };
 
         <span class="self">self</span>.<span class="ident">gc_full_heap</span>.<span class="ident">store</span>(<span class="ident">is_full_heap</span>, <span class="ident">Ordering::SeqCst</span>);
@@ -433,7 +497,7 @@
             <span class="kw">if</span> <span class="ident">is_full_heap</span> {
                 <span class="string">&quot;Full heap GC&quot;</span>
             } <span class="kw">else</span> {
-                <span class="string">&quot;nursery GC&quot;</span>
+                <span class="string">&quot;Nursery GC&quot;</span>
             }
         );
 
@@ -487,9 +551,13 @@
     }
 
     <span class="doccomment">/// Check a plan to see if the next GC should be a full heap GC.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note that this function should be called after all spaces have been released. This is</span>
+    <span class="doccomment">/// required as we may get incorrect values since this function uses [`get_available_pages`]</span>
+    <span class="doccomment">/// whose value depends on which spaces have been released.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_next_gc_be_full_heap</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">plan</span>.<span class="ident">get_available_pages</span>()
-            <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">min_nursery</span>)
+            <span class="op">&lt;</span> <span class="ident">conversions::bytes_to_pages_up</span>(<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">options</span>.<span class="ident">get_min_nursery</span>())
     }
 
     <span class="doccomment">/// Set next_gc_full_heap to the given value.</span>

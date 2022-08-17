@@ -261,6 +261,14 @@
 <span id="259">259</span>
 <span id="260">260</span>
 <span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenCopyNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
@@ -349,7 +357,7 @@
     }
 
     <span class="kw">fn</span> <span class="ident">schedule_collection</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="self">self</span>, <span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
-        <span class="kw">let</span> <span class="ident">is_full_heap</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">request_full_heap_collection</span>();
+        <span class="kw">let</span> <span class="ident">is_full_heap</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">requires_full_heap_collection</span>();
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
         <span class="kw">if</span> <span class="ident">is_full_heap</span> {
@@ -390,6 +398,11 @@
             <span class="self">self</span>.<span class="ident">fromspace</span>().<span class="ident">release</span>();
         }
 
+        <span class="comment">// TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker</span>
+        <span class="comment">// NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is</span>
+        <span class="comment">// called _after_ all spaces have been released (including ones in `gen`) as otherwise we</span>
+        <span class="comment">// may get incorrect results since the function uses values such as available pages that</span>
+        <span class="comment">// will change dependant on which spaces have been released</span>
         <span class="self">self</span>.<span class="ident">gen</span>
             .<span class="ident">set_next_gc_full_heap</span>(<span class="ident">Gen::should_next_gc_be_full_heap</span>(<span class="self">self</span>));
     }
@@ -402,13 +415,17 @@
         <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">get_used_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>()
     }
 
-    <span class="doccomment">/// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.</span>
+    <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.</span>
     <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="comment">// super.get_pages_avail() / 2 to reserve pages for copying</span>
         (<span class="self">self</span>
             .<span class="ident">get_total_pages</span>()
             .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>()))
             <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_mature_physical_pages_available</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">available_physical_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -485,9 +502,8 @@
         <span class="ident">res</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">request_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">gen</span>
-            .<span class="ident">request_full_heap_collection</span>(<span class="self">self</span>.<span class="ident">get_total_pages</span>(), <span class="self">self</span>.<span class="ident">get_reserved_pages</span>())
+    <span class="kw">fn</span> <span class="ident">requires_full_heap_collection</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">gen</span>.<span class="ident">requires_full_heap_collection</span>(<span class="self">self</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">tospace</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {

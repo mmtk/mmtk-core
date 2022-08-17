@@ -266,6 +266,9 @@
 <span id="264">264</span>
 <span id="265">265</span>
 <span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::counter</span>::<span class="kw-2">*</span>;
@@ -507,7 +510,10 @@
         <span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">set_gathering_stats</span>(<span class="bool-val">true</span>);
 
         <span class="kw">for</span> <span class="ident">c</span> <span class="kw">in</span> <span class="kw-2">&amp;</span>(<span class="kw-2">*</span><span class="ident">counters</span>) {
-            <span class="ident">c</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">start</span>();
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ctr</span> <span class="op">=</span> <span class="ident">c</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+            <span class="kw">if</span> <span class="ident">ctr</span>.<span class="ident">implicitly_start</span>() {
+                <span class="ident">ctr</span>.<span class="ident">start</span>();
+            }
         }
     }
 

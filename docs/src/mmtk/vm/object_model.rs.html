@@ -370,6 +370,11 @@
 <span id="368">368</span>
 <span id="369">369</span>
 <span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
@@ -619,6 +624,11 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `reference`: The object to be queried.</span>
     <span class="kw">fn</span> <span class="ident">get_type_descriptor</span>(<span class="ident">reference</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> [<span class="ident">i8</span>];
+
+    <span class="doccomment">/// This is the worst case expansion that can occur due to object size increasing while</span>
+    <span class="doccomment">/// copying. This constant is used to calculate whether a nursery has grown larger than the</span>
+    <span class="doccomment">/// mature space for generational plans.</span>
+    <span class="kw">const</span> <span class="ident">VM_WORST_CASE_COPY_EXPANSION</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">1.5</span>;
 
     <span class="doccomment">/// For our allocation result `[cell, cell + bytes)`, if a binding&#39;s</span>
     <span class="doccomment">/// definition of `ObjectReference` may point outside the cell (i.e. `object_ref &gt;= cell + bytes`),</span>

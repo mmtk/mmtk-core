@@ -828,6 +828,27 @@
 <span id="826">826</span>
 <span id="827">827</span>
 <span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
@@ -1369,8 +1390,24 @@
         <span class="comment">// If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident">new_chunk</span> {
-            <span class="macro">debug_assert!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>, <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>, <span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>, <span class="ident">start</span>, <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>());
-            <span class="macro">debug_assert!</span>(<span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>, <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}&quot;</span>, <span class="ident">start</span>, <span class="ident">bytes</span>, <span class="ident">new_chunk</span>, <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>, <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>());
+            <span class="macro">debug_assert!</span>(
+                <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>,
+                <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>,
+                <span class="ident">start</span>,
+                <span class="ident">bytes</span>,
+                <span class="ident">new_chunk</span>,
+                <span class="ident">start</span>,
+                <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span>).<span class="ident">name</span>()
+            );
+            <span class="macro">debug_assert!</span>(
+                <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">EMPTY_SFT_NAME</span>,
+                <span class="string">&quot;In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})&quot;</span>,
+                <span class="ident">start</span>,
+                <span class="ident">bytes</span>,
+                <span class="ident">new_chunk</span>,
+                <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>,
+                <span class="ident">SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span> <span class="op">-</span> <span class="number">1</span>).<span class="ident">name</span>()
+            );
         }
 
         <span class="kw">if</span> <span class="ident">new_chunk</span> {
@@ -1401,6 +1438,11 @@
         <span class="kw">let</span> <span class="ident">data_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">reserved_pages</span>();
         <span class="kw">let</span> <span class="ident">meta_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>.<span class="ident">calculate_reserved_pages</span>(<span class="ident">data_pages</span>);
         <span class="ident">data_pages</span> <span class="op">+</span> <span class="ident">meta_pages</span>
+    }
+
+    <span class="doccomment">/// Return the number of physical pages available.</span>
+    <span class="kw">fn</span> <span class="ident">available_physical_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="self">self</span>.<span class="ident">get_page_resource</span>().<span class="ident">get_available_physical_pages</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">get_name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> {

@@ -342,7 +342,16 @@
 <span id="340">340</span>
 <span id="341">341</span>
 <span id="342">342</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
+<span id="343">343</span>
+<span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::layout::vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">PAGES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::required_chunks</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
@@ -401,6 +410,15 @@
     <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">pages</span>);
         <span class="ident">pages</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_available_physical_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="kw">let</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">bytes_to_pages</span>(<span class="ident">sync</span>.<span class="ident">sentinel</span> <span class="op">-</span> <span class="ident">sync</span>.<span class="ident">cursor</span>);
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">contiguous</span> {
+            <span class="ident">rtn</span> <span class="op">+</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">vm_map</span>.<span class="ident">get_available_discontiguous_chunks</span>() <span class="op">*</span> <span class="ident">PAGES_IN_CHUNK</span>;
+        }
+        <span class="ident">rtn</span>
     }
 
     <span class="kw">fn</span> <span class="ident">alloc_pages</span>(

@@ -241,6 +241,14 @@
 <span id="239">239</span>
 <span id="240">240</span>
 <span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::map::Map</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
@@ -393,6 +401,14 @@
 
     <span class="kw">fn</span> <span class="ident">get_contiguous_region_size</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">usize</span> {
         <span class="macro">unreachable!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_available_discontiguous_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;We don&#39;t use discontiguous chunks for 64-bit!&quot;</span>);
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_chunk_consumer_count</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;We don&#39;t use discontiguous chunks for 64-bit!&quot;</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">free_all_chunks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_any_chunk</span>: <span class="ident">Address</span>) {

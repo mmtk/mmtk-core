@@ -1046,6 +1046,12 @@
 <span id="1044">1044</span>
 <span id="1045">1045</span>
 <span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
+<span id="1051">1051</span>
+<span id="1052">1052</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1335,7 +1341,7 @@
     <span class="doccomment">/// should always be positive or 0.</span>
     <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="comment">// It is possible that the reserved pages is larger than the total pages so we are doing</span>
-        <span class="comment">// a saturating substraction to make sure we return a non-negative number.</span>
+        <span class="comment">// a saturating subtraction to make sure we return a non-negative number.</span>
         <span class="comment">// For example,</span>
         <span class="comment">// 1. our GC trigger checks if reserved pages is more than total pages.</span>
         <span class="comment">// 2. when the heap is almost full of live objects (such as in the case of an OOM) and we are doing a copying GC, it is possible</span>
@@ -1344,6 +1350,12 @@
         <span class="comment">//    buffers for copy allocators).</span>
         <span class="self">self</span>.<span class="ident">get_total_pages</span>()
             .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>())
+    }
+
+    <span class="doccomment">/// Return the number of pages available for allocation into the mature space. Only</span>
+    <span class="doccomment">/// generational plans have to implement this function.</span>
+    <span class="kw">fn</span> <span class="ident">get_mature_physical_pages_available</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;This is not a generational plan.&quot;</span>)
     }
 
     <span class="doccomment">/// Get the number of pages that are reserved for collection. By default, we return 0.</span>
@@ -1614,7 +1626,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
     <span class="doccomment">/// The application code has requested a collection.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">handle_user_collection_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>, <span class="ident">force</span>: <span class="ident">bool</span>) {
-        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">ignore_system_g_c</span> {
+        <span class="kw">if</span> <span class="ident">force</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">options</span>.<span class="ident">ignore_system_gc</span> {
             <span class="macro">info!</span>(<span class="string">&quot;User triggering collection&quot;</span>);
             <span class="self">self</span>.<span class="ident">user_triggered_collection</span>
                 .<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::Relaxed</span>);
