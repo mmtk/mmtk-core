@@ -539,8 +539,24 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
         #[cfg(debug_assertions)]
         if !new_chunk {
-            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})", start, bytes, new_chunk, start, SFT_MAP.get(start).name());
-            debug_assert!(SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}", start, bytes, new_chunk, start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
+            debug_assert!(
+                SFT_MAP.get(start).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start,
+                SFT_MAP.get(start).name()
+            );
+            debug_assert!(
+                SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start + bytes - 1,
+                SFT_MAP.get(start + bytes - 1).name()
+            );
         }
 
         if new_chunk {
@@ -571,6 +587,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let data_pages = self.get_page_resource().reserved_pages();
         let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
+    }
+
+    /// Return the number of physical pages available.
+    fn available_physical_pages(&self) -> usize {
+        self.get_page_resource().get_available_physical_pages()
     }
 
     fn get_name(&self) -> &'static str {

@@ -86,7 +86,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
-        let is_full_heap = self.request_full_heap_collection();
+        let is_full_heap = self.requires_full_heap_collection();
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         if is_full_heap {
@@ -127,6 +127,11 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             self.fromspace().release();
         }
 
+        // TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker
+        // NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is
+        // called _after_ all spaces have been released (including ones in `gen`) as otherwise we
+        // may get incorrect results since the function uses values such as available pages that
+        // will change dependant on which spaces have been released
         self.gen
             .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
     }
@@ -139,13 +144,17 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.gen.get_used_pages() + self.tospace().reserved_pages()
     }
 
-    /// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.
+    /// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
     fn get_available_pages(&self) -> usize {
         // super.get_pages_avail() / 2 to reserve pages for copying
         (self
             .get_total_pages()
             .saturating_sub(self.get_reserved_pages()))
             >> 1
+    }
+
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.tospace().available_physical_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -222,9 +231,8 @@ impl<VM: VMBinding> GenCopy<VM> {
         res
     }
 
-    fn request_full_heap_collection(&self) -> bool {
-        self.gen
-            .request_full_heap_collection(self.get_total_pages(), self.get_reserved_pages())
+    fn requires_full_heap_collection(&self) -> bool {
+        self.gen.requires_full_heap_collection(self)
     }
 
     pub fn tospace(&self) -> &CopySpace<VM> {

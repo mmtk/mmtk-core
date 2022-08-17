@@ -91,6 +91,20 @@ pub trait PageResource<VM: VMBinding>: 'static {
         self.common().accounting.get_committed_pages()
     }
 
+    /// Return the number of available physical pages by this resource. This includes all pages
+    /// currently unused by this resource. If the resource is using a discontiguous space, it also
+    /// includes the currently unassigned discontiguous space.
+    ///
+    /// Note: This just considers physical pages (i.e. virtual memory pages allocated for use by
+    /// this resource). This calculation is orthogonal to and does not consider any restrictions on
+    /// the number of pages this resource may actually use at any time (i.e. the number of
+    /// committed and reserved pages).
+    ///
+    /// Note: The calculation is made on the assumption that all space that could be assigned to
+    /// this resource would be assigned to this resource (i.e. the unused discontiguous space could
+    /// just as likely be assigned to another competing resource).
+    fn get_available_physical_pages(&self) -> usize;
+
     fn common(&self) -> &CommonPageResource;
     fn common_mut(&mut self) -> &mut CommonPageResource;
     fn vm_map(&self) -> &'static VMMap {
@@ -111,7 +125,7 @@ pub struct CommonPageResource {
     pub contiguous: bool,
     pub growable: bool,
 
-    vm_map: &'static VMMap,
+    pub vm_map: &'static VMMap,
     head_discontiguous_region: Mutex<Address>,
 }
 
