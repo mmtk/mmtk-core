@@ -61,9 +61,18 @@ perf_counter = ["pfm"]
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
 
-# spaces
+# spaces with different semantics
+
+# A VM-allocated/managed space. A binding could use this for their boot image, metadata space, etc.
+# FIXME: This is not properly implemented yet (it is only working for JikesRVM): https://github.com/mmtk/mmtk-core/issues/415
+# If a binding would need to trace/scan objects that is allocated and managed by the VM, `ActivePlan::vm_trace_object()` is an alternative.
 vm_space = []
+
+# A readonly space.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
+# A code space with execution permission.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
 # metadata
