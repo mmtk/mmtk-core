@@ -167,10 +167,7 @@ pub fn post_alloc<VM: VMBinding>(
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `target`: The target for the write operation.
-pub fn post_write_barrier<VM: VMBinding>(
-    mutator: &mut Mutator<VM>,
-    target: BarrierWriteTarget,
-) {
+pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
     mutator.barrier().post_write_barrier(target)
 }
 
