@@ -122,6 +122,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
+#[inline(always)]
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
@@ -149,6 +150,7 @@ pub fn alloc<VM: VMBinding>(
 /// * `refer`: The newly allocated object.
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
+#[inline(always)]
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     refer: ObjectReference,
@@ -167,6 +169,7 @@ pub fn post_alloc<VM: VMBinding>(
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `target`: The target for the write operation.
+#[inline(always)]
 pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
     mutator.barrier().post_write_barrier(target)
 }
