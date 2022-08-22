@@ -204,10 +204,13 @@ impl<VM: VMBinding> CopySpace<VM> {
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            crate::util::alloc_bit::bzero_alloc_bit(
-                self.common.start,
-                current_chunk + BYTES_IN_CHUNK - self.common.start,
-            );
+            // If we have allocated something into this space, we need to clear its alloc bit.
+            if current_chunk != self.common.start {
+                crate::util::alloc_bit::bzero_alloc_bit(
+                    self.common.start,
+                    current_chunk + BYTES_IN_CHUNK - self.common.start,
+                );
+            }
         } else {
             unimplemented!();
         }
