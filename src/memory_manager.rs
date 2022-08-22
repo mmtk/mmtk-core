@@ -14,6 +14,7 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
+use crate::plan::BarrierWriteTarget;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -121,6 +122,7 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// * `align`: Required alignment for the object.
 /// * `offset`: Offset associated with the alignment.
 /// * `semantics`: The allocation semantic required for the allocation.
+#[inline(always)]
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
@@ -148,6 +150,7 @@ pub fn alloc<VM: VMBinding>(
 /// * `refer`: The newly allocated object.
 /// * `bytes`: The size of the space allocated for the object (in bytes).
 /// * `semantics`: The allocation semantics used for the allocation.
+#[inline(always)]
 pub fn post_alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     refer: ObjectReference,
@@ -155,6 +158,20 @@ pub fn post_alloc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) {
     mutator.post_alloc(refer, bytes, semantics);
+}
+
+/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
+/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// TODO: We plan to replace this API with a subsuming barrier API.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
+    mutator.barrier().post_write_barrier(target)
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
