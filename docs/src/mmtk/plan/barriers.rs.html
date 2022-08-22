@@ -123,6 +123,35 @@
 <span id="121">121</span>
 <span id="122">122</span>
 <span id="123">123</span>
+<span id="124">124</span>
+<span id="125">125</span>
+<span id="126">126</span>
+<span id="127">127</span>
+<span id="128">128</span>
+<span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.</span>
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -149,21 +178,23 @@
 }
 
 <span class="doccomment">/// For field writes in HotSpot, we cannot always get the source object pointer and the field address</span>
-<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">WriteTarget</span> {
+<span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">BarrierWriteTarget</span> {
     <span class="ident">Object</span>(<span class="ident">ObjectReference</span>),
     <span class="ident">Slot</span>(<span class="ident">Address</span>),
 }
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Barrier</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>);
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>);
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">BarrierWriteTarget</span>);
+    <span class="kw">fn</span> <span class="ident">post_write_barrier_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">BarrierWriteTarget</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">NoBarrier</span>;
 
 <span class="kw">impl</span> <span class="ident">Barrier</span> <span class="kw">for</span> <span class="ident">NoBarrier</span> {
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {}
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_target</span>: <span class="ident">WriteTarget</span>) {}
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_target</span>: <span class="ident">BarrierWriteTarget</span>) {}
+    <span class="kw">fn</span> <span class="ident">post_write_barrier_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_target</span>: <span class="ident">BarrierWriteTarget</span>) {}
 }
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectRememberingBarrier</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> {
@@ -189,11 +220,9 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">log_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span>
-                <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>));
-            <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="kw">return</span> <span class="bool-val">false</span>;
-            }
+            <span class="comment">// Try set the bit from 1 to 0 (log object). This may fail, if</span>
+            <span class="comment">// 1. the bit is cleared by others, or</span>
+            <span class="comment">// 2. other bits in the same byte may get modified if we use side metadata</span>
             <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(
                 <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>,
                 <span class="ident">object</span>,
@@ -203,7 +232,15 @@
                 <span class="ident">Ordering::SeqCst</span>,
                 <span class="ident">Ordering::SeqCst</span>,
             ) {
+                <span class="comment">// We just logged the object</span>
                 <span class="kw">return</span> <span class="bool-val">true</span>;
+            } <span class="kw">else</span> {
+                <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span>
+                    <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>));
+                <span class="comment">// If the bit is cleared before, someone else has logged the object. Return false.</span>
+                <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">==</span> <span class="number">0</span> {
+                    <span class="kw">return</span> <span class="bool-val">false</span>;
+                }
             }
         }
     }
@@ -217,6 +254,19 @@
                 <span class="self">self</span>.<span class="ident">flush</span>();
             }
         }
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
+        <span class="kw">if</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">obj</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>) <span class="op">==</span> <span class="number">0</span> {
+            <span class="kw">return</span>;
+        }
+        <span class="self">self</span>.<span class="ident">barrier_slow</span>(<span class="ident">obj</span>);
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">never</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">barrier_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
+        <span class="self">self</span>.<span class="ident">enqueue_node</span>(<span class="ident">obj</span>);
     }
 }
 
@@ -237,9 +287,17 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">WriteTarget</span>) {
+    <span class="kw">fn</span> <span class="ident">post_write_barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">BarrierWriteTarget</span>) {
         <span class="kw">match</span> <span class="ident">target</span> {
-            <span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>) =&gt; {
+            <span class="ident">BarrierWriteTarget::Object</span>(<span class="ident">obj</span>) =&gt; <span class="self">self</span>.<span class="ident">barrier</span>(<span class="ident">obj</span>),
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+        }
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">post_write_barrier_slow</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">target</span>: <span class="ident">BarrierWriteTarget</span>) {
+        <span class="kw">match</span> <span class="ident">target</span> {
+            <span class="ident">BarrierWriteTarget::Object</span>(<span class="ident">obj</span>) =&gt; {
                 <span class="self">self</span>.<span class="ident">enqueue_node</span>(<span class="ident">obj</span>);
             }
             <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),

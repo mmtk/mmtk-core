@@ -298,13 +298,9 @@
 <span id="296">296</span>
 <span id="297">297</span>
 <span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.</span>
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers</span>::{<span class="ident">Barrier</span>, <span class="ident">WriteTarget</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::Barrier</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
@@ -439,10 +435,6 @@
     }
     <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span>;
     <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span>;
-
-    <span class="kw">fn</span> <span class="ident">record_modified_node</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
-        <span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">post_write_barrier</span>(<span class="ident">WriteTarget::Object</span>(<span class="ident">obj</span>));
-    }
 }
 
 <span class="doccomment">/// This is used for plans to indicate the number of allocators reserved for the plan.</span>
