@@ -351,6 +351,9 @@
 <span id="349">349</span>
 <span id="350">350</span>
 <span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
@@ -557,10 +560,13 @@
     <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">reset_alloc_bit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">current_chunk</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">get_current_chunk</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">contiguous</span> {
-            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(
-                <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>,
-                <span class="ident">current_chunk</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>,
-            );
+            <span class="comment">// If we have allocated something into this space, we need to clear its alloc bit.</span>
+            <span class="kw">if</span> <span class="ident">current_chunk</span> <span class="op">!</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span> {
+                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::bzero_alloc_bit</span>(
+                    <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>,
+                    <span class="ident">current_chunk</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">start</span>,
+                );
+            }
         } <span class="kw">else</span> {
             <span class="macro">unimplemented!</span>();
         }
