@@ -19,6 +19,7 @@ impl BarrierSelector {
 pub trait Barrier: 'static + Send {
     fn flush(&mut self) {}
 
+    /// Substituting barrier for object reference write
     fn object_reference_write(
         &mut self,
         src: ObjectReference,
@@ -30,6 +31,7 @@ pub trait Barrier: 'static + Send {
         self.object_reference_write_post(src, slot, target);
     }
 
+    /// Full pre-barrier for object reference write
     fn object_reference_write_pre(
         &mut self,
         _src: ObjectReference,
@@ -38,6 +40,7 @@ pub trait Barrier: 'static + Send {
     ) {
     }
 
+    /// Full post-barrier for object reference write
     fn object_reference_write_post(
         &mut self,
         _src: ObjectReference,
@@ -46,17 +49,32 @@ pub trait Barrier: 'static + Send {
     ) {
     }
 
+    /// Object reference write slow-path call.
+    /// This can be called either before or after the store, depend on the concrete barrier implementation.
+    fn object_reference_write_slow(
+        &mut self,
+        _src: ObjectReference,
+        _slot: Address,
+        _target: ObjectReference,
+    ) {
+    }
+
+    /// Substituting barrier for array copy
     fn array_copy(&mut self, src: Address, dst: Address, count: usize) {
         self.array_copy_pre(src, dst, count);
         unsafe { std::ptr::copy::<ObjectReference>(src.to_ptr(), dst.to_mut_ptr(), count) };
         self.array_copy_post(src, dst, count);
     }
 
+    /// Full pre-barrier for array copy
     fn array_copy_pre(&mut self, _src: Address, _dst: Address, _count: usize) {}
 
+    /// Full post-barrier for array copy
     fn array_copy_post(&mut self, _src: Address, _dst: Address, _count: usize) {}
 }
 
+/// Empty barrier implementation.
+/// For GCs that do not need any barriers
 pub struct NoBarrier;
 
 impl Barrier for NoBarrier {}

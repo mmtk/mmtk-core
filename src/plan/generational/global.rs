@@ -1,6 +1,3 @@
-use super::gc_work::ProcessModBuf;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
-use crate::plan::generational::gc_work::ProcessArrayCopyModBuf;
 use crate::plan::global::CommonPlan;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
@@ -18,12 +15,9 @@ use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::util::statistics::counter::EventCounter;
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::vm::ObjectModel;
-use crate::vm::VMBinding;
-use crate::MMTK;
+use crate::vm::{ObjectModel, VMBinding};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -83,39 +77,6 @@ impl<VM: VMBinding> Gen<VM> {
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),
             full_heap_gc_count,
-        }
-    }
-
-    pub fn add_barrier_modbuf(&self, mmtk: &'static MMTK<VM>, modbuf: Vec<ObjectReference>) {
-        debug_assert!(
-            !mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
-            "{:?}",
-            self as *const _
-        );
-        if !modbuf.is_empty() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessModBuf::<
-                GenNurseryProcessEdges<VM>,
-            >::new(
-                modbuf,
-                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-            ));
-        }
-    }
-
-    pub fn add_barrier_arraycopy_modbuf(
-        &self,
-        mmtk: &'static MMTK<VM>,
-        modbuf: Vec<(Address, usize)>,
-    ) {
-        debug_assert!(
-            !mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
-            "{:?}",
-            self as *const _
-        );
-        if !modbuf.is_empty() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessArrayCopyModBuf::<
-                GenNurseryProcessEdges<VM>,
-            >::new(modbuf));
         }
     }
 

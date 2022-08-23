@@ -65,6 +65,9 @@ impl<VM: VMBinding> DerefMut for GenNurseryProcessEdges<VM> {
     }
 }
 
+/// The modbuf contains a list of objects in mature space(s) that
+/// may contain pointers to the nursery space.
+/// This work packet scans the recorded objects and forwards pointers if necessary.
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
@@ -73,6 +76,7 @@ pub struct ProcessModBuf<E: ProcessEdgesWork> {
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
     pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
+        debug_assert!(!modbuf.is_empty());
         Self {
             modbuf,
             meta,
@@ -84,27 +88,27 @@ impl<E: ProcessEdgesWork> ProcessModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modbuf.is_empty() {
-            for obj in &self.modbuf {
-                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
-            }
+        // Flip the per-object unlogged bits to "unlogged" state.
+        for obj in &self.modbuf {
+            store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
         }
+        // scan modbuf only if the current GC is a nursery GC
         if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut modbuf = vec![];
-                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(
-                    &mut ScanObjects::<E>::new(modbuf, false, false),
-                    worker,
-                    mmtk,
-                )
-            }
-        } else {
-            // Do nothing
+            // Scan objects in the modbuf and forward pointers
+            let mut modbuf = vec![];
+            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+            GCWork::do_work(
+                &mut ScanObjects::<E>::new(modbuf, false, false),
+                worker,
+                mmtk,
+            )
         }
     }
 }
 
+/// The array-copy modbuf contains a list of array slices in mature space(s) that
+/// may contain pointers to the nursery space.
+/// This work packet forwards and updates each entry in the recorded slices.
 pub struct ProcessArrayCopyModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<(Address, usize)>,
     phantom: PhantomData<E>,
@@ -122,18 +126,17 @@ impl<E: ProcessEdgesWork> ProcessArrayCopyModBuf<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessArrayCopyModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        // Scan modbuf only if the current GC is a nursery GC
         if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut edges = vec![];
-                for (addr, count) in &self.modbuf {
-                    for i in 0..*count {
-                        edges.push(*addr + (i << LOG_BYTES_IN_ADDRESS));
-                    }
+            // Collect all the entries in all the slices
+            let mut edges = vec![];
+            for (addr, count) in &self.modbuf {
+                for i in 0..*count {
+                    edges.push(*addr + (i << LOG_BYTES_IN_ADDRESS));
                 }
-                GCWork::do_work(&mut E::new(edges, false, mmtk), worker, mmtk)
             }
-        } else {
-            // Do nothing
+            // Forward entries
+            GCWork::do_work(&mut E::new(edges, false, mmtk), worker, mmtk)
         }
     }
 }
