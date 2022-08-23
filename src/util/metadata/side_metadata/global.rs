@@ -352,7 +352,7 @@ pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Ad
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
 }
 
-// We currently only support atomic opertaions for side metadata that has lengths equal to or smaller than the architecture's word size.
+// We currently only support side metadata that has a length equal to or smaller than the architecture's word size.
 // That means we do not support side metadata of more than 8 bytes, and we do not support side metadata of 8 bytes on 32 bits architectures.
 // This macro is used to check word size. It makes sure that the given block is only executed on 64 bits architectures, and panic on other architectures.
 macro_rules! only_available_on_64bits {
@@ -713,7 +713,7 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
     } else if bits_num_log == 5 {
         meta_addr.load::<u32>() as usize
     } else if bits_num_log == 6 {
-        meta_addr.load::<u64>() as usize
+        only_available_on_64bits!({ meta_addr.load::<u64>() as usize })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -763,7 +763,7 @@ pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metada
     } else if bits_num_log == 5 {
         meta_addr.store::<u32>(metadata as u32);
     } else if bits_num_log == 6 {
-        meta_addr.store::<u64>(metadata as u64);
+        only_available_on_64bits!({ meta_addr.store::<u64>(metadata as u64) });
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
