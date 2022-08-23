@@ -115,7 +115,6 @@ malloc_counted_size = []
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
-malloc_hoard = ["hoard-sys"]
 
 # If there are more groups, they should be inserted above this line
 # Group:end

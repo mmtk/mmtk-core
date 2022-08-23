@@ -26,8 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { os: ubuntu-18.04, triple: x86_64-unknown-linux-gnu }
-          - { os: ubuntu-18.04, triple: i686-unknown-linux-gnu }
+          - { os: ubuntu-22.04, triple: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04, triple: i686-unknown-linux-gnu }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: ${{ matrix.target.triple }} / ${{ matrix.rust }}

@@ -9,7 +9,7 @@ if [[ $arch == "x86_64" && $os == "linux" ]]; then
     cargo test --features perf_counter
 fi
 
-python examples/build.py
+./examples/build.py
 
 ALL_PLANS=$(sed -n '/enum PlanSelector/,/}/p' src/util/options.rs | xargs | grep -o '{.*}' | grep -o '\w\+')
 

@@ -82,7 +82,8 @@ shutil.copyfile("{}/target/release/libmmtk_dummyvm{}".format(vmbinding, SUFFIX),
                 "./libmmtk{}".format(SUFFIX))
 
 cmd = [
-    "clang",
+    "gcc",
+    "./examples/main.c",
     "-lmmtk",
     "-L.",
     "-I{}/api".format(vmbinding),
@@ -92,7 +93,7 @@ cmd = [
 ]
 if m32:
     cmd.append("-m32")
-cmd.append("./examples/main.c")
+
 exec_and_redirect(cmd)
 
 for plan in PLANS:
