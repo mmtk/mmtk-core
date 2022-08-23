@@ -14,7 +14,9 @@
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
 mod barriers;
+pub use barriers::Barrier;
 pub use barriers::BarrierSelector;
+pub use barriers::BarrierWriteTarget;
 
 pub(crate) mod gc_requester;
 
