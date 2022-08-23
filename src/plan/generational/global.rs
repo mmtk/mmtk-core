@@ -15,7 +15,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
+use crate::util::statistics::counter::EventCounter;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::ObjectModel;
@@ -23,7 +24,7 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use mmtk_macros::PlanTraceObject;
 
@@ -41,6 +42,7 @@ pub struct Gen<VM: VMBinding> {
     pub gc_full_heap: AtomicBool,
     /// Is next GC full heap?
     pub next_gc_full_heap: AtomicBool,
+    pub full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
 impl<VM: VMBinding> Gen<VM> {
@@ -50,45 +52,34 @@ impl<VM: VMBinding> Gen<VM> {
         constraints: &'static PlanConstraints,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
     ) -> Self {
+        let nursery = CopySpace::new(
+            "nursery",
+            false,
+            true,
+            VMRequest::fixed_extent(options.get_max_nursery(), false),
+            global_metadata_specs.clone(),
+            vm_map,
+            mmapper,
+            &mut heap,
+        );
+        let common = CommonPlan::new(
+            vm_map,
+            mmapper,
+            options,
+            heap,
+            constraints,
+            global_metadata_specs,
+        );
+
+        let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
+
         Gen {
-            nursery: CopySpace::new(
-                "nursery",
-                false,
-                true,
-                VMRequest::fixed_extent(crate::util::options::NURSERY_SIZE, false),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                constraints,
-                global_metadata_specs,
-            ),
+            nursery,
+            common,
             gc_full_heap: AtomicBool::default(),
             next_gc_full_heap: AtomicBool::new(false),
-        }
-    }
-
-    pub fn add_barrier_modbuf(&self, mmtk: &'static MMTK<VM>, modbuf: Vec<ObjectReference>) {
-        debug_assert!(
-            !mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
-            "{:?}",
-            self as *const _
-        );
-        if !modbuf.is_empty() {
-            mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessModBuf::<
-                GenNurseryProcessEdges<VM>,
-            >::new(
-                modbuf,
-                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
-            ));
         }
     }
 
@@ -98,15 +89,19 @@ impl<VM: VMBinding> Gen<VM> {
         self.nursery.verify_side_metadata_sanity(sanity);
     }
 
-    /// Initialize Gen. This should be called by the gc_init() API call.
-    pub fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-        self.nursery.init(vm_map);
+    /// Get spaces in generation plans
+    pub fn get_spaces(&self) -> Vec<&dyn Space<VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.nursery);
+        ret
     }
 
     /// Prepare Gen. This should be called by a single thread in GC prepare work.
     pub fn prepare(&mut self, tls: VMWorkerThread) {
         let full_heap = !self.is_current_gc_nursery();
+        if full_heap {
+            self.full_heap_gc_count.lock().unwrap().inc();
+        }
         self.common.prepare(tls, full_heap);
         self.nursery.prepare(true);
         self.nursery
@@ -120,6 +115,18 @@ impl<VM: VMBinding> Gen<VM> {
         self.nursery.release();
     }
 
+    /// Independent of how many pages remain in the page budget (a function of heap size), we must
+    /// ensure we never exhaust virtual memory. Therefore we must never let the nursery grow to the
+    /// extent that it can't be copied into the mature space.
+    ///
+    /// Returns `true` if the nursery has grown to the extent that it may not be able to be copied
+    /// into the mature space.
+    fn virtual_memory_exhausted<P: Plan>(&self, plan: &P) -> bool {
+        ((plan.get_collection_reserved_pages() as f64
+            * VM::VMObjectModel::VM_WORST_CASE_COPY_EXPANSION) as usize)
+            > plan.get_mature_physical_pages_available()
+    }
+
     /// Check if we need a GC based on the nursery space usage. This method may mark
     /// the following GC as a full heap GC.
     pub fn collection_required<P: Plan>(
@@ -129,8 +136,13 @@ impl<VM: VMBinding> Gen<VM> {
         space: Option<&dyn Space<VM>>,
     ) -> bool {
         let nursery_full = self.nursery.reserved_pages()
-            >= (conversions::bytes_to_pages_up(*self.common.base.options.max_nursery));
+            >= (conversions::bytes_to_pages_up(self.common.base.options.get_max_nursery()));
+
         if nursery_full {
+            return true;
+        }
+
+        if self.virtual_memory_exhausted(plan) {
             return true;
         }
 
@@ -158,7 +170,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
-    pub fn request_full_heap_collection(&self, total_pages: usize, reserved_pages: usize) -> bool {
+    pub fn requires_full_heap_collection<P: Plan>(&self, plan: &P) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         #[allow(clippy::if_same_then_else)]
@@ -184,8 +196,10 @@ impl<VM: VMBinding> Gen<VM> {
         {
             // Forces full heap collection
             true
+        } else if self.virtual_memory_exhausted(plan) {
+            true
         } else {
-            total_pages <= reserved_pages
+            plan.get_total_pages() <= plan.get_reserved_pages()
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
@@ -195,7 +209,7 @@ impl<VM: VMBinding> Gen<VM> {
             if is_full_heap {
                 "Full heap GC"
             } else {
-                "nursery GC"
+                "Nursery GC"
             }
         );
 
@@ -249,9 +263,13 @@ impl<VM: VMBinding> Gen<VM> {
     }
 
     /// Check a plan to see if the next GC should be a full heap GC.
+    ///
+    /// Note that this function should be called after all spaces have been released. This is
+    /// required as we may get incorrect values since this function uses [`get_available_pages`]
+    /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         plan.get_available_pages()
-            < conversions::bytes_to_pages_up(*plan.base().options.min_nursery)
+            < conversions::bytes_to_pages_up(plan.base().options.get_min_nursery())
     }
 
     /// Set next_gc_full_heap to the given value.

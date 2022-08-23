@@ -133,6 +133,14 @@ impl Map for Map32 {
         self.get_contiguous_region_chunks(start) << LOG_BYTES_IN_CHUNK
     }
 
+    fn get_available_discontiguous_chunks(&self) -> usize {
+        self.total_available_discontiguous_chunks
+    }
+
+    fn get_chunk_consumer_count(&self) -> usize {
+        self.shared_discontig_fl_count
+    }
+
     fn free_all_chunks(&self, any_chunk: Address) {
         debug!("free_all_chunks: {}", any_chunk);
         let (_sync, self_mut) = self.mut_self_with_sync();
@@ -160,7 +168,7 @@ impl Map for Map32 {
     }
 
     fn finalize_static_space_map(&self, from: Address, to: Address) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         /* establish bounds of discontiguous space */

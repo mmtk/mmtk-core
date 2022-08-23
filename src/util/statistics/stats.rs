@@ -239,7 +239,10 @@ impl Stats {
         self.shared.set_gathering_stats(true);
 
         for c in &(*counters) {
-            c.lock().unwrap().start();
+            let mut ctr = c.lock().unwrap();
+            if ctr.implicitly_start() {
+                ctr.start();
+            }
         }
     }
 

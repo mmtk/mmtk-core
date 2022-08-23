@@ -4,7 +4,6 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::space::CommonSpace;
 use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -123,8 +122,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         unreachable!()
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        // Do nothing
+    fn initialize_sft(&self) {
+        // Do nothing - we will set sft when we get new results from malloc
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
