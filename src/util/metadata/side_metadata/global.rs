@@ -7,7 +7,7 @@ use crate::util::memory;
 use crate::util::{constants, Address};
 use std::fmt;
 use std::io::Result;
-use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering};
 
 /// This struct stores the specification of a side metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
@@ -352,6 +352,19 @@ pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Ad
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
 }
 
+// We currently only support atomic opertaions for side metadata that has lengths equal to or smaller than the architecture's word size.
+// That means we do not support side metadata of more than 8 bytes, and we do not support side metadata of 8 bytes on 32 bits architectures.
+// This macro is used to check word size. It makes sure that the given block is only executed on 64 bits architectures, and panic on other architectures.
+macro_rules! only_available_on_64bits {
+    ($b: block) => {
+        if cfg!(target_pointer_width = "64")
+        $b
+        else {
+            panic!("MMTk only supports such operations for 8-bytes side metadata on 64 bits architures.")
+        }
+    }
+}
+
 #[inline(always)]
 pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
     #[cfg(feature = "extreme_assertions")]
@@ -375,7 +388,7 @@ pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: 
     } else if bits_num_log == 5 {
         unsafe { meta_addr.atomic_load::<AtomicU32>(order) as usize }
     } else if bits_num_log == 6 {
-        unsafe { meta_addr.atomic_load::<AtomicUsize>(order) }
+        only_available_on_64bits!({ unsafe { meta_addr.atomic_load::<AtomicU64>(order) as usize } })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -428,7 +441,9 @@ pub fn store_atomic(
     } else if bits_num_log == 5 {
         unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, order) };
     } else if bits_num_log == 6 {
-        unsafe { meta_addr.atomic_store::<AtomicUsize>(metadata as usize, order) };
+        only_available_on_64bits!({
+            unsafe { meta_addr.atomic_store::<AtomicU64>(metadata as u64, order) };
+        })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -516,16 +531,18 @@ pub fn compare_exchange_atomic(
                 .is_ok()
         }
     } else if bits_num_log == 6 {
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicUsize>(
-                    old_metadata,
-                    new_metadata,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
+        only_available_on_64bits!({
+            unsafe {
+                meta_addr
+                    .compare_exchange::<AtomicU64>(
+                        old_metadata as u64,
+                        new_metadata as u64,
+                        success_order,
+                        failure_order,
+                    )
+                    .is_ok()
+            }
+        })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -586,7 +603,9 @@ pub fn fetch_add_atomic(
     } else if bits_num_log == 5 {
         unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, order) as usize }
     } else if bits_num_log == 6 {
-        unsafe { (*meta_addr.to_ptr::<AtomicUsize>()).fetch_add(val, order) }
+        only_available_on_64bits!({
+            unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_add(val as u64, order) as usize }
+        })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -645,7 +664,9 @@ pub fn fetch_sub_atomic(
     } else if bits_num_log == 5 {
         unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, order) as usize }
     } else if bits_num_log == 6 {
-        unsafe { (*meta_addr.to_ptr::<AtomicUsize>()).fetch_sub(val, order) }
+        only_available_on_64bits!({
+            unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_sub(val as u64, order) as usize }
+        })
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -692,7 +713,7 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
     } else if bits_num_log == 5 {
         meta_addr.load::<u32>() as usize
     } else if bits_num_log == 6 {
-        meta_addr.load::<usize>() as usize
+        meta_addr.load::<u64>() as usize
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
@@ -742,7 +763,7 @@ pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metada
     } else if bits_num_log == 5 {
         meta_addr.store::<u32>(metadata as u32);
     } else if bits_num_log == 6 {
-        meta_addr.store::<usize>(metadata as usize);
+        meta_addr.store::<u64>(metadata as u64);
     } else {
         unreachable!(
             "side metadata > {}-bits is not supported!",
