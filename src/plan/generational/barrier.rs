@@ -114,7 +114,7 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
     }
 
     #[inline(always)]
-    fn object_reference_write_pre(
+    fn object_reference_write_post(
         &mut self,
         src: ObjectReference,
         _slot: Address,
@@ -136,7 +136,7 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
     }
 
     #[inline(always)]
-    fn array_copy_pre(&mut self, _src: Address, dst: Address, count: usize) {
+    fn array_copy_post(&mut self, _src: Address, dst: Address, count: usize) {
         debug_assert!(!dst.is_zero());
         // Only enqueue array slices in mature spaces
         if !self.gen.nursery.address_in_space(dst) {
