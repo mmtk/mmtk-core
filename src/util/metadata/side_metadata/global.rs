@@ -4,6 +4,7 @@ use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
+use crate::util::metadata::only_available_on_64bits;
 use crate::util::{constants, Address};
 use std::fmt;
 use std::io::Result;
@@ -350,19 +351,6 @@ pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Ad
     );
 
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
-}
-
-// We currently only support side metadata that has a length equal to or smaller than the architecture's word size.
-// That means we do not support side metadata of more than 8 bytes, and we do not support side metadata of 8 bytes on 32 bits architectures.
-// This macro is used to check word size. It makes sure that the given block is only executed on 64 bits architectures, and panic on other architectures.
-macro_rules! only_available_on_64bits {
-    ($b: block) => {
-        if cfg!(target_pointer_width = "64")
-        $b
-        else {
-            panic!("MMTk only supports such operations for 8-bytes side metadata on 64 bits architures.")
-        }
-    }
 }
 
 #[inline(always)]

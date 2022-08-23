@@ -6,16 +6,16 @@ use std::sync::atomic::AtomicUsize;
 
 use atomic::Ordering;
 
-use crate::util::constants::BITS_IN_BYTE;
-use crate::util::constants::BITS_IN_WORD;
 use crate::util::constants::LOG_BITS_IN_BYTE;
-use crate::util::constants::LOG_BITS_IN_WORD;
+use crate::util::metadata::only_available_on_64bits;
 use crate::util::ObjectReference;
 
 const LOG_BITS_IN_U16: usize = 4;
-const BIT_IN_U16: usize = 1 << LOG_BITS_IN_U16;
+const BITS_IN_U16: usize = 1 << LOG_BITS_IN_U16;
 const LOG_BITS_IN_U32: usize = 5;
 const BITS_IN_U32: usize = 1 << LOG_BITS_IN_U32;
+const LOG_BITS_IN_U64: usize = 6;
+const BITS_IN_U64: usize = 1 << LOG_BITS_IN_U64;
 
 /// This module provides a default implementation of the access functions for in-header metadata.
 
@@ -52,7 +52,7 @@ pub fn load_metadata(
     debug_assert!(optional_mask.is_none() || metadata_spec.num_of_bits >= 8,"optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})", metadata_spec);
 
     // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
-    let res: usize = if metadata_spec.num_of_bits < BITS_IN_BYTE {
+    let res: usize = if metadata_spec.num_of_bits < 8 {
         debug_assert!(
             (metadata_spec.bit_offset >> LOG_BITS_IN_BYTE)
                 == ((metadata_spec.bit_offset + metadata_spec.num_of_bits as isize - 1)
@@ -73,7 +73,7 @@ pub fn load_metadata(
         };
 
         ((byte_val & mask) >> bit_shift) as usize
-    } else if metadata_spec.num_of_bits == BITS_IN_BYTE {
+    } else if metadata_spec.num_of_bits == 8 {
         debug_assert!(
             metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_BYTE.into(),
             "Metadata 16-bits: ({:?}) bit_offset must be byte aligned!",
@@ -90,7 +90,7 @@ pub fn load_metadata(
                 (object.to_address() + byte_offset).load::<u8>().into()
             }
         }
-    } else if metadata_spec.num_of_bits == BIT_IN_U16 {
+    } else if metadata_spec.num_of_bits == 16 {
         debug_assert!(
             metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U16,
             "Metadata 16-bits: ({:?}) bit_offset must be 2-bytes aligned!",
@@ -107,7 +107,7 @@ pub fn load_metadata(
                 (object.to_address() + u16_offset).load::<u16>().into()
             }
         }
-    } else if metadata_spec.num_of_bits == BITS_IN_U32 {
+    } else if metadata_spec.num_of_bits == 32 {
         debug_assert!(
             metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U32,
             "Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!",
@@ -122,21 +122,23 @@ pub fn load_metadata(
                 (object.to_address() + u32_offset).load::<u32>() as usize
             }
         }
-    } else if metadata_spec.num_of_bits == BITS_IN_WORD {
-        debug_assert!(
-            metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_WORD,
-            "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
-            metadata_spec
-        );
-        let u64_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
+    } else if metadata_spec.num_of_bits == 64 {
+        only_available_on_64bits!({
+            debug_assert!(
+                metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U64,
+                "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
+                metadata_spec
+            );
+            let u64_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
 
-        unsafe {
-            if let Some(order) = atomic_ordering {
-                (object.to_address() + u64_offset).atomic_load::<AtomicUsize>(order)
-            } else {
-                (object.to_address() + u64_offset).load::<usize>()
+            unsafe {
+                if let Some(order) = atomic_ordering {
+                    (object.to_address() + u64_offset).atomic_load::<AtomicUsize>(order)
+                } else {
+                    (object.to_address() + u64_offset).load::<usize>()
+                }
             }
-        }
+        })
     } else {
         unreachable!()
     };
@@ -310,43 +312,45 @@ pub fn store_metadata(
             }
         }
     } else if metadata_spec.num_of_bits == 64 {
-        debug_assert!(
-            metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_WORD,
-            "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
-            metadata_spec
-        );
-        let u64_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
-        let u64_addr = object.to_address() + u64_offset;
+        only_available_on_64bits!({
+            debug_assert!(
+                metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U64,
+                "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
+                metadata_spec
+            );
+            let u64_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
+            let u64_addr = object.to_address() + u64_offset;
 
-        unsafe {
-            if let Some(order) = atomic_ordering {
-                // if the optional mask is provided (e.g. for forwarding pointer), we need to use compare_exchange
-                if let Some(mask) = optional_mask {
-                    loop {
-                        let old_val = u64_addr.atomic_load::<AtomicUsize>(order);
-                        let new_val =
-                            (old_val & !(mask as usize)) | (val as usize & (mask as usize));
-                        if u64_addr
-                            .compare_exchange::<AtomicUsize>(old_val, new_val, order, order)
-                            .is_ok()
-                        {
-                            break;
+            unsafe {
+                if let Some(order) = atomic_ordering {
+                    // if the optional mask is provided (e.g. for forwarding pointer), we need to use compare_exchange
+                    if let Some(mask) = optional_mask {
+                        loop {
+                            let old_val = u64_addr.atomic_load::<AtomicUsize>(order);
+                            let new_val =
+                                (old_val & !(mask as usize)) | (val as usize & (mask as usize));
+                            if u64_addr
+                                .compare_exchange::<AtomicUsize>(old_val, new_val, order, order)
+                                .is_ok()
+                            {
+                                break;
+                            }
                         }
+                    } else {
+                        u64_addr.atomic_store::<AtomicUsize>(val as usize, order);
                     }
                 } else {
-                    u64_addr.atomic_store::<AtomicUsize>(val as usize, order);
-                }
-            } else {
-                let val = if let Some(mask) = optional_mask {
-                    let old_val = u64_addr.load::<usize>();
-                    (old_val & !(mask as usize)) | (val as usize & (mask as usize))
-                } else {
-                    val
-                };
+                    let val = if let Some(mask) = optional_mask {
+                        let old_val = u64_addr.load::<usize>();
+                        (old_val & !(mask as usize)) | (val as usize & (mask as usize))
+                    } else {
+                        val
+                    };
 
-                u64_addr.store(val);
+                    u64_addr.store(val);
+                }
             }
-        }
+        })
     } else {
         unreachable!()
     }
@@ -479,33 +483,35 @@ pub fn compare_exchange_metadata(
                 .is_ok()
         }
     } else if metadata_spec.num_of_bits == 64 {
-        debug_assert!(
-            metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_WORD,
-            "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
-            metadata_spec
-        );
-        let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
-        let meta_addr = object.to_address() + meta_offset;
+        only_available_on_64bits!({
+            debug_assert!(
+                metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U64,
+                "Metadata 64-bits: ({:?}) bit_offset must be 8-bytes aligned!",
+                metadata_spec
+            );
+            let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
+            let meta_addr = object.to_address() + meta_offset;
 
-        let (old_metadata, new_metadata) = if let Some(mask) = optional_mask {
-            let old_val = unsafe { meta_addr.atomic_load::<AtomicUsize>(success_order) };
-            let expected_new_val = (old_val & !mask) | new_metadata;
-            let expected_old_val = (old_val & !mask) | old_metadata;
-            (expected_old_val, expected_new_val)
-        } else {
-            (old_metadata, new_metadata)
-        };
+            let (old_metadata, new_metadata) = if let Some(mask) = optional_mask {
+                let old_val = unsafe { meta_addr.atomic_load::<AtomicUsize>(success_order) };
+                let expected_new_val = (old_val & !mask) | new_metadata;
+                let expected_old_val = (old_val & !mask) | old_metadata;
+                (expected_old_val, expected_new_val)
+            } else {
+                (old_metadata, new_metadata)
+            };
 
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicUsize>(
-                    old_metadata,
-                    new_metadata,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
+            unsafe {
+                meta_addr
+                    .compare_exchange::<AtomicUsize>(
+                        old_metadata,
+                        new_metadata,
+                        success_order,
+                        failure_order,
+                    )
+                    .is_ok()
+            }
+        })
     } else {
         unreachable!()
     }
@@ -588,16 +594,18 @@ pub fn fetch_add_metadata(
                 as usize
         }
     } else if metadata_spec.num_of_bits == 64 {
-        debug_assert!(
-            metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_WORD,
-            "Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!",
-            metadata_spec
-        );
-        let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
+        only_available_on_64bits!({
+            debug_assert!(
+                metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U64,
+                "Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!",
+                metadata_spec
+            );
+            let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
 
-        unsafe {
-            (*(object.to_address() + meta_offset).to_ptr::<AtomicUsize>()).fetch_add(val, order)
-        }
+            unsafe {
+                (*(object.to_address() + meta_offset).to_ptr::<AtomicUsize>()).fetch_add(val, order)
+            }
+        })
     } else {
         unreachable!()
     }
@@ -680,16 +688,18 @@ pub fn fetch_sub_metadata(
                 as usize
         }
     } else if metadata_spec.num_of_bits == 64 {
-        debug_assert!(
-            metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_WORD,
-            "Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!",
-            metadata_spec
-        );
-        let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
+        only_available_on_64bits!({
+            debug_assert!(
+                metadata_spec.bit_offset.trailing_zeros() as usize >= LOG_BITS_IN_U64,
+                "Metadata 32-bits: ({:?}) bit_offset must be 4-bytes aligned!",
+                metadata_spec
+            );
+            let meta_offset = metadata_spec.bit_offset >> LOG_BITS_IN_BYTE;
 
-        unsafe {
-            (*(object.to_address() + meta_offset).to_ptr::<AtomicUsize>()).fetch_sub(val, order)
-        }
+            unsafe {
+                (*(object.to_address() + meta_offset).to_ptr::<AtomicUsize>()).fetch_sub(val, order)
+            }
+        })
     } else {
         unreachable!()
     }
