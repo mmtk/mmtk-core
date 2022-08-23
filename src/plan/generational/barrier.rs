@@ -3,12 +3,17 @@
 use atomic::Ordering;
 
 use crate::plan::barriers::Barrier;
+use crate::policy::space::Space;
+use crate::scheduler::WorkBucketStage;
 use crate::util::metadata::compare_exchange_metadata;
 use crate::util::metadata::load_metadata;
 use crate::util::*;
 use crate::vm::{ObjectModel, VMBinding};
 use crate::MMTK;
 
+use super::gc_work::GenNurseryProcessEdges;
+use super::gc_work::ProcessArrayCopyModBuf;
+use super::gc_work::ProcessModBuf;
 use super::global::Gen;
 
 pub struct GenObjectBarrier<VM: VMBinding> {
@@ -16,6 +21,7 @@ pub struct GenObjectBarrier<VM: VMBinding> {
     gen: &'static Gen<VM>,
     modbuf: Vec<ObjectReference>,
     capacity: usize,
+    arraycopy_modbuf: Vec<(Address, usize)>,
 }
 
 impl<VM: VMBinding> GenObjectBarrier<VM> {
@@ -26,6 +32,7 @@ impl<VM: VMBinding> GenObjectBarrier<VM> {
             gen,
             modbuf: vec![],
             capacity,
+            arraycopy_modbuf: vec![],
         }
     }
 
@@ -80,7 +87,21 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
     fn flush(&mut self) {
         let mut modbuf = vec![];
         std::mem::swap(&mut modbuf, &mut self.modbuf);
-        self.gen.add_barrier_modbuf(self.mmtk, modbuf);
+        if !modbuf.is_empty() {
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessModBuf::<
+                GenNurseryProcessEdges<VM>,
+            >::new(
+                modbuf,
+                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            ));
+        }
+        let mut modbuf = vec![];
+        std::mem::swap(&mut modbuf, &mut self.arraycopy_modbuf);
+        if !modbuf.is_empty() {
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(
+                ProcessArrayCopyModBuf::<GenNurseryProcessEdges<VM>>::new(modbuf),
+            );
+        }
     }
 
     #[inline(always)]
@@ -94,14 +115,13 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
     }
 
     #[inline(always)]
-    fn array_copy_pre(
-        &mut self,
-        _src_object: Option<ObjectReference>,
-        _src: Address,
-        dst_object: Option<ObjectReference>,
-        _dst: Address,
-        _count: usize,
-    ) {
-        self.try_record_node(dst_object.unwrap());
+    fn array_copy_pre(&mut self, _src: Address, dst: Address, count: usize) {
+        debug_assert!(!dst.is_zero());
+        if !self.gen.nursery.address_in_space(dst) {
+            self.arraycopy_modbuf.push((dst, count));
+            if self.arraycopy_modbuf.len() >= self.capacity {
+                self.flush();
+            }
+        }
     }
 }

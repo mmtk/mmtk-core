@@ -14,7 +14,6 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
-use crate::plan::BarrierWriteTarget;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -158,20 +157,6 @@ pub fn post_alloc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) {
     mutator.post_alloc(refer, bytes, semantics);
-}
-
-/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
-/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
-/// fast-path on their side rather than just calling this function.
-///
-/// TODO: We plan to replace this API with a subsuming barrier API.
-///
-/// Arguments:
-/// * `mutator`: The mutator for the current thread.
-/// * `target`: The target for the write operation.
-#[inline(always)]
-pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
-    mutator.barrier().post_write_barrier(target)
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided

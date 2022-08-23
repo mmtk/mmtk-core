@@ -30,11 +30,13 @@ pub trait Barrier: 'static + Send {
         self.object_reference_write_post(src, slot, target);
     }
 
-pub trait Barrier: 'static + Send {
-    fn flush(&mut self);
-    fn post_write_barrier(&mut self, target: BarrierWriteTarget);
-    fn post_write_barrier_slow(&mut self, target: BarrierWriteTarget);
-}
+    fn object_reference_write_pre(
+        &mut self,
+        _src: ObjectReference,
+        _slot: Address,
+        _target: ObjectReference,
+    ) {
+    }
 
     fn object_reference_write_post(
         &mut self,
@@ -44,59 +46,16 @@ pub trait Barrier: 'static + Send {
     ) {
     }
 
-    fn array_copy(
-        &mut self,
-        src_object: Option<ObjectReference>,
-        src: Address,
-        dst_object: Option<ObjectReference>,
-        dst: Address,
-        count: usize,
-    ) {
-        self.array_copy_pre(src_object, src, dst_object, dst, count);
+    fn array_copy(&mut self, src: Address, dst: Address, count: usize) {
+        self.array_copy_pre(src, dst, count);
         unsafe { std::ptr::copy::<ObjectReference>(src.to_ptr(), dst.to_mut_ptr(), count) };
-        self.array_copy_post(src_object, src, dst_object, dst, count);
+        self.array_copy_post(src, dst, count);
     }
 
-    fn array_copy_pre(
-        &mut self,
-        _src_object: Option<ObjectReference>,
-        _src: Address,
-        _dst_object: Option<ObjectReference>,
-        _dst: Address,
-        _count: usize,
-    ) {
-    }
+    fn array_copy_pre(&mut self, _src: Address, _dst: Address, _count: usize) {}
 
-    fn array_copy_post(
-        &mut self,
-        _src_object: Option<ObjectReference>,
-        _src: Address,
-        _dst_object: Option<ObjectReference>,
-        _dst: Address,
-        _count: usize,
-    ) {
-    }
+    fn array_copy_post(&mut self, _src: Address, _dst: Address, _count: usize) {}
 }
-
-pub struct NoBarrier;
-
-impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
-    #[cold]
-    fn flush(&mut self) {
-        let mut modbuf = vec![];
-        std::mem::swap(&mut modbuf, &mut self.modbuf);
-        debug_assert!(
-            !self.mmtk.scheduler.work_buckets[WorkBucketStage::Final].is_activated(),
-            "{:?}",
-            self as *const _
-        );
-        if !modbuf.is_empty() {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::<E>::new(modbuf, self.meta));
-        }
-    }
-
-pub use super::generational::barrier::GenObjectBarrier;
 
 pub struct NoBarrier;
 

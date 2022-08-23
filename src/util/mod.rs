@@ -53,8 +53,6 @@ pub mod malloc;
 pub mod metadata;
 /// Forwarding word in object copying.
 pub(crate) mod object_forwarding;
-/// MMTk command line options.
-pub mod options;
 /// Utilities funcitons for Rust
 pub(crate) mod rust_util;
 /// Sanity checker for GC.

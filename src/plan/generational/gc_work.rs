@@ -3,6 +3,7 @@ use atomic::Ordering;
 use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker};
+use crate::util::constants::LOG_BYTES_IN_ADDRESS;
 use crate::util::metadata::{store_metadata, MetadataSpec};
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -92,7 +93,44 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             if !self.modbuf.is_empty() {
                 let mut modbuf = vec![];
                 ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(&mut ScanObjects::<E>::new(modbuf, false), worker, mmtk)
+                GCWork::do_work(
+                    &mut ScanObjects::<E>::new(modbuf, false, false),
+                    worker,
+                    mmtk,
+                )
+            }
+        } else {
+            // Do nothing
+        }
+    }
+}
+
+pub struct ProcessArrayCopyModBuf<E: ProcessEdgesWork> {
+    modbuf: Vec<(Address, usize)>,
+    phantom: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork> ProcessArrayCopyModBuf<E> {
+    pub fn new(modbuf: Vec<(Address, usize)>) -> Self {
+        Self {
+            modbuf,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessArrayCopyModBuf<E> {
+    #[inline(always)]
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
+        if mmtk.plan.is_current_gc_nursery() {
+            if !self.modbuf.is_empty() {
+                let mut edges = vec![];
+                for (addr, count) in &self.modbuf {
+                    for i in 0..*count {
+                        edges.push(*addr + (i << LOG_BYTES_IN_ADDRESS));
+                    }
+                }
+                GCWork::do_work(&mut E::new(edges, false, mmtk), worker, mmtk)
             }
         } else {
             // Do nothing
