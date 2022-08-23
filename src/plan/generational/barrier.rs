@@ -78,6 +78,12 @@ impl<VM: VMBinding> GenObjectBarrier<VM> {
     }
 
     /// object barrier slow-path call
+    #[inline(never)]
+    pub fn gen_object_reference_write_slow_no_inline(&mut self, src: ObjectReference) {
+        self.gen_object_reference_write_slow(src)
+    }
+
+    #[inline(always)]
     pub fn gen_object_reference_write_slow(&mut self, src: ObjectReference) {
         // Log and enqueue the object if it is unlogged
         if self.log_object(src) {
@@ -121,7 +127,7 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
         _target: ObjectReference,
     ) {
         if self.object_is_unlogged(src) {
-            self.gen_object_reference_write_slow(src);
+            self.gen_object_reference_write_slow_no_inline(src);
         }
     }
 
