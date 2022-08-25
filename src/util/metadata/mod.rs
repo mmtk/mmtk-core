@@ -221,6 +221,7 @@
 mod global;
 pub mod header_metadata;
 pub mod side_metadata;
+mod metadata_val_traits;
 
 pub(crate) mod log_bit;
 

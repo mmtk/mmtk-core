@@ -466,6 +466,34 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
     }
 }
 
+use crate::util::metadata::metadata_val_traits::*;
+
+#[cfg(feature = "extreme_assertions")]
+pub fn typed_verify_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: T) {
+    let actual_val: usize = actual_val.to_usize().unwrap();
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
+    match sanity_map.get(metadata_spec) {
+        Some(spec_sanity_map) => {
+            // A content of None is Ok because we may load before store
+            let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
+                *expected_val
+            } else {
+                0usize
+            };
+            assert!(
+                expected_val == actual_val,
+                "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
+                metadata_spec,
+                data_addr,
+                expected_val,
+                actual_val
+            );
+        }
+        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+    }
+}
+
 /// Commits a side metadata store operation.
 /// Panics if:
 /// 1 - the loaded side metadata content is not equal to the correct content.
@@ -477,6 +505,21 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
 ///
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+    match sanity_map.get_mut(metadata_spec) {
+        Some(spec_sanity_map) => {
+            // Newly mapped memory including the side metadata memory is zeroed
+            let content = spec_sanity_map.entry(data_addr).or_insert(0);
+            *content = metadata;
+        }
+        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+    }
+}
+
+#[cfg(feature = "extreme_assertions")]
+pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
+    let metadata: usize = metadata.to_usize().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {

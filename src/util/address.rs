@@ -314,6 +314,10 @@ impl Address {
         self.0 as *mut T
     }
 
+    pub unsafe fn as_ref<'a, T>(self) -> &'a T {
+        &*self.to_mut_ptr()
+    }
+
     /// converts the Address to a pointer-sized integer
     #[inline(always)]
     pub const fn as_usize(self) -> usize {
