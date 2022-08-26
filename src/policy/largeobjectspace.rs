@@ -19,7 +19,6 @@ use crate::util::metadata::store_metadata;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 #[allow(unused)]
@@ -54,7 +53,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
         let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
@@ -64,7 +63,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             new_value |= NURSERY_BIT;
         }
         store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             new_value,
             None,
@@ -73,12 +72,12 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 
         // If this object is freshly allocated, we do not set it as unlogged
         if !alloc && self.common.needs_log_bit {
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(object);
-        let cell = VM::VMObjectModel::object_start_ref(object);
+        let cell = VM::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
@@ -159,9 +158,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
                     global: global_side_metadata_specs,
-                    local: metadata::extract_side_metadata(&[
-                        *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
-                    ]),
+                    local: metadata::extract_side_metadata(&[*VM::LOCAL_LOS_MARK_NURSERY_SPEC]),
                 },
             },
             vm_map,
@@ -217,13 +214,12 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object);
+                let cell = VM::object_start_ref(object);
                 self.treadmill.copy(cell, nursery_object);
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
-                        .mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+                    VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
                 }
                 queue.enqueue(object);
             }
@@ -265,7 +261,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 MARK_BIT
             };
             let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -275,7 +271,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 return false;
             }
             if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 old_value,
                 old_value & !LOS_BIT_MASK | value,
@@ -291,7 +287,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
 
     fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
         load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
@@ -302,7 +298,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
         load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
             object,
             None,
             Some(Ordering::Relaxed),
@@ -314,14 +310,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     fn clear_nursery(&self, object: ObjectReference) {
         loop {
             let old_val = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 None,
                 Some(Ordering::Relaxed),
             );
             let new_val = old_val & !NURSERY_BIT;
             if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+                &VM::LOCAL_LOS_MARK_NURSERY_SPEC,
                 object,
                 old_val,
                 new_val,

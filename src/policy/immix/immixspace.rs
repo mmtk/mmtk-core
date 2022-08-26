@@ -164,7 +164,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::LOCAL_MARK_BIT_SPEC,
             ]
         } else {
             vec![
@@ -172,7 +172,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::DEFRAG_STATE_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
-                *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                *VM::LOCAL_MARK_BIT_SPEC,
             ]
         })
     }
@@ -259,7 +259,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub fn prepare(&mut self, major_gc: bool) {
         if major_gc {
             // Update mark_state
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
+            if VM::LOCAL_MARK_BIT_SPEC.is_on_side() {
                 self.mark_state = Self::MARKED_STATE;
             } else {
                 // For header metadata, we use cyclic mark bits.
@@ -503,7 +503,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -513,7 +513,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
 
             if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 old_value as usize,
                 mark_state as usize,
@@ -531,7 +531,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
         let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
@@ -610,7 +610,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        if let MetadataSpec::OnSide(side) = *VM::LOCAL_MARK_BIT_SPEC {
             side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
         }
     }
@@ -683,7 +683,7 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
         // Mark the object
         store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::LOCAL_MARK_BIT_SPEC,
             obj,
             self.get_space().mark_state as usize,
             None,

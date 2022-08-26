@@ -138,8 +138,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         heap: &mut HeapMeta,
     ) -> Self {
         let local_specs = extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            *VM::LOCAL_FORWARDING_BITS_SPEC,
+            *VM::LOCAL_FORWARDING_POINTER_SPEC,
         ]);
         let common = CommonSpace::new(
             SpaceOptions {
@@ -179,8 +179,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         // Clear the metadata if we are using side forwarding status table. Otherwise
         // objects may inherit forwarding status from the previous GC.
         // TODO: Fix performance.
-        if let MetadataSpec::OnSide(side_forwarding_status_table) =
-            *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
+        if let MetadataSpec::OnSide(side_forwarding_status_table) = *VM::LOCAL_FORWARDING_BITS_SPEC
         {
             side_metadata::bzero_metadata(
                 &side_forwarding_status_table,

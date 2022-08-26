@@ -299,7 +299,7 @@ impl ReferenceProcessor {
                 trace!(
                     "Forwarding reference: {} (size: {})",
                     reference,
-                    <E::VM as VMBinding>::VMObjectModel::get_current_size(reference)
+                    E::VM::get_current_size(reference)
                 );
                 trace!(
                     " referent: {} (forwarded to {})",

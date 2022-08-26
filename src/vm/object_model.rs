@@ -63,7 +63,9 @@ use crate::util::copy::*;
 /// [`header_metadata`]:    ../util/metadata/header_metadata/index.html
 /// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html
 /// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html
-pub trait ObjectModel<VM: VMBinding> {
+pub trait ObjectModel {
+    type VM: VMBinding;
+
     // Per-object Metadata Spec definitions go here
     //
     // Note a number of Global and PolicySpecific side metadata specifications are already reserved by mmtk-core.
@@ -191,7 +193,7 @@ pub trait ObjectModel<VM: VMBinding> {
     fn copy(
         from: ObjectReference,
         semantics: CopySemantics,
-        copy_context: &mut GCWorkerCopyContext<VM>,
+        copy_context: &mut GCWorkerCopyContext<Self::VM>,
     ) -> ObjectReference;
 
     /// Copy an object. This is required

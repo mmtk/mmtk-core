@@ -7,7 +7,7 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
-use crate::vm::{ActivePlan, Collection, ObjectModel};
+use crate::vm::{ActivePlan, Collection};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
@@ -360,7 +360,7 @@ impl<'a> SFTMap<'a> {
     #[cfg(debug_assertions)]
     pub fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
         let object_sft = self.get(object.to_address());
-        let object_start_sft = self.get(VM::VMObjectModel::object_start_ref(object));
+        let object_start_sft = self.get(VM::object_start_ref(object));
 
         debug_assert!(
             object_sft.name() != EMPTY_SFT_NAME,
@@ -515,7 +515,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        let start = VM::VMObjectModel::ref_to_address(object);
+        let start = VM::ref_to_address(object);
         self.address_in_space(start)
     }
 

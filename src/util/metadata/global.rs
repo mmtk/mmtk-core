@@ -1,7 +1,6 @@
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use atomic::Ordering;
 
@@ -60,7 +59,7 @@ pub fn load_metadata<VM: VMBinding>(
             }
         }
         MetadataSpec::InHeader(metadata_spec) => {
-            VM::VMObjectModel::load_metadata(metadata_spec, object, mask, atomic_ordering)
+            VM::load_metadata(metadata_spec, object, mask, atomic_ordering)
         }
     }
 }
@@ -94,7 +93,7 @@ pub fn store_metadata<VM: VMBinding>(
             }
         }
         MetadataSpec::InHeader(metadata_spec) => {
-            VM::VMObjectModel::store_metadata(metadata_spec, object, val, mask, atomic_ordering);
+            VM::store_metadata(metadata_spec, object, val, mask, atomic_ordering);
         }
     }
 }
@@ -132,7 +131,7 @@ pub fn compare_exchange_metadata<VM: VMBinding>(
             success_order,
             failure_order,
         ),
-        MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::compare_exchange_metadata(
+        MetadataSpec::InHeader(metadata_spec) => VM::compare_exchange_metadata(
             metadata_spec,
             object,
             old_val,
@@ -167,7 +166,7 @@ pub fn fetch_add_metadata<VM: VMBinding>(
             side_metadata::fetch_add_atomic(metadata_spec, object.to_address(), val, order)
         }
         MetadataSpec::InHeader(metadata_spec) => {
-            VM::VMObjectModel::fetch_add_metadata(metadata_spec, object, val, order)
+            VM::fetch_add_metadata(metadata_spec, object, val, order)
         }
     }
 }
@@ -195,7 +194,7 @@ pub fn fetch_sub_metadata<VM: VMBinding>(
             side_metadata::fetch_sub_atomic(metadata_spec, object.to_address(), val, order)
         }
         MetadataSpec::InHeader(metadata_spec) => {
-            VM::VMObjectModel::fetch_sub_metadata(metadata_spec, object, val, order)
+            VM::fetch_sub_metadata(metadata_spec, object, val, order)
         }
     }
 }
