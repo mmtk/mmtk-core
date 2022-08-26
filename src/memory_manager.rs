@@ -14,6 +14,7 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
+use crate::plan::GenObjectBarrier;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -157,6 +158,159 @@ pub fn post_alloc<VM: VMBinding>(
     semantics: AllocationSemantics,
 ) {
     mutator.post_alloc(refer, bytes, semantics);
+}
+
+/// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: Address,
+    target: ObjectReference,
+) {
+    mutator.barrier().object_reference_write(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *pre* write barrier, which we expect a binding to call
+/// *before* they modify an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_pre<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: Address,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_pre(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
+/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_post<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: Address,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_post(src, slot, target);
+}
+
+/// The *generic* write barrier *slow-path* by MMTk. This can be either a *pre* or a *post* write barrier slow-path,
+/// depending on the implementation of the barrier. For example, an object barrier may expect this
+/// function will be called after the store operation.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_slow<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: Address,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_slow(src, slot, target);
+}
+
+/// The *specialized* generational object barrier *slow-path* by MMTk.
+/// VM bindings can choose to either invoke a generic slow-path, or this specialized slow-path.
+/// This function can only be used for generation GC, and can be called either *before* or *after* the store operation.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+#[inline(always)]
+pub fn object_barrier_slow_generational<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: ObjectReference,
+) {
+    unsafe {
+        mutator
+            .barrier_impl::<GenObjectBarrier<VM>>()
+            .gen_object_reference_write_slow(src);
+    }
+}
+
+/// The *subsuming* array-copy barrier by MMTk.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Start address of the copy source.
+/// * `dst`: Start address of the copy destination.
+/// * `count`: Number of elements to copy.
+#[inline(always)]
+pub fn array_copy<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: Address,
+    dst: Address,
+    count: usize,
+) {
+    mutator.barrier().array_copy(src, dst, count);
+}
+
+/// The *generic* array-copy *pre* barrier by MMTk, which we expect a binding to call
+/// *before* they modify an object.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Start address of the copy source.
+/// * `dst`: Start address of the copy destination.
+/// * `count`: Number of elements to copy.
+#[inline(always)]
+pub fn array_copy_pre<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: Address,
+    dst: Address,
+    count: usize,
+) {
+    mutator.barrier().array_copy_pre(src, dst, count);
+}
+
+/// The *generic* array-copy *post* barrier by MMTk, which we expect a binding to call
+/// *after* they modify an object.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Start address of the copy source.
+/// * `dst`: Start address of the copy destination.
+/// * `count`: Number of elements to copy.
+#[inline(always)]
+pub fn array_copy_post<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: Address,
+    dst: Address,
+    count: usize,
+) {
+    mutator.barrier().array_copy_post(src, dst, count);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided

@@ -106,13 +106,14 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         self.mutator_tls
     }
 
-    #[inline]
+    #[inline(always)]
     unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B {
+        debug_assert!(self.barrier().is::<B>());
         let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
         &mut *payload
     }
 
-    #[inline]
+    #[inline(always)]
     fn barrier(&mut self) -> &mut dyn Barrier {
         &mut *self.barrier
     }

@@ -79,10 +79,12 @@ impl<VM: VMBinding> GenObjectBarrier<VM> {
 
     /// object barrier slow-path call
     #[inline(never)]
-    pub fn gen_object_reference_write_slow_no_inline(&mut self, src: ObjectReference) {
+    fn gen_object_reference_write_slow_no_inline(&mut self, src: ObjectReference) {
         self.gen_object_reference_write_slow(src)
     }
 
+    /// object barrier slow-path call.
+    /// Can be called directly by bindings to for a specialized slow-path call
     #[inline(always)]
     pub fn gen_object_reference_write_slow(&mut self, src: ObjectReference) {
         // Log and enqueue the object if it is unlogged

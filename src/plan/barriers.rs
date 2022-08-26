@@ -1,6 +1,7 @@
 //! Read/Write barrier implementations.
 
 use crate::util::*;
+use downcast_rs::Downcast;
 
 /// BarrierSelector describes which barrier to use.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -16,10 +17,10 @@ impl BarrierSelector {
     }
 }
 
-pub trait Barrier: 'static + Send {
+pub trait Barrier: 'static + Send + Downcast {
     fn flush(&mut self) {}
 
-    /// Substituting barrier for object reference write
+    /// Subsuming barrier for object reference write
     fn object_reference_write(
         &mut self,
         src: ObjectReference,
@@ -59,7 +60,7 @@ pub trait Barrier: 'static + Send {
     ) {
     }
 
-    /// Substituting barrier for array copy
+    /// Subsuming barrier for array copy
     fn array_copy(&mut self, src: Address, dst: Address, count: usize) {
         self.array_copy_pre(src, dst, count);
         unsafe { std::ptr::copy::<ObjectReference>(src.to_ptr(), dst.to_mut_ptr(), count) };
@@ -72,6 +73,8 @@ pub trait Barrier: 'static + Send {
     /// Full post-barrier for array copy
     fn array_copy_post(&mut self, _src: Address, _dst: Address, _count: usize) {}
 }
+
+impl_downcast!(Barrier);
 
 /// Empty barrier implementation.
 /// For GCs that do not need any barriers
