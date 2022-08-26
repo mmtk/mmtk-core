@@ -7,7 +7,7 @@ use mmtk::{
 };
 
 use crate::{
-    edges::{DummyVMEdge, OffsetEdge, ValueEdge},
+    edges::{DummyVMEdge, OffsetEdge, TaggedEdge},
     tests::fixtures::{Fixture, TwoObjects},
 };
 
@@ -117,13 +117,53 @@ pub fn store_offset() {
     });
 }
 
-#[test]
-pub fn load_value() {
-    FIXTURE.with_fixture(|fixture| {
-        let edge = ValueEdge::new(fixture.objref1);
-        let objref = edge.load();
+const TAG1: usize = 0b01;
+const TAG2: usize = 0b10;
 
-        assert_eq!(objref, fixture.objref1);
+#[test]
+pub fn load_tagged() {
+    FIXTURE.with_fixture(|fixture| {
+        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG2);
+
+        let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
+        let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
+        let objref1 = edge1.load();
+        let objref2 = edge2.load();
+
+        // Tags should not affect loaded values.
+        assert_eq!(objref1, fixture.objref1);
+        assert_eq!(objref2, fixture.objref1);
+    });
+}
+
+#[test]
+pub fn store_tagged() {
+    FIXTURE.with_fixture(|fixture| {
+        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG2);
+
+        let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
+        let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
+        edge1.store(fixture.objref2);
+        edge2.store(fixture.objref2);
+
+        // Tags should be preserved.
+        assert_eq!(
+            slot1.load(Ordering::SeqCst),
+            fixture.objref2.to_address().as_usize() | TAG1
+        );
+        assert_eq!(
+            slot2.load(Ordering::SeqCst),
+            fixture.objref2.to_address().as_usize() | TAG2
+        );
+
+        let objref1 = edge1.load();
+        let objref2 = edge2.load();
+
+        // Tags should not affect loaded values.
+        assert_eq!(objref1, fixture.objref2);
+        assert_eq!(objref2, fixture.objref2);
     });
 }
 
@@ -137,14 +177,15 @@ pub fn mixed() {
 
         let mut slot1: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
         let mut slot3: Atomic<Address> = Atomic::new(addr1 + OFFSET);
+        let mut slot4: Atomic<usize> = Atomic::new(addr1.as_usize() | TAG1);
 
         let edge1 = SimpleEdge::from_address(Address::from_ref(&mut slot1));
         let edge3 = OffsetEdge::new_with_offset(Address::from_ref(&mut slot3), OFFSET);
-        let edge4 = ValueEdge::new(fixture.objref1);
+        let edge4 = TaggedEdge::new(Address::from_ref(&mut slot4));
 
         let de1 = DummyVMEdge::Simple(edge1);
         let de3 = DummyVMEdge::Offset(edge3);
-        let de4 = DummyVMEdge::Value(edge4);
+        let de4 = DummyVMEdge::Tagged(edge4);
 
         let edges = vec![de1, de3, de4];
         for (i, edge) in edges.iter().enumerate() {
@@ -152,7 +193,7 @@ pub fn mixed() {
             assert_eq!(objref, fixture.objref1, "Edge {} is not properly loaded", i);
         }
 
-        let mutable_edges = vec![de1, de3];
+        let mutable_edges = vec![de1, de3, de4];
         for (i, edge) in mutable_edges.iter().enumerate() {
             edge.store(fixture.objref2);
             let objref = edge.load();

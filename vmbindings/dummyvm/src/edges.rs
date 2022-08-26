@@ -11,7 +11,7 @@ pub enum DummyVMEdge {
     #[cfg(target_pointer_width = "64")]
     Compressed(only_64_bit::CompressedOopEdge),
     Offset(OffsetEdge),
-    Value(ValueEdge),
+    Tagged(TaggedEdge),
 }
 
 unsafe impl Send for DummyVMEdge {}
@@ -23,7 +23,7 @@ impl Edge for DummyVMEdge {
             #[cfg(target_pointer_width = "64")]
             DummyVMEdge::Compressed(e) => e.load(),
             DummyVMEdge::Offset(e) => e.load(),
-            DummyVMEdge::Value(e) => e.load(),
+            DummyVMEdge::Tagged(e) => e.load(),
         }
     }
 
@@ -33,7 +33,7 @@ impl Edge for DummyVMEdge {
             #[cfg(target_pointer_width = "64")]
             DummyVMEdge::Compressed(e) => e.store(object),
             DummyVMEdge::Offset(e) => e.store(object),
-            DummyVMEdge::Value(e) => e.store(object),
+            DummyVMEdge::Tagged(e) => e.store(object),
         }
     }
 }
@@ -130,28 +130,36 @@ impl Edge for OffsetEdge {
 
 /// This edge presents the object reference itself to mmtk-core.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ValueEdge {
-    value: ObjectReference,
+pub struct TaggedEdge {
+    slot_addr: *mut Atomic<usize>,
 }
 
-unsafe impl Send for ValueEdge {}
+unsafe impl Send for TaggedEdge {}
 
-impl ValueEdge {
-    pub fn new(value: ObjectReference) -> Self {
-        Self { value }
-    }
+impl TaggedEdge {
+    // The DummyVM has OBJECT_REF_OFFSET = 4.
+    // Using a two-bit tag should be safe on both 32-bit and 64-bit platforms.
+    const TAG_BITS_MASK: usize = 0b11;
 
-    pub fn value(&self) -> ObjectReference {
-        self.value
+    #[inline(always)]
+    pub fn new(address: Address) -> Self {
+        Self {
+            slot_addr: address.to_mut_ptr(),
+        }
     }
 }
 
-impl Edge for ValueEdge {
+impl Edge for TaggedEdge {
     fn load(&self) -> ObjectReference {
-        self.value
+        let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
+        let untagged = tagged & !Self::TAG_BITS_MASK;
+        unsafe { Address::from_usize(untagged).to_object_reference() }
     }
 
-    fn store(&self, _object: ObjectReference) {
-        // No-op.  Value edges are immutable.
+    fn store(&self, object: ObjectReference) {
+        let old_tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
+        let new_untagged = object.to_address().as_usize();
+        let new_tagged = new_untagged | (old_tagged & Self::TAG_BITS_MASK);
+        unsafe { (*self.slot_addr).store(new_tagged, atomic::Ordering::Relaxed) }
     }
 }
