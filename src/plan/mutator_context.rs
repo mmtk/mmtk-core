@@ -142,7 +142,12 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         self.flush_remembered_sets();
     }
     fn get_tls(&self) -> VMMutatorThread;
+    /// Get active barrier trait object
     fn barrier(&mut self) -> &mut dyn Barrier;
+    /// Force cast the barrier trait object to a concrete implementation.
+    ///
+    /// # Safety
+    /// The safety of this function is ensured by a down-cast check.
     unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B;
 }
 
