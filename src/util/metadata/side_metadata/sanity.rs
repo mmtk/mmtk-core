@@ -466,6 +466,7 @@ pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_
     }
 }
 
+#[cfg(feature = "extreme_assertions")]
 use crate::util::metadata::metadata_val_traits::*;
 
 #[cfg(feature = "extreme_assertions")]
@@ -591,6 +592,29 @@ pub fn verify_add(
     }
 }
 
+#[cfg(feature = "extreme_assertions")]
+pub fn typed_verify_add<T: MetadataValue>(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    val_to_add: T,
+    actual_old_val: T,
+) {
+    let val_to_add: usize = val_to_add.to_usize().unwrap();
+    let actual_old_val: usize = actual_old_val.to_usize().unwrap();
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
+        Ok(expected_old_val) => {
+            assert!(
+                actual_old_val == expected_old_val,
+                "Expected (0x{:x}) but found (0x{:x})",
+                expected_old_val,
+                actual_old_val
+            );
+        }
+        Err(e) => panic!("{}", e),
+    }
+}
+
 /// Commits a fetch and sub operation and ensures it returns the correct old side metadata content.
 /// Panics if:
 /// 1 - the metadata spec is not valid,
@@ -609,6 +633,29 @@ pub fn verify_sub(
     val_to_sub: usize,
     actual_old_val: usize,
 ) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
+    match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
+        Ok(expected_old_val) => {
+            assert!(
+                actual_old_val == expected_old_val,
+                "Expected (0x{:x}) but found (0x{:x})",
+                expected_old_val,
+                actual_old_val
+            );
+        }
+        Err(e) => panic!("{}", e),
+    }
+}
+
+#[cfg(feature = "extreme_assertions")]
+pub fn typed_verify_sub<T: MetadataValue>(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    val_to_sub: T,
+    actual_old_val: T,
+) {
+    let val_to_add: usize = val_to_add.to_usize().unwrap();
+    let actual_old_val: usize = actual_old_val.to_usize().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
         Ok(expected_old_val) => {

@@ -6,6 +6,8 @@ use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
 use crate::util::metadata::only_available_on_64bits;
 use crate::util::{constants, Address};
+use crate::util::metadata::metadata_val_traits::*;
+use num_traits::{FromPrimitive, ToPrimitive};
 use std::fmt;
 use std::io::Result;
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicU64, AtomicU8, Ordering};
@@ -97,6 +99,268 @@ impl SideMetadataSpec {
     pub const fn upper_bound_address_for_chunked(&self, data_addr: Address) -> Address {
         debug_assert!(self.is_rel_offset());
         address_to_meta_chunk_addr(data_addr).add(unsafe { self.upper_bound_offset().rel_offset })
+    }
+
+    /// Used only for debugging.
+    /// This panics if the required metadata is not mapped
+    fn assert_metadata_mapped(&self, data_addr: Address) {
+        let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
+
+        debug!(
+            "ensure_metadata_is_mapped({}).meta_start({})",
+            data_addr, meta_start
+        );
+
+        memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
+    }
+
+    /// Used only for debugging.
+    /// Assert if the given MetadataValue type matches the spec.
+    fn assert_value_type<T: MetadataValue>(&self) {
+        let log_b = self.log_num_of_bits;
+        match log_b {
+            _ if log_b < 3 => assert_eq!(T::LOG2, 3),
+            3..=6 => assert_eq!(T::LOG2, log_b as u32),
+            _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
+        }
+    }
+
+    /// This is a wrapper method for implementing side metadata access. It does nothing other than
+    /// calling the access function with no overhead, but in debug builds,
+    /// it includes multiple checks to make sure the access is sane.
+    /// * check whether the given value type matches the number of bits for the side metadata.
+    /// * check if the side metadata memory is mapped.
+    /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
+    #[inline(always)]
+    fn side_metadata_access<T: MetadataValue, R: Copy, F: Fn() -> R, V: Fn(R)>(&self, data_addr: Address, access_func: F, verify_func: V) -> R {
+        // With extreme assertions, we maintain a sanity table for each side metadata access. For whatever we store in
+        // side metadata, we store in the sanity table. So we can use that table to check if its results are conssitent
+        // with the actual side metadata.
+        // To achieve this, we need to apply a lock when we access side metadata. This will hide some concurrency bugs,
+        // but makes it possible for us to assert our side metadata implementation is correct.
+        #[cfg(feature = "extreme_assertions")]
+        let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        // A few checks
+        if cfg!(debug_assertions) {
+            self.assert_value_type::<T>();
+            self.assert_metadata_mapped(data_addr);
+        }
+
+        // Actual access to the side metadata
+        let ret = access_func();
+
+        // Verifying the side metadata: checks the result with the sanity table, or store some results to the sanity table
+        verify_func(ret);
+
+        return ret;
+    }
+
+    /// Non-atomic load of metadata.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    #[inline(always)]
+    pub unsafe fn load<T: MetadataValue>(&self, data_addr: Address) -> T {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let byte_val = meta_addr.load::<u8>();
+
+                FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
+            } else {
+                meta_addr.load::<T>()
+            }
+        }, |_v| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_load(metadata_spec, data_addr, _v);
+        })
+    }
+
+    /// Non-atomic store of metadata.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    #[inline(always)]
+    pub unsafe fn store<T: MetadataValue>(&self, data_addr: Address, metadata: T) {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let old_val = meta_addr.load::<u8>();
+                let new_val = (old_val & !mask) | (metadata.to_u8().unwrap() << lshift);
+
+                meta_addr.store::<u8>(new_val);
+            } else {
+                meta_addr.store::<T>(metadata);
+            }
+        }, |_| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+        })
+    }
+
+    #[inline(always)]
+    pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(order) };
+                FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
+            } else {
+                T::load_atomic(meta_addr, order)
+            }
+        }, |_v| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_load(metadata_spec, data_addr, _v);
+        })
+    }
+
+    #[inline(always)]
+    pub fn store_atomic<T: MetadataValue>(&self, data_addr: Address, metadata: T, order: Ordering) {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let metadata_u8 = metadata.to_u8().unwrap();
+                let mut old_val = unsafe { meta_addr.load::<u8>() };
+                let mut new_val = (old_val & !mask) | (metadata_u8 << lshift);
+
+                while unsafe {
+                    meta_addr
+                        .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+                        .is_err()
+                } {
+                    old_val = unsafe { meta_addr.load::<u8>() };
+                    new_val = (old_val & !mask) | (metadata_u8 << lshift);
+                }
+            } else {
+                T::store_atomic(meta_addr, metadata, order)
+            }
+        }, |_| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+        })
+    }
+
+    #[inline(always)]
+    pub fn compare_exchange_atomic<T: MetadataValue>(&self, data_addr: Address, old_metadata: T, new_metadata: T, success_order: Ordering, failure_order: Ordering) -> bool {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+
+                let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(success_order) };
+                let expected_old_byte = (real_old_byte & !mask) | ((old_metadata.to_u8().unwrap()) << lshift);
+                let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata.to_u8().unwrap()) << lshift);
+
+                unsafe {
+                    meta_addr
+                        .compare_exchange::<AtomicU8>(
+                            expected_old_byte,
+                            expected_new_byte,
+                            success_order,
+                            failure_order,
+                        )
+                        .is_ok()
+                }
+            } else {
+                T::compare_exchange(meta_addr, old_metadata, new_metadata, success_order, failure_order).is_ok()
+            }
+        }, |_success| {
+            #[cfg(feature = "extreme_assertions")]
+            if _success {
+                sanity::typed_verify_store(self, data_addr, new_metadata);
+            }
+        })
+    }
+
+    #[inline(always)]
+    pub fn fetch_add_atomic<T: MetadataValue>(&self, data_addr: Address, val: T, order: Ordering) -> T {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let val_u8 = val.to_u8().unwrap();
+
+                let mut old_val = unsafe { meta_addr.load::<u8>() };
+                let mut new_sub_val = (((old_val & mask) >> lshift) + val_u8) & (mask >> lshift);
+                let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+
+                while unsafe {
+                    meta_addr
+                        .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+                        .is_err()
+                } {
+                    old_val = unsafe { meta_addr.load::<u8>() };
+                    new_sub_val = (((old_val & mask) >> lshift) + val_u8) & (mask >> lshift);
+                    new_val = (old_val & !mask) | (new_sub_val << lshift);
+                }
+
+                FromPrimitive::from_u8(old_val & mask).unwrap()
+            } else {
+                T::fetch_add(meta_addr, val, order)
+            }
+        }, |_old_val| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_add(self, data_addr, val, _old_val)
+        })
+    }
+
+    #[inline(always)]
+    pub fn fetch_sub_atomic<T: MetadataValue>(&self, data_addr: Address, val: T, order: Ordering) -> T {
+        self.side_metadata_access::<T, _, _, _>(data_addr, || {
+            let meta_addr = address_to_meta_address(self, data_addr);
+            let bits_num_log = self.log_num_of_bits;
+            if bits_num_log < 3 {
+                let lshift = meta_byte_lshift(self, data_addr);
+                let mask = meta_byte_mask(self) << lshift;
+                let val_u8 = val.to_u8().unwrap();
+
+                let mut old_val = unsafe { meta_addr.load::<u8>() };
+                let mut new_sub_val = (((old_val & mask) >> lshift) -val_u8) & (mask >> lshift);
+                let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+
+                while unsafe {
+                    meta_addr
+                        .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+                        .is_err()
+                } {
+                    old_val = unsafe { meta_addr.load::<u8>() };
+                    new_sub_val = (((old_val & mask) >> lshift) - val_u8) & (mask >> lshift);
+                    new_val = (old_val & !mask) | (new_sub_val << lshift);
+                }
+
+                FromPrimitive::from_u8(old_val & mask).unwrap()
+            } else {
+                T::fetch_sub(meta_addr, val, order)
+            }
+        }, |_old_val| {
+            #[cfg(feature = "extreme_assertions")]
+            sanity::typed_verify_sub(self, data_addr, val, _old_val)
+        })
     }
 }
 
@@ -353,320 +617,320 @@ pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Ad
     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
 }
 
-#[inline(always)]
-pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    let res = if bits_num_log <= 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
-        let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(order) };
+//     let res = if bits_num_log <= 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
+//         let byte_val = unsafe { meta_addr.atomic_load::<AtomicU8>(order) };
 
-        ((byte_val & mask) as usize) >> lshift
-    } else if bits_num_log == 4 {
-        unsafe { meta_addr.atomic_load::<AtomicU16>(order) as usize }
-    } else if bits_num_log == 5 {
-        unsafe { meta_addr.atomic_load::<AtomicU32>(order) as usize }
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({ unsafe { meta_addr.atomic_load::<AtomicU64>(order) as usize } })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    };
+//         ((byte_val & mask) as usize) >> lshift
+//     } else if bits_num_log == 4 {
+//         unsafe { meta_addr.atomic_load::<AtomicU16>(order) as usize }
+//     } else if bits_num_log == 5 {
+//         unsafe { meta_addr.atomic_load::<AtomicU32>(order) as usize }
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({ unsafe { meta_addr.atomic_load::<AtomicU64>(order) as usize } })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     };
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(metadata_spec, data_addr, res);
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_load(metadata_spec, data_addr, res);
 
-    res
-}
+//     res
+// }
 
-#[inline(always)]
-pub fn store_atomic(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    metadata: usize,
-    order: Ordering,
-) {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub fn store_atomic(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     metadata: usize,
+//     order: Ordering,
+// ) {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
+//     if bits_num_log < 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
 
-        let mut old_val = unsafe { meta_addr.load::<u8>() };
-        let mut new_val = (old_val & !mask) | ((metadata as u8) << lshift);
+//         let mut old_val = unsafe { meta_addr.load::<u8>() };
+//         let mut new_val = (old_val & !mask) | ((metadata as u8) << lshift);
 
-        while unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                .is_err()
-        } {
-            old_val = unsafe { meta_addr.load::<u8>() };
-            new_val = (old_val & !mask) | ((metadata as u8) << lshift);
-        }
-    } else if bits_num_log == 3 {
-        unsafe { meta_addr.atomic_store::<AtomicU8>(metadata as u8, order) };
-    } else if bits_num_log == 4 {
-        unsafe { meta_addr.atomic_store::<AtomicU16>(metadata as u16, order) };
-    } else if bits_num_log == 5 {
-        unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, order) };
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({
-            unsafe { meta_addr.atomic_store::<AtomicU64>(metadata as u64, order) };
-        })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    }
+//         while unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+//                 .is_err()
+//         } {
+//             old_val = unsafe { meta_addr.load::<u8>() };
+//             new_val = (old_val & !mask) | ((metadata as u8) << lshift);
+//         }
+//     } else if bits_num_log == 3 {
+//         unsafe { meta_addr.atomic_store::<AtomicU8>(metadata as u8, order) };
+//     } else if bits_num_log == 4 {
+//         unsafe { meta_addr.atomic_store::<AtomicU16>(metadata as u16, order) };
+//     } else if bits_num_log == 5 {
+//         unsafe { meta_addr.atomic_store::<AtomicU32>(metadata as u32, order) };
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({
+//             unsafe { meta_addr.atomic_store::<AtomicU64>(metadata as u64, order) };
+//         })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     }
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_store(metadata_spec, data_addr, metadata);
-}
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_store(metadata_spec, data_addr, metadata);
+// }
 
-#[inline(always)]
-pub fn compare_exchange_atomic(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    old_metadata: usize,
-    new_metadata: usize,
-    success_order: Ordering,
-    failure_order: Ordering,
-) -> bool {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub fn compare_exchange_atomic(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     old_metadata: usize,
+//     new_metadata: usize,
+//     success_order: Ordering,
+//     failure_order: Ordering,
+// ) -> bool {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    debug!(
-        "compare_exchange_atomic({:?}, {}, {}, {})",
-        metadata_spec, data_addr, old_metadata, new_metadata
-    );
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     debug!(
+//         "compare_exchange_atomic({:?}, {}, {}, {})",
+//         metadata_spec, data_addr, old_metadata, new_metadata
+//     );
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    #[allow(clippy::let_and_return)]
-    let res = if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
+//     #[allow(clippy::let_and_return)]
+//     let res = if bits_num_log < 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
 
-        let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(success_order) };
-        let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
-        let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata as u8) << lshift);
+//         let real_old_byte = unsafe { meta_addr.atomic_load::<AtomicU8>(success_order) };
+//         let expected_old_byte = (real_old_byte & !mask) | ((old_metadata as u8) << lshift);
+//         let expected_new_byte = (expected_old_byte & !mask) | ((new_metadata as u8) << lshift);
 
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(
-                    expected_old_byte,
-                    expected_new_byte,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
-    } else if bits_num_log == 3 {
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(
-                    old_metadata as u8,
-                    new_metadata as u8,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
-    } else if bits_num_log == 4 {
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU16>(
-                    old_metadata as u16,
-                    new_metadata as u16,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
-    } else if bits_num_log == 5 {
-        unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU32>(
-                    old_metadata as u32,
-                    new_metadata as u32,
-                    success_order,
-                    failure_order,
-                )
-                .is_ok()
-        }
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({
-            unsafe {
-                meta_addr
-                    .compare_exchange::<AtomicU64>(
-                        old_metadata as u64,
-                        new_metadata as u64,
-                        success_order,
-                        failure_order,
-                    )
-                    .is_ok()
-            }
-        })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    };
+//         unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU8>(
+//                     expected_old_byte,
+//                     expected_new_byte,
+//                     success_order,
+//                     failure_order,
+//                 )
+//                 .is_ok()
+//         }
+//     } else if bits_num_log == 3 {
+//         unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU8>(
+//                     old_metadata as u8,
+//                     new_metadata as u8,
+//                     success_order,
+//                     failure_order,
+//                 )
+//                 .is_ok()
+//         }
+//     } else if bits_num_log == 4 {
+//         unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU16>(
+//                     old_metadata as u16,
+//                     new_metadata as u16,
+//                     success_order,
+//                     failure_order,
+//                 )
+//                 .is_ok()
+//         }
+//     } else if bits_num_log == 5 {
+//         unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU32>(
+//                     old_metadata as u32,
+//                     new_metadata as u32,
+//                     success_order,
+//                     failure_order,
+//                 )
+//                 .is_ok()
+//         }
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({
+//             unsafe {
+//                 meta_addr
+//                     .compare_exchange::<AtomicU64>(
+//                         old_metadata as u64,
+//                         new_metadata as u64,
+//                         success_order,
+//                         failure_order,
+//                     )
+//                     .is_ok()
+//             }
+//         })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     };
 
-    #[cfg(feature = "extreme_assertions")]
-    if res {
-        sanity::verify_store(metadata_spec, data_addr, new_metadata);
-    }
+//     #[cfg(feature = "extreme_assertions")]
+//     if res {
+//         sanity::verify_store(metadata_spec, data_addr, new_metadata);
+//     }
 
-    res
-}
-
-// same as Rust atomics, this wraps around on overflow
-#[inline(always)]
-pub fn fetch_add_atomic(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val: usize,
-    order: Ordering,
-) -> usize {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
-
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
-
-    let bits_num_log = metadata_spec.log_num_of_bits;
-
-    #[allow(clippy::let_and_return)]
-    let old_val = if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
-
-        let mut old_val = unsafe { meta_addr.load::<u8>() };
-        let mut new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
-        let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
-
-        while unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                .is_err()
-        } {
-            old_val = unsafe { meta_addr.load::<u8>() };
-            new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
-            new_val = (old_val & !mask) | (new_sub_val << lshift);
-        }
-
-        (old_val & mask) as usize
-    } else if bits_num_log == 3 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_add(val as u8, order) as usize }
-    } else if bits_num_log == 4 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_add(val as u16, order) as usize }
-    } else if bits_num_log == 5 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, order) as usize }
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({
-            unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_add(val as u64, order) as usize }
-        })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    };
-
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_add(metadata_spec, data_addr, val, old_val);
-
-    old_val
-}
+//     res
+// }
 
 // same as Rust atomics, this wraps around on overflow
-#[inline(always)]
-pub fn fetch_sub_atomic(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val: usize,
-    order: Ordering,
-) -> usize {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub fn fetch_add_atomic(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val: usize,
+//     order: Ordering,
+// ) -> usize {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    #[allow(clippy::let_and_return)]
-    let old_val = if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
+//     #[allow(clippy::let_and_return)]
+//     let old_val = if bits_num_log < 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
 
-        let mut old_val = unsafe { meta_addr.load::<u8>() };
-        let mut new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
-        let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+//         let mut old_val = unsafe { meta_addr.load::<u8>() };
+//         let mut new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
+//         let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
 
-        while unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                .is_err()
-        } {
-            old_val = unsafe { meta_addr.load::<u8>() };
-            new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
-            new_val = (old_val & !mask) | (new_sub_val << lshift);
-        }
+//         while unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+//                 .is_err()
+//         } {
+//             old_val = unsafe { meta_addr.load::<u8>() };
+//             new_sub_val = (((old_val & mask) >> lshift) + (val as u8)) & (mask >> lshift);
+//             new_val = (old_val & !mask) | (new_sub_val << lshift);
+//         }
 
-        (old_val & mask) as usize
-    } else if bits_num_log == 3 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_sub(val as u8, order) as usize }
-    } else if bits_num_log == 4 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_sub(val as u16, order) as usize }
-    } else if bits_num_log == 5 {
-        unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, order) as usize }
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({
-            unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_sub(val as u64, order) as usize }
-        })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    };
+//         (old_val & mask) as usize
+//     } else if bits_num_log == 3 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_add(val as u8, order) as usize }
+//     } else if bits_num_log == 4 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_add(val as u16, order) as usize }
+//     } else if bits_num_log == 5 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_add(val as u32, order) as usize }
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({
+//             unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_add(val as u64, order) as usize }
+//         })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     };
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_sub(metadata_spec, data_addr, val, old_val);
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_add(metadata_spec, data_addr, val, old_val);
 
-    old_val
-}
+//     old_val
+// }
+
+// same as Rust atomics, this wraps around on overflow
+// #[inline(always)]
+// pub fn fetch_sub_atomic(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val: usize,
+//     order: Ordering,
+// ) -> usize {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
+
+//     let bits_num_log = metadata_spec.log_num_of_bits;
+
+//     #[allow(clippy::let_and_return)]
+//     let old_val = if bits_num_log < 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
+
+//         let mut old_val = unsafe { meta_addr.load::<u8>() };
+//         let mut new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
+//         let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
+
+//         while unsafe {
+//             meta_addr
+//                 .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+//                 .is_err()
+//         } {
+//             old_val = unsafe { meta_addr.load::<u8>() };
+//             new_sub_val = (((old_val & mask) >> lshift) - (val as u8)) & (mask >> lshift);
+//             new_val = (old_val & !mask) | (new_sub_val << lshift);
+//         }
+
+//         (old_val & mask) as usize
+//     } else if bits_num_log == 3 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU8>()).fetch_sub(val as u8, order) as usize }
+//     } else if bits_num_log == 4 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU16>()).fetch_sub(val as u16, order) as usize }
+//     } else if bits_num_log == 5 {
+//         unsafe { (*meta_addr.to_ptr::<AtomicU32>()).fetch_sub(val as u32, order) as usize }
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({
+//             unsafe { (*meta_addr.to_ptr::<AtomicU64>()).fetch_sub(val as u64, order) as usize }
+//         })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     };
+
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_sub(metadata_spec, data_addr, val, old_val);
+
+//     old_val
+// }
 
 /// Non-atomic load of metadata.
 ///
@@ -677,43 +941,43 @@ pub fn fetch_sub_atomic(
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-#[inline(always)]
-pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usize {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usize {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    #[allow(clippy::let_and_return)]
-    let res = if bits_num_log <= 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
-        let byte_val = meta_addr.load::<u8>();
+//     #[allow(clippy::let_and_return)]
+//     let res = if bits_num_log <= 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
+//         let byte_val = meta_addr.load::<u8>();
 
-        ((byte_val & mask) as usize) >> lshift
-    } else if bits_num_log == 4 {
-        meta_addr.load::<u16>() as usize
-    } else if bits_num_log == 5 {
-        meta_addr.load::<u32>() as usize
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({ meta_addr.load::<u64>() as usize })
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    };
+//         ((byte_val & mask) as usize) >> lshift
+//     } else if bits_num_log == 4 {
+//         meta_addr.load::<u16>() as usize
+//     } else if bits_num_log == 5 {
+//         meta_addr.load::<u32>() as usize
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({ meta_addr.load::<u64>() as usize })
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     };
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_load(metadata_spec, data_addr, res);
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_load(metadata_spec, data_addr, res);
 
-    res
-}
+//     res
+// }
 
 /// Non-atomic store of metadata.
 ///
@@ -724,190 +988,187 @@ pub unsafe fn load(metadata_spec: &SideMetadataSpec, data_addr: Address) -> usiz
 /// 1. Concurrent access to this operation is undefined behaviour.
 /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
 ///
-#[inline(always)]
-pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// #[inline(always)]
+// pub unsafe fn store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+//     let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     if cfg!(debug_assertions) {
+//         ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     }
 
-    let bits_num_log = metadata_spec.log_num_of_bits;
+//     let bits_num_log = metadata_spec.log_num_of_bits;
 
-    if bits_num_log < 3 {
-        let lshift = meta_byte_lshift(metadata_spec, data_addr);
-        let mask = meta_byte_mask(metadata_spec) << lshift;
+//     if bits_num_log < 3 {
+//         let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//         let mask = meta_byte_mask(metadata_spec) << lshift;
 
-        let old_val = meta_addr.load::<u8>();
-        let new_val = (old_val & !mask) | ((metadata as u8) << lshift);
+//         let old_val = meta_addr.load::<u8>();
+//         let new_val = (old_val & !mask) | ((metadata as u8) << lshift);
 
-        meta_addr.store::<u8>(new_val);
-    } else if bits_num_log == 3 {
-        meta_addr.store::<u8>(metadata as u8);
-    } else if bits_num_log == 4 {
-        meta_addr.store::<u16>(metadata as u16);
-    } else if bits_num_log == 5 {
-        meta_addr.store::<u32>(metadata as u32);
-    } else if bits_num_log == 6 {
-        only_available_on_64bits!({ meta_addr.store::<u64>(metadata as u64) });
-    } else {
-        unreachable!(
-            "side metadata > {}-bits is not supported!",
-            constants::BITS_IN_WORD
-        );
-    }
+//         meta_addr.store::<u8>(new_val);
+//     } else if bits_num_log == 3 {
+//         meta_addr.store::<u8>(metadata as u8);
+//     } else if bits_num_log == 4 {
+//         meta_addr.store::<u16>(metadata as u16);
+//     } else if bits_num_log == 5 {
+//         meta_addr.store::<u32>(metadata as u32);
+//     } else if bits_num_log == 6 {
+//         only_available_on_64bits!({ meta_addr.store::<u64>(metadata as u64) });
+//     } else {
+//         unreachable!(
+//             "side metadata > {}-bits is not supported!",
+//             constants::BITS_IN_WORD
+//         );
+//     }
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_store(metadata_spec, data_addr, metadata);
-}
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_store(metadata_spec, data_addr, metadata);
+// }
 
-use crate::util::metadata::metadata_val_traits::*;
-use num_traits::ToPrimitive;
+// fn assert_int_type<T: Bits>(spec: &SideMetadataSpec) {
+//     let log_b = spec.log_num_of_bits;
+//     match log_b {
+//         _ if log_b < 3 => assert_eq!(T::LOG2, 3),
+//         3..=6 => assert_eq!(T::LOG2, log_b as u32),
+//         _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
+//     }
+// }
 
-fn assert_int_type<T: Bits>(spec: &SideMetadataSpec) {
-    let log_b = spec.log_num_of_bits;
-    match log_b {
-        _ if log_b < 3 => assert_eq!(T::LOG2, 3),
-        3..=6 => assert_eq!(T::LOG2, log_b as u32),
-        _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
-    }
-}
+// #[inline(always)]
+// fn side_metadata_access<T: MetadataValue, R: Copy, F: Fn() -> R, V: Fn(R)>(spec: &SideMetadataSpec, data_addr: Address, access_func: F, verify_func: V) -> R {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-#[inline(always)]
-fn side_metadata_access<T: MetadataValue, R: Copy, F: Fn() -> R, V: Fn(R)>(spec: &SideMetadataSpec, data_addr: Address, access_func: F, verify_func: V) -> R {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+//     if cfg!(debug_assertions) {
+//         let log_b = spec.log_num_of_bits;
+//         match log_b {
+//             _ if log_b < 3 => assert_eq!(T::LOG2, 3),
+//             3..=6 => assert_eq!(T::LOG2, log_b as u32),
+//             _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
+//         }
+//         ensure_metadata_is_mapped(spec, data_addr);
+//     }
 
-    if cfg!(debug_assertions) {
-        let log_b = spec.log_num_of_bits;
-        match log_b {
-            _ if log_b < 3 => assert_eq!(T::LOG2, 3),
-            3..=6 => assert_eq!(T::LOG2, log_b as u32),
-            _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
-        }
-        ensure_metadata_is_mapped(spec, data_addr);
-    }
+//     let ret = access_func();
 
-    let ret = access_func();
+//     verify_func(ret);
 
-    verify_func(ret);
+//     return ret;
+// }
 
-    return ret;
-}
+// #[inline(always)]
+// pub unsafe fn typed_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address) -> T {
+//     // #[cfg(feature = "extreme_assertions")]
+//     // let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-#[inline(always)]
-pub unsafe fn typed_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address) -> T {
-    // #[cfg(feature = "extreme_assertions")]
-    // let _lock = sanity::SANITY_LOCK.lock().unwrap();
+//     // let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//     // if cfg!(debug_assertions) {
+//     //     ensure_metadata_is_mapped(metadata_spec, data_addr);
+//     // }
 
-    // let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-    // if cfg!(debug_assertions) {
-    //     ensure_metadata_is_mapped(metadata_spec, data_addr);
-    // }
+//     // let bits_num_log = metadata_spec.log_num_of_bits;
 
-    // let bits_num_log = metadata_spec.log_num_of_bits;
+//     // #[allow(clippy::let_and_return)]
+//     // let res = if bits_num_log <= 3 {
+//     //     let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//     //     let mask = meta_byte_mask(metadata_spec) << lshift;
+//     //     let byte_val = meta_addr.load::<u8>();
 
-    // #[allow(clippy::let_and_return)]
-    // let res = if bits_num_log <= 3 {
-    //     let lshift = meta_byte_lshift(metadata_spec, data_addr);
-    //     let mask = meta_byte_mask(metadata_spec) << lshift;
-    //     let byte_val = meta_addr.load::<u8>();
+//     //     ((byte_val & mask) as usize) >> lshift
+//     // } else if bits_num_log == 4 {
+//     //     meta_addr.load::<u16>() as usize
+//     // } else if bits_num_log == 5 {
+//     //     meta_addr.load::<u32>() as usize
+//     // } else if bits_num_log == 6 {
+//     //     only_available_on_64bits!({ meta_addr.load::<u64>() as usize })
+//     // } else {
+//     //     unreachable!(
+//     //         "side metadata > {}-bits is not supported!",
+//     //         constants::BITS_IN_WORD
+//     //     );
+//     // };
 
-    //     ((byte_val & mask) as usize) >> lshift
-    // } else if bits_num_log == 4 {
-    //     meta_addr.load::<u16>() as usize
-    // } else if bits_num_log == 5 {
-    //     meta_addr.load::<u32>() as usize
-    // } else if bits_num_log == 6 {
-    //     only_available_on_64bits!({ meta_addr.load::<u64>() as usize })
-    // } else {
-    //     unreachable!(
-    //         "side metadata > {}-bits is not supported!",
-    //         constants::BITS_IN_WORD
-    //     );
-    // };
+//     // #[cfg(feature = "extreme_assertions")]
+//     // sanity::verify_load(metadata_spec, data_addr, res);
 
-    // #[cfg(feature = "extreme_assertions")]
-    // sanity::verify_load(metadata_spec, data_addr, res);
+//     // res
+//     side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
+//         let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//         let bits_num_log = metadata_spec.log_num_of_bits;
+//         if bits_num_log < 3 {
+//             let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//             let mask = meta_byte_mask(metadata_spec) << lshift;
+//             let byte_val = meta_addr.load::<u8>();
 
-    // res
-    side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
-        let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-        let bits_num_log = metadata_spec.log_num_of_bits;
-        if bits_num_log < 3 {
-            let lshift = meta_byte_lshift(metadata_spec, data_addr);
-            let mask = meta_byte_mask(metadata_spec) << lshift;
-            let byte_val = meta_addr.load::<u8>();
+//             num_traits::FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
+//         } else {
+//             meta_addr.load::<T>()
+//         }
+//     }, |_v| {
+//         #[cfg(feature = "extreme_assertions")]
+//         sanity::typed_verify_load(metadata_spec, data_addr, _v);
+//     })
+// }
 
-            num_traits::FromPrimitive::from_u8((byte_val & mask) >> lshift).unwrap()
-        } else {
-            meta_addr.load::<T>()
-        }
-    }, |v| {
-        #[cfg(feature = "extreme_assertions")]
-        sanity::typed_verify_load(metadata_spec, data_addr, v);
-    })
-}
+// #[inline(never)]
+// pub unsafe fn typed_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
+//     side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
+//         let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//         let bits_num_log = metadata_spec.log_num_of_bits;
 
-#[inline(never)]
-pub unsafe fn typed_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
-    side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
-        let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-        let bits_num_log = metadata_spec.log_num_of_bits;
+//         if bits_num_log < 3 {
+//             let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//             let mask = meta_byte_mask(metadata_spec) << lshift;
 
-        if bits_num_log < 3 {
-            let lshift = meta_byte_lshift(metadata_spec, data_addr);
-            let mask = meta_byte_mask(metadata_spec) << lshift;
+//             let old_val: u8 = meta_addr.load::<u8>();
+//             let new_val = (old_val & !mask) | (metadata.to_u8().unwrap() << lshift);
 
-            let old_val: u8 = meta_addr.load::<u8>();
-            let new_val = (old_val & !mask) | (metadata.to_u8().unwrap() << lshift);
+//             meta_addr.store::<u8>(new_val);
+//         } else {
+//             meta_addr.store::<T>(metadata);
+//         }
+//     }, |_| {
+//         #[cfg(feature = "extreme_assertions")]
+//         sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+//     })
+// }
 
-            meta_addr.store::<u8>(new_val);
-        } else {
-            meta_addr.store::<T>(metadata);
-        }
-    }, |_| {
-        #[cfg(feature = "extreme_assertions")]
-        sanity::typed_verify_store(metadata_spec, data_addr, metadata);
-    })
-}
+// #[inline(always)]
+// pub fn typed_store_atomic<T: MetadataValue>(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     metadata: <T::AtomicType as MetadataAtomic>::NonAtomicType,
+//     order: Ordering,
+// ) {
+//     side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
+//         let meta_addr = address_to_meta_address(metadata_spec, data_addr);
+//         let bits_num_log = metadata_spec.log_num_of_bits;
+//         if bits_num_log < 3 {
+//             let lshift = meta_byte_lshift(metadata_spec, data_addr);
+//             let mask = meta_byte_mask(metadata_spec) << lshift;
+//             let metadata_u8 = metadata.to_u8().unwrap();
 
-#[inline(always)]
-pub fn typed_store_atomic<T: MetadataValue>(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    metadata: <T::AtomicType as MetadataAtomic>::NonAtomicType,
-    order: Ordering,
-) {
-    side_metadata_access::<T, _, _, _>(metadata_spec, data_addr, || {
-        let meta_addr = address_to_meta_address(metadata_spec, data_addr);
-        let bits_num_log = metadata_spec.log_num_of_bits;
-        if bits_num_log < 3 {
-            let lshift = meta_byte_lshift(metadata_spec, data_addr);
-            let mask = meta_byte_mask(metadata_spec) << lshift;
-            let metadata_u8 = metadata.to_u8().unwrap();
+//             let mut old_val = unsafe { meta_addr.load::<u8>() };
+//             let mut new_val = (old_val & !mask) | (metadata_u8 << lshift);
 
-            let mut old_val = unsafe { meta_addr.load::<u8>() };
-            let mut new_val = (old_val & !mask) | (metadata_u8 << lshift);
-
-            while unsafe {
-                meta_addr
-                    .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                    .is_err()
-            } {
-                old_val = unsafe { meta_addr.load::<u8>() };
-                new_val = (old_val & !mask) | (metadata_u8 << lshift);
-            }
-        } else {
-            unsafe { meta_addr.as_ref::<T::AtomicType>() }.store(metadata, order)
-        }
-    }, |_| {
-        #[cfg(feature = "extreme_assertions")]
-        sanity::typed_verify_store(metadata_spec, data_addr, metadata);
-    })
-}
+//             while unsafe {
+//                 meta_addr
+//                     .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
+//                     .is_err()
+//             } {
+//                 old_val = unsafe { meta_addr.load::<u8>() };
+//                 new_val = (old_val & !mask) | (metadata_u8 << lshift);
+//             }
+//         } else {
+//             unsafe { meta_addr.as_ref::<T::AtomicType>() }.store(metadata, order)
+//         }
+//     }, |_| {
+//         #[cfg(feature = "extreme_assertions")]
+//         sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+//     })
+// }
 
 /// A byte array in side-metadata
 pub struct MetadataByteArrayRef<const ENTRIES: usize> {

@@ -60,7 +60,7 @@ impl Line {
     pub fn mark(&self, state: u8) {
         debug_assert!(!super::BLOCK_ONLY);
         unsafe {
-            side_metadata::store(&Self::MARK_TABLE, self.start(), state as _);
+            Self::MARK_TABLE.store::<u8>(self.start(), state);
         }
     }
 
@@ -68,7 +68,7 @@ impl Line {
     #[inline(always)]
     pub fn is_marked(&self, state: u8) -> bool {
         debug_assert!(!super::BLOCK_ONLY);
-        unsafe { side_metadata::load(&Self::MARK_TABLE, self.start()) as u8 == state }
+        unsafe { Self::MARK_TABLE.load::<u8>(self.start()) == state }
     }
 
     /// Mark all lines the object is spanned to.

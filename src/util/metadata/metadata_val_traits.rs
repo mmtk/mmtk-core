@@ -1,6 +1,7 @@
 use core::sync::atomic::*;
 use num_traits::Unsigned;
 use num_traits::{FromPrimitive, ToPrimitive};
+use crate::util::Address;
 
 /// Describes bits and log2 bits for the numbers.
 /// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/247
@@ -110,11 +111,71 @@ impl_atomic_trait!(AtomicU64, u64);
 /// The number type for load/store metadata.
 pub trait MetadataValue: Unsigned + Bits + ToPrimitive + Copy + FromPrimitive {
     type AtomicType: MetadataAtomic;
+    fn as_atomic(&self) -> &Self::AtomicType;
+    fn load_atomic(addr: Address, order: Ordering) -> Self;
+    fn store_atomic(addr: Address, value: Self, order: Ordering);
+    fn compare_exchange(addr: Address, current: Self, new: Self, success: Ordering, failure: Ordering) -> Result<Self, Self>;
+    fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self;
+    fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self;
+    fn fetch_update<F>(addr: Address, set_order: Ordering, fetch_order: Ordering, f: F) -> Result<Self, Self> where F: FnMut(Self) -> Option<Self>;
 }
 macro_rules! impl_metadata_value_trait {
     ($non_atomic: ty, $atomic: ty) => {
         impl MetadataValue for $non_atomic {
             type AtomicType = $atomic;
+
+            #[inline(always)]
+            fn as_atomic(&self) -> &$atomic {
+                unsafe { std::mem::transmute(self) }
+            }
+
+            #[inline]
+            fn load_atomic(addr: Address, order: Ordering) -> Self {
+                unsafe { addr.as_ref::<$atomic>() }.load(order)
+            }
+
+            #[inline]
+            fn store_atomic(addr: Address, value: Self, order: Ordering) {
+                unsafe { addr.as_ref::<$atomic>() }.store(value, order)
+            }
+
+            #[inline]
+            fn compare_exchange(
+                addr: Address,
+                current: Self,
+                new: Self,
+                success: Ordering,
+                failure: Ordering,
+            ) -> Result<Self, Self> {
+                unsafe { addr.as_ref::<$atomic>() }.compare_exchange(
+                    current,
+                    new,
+                    success,
+                    failure,
+                )
+            }
+
+            #[inline]
+            fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self{
+                unsafe { addr.as_ref::<$atomic>() }.fetch_add(value, order)
+            }
+
+            #[inline]
+            fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self{
+                unsafe { addr.as_ref::<$atomic>() }.fetch_sub(value, order)
+            }
+
+            #[inline]
+            fn fetch_update<F>(
+                addr: Address,
+                set_order: Ordering,
+                fetch_order: Ordering,
+                f: F,
+            ) -> Result<Self, Self>
+            where
+                F: FnMut(Self) -> Option<Self> {
+                unsafe { addr.as_ref::<$atomic>() }.fetch_update(set_order, fetch_order, f)
+            }
         }
     }
 }

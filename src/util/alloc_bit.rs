@@ -24,12 +24,7 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
 
 pub fn set_alloc_bit(object: ObjectReference) {
     debug_assert!(!is_alloced(object), "{:x}: alloc bit already set", object);
-    side_metadata::typed_store_atomic::<u8>(
-        &ALLOC_SIDE_METADATA_SPEC,
-        object.to_address(),
-        1,
-        Ordering::SeqCst,
-    );
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
 }
 
 pub fn unset_addr_alloc_bit(address: Address) {
@@ -38,17 +33,12 @@ pub fn unset_addr_alloc_bit(address: Address) {
         "{:x}: alloc bit not set",
         address
     );
-    side_metadata::store_atomic(&ALLOC_SIDE_METADATA_SPEC, address, 0, Ordering::SeqCst);
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(address, 0, Ordering::SeqCst);
 }
 
 pub fn unset_alloc_bit(object: ObjectReference) {
     debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
-    side_metadata::store_atomic(
-        &ALLOC_SIDE_METADATA_SPEC,
-        object.to_address(),
-        0,
-        Ordering::SeqCst,
-    );
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
 }
 
 /// # Safety
@@ -57,7 +47,7 @@ pub fn unset_alloc_bit(object: ObjectReference) {
 ///
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
     debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
-    side_metadata::typed_store::<u8>(&ALLOC_SIDE_METADATA_SPEC, object.to_address(), 0);
+    ALLOC_SIDE_METADATA_SPEC.store::<u8>(object.to_address(), 0);
 }
 
 pub fn is_alloced(object: ObjectReference) -> bool {
@@ -65,7 +55,7 @@ pub fn is_alloced(object: ObjectReference) -> bool {
 }
 
 pub fn is_alloced_object(address: Address) -> bool {
-    side_metadata::load_atomic(&ALLOC_SIDE_METADATA_SPEC, address, Ordering::SeqCst) == 1
+    ALLOC_SIDE_METADATA_SPEC.load_atomic::<u8>(address, Ordering::SeqCst) == 1
 }
 
 /// # Safety
@@ -73,7 +63,7 @@ pub fn is_alloced_object(address: Address) -> bool {
 /// This is unsafe: check the comment on `side_metadata::load`
 ///
 pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
-    side_metadata::typed_load::<u8>(&ALLOC_SIDE_METADATA_SPEC, address) == 1
+    ALLOC_SIDE_METADATA_SPEC.load::<u8>(address) == 1
 }
 
 pub fn bzero_alloc_bit(start: Address, size: usize) {
