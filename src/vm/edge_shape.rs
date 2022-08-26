@@ -60,6 +60,7 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
 /// A simple edge implementation that represents a word-sized slot where an ObjectReference value
 /// is stored as is.  It is the default edge type, and should be suitable for most VMs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct SimpleEdge {
     slot_addr: *mut Atomic<ObjectReference>,
 }
@@ -99,9 +100,16 @@ impl Edge for SimpleEdge {
     }
 }
 
-/// For backword compatibility.
-/// We let Address implement Edge so existing bindings that use `Address` to represent an edge can
-/// continue to work.
+/// For backword compatibility, we let `Address` implement `Edge` so that existing bindings that
+/// use `Address` to represent an edge can continue to work.
+///
+/// However, we should use `SimpleEdge` directly instead of using `Address`.  The purpose of the
+/// `Address` type is to represent an address in memory.  It is not directly related to fields
+/// that hold references to other objects.  Calling `load()` and `store()` on an `Address` does
+/// not indicate how many bytes to load or store, or how to interpret those bytes.  On the other
+/// hand, `SimpleEdge` is all about how to access a field that holds a reference represented
+/// simply as an `ObjectReference`.  The intention and the semantics are clearer with
+/// `SimpleEdge`.
 impl Edge for Address {
     #[inline(always)]
     fn load(&self) -> ObjectReference {
@@ -112,4 +120,12 @@ impl Edge for Address {
     fn store(&self, object: ObjectReference) {
         unsafe { Address::store(*self, object) }
     }
+}
+
+#[test]
+fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
+    assert_eq!(
+        std::mem::size_of::<SimpleEdge>(),
+        std::mem::size_of::<*mut libc::c_void>()
+    );
 }
