@@ -9,7 +9,7 @@ use crate::plan::AllocationSemantics;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 use crate::MMTK;
 
 pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
@@ -44,7 +44,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: Box::new(ObjectRememberingBarrier::<GenNurseryProcessEdges<VM>>::new(
             mmtk,
-            *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            *VM::GLOBAL_LOG_BIT_SPEC,
         )),
         mutator_tls,
         config,

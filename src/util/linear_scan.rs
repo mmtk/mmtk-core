@@ -1,7 +1,6 @@
 use crate::util::alloc_bit;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 
@@ -70,7 +69,7 @@ pub struct DefaultObjectSize<VM: VMBinding>(PhantomData<VM>);
 impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
     #[inline(always)]
     fn size(object: ObjectReference) -> usize {
-        VM::VMObjectModel::get_current_size(object)
+        VM::get_current_size(object)
     }
 }
 
@@ -114,7 +113,7 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     /// Return the region that contains the object (by its cell address).
     #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
+        Self::from(VM::ref_to_address(object).align_down(Self::BYTES))
     }
 }
 

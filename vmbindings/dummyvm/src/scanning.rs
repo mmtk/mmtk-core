@@ -8,7 +8,9 @@ use mmtk::Mutator;
 
 pub struct VMScanning {}
 
-impl Scanning<DummyVM> for VMScanning {
+impl Scanning for DummyVM {
+    type VM = Self;
+
     fn scan_thread_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory) {
         unimplemented!()
     }

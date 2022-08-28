@@ -5,9 +5,9 @@ use mmtk::Mutator;
 use crate::DummyVM;
 use crate::SINGLETON;
 
-pub struct VMActivePlan<> {}
+impl ActivePlan for DummyVM {
+    type VM = Self;
 
-impl ActivePlan<DummyVM> for VMActivePlan {
     fn global() -> &'static dyn Plan<VM=DummyVM> {
         SINGLETON.get_plan()
     }

@@ -46,7 +46,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in C::VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
@@ -109,13 +109,13 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        <C::VM as VMBinding>::VMCollection::vm_release();
+        C::VM::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in C::VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
@@ -175,7 +175,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // If the VM requires that only the coordinator thread can stop the world,
         // we delegate the work to the coordinator.
-        if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
+        if E::VM::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
             mmtk.scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
             return;
@@ -183,29 +183,25 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
-        <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+        E::VM::stop_all_mutators(worker.tls, |mutator| {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+        if E::VM::SCAN_MUTATORS_IN_SAFEPOINT {
             // Prepare mutators if necessary
             // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
             if !mmtk.plan.base().stacks_prepared() {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                        worker.tls,
-                        mutator.get_tls(),
-                        mutator,
-                    );
+                for mutator in E::VM::mutators() {
+                    E::VM::prepare_mutator(worker.tls, mutator.get_tls(), mutator);
                 }
             }
             // Scan mutators
-            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
+            if E::VM::SINGLE_THREAD_MUTATOR_SCANNING {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                     .add(ScanStackRoots::<E>::new());
             } else {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                for mutator in E::VM::mutators() {
                     mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                         .add(ScanStackRoot::<E>(mutator));
                 }
@@ -230,7 +226,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             crate::util::edge_logger::reset();
         }
 
-        if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
+        if VM::COORDINATOR_ONLY_STW {
             assert!(worker.is_coordinator(),
                     "VM only allows coordinator to resume mutators, but the current worker is not the coordinator.");
         }
@@ -240,7 +236,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         // Reset the triggering information.
         mmtk.plan.base().reset_collection_trigger();
 
-        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+        VM::resume_mutators(worker.tls);
     }
 }
 
@@ -263,7 +259,7 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
+        E::VM::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
     }
 }
 
@@ -280,9 +276,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
-        <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
-        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+        E::VM::scan_thread_roots(worker.tls, factory);
+        E::VM::notify_initial_thread_scan_complete(false, worker.tls);
+        for mutator in E::VM::mutators() {
             mutator.flush();
         }
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
@@ -295,19 +291,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
-        let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
+        let mutators = E::VM::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_root(
-            worker.tls,
-            unsafe { &mut *(self.0 as *mut _) },
-            factory,
-        );
+        E::VM::scan_thread_root(worker.tls, unsafe { &mut *(self.0 as *mut _) }, factory);
         self.0.flush();
 
         if mmtk.plan.base().inform_stack_scanned(mutators) {
-            <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
-                false, worker.tls,
-            );
+            E::VM::notify_initial_thread_scan_complete(false, worker.tls);
             base.set_gc_status(GcStatus::GcProper);
         }
     }
@@ -326,7 +316,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
+        E::VM::scan_vm_specific_roots(worker.tls, factory);
     }
 }
 
@@ -660,9 +650,9 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
-                if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
+                if VM::support_edge_enqueuing(tls, object) {
                     // If an object supports edge-enqueuing, we enqueue its edges.
-                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
+                    VM::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
                 } else {
                     // If an object does not support edge-enqueuing, we have to use
@@ -684,11 +674,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
             // Scan objects and trace their edges at the same time.
             for object in scan_later.iter().copied() {
-                <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
-                    tls,
-                    object,
-                    &mut closure,
-                );
+                VM::scan_object_and_trace_edges(tls, object, &mut closure);
                 self.post_scan_object(object);
             }
 

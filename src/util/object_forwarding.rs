@@ -4,7 +4,6 @@ use crate::util::metadata::{
 };
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
 use crate::util::{constants, Address, ObjectReference};
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -28,7 +27,7 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> usize {
         let old_value = get_forwarding_status::<VM>(object);
         if old_value != FORWARDING_NOT_TRIGGERED_YET
             || compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                &VM::LOCAL_FORWARDING_BITS_SPEC,
                 object,
                 old_value,
                 BEING_FORWARDED,
@@ -81,12 +80,12 @@ pub fn forward_object<VM: VMBinding>(
     semantics: CopySemantics,
     copy_context: &mut GCWorkerCopyContext<VM>,
 ) -> ObjectReference {
-    let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
+    let new_object = VM::copy(object, semantics, copy_context);
     #[cfg(feature = "global_alloc_bit")]
     crate::util::alloc_bit::set_alloc_bit(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            &VM::LOCAL_FORWARDING_POINTER_SPEC,
             object,
             new_object.to_address().as_usize() | (FORWARDED << shift),
             None,
@@ -95,7 +94,7 @@ pub fn forward_object<VM: VMBinding>(
     } else {
         write_forwarding_pointer::<VM>(object, new_object);
         store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+            &VM::LOCAL_FORWARDING_BITS_SPEC,
             object,
             FORWARDED,
             None,
@@ -111,7 +110,7 @@ pub fn forward_object<VM: VMBinding>(
 #[inline]
 pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> usize {
     load_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+        &VM::LOCAL_FORWARDING_BITS_SPEC,
         object,
         None,
         Some(Ordering::SeqCst),
@@ -142,7 +141,7 @@ pub fn state_is_being_forwarded(forwarding_bits: usize) -> bool {
 /// This function is used on new objects.
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
     store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+        &VM::LOCAL_FORWARDING_BITS_SPEC,
         object,
         0,
         None,
@@ -161,7 +160,7 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
 
     unsafe {
         Address::from_usize(load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            &VM::LOCAL_FORWARDING_POINTER_SPEC,
             object,
             Some(FORWARDING_POINTER_MASK),
             Some(Ordering::SeqCst),
@@ -185,7 +184,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
 
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
     store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+        &VM::LOCAL_FORWARDING_POINTER_SPEC,
         object,
         new_object.to_address().as_usize(),
         Some(FORWARDING_POINTER_MASK),
@@ -205,8 +204,8 @@ pub(super) fn forwarding_bits_offset_in_forwarding_pointer<VM: VMBinding>() -> O
     use std::ops::Deref;
     // if both forwarding bits and forwarding pointer are in-header
     match (
-        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.deref(),
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.deref(),
+        VM::LOCAL_FORWARDING_POINTER_SPEC.deref(),
+        VM::LOCAL_FORWARDING_BITS_SPEC.deref(),
     ) {
         (MetadataSpec::InHeader(fp), MetadataSpec::InHeader(fb)) => {
             let maybe_shift = fb.bit_offset - fp.bit_offset;

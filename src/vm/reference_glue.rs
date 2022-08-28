@@ -13,7 +13,9 @@ use crate::vm::VMBinding;
 ///   from MMTk, the specified type is used for the finalizable objects. For most languages,
 ///   they can just use `ObjectReference` for the finalizable type, meaning that they are registering
 ///   and popping a normal object reference as finalizable objects.
-pub trait ReferenceGlue<VM: VMBinding> {
+pub trait ReferenceGlue {
+    type VM: VMBinding;
+
     /// The type of finalizable objects. This type is used when the binding registers and pops finalizable objects.
     type FinalizableType: Finalizable;
 

@@ -7,7 +7,6 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
-use crate::vm::{ActivePlan, Collection, ObjectModel};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
@@ -360,7 +359,7 @@ impl<'a> SFTMap<'a> {
     #[cfg(debug_assertions)]
     pub fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
         let object_sft = self.get(object.to_address());
-        let object_start_sft = self.get(VM::VMObjectModel::object_start_ref(object));
+        let object_start_sft = self.get(VM::object_start_ref(object));
 
         debug_assert!(
             object_sft.name() != EMPTY_SFT_NAME,
@@ -393,11 +392,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // Should we poll to attempt to GC?
         // - If tls is collector, we cannot attempt a GC.
         // - If gc is disabled, we cannot attempt a GC.
-        let should_poll = VM::VMActivePlan::is_mutator(tls)
-            && VM::VMActivePlan::global().should_trigger_gc_when_heap_is_full();
+        let should_poll = VM::is_mutator(tls) && VM::global().should_trigger_gc_when_heap_is_full();
         // Is a GC allowed here? If we should poll but are not allowed to poll, we will panic.
         // initialize_collection() has to be called so we know GC is initialized.
-        let allow_gc = should_poll && VM::VMActivePlan::global().is_initialized();
+        let allow_gc = should_poll && VM::global().is_initialized();
 
         trace!("Reserving pages");
         let pr = self.get_page_resource();
@@ -405,11 +403,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && VM::VMActivePlan::global().poll(false, Some(self.as_space())) {
+        if should_poll && VM::global().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            VM::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -496,10 +494,10 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         "Physical allocation failed when GC is not allowed!"
                     );
 
-                    let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
+                    let gc_performed = VM::global().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    VM::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }
@@ -515,7 +513,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        let start = VM::VMObjectModel::ref_to_address(object);
+        let start = VM::ref_to_address(object);
         self.address_in_space(start)
     }
 

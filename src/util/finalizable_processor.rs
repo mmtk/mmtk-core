@@ -2,8 +2,8 @@ use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
+use crate::vm::Collection;
 use crate::vm::Finalizable;
-use crate::vm::{Collection, VMBinding};
 use crate::MMTK;
 use std::marker::PhantomData;
 
@@ -73,7 +73,7 @@ impl<F: Finalizable> FinalizableProcessor<F> {
 
         self.nursery_index = self.candidates.len();
 
-        <<E as ProcessEdgesWork>::VM as VMBinding>::VMCollection::schedule_finalization(tls);
+        E::VM::schedule_finalization(tls);
     }
 
     pub fn forward_candidate<E: ProcessEdgesWork>(&mut self, e: &mut E, _nursery: bool) {

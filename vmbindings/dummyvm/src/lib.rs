@@ -21,12 +21,6 @@ mod tests;
 pub struct DummyVM;
 
 impl VMBinding for DummyVM {
-    type VMObjectModel = object_model::VMObjectModel;
-    type VMScanning = scanning::VMScanning;
-    type VMCollection = collection::VMCollection;
-    type VMActivePlan = active_plan::VMActivePlan;
-    type VMReferenceGlue = reference_glue::VMReferenceGlue;
-
     /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;
 

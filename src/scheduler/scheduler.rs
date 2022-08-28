@@ -4,7 +4,6 @@ use super::worker::{GCWorker, GCWorkerShared, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
-use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
 use enum_map::Enum;
@@ -146,7 +145,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             receiver,
             coordinator_worker,
         );
-        VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
+        VM::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
 
         self.worker_group.spawn(mmtk, sender, tls)
     }

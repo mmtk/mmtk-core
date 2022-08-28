@@ -15,7 +15,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
@@ -137,7 +136,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
-            let addr = VM::VMObjectModel::object_start_ref(object);
+            let addr = VM::object_start_ref(object);
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
@@ -221,7 +220,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
                     MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
-                    *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                    *VM::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
             #[cfg(debug_assertions)]
@@ -237,9 +236,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
-        if VM::VMActivePlan::global().poll(false, Some(self)) {
-            assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+        if VM::global().poll(false, Some(self)) {
+            assert!(VM::is_mutator(tls), "Polling in GC worker");
+            VM::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }
 
@@ -372,7 +371,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
-        match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        match *VM::LOCAL_MARK_BIT_SPEC {
             MetadataSpec::OnSide(local_mark_bit_side_spec) => {
                 self.sweep_chunk_mark_on_side(chunk_start, local_mark_bit_side_spec);
             }
@@ -385,7 +384,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
     #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
-        let obj_start = VM::VMObjectModel::object_start_ref(object);
+        let obj_start = VM::object_start_ref(object);
         let offset_malloc_bit = is_offset_malloc(obj_start);
         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
         (obj_start, offset_malloc_bit, bytes)

@@ -153,7 +153,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     /// Get the address for header forwarding pointer
     #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
-        VM::VMObjectModel::object_start_ref(object) - GC_EXTRA_HEADER_BYTES
+        VM::object_start_ref(object) - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
@@ -193,7 +193,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
     ) -> Self {
-        let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
+        let local_specs = extract_side_metadata(&[*VM::LOCAL_MARK_BIT_SPEC]);
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -263,7 +263,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     pub fn test_and_mark(object: ObjectReference) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -273,7 +273,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 return false;
             }
             if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 old_value,
                 1,
@@ -290,7 +290,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     pub fn test_and_clear_mark(object: ObjectReference) -> bool {
         loop {
             let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 None,
                 Some(Ordering::SeqCst),
@@ -301,7 +301,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             }
 
             if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                &VM::LOCAL_MARK_BIT_SPEC,
                 object,
                 old_value,
                 0,
@@ -317,7 +317,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn is_marked(object: ObjectReference) -> bool {
         let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            &VM::LOCAL_MARK_BIT_SPEC,
             object,
             None,
             Some(Ordering::SeqCst),
@@ -340,22 +340,19 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 start, end,
             );
         for obj in linear_scan.filter(|obj| Self::to_be_compacted(*obj)) {
-            let copied_size =
-                VM::VMObjectModel::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
-            let align = VM::VMObjectModel::get_align_when_copied(obj);
-            let offset = VM::VMObjectModel::get_align_offset_when_copied(obj);
+            let copied_size = VM::get_size_when_copied(obj) + Self::HEADER_RESERVED_IN_BYTES;
+            let align = VM::get_align_when_copied(obj);
+            let offset = VM::get_align_offset_when_copied(obj);
             to = align_allocation_no_fill::<VM>(to, align, offset);
-            let new_obj = VM::VMObjectModel::get_reference_when_copied_to(
-                obj,
-                to + Self::HEADER_RESERVED_IN_BYTES,
-            );
+            let new_obj =
+                VM::get_reference_when_copied_to(obj, to + Self::HEADER_RESERVED_IN_BYTES);
 
             Self::store_header_forwarding_pointer(obj, new_obj);
 
             trace!(
                 "Calculate forward: {} (size when copied = {}) ~> {} (size = {})",
                 obj,
-                VM::VMObjectModel::get_size_when_copied(obj),
+                VM::get_size_when_copied(obj),
                 to,
                 copied_size
             );
@@ -382,13 +379,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
             trace!("Compact {} to {}", obj, forwarding_pointer);
             if !forwarding_pointer.is_null() {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
+                let copied_size = VM::get_size_when_copied(obj);
                 let new_object = forwarding_pointer;
                 Self::clear_header_forwarding_pointer(new_object);
 
                 // copy object
                 trace!(" copy from {} to {}", obj, new_object);
-                let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
+                let end_of_new_object = VM::copy_to(obj, new_object, Address::ZERO);
                 // update alloc_bit,
                 alloc_bit::set_alloc_bit(new_object);
                 to = new_object.to_address() + copied_size;
@@ -407,6 +404,6 @@ struct MarkCompactObjectSize<VM>(std::marker::PhantomData<VM>);
 impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MarkCompactObjectSize<VM> {
     #[inline(always)]
     fn size(object: ObjectReference) -> usize {
-        VM::VMObjectModel::get_current_size(object)
+        VM::get_current_size(object)
     }
 }

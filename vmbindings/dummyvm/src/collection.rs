@@ -5,9 +5,9 @@ use mmtk::vm::GCThreadContext;
 use mmtk::Mutator;
 use mmtk::MutatorContext;
 
-pub struct VMCollection {}
+impl Collection for DummyVM {
+    type VM = Self;
 
-impl Collection<DummyVM> for VMCollection {
     fn stop_all_mutators<F>(_tls: VMWorkerThread, _mutator_visitor: F)
     where
         F: FnMut(&'static mut Mutator<DummyVM>),

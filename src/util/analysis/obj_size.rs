@@ -51,7 +51,7 @@ impl<VM: VMBinding> RtAnalysis<VM> for PerSizeClassObjectCounter {
             return;
         }
 
-        let stats = &(VM::VMActivePlan::global().base()).stats;
+        let stats = &(VM::global().base()).stats;
         let size_class = format!("size{}", self.size_class(size));
         let mut size_classes = self.size_classes.lock().unwrap();
         let c = size_classes.get_mut(&size_class);

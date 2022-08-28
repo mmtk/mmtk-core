@@ -25,7 +25,6 @@ use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -577,7 +576,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             self.user_triggered_collection
                 .store(true, Ordering::Relaxed);
             self.gc_requester.request();
-            VM::VMCollection::block_for_gc(tls);
+            VM::block_for_gc(tls);
         }
     }
 
@@ -663,7 +662,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             return self.vm_space.trace_object(queue, object);
         }
 
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
+        VM::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {
@@ -1025,8 +1024,8 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
+    /// Post-scan objects in the plan. Each object is scanned by `VM::scan_object()`, and this function
+    /// will be called after the `VM::scan_object()` as a hook to invoke possible policy post scan method.
     /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
     /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
     /// this method should also invoke those policy specific methods for objects in that space.

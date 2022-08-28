@@ -17,7 +17,6 @@
 
 use crate::util::heap::layout::vm_layout_constants::{BYTES_IN_CHUNK, CHUNK_MASK};
 use crate::util::Address;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 /// Adjust limit for thread local buffer to make sure that we will not allocate objects whose object reference may
@@ -25,7 +24,7 @@ use crate::vm::VMBinding;
 pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Address {
     // We only need to adjust limit when the binding tells us that
     // object ref may point outside the allocated memory and when limit is at chunk boundary
-    if let Some(offset) = VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL {
+    if let Some(offset) = VM::OBJECT_REF_OFFSET_BEYOND_CELL {
         if limit.is_aligned_to(BYTES_IN_CHUNK) {
             debug_assert!(limit.as_usize() > offset);
             // We simply not use the last few bytes. This is a rare case anyway (expect less than 1% of slowpath allocation goes here).
@@ -41,25 +40,24 @@ pub fn adjust_thread_local_buffer_limit<VM: VMBinding>(limit: Address) -> Addres
 /// Assert that the object reference should always inside the allocation cell
 #[cfg(debug_assertions)]
 pub fn assert_object_ref_in_cell<VM: VMBinding>(size: usize) {
-    if VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.is_none() {
+    if VM::OBJECT_REF_OFFSET_BEYOND_CELL.is_none() {
         return;
     }
 
     // If the object ref offset is smaller than size, it is always inside the allocation cell.
     debug_assert!(
-        size > VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap(),
+        size > VM::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap(),
         "Allocating objects of size {} may cross chunk (OBJECT_REF_OFFSET_BEYOND_CELL = {})",
         size,
-        VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap()
+        VM::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap()
     );
 }
 
 /// Check if the object reference for this allocation may cross and fall into the next chunk.
 pub fn object_ref_may_cross_chunk<VM: VMBinding>(addr: Address) -> bool {
-    if VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.is_none() {
+    if VM::OBJECT_REF_OFFSET_BEYOND_CELL.is_none() {
         return false;
     }
 
-    (addr & CHUNK_MASK) + VM::VMObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap()
-        >= BYTES_IN_CHUNK
+    (addr & CHUNK_MASK) + VM::OBJECT_REF_OFFSET_BEYOND_CELL.unwrap() >= BYTES_IN_CHUNK
 }

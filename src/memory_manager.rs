@@ -24,7 +24,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -251,9 +250,8 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
 /// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
 pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    use crate::vm::{ActivePlan, Collection};
     debug_assert!(
-        VM::VMActivePlan::is_mutator(tls.0),
+        VM::is_mutator(tls.0),
         "gc_poll() can only be called by a mutator thread."
     );
 
@@ -261,7 +259,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
         debug!("Collection required");
         assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-        VM::VMCollection::block_for_gc(tls);
+        VM::block_for_gc(tls);
     }
 }
 
@@ -583,10 +581,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
-pub fn add_finalizer<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-    object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
-) {
+pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: VM::FinalizableType) {
     if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
@@ -602,9 +597,7 @@ pub fn add_finalizer<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_finalized_object<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_finalized_object() is called when no_finalizer = true");
     }
@@ -622,9 +615,7 @@ pub fn get_finalized_object<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_all_finalizers<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+pub fn get_all_finalizers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Vec<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_all_finalizers() is called when no_finalizer = true");
     }
@@ -644,7 +635,7 @@ pub fn get_all_finalizers<VM: VMBinding>(
 pub fn get_finalizers_for<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     object: ObjectReference,
-) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+) -> Vec<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_finalizers() is called when no_finalizer = true");
     }

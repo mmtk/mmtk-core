@@ -8,7 +8,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::{ObjectModel, VMBinding};
+use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
@@ -168,12 +168,7 @@ pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
-    load_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        None,
-        ordering,
-    ) == 1
+    load_metadata::<VM>(&VM::LOCAL_MARK_BIT_SPEC, object, None, ordering) == 1
 }
 
 #[allow(unused)]
@@ -212,13 +207,7 @@ pub fn set_alloc_bit(object: ObjectReference) {
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        1,
-        None,
-        ordering,
-    );
+    store_metadata::<VM>(&VM::LOCAL_MARK_BIT_SPEC, object, 1, None, ordering);
 }
 
 #[allow(unused)]
@@ -257,13 +246,7 @@ pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
 
 #[allow(unused)]
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        0,
-        None,
-        ordering,
-    );
+    store_metadata::<VM>(&VM::LOCAL_MARK_BIT_SPEC, object, 0, None, ordering);
 }
 
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {

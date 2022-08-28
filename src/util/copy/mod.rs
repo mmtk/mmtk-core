@@ -11,7 +11,6 @@ use crate::policy::space::Space;
 use crate::util::object_forwarding;
 use crate::util::opaque_pointer::VMWorkerThread;
 use crate::util::{Address, ObjectReference};
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -105,7 +104,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         // If we are copying objects in mature space, we would need to mark the object as mature.
         if semantics.is_mature() && self.config.constraints.needs_log_bit {
             // If the plan uses unlogged bit, we set the unlogged bit (the object is unlogged/mature)
-            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
+            VM::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         // Policy specific post copy.
         match self.config.copy_mapping[semantics] {

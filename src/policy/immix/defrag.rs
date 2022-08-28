@@ -110,9 +110,8 @@ impl Defrag {
 
         // Calculate available free space for defragmentation.
 
-        let mut available_clean_pages_for_defrag = VM::VMActivePlan::global().get_total_pages()
-            as isize
-            - VM::VMActivePlan::global().get_reserved_pages() as isize
+        let mut available_clean_pages_for_defrag = VM::global().get_total_pages() as isize
+            - VM::global().get_reserved_pages() as isize
             + self.defrag_headroom_pages(space) as isize;
         if available_clean_pages_for_defrag < 0 {
             available_clean_pages_for_defrag = 0
@@ -127,7 +126,7 @@ impl Defrag {
 
         self.available_clean_pages_for_defrag.store(
             available_clean_pages_for_defrag as usize
-                + VM::VMActivePlan::global().get_collection_reserved_pages(),
+                + VM::global().get_collection_reserved_pages(),
             Ordering::Release,
         );
     }
