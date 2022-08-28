@@ -11,7 +11,9 @@ pub enum GCThreadContext<VM: VMBinding> {
 }
 
 /// VM-specific methods for garbage collection.
-pub trait Collection<VM: VMBinding> {
+pub trait Collection {
+    type VM: VMBinding;
+
     /// If true, only the coordinator thread can call stop_all_mutators and the resume_mutators methods.
     /// If false, any GC thread can call these methods.
     ///
@@ -30,7 +32,7 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls`: The thread pointer for the GC controller/coordinator.
     fn stop_all_mutators<F>(tls: VMWorkerThread, mutator_visitor: F)
     where
-        F: FnMut(&'static mut Mutator<VM>);
+        F: FnMut(&'static mut Mutator<Self::VM>);
 
     /// Resume all the mutator threads, the opposite of the above. When a GC is finished, MMTk calls this method.
     ///
@@ -61,7 +63,7 @@ pub trait Collection<VM: VMBinding> {
     ///   * If `Worker` is passed, it means spawning a thread to run as a GC worker.
     ///     The spawned thread shall call `memory_manager::start_worker`.
     ///   In either case, the `Box` inside should be passed back to the called function.
-    fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
+    fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<Self::VM>);
 
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
@@ -69,7 +71,7 @@ pub trait Collection<VM: VMBinding> {
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     /// * `tls_mutator`: The thread pointer for the target mutator thread.
     /// * `m`: The mutator context for the thread.
-    fn prepare_mutator<T: MutatorContext<VM>>(
+    fn prepare_mutator<T: MutatorContext<Self::VM>>(
         tls_worker: VMWorkerThread,
         tls_mutator: VMMutatorThread,
         m: &T,
@@ -102,5 +104,5 @@ pub trait Collection<VM: VMBinding> {
     fn vm_release() {}
 
     /// Delegate to the VM binding for reference processing.
-    fn process_weak_refs(_worker: &mut GCWorker<VM>) {} // FIXME: Add an appropriate factory/callback parameter.
+    fn process_weak_refs(_worker: &mut GCWorker<Self::VM>) {} // FIXME: Add an appropriate factory/callback parameter.
 }

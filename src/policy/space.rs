@@ -7,7 +7,7 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
-use crate::vm::{ActivePlan, Collection};
+use crate::vm::ActivePlan;
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
@@ -409,7 +409,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            VM::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -499,7 +499,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
-                    VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    VM::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
                     unsafe { Address::zero() }
                 }
             }

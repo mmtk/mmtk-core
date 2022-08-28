@@ -109,7 +109,7 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        <C::VM as VMBinding>::VMCollection::vm_release();
+        C::VM::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -175,7 +175,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // If the VM requires that only the coordinator thread can stop the world,
         // we delegate the work to the coordinator.
-        if <E::VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
+        if E::VM::COORDINATOR_ONLY_STW && !worker.is_coordinator() {
             mmtk.scheduler
                 .add_coordinator_work(StopMutators::<E>::new(), worker);
             return;
@@ -183,7 +183,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
 
         trace!("stop_all_mutators start");
         mmtk.plan.base().prepare_for_stack_scanning();
-        <E::VM as VMBinding>::VMCollection::stop_all_mutators(worker.tls, |mutator| {
+        E::VM::stop_all_mutators(worker.tls, |mutator| {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
@@ -193,11 +193,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
             if !mmtk.plan.base().stacks_prepared() {
                 for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
-                    <E::VM as VMBinding>::VMCollection::prepare_mutator(
-                        worker.tls,
-                        mutator.get_tls(),
-                        mutator,
-                    );
+                    E::VM::prepare_mutator(worker.tls, mutator.get_tls(), mutator);
                 }
             }
             // Scan mutators
@@ -230,7 +226,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
             crate::util::edge_logger::reset();
         }
 
-        if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
+        if VM::COORDINATOR_ONLY_STW {
             assert!(worker.is_coordinator(),
                     "VM only allows coordinator to resume mutators, but the current worker is not the coordinator.");
         }
@@ -240,7 +236,7 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
         // Reset the triggering information.
         mmtk.plan.base().reset_collection_trigger();
 
-        <VM as VMBinding>::VMCollection::resume_mutators(worker.tls);
+        VM::resume_mutators(worker.tls);
     }
 }
 
@@ -263,7 +259,7 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
+        E::VM::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
     }
 }
 

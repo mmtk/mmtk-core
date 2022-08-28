@@ -5,8 +5,8 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection};
 use downcast_rs::Downcast;
 
 #[repr(C)]
@@ -273,7 +273,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                 if fail_with_oom {
                     // Note that we throw a `HeapOutOfMemory` error here and return a null ptr back to the VM
                     trace!("Throw HeapOutOfMemory!");
-                    VM::VMCollection::out_of_memory(tls, AllocationError::HeapOutOfMemory);
+                    VM::out_of_memory(tls, AllocationError::HeapOutOfMemory);
                     plan.allocation_success.swap(false, Ordering::SeqCst);
                     return result;
                 }

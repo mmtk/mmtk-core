@@ -251,7 +251,7 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
 /// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
 pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    use crate::vm::{ActivePlan, Collection};
+    use crate::vm::ActivePlan;
     debug_assert!(
         VM::VMActivePlan::is_mutator(tls.0),
         "gc_poll() can only be called by a mutator thread."
@@ -261,7 +261,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
         debug!("Collection required");
         assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-        VM::VMCollection::block_for_gc(tls);
+        VM::block_for_gc(tls);
     }
 }
 

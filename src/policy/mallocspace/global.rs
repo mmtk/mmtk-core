@@ -14,8 +14,8 @@ use crate::util::opaque_pointer::*;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::{conversions, metadata};
+use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
-use crate::vm::{ActivePlan, Collection};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
@@ -239,7 +239,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // TODO: Should refactor this and Space.acquire()
         if VM::VMActivePlan::global().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
-            VM::VMCollection::block_for_gc(VMMutatorThread(tls));
+            VM::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };
         }
 
