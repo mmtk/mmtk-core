@@ -188,7 +188,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
         });
         trace!("stop_all_mutators end");
         mmtk.scheduler.notify_mutators_paused(mmtk);
-        if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
+        if E::VM::SCAN_MUTATORS_IN_SAFEPOINT {
             // Prepare mutators if necessary
             // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
             if !mmtk.plan.base().stacks_prepared() {
@@ -201,7 +201,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 }
             }
             // Scan mutators
-            if <E::VM as VMBinding>::VMScanning::SINGLE_THREAD_MUTATOR_SCANNING {
+            if E::VM::SINGLE_THREAD_MUTATOR_SCANNING {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                     .add(ScanStackRoots::<E>::new());
             } else {
@@ -280,8 +280,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_roots(worker.tls, factory);
-        <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(false, worker.tls);
+        E::VM::scan_thread_roots(worker.tls, factory);
+        E::VM::notify_initial_thread_scan_complete(false, worker.tls);
         for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
             mutator.flush();
         }
@@ -297,17 +297,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
         let base = &mmtk.plan.base();
         let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_thread_root(
-            worker.tls,
-            unsafe { &mut *(self.0 as *mut _) },
-            factory,
-        );
+        E::VM::scan_thread_root(worker.tls, unsafe { &mut *(self.0 as *mut _) }, factory);
         self.0.flush();
 
         if mmtk.plan.base().inform_stack_scanned(mutators) {
-            <E::VM as VMBinding>::VMScanning::notify_initial_thread_scan_complete(
-                false, worker.tls,
-            );
+            E::VM::notify_initial_thread_scan_complete(false, worker.tls);
             base.set_gc_status(GcStatus::GcProper);
         }
     }
@@ -326,7 +320,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStaticRoots");
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
-        <E::VM as VMBinding>::VMScanning::scan_vm_specific_roots(worker.tls, factory);
+        E::VM::scan_vm_specific_roots(worker.tls, factory);
     }
 }
 
@@ -660,9 +654,9 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         {
             let mut closure = ObjectsClosure::<Self::E>::new(worker);
             for object in objects_to_scan.iter().copied() {
-                if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
+                if VM::support_edge_enqueuing(tls, object) {
                     // If an object supports edge-enqueuing, we enqueue its edges.
-                    <VM as VMBinding>::VMScanning::scan_object(tls, object, &mut closure);
+                    VM::scan_object(tls, object, &mut closure);
                     self.post_scan_object(object);
                 } else {
                     // If an object does not support edge-enqueuing, we have to use
@@ -684,11 +678,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
             // Scan objects and trace their edges at the same time.
             for object in scan_later.iter().copied() {
-                <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
-                    tls,
-                    object,
-                    &mut closure,
-                );
+                VM::scan_object_and_trace_edges(tls, object, &mut closure);
                 self.post_scan_object(object);
             }
 

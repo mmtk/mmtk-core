@@ -71,7 +71,9 @@ pub trait RootsWorkFactory: Clone + Send + 'static {
 }
 
 /// VM-specific methods for scanning roots/objects.
-pub trait Scanning<VM: VMBinding> {
+pub trait Scanning {
+    type VM: VMBinding;
+
     /// Scan stack roots after all mutators are paused.
     const SCAN_MUTATORS_IN_SAFEPOINT: bool = true;
 
@@ -162,7 +164,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `factory`: The VM uses it to create work packets for scanning roots.
     fn scan_thread_root(
         tls: VMWorkerThread,
-        mutator: &'static mut Mutator<VM>,
+        mutator: &'static mut Mutator<Self::VM>,
         factory: impl RootsWorkFactory,
     );
 

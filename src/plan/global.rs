@@ -1025,8 +1025,8 @@ pub trait PlanTraceObject<VM: VMBinding> {
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference;
 
-    /// Post-scan objects in the plan. Each object is scanned by `VM::VMScanning::scan_object()`, and this function
-    /// will be called after the `VM::VMScanning::scan_object()` as a hook to invoke possible policy post scan method.
+    /// Post-scan objects in the plan. Each object is scanned by `VM::scan_object()`, and this function
+    /// will be called after the `VM::scan_object()` as a hook to invoke possible policy post scan method.
     /// If a plan does not have any policy that needs post scan, this method can be implemented as empty.
     /// If a plan has a policy that has some policy specific behaviors for scanning (e.g. mark lines in Immix),
     /// this method should also invoke those policy specific methods for objects in that space.

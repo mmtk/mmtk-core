@@ -26,7 +26,7 @@ const DEBUG_MACRO_OUTPUT: bool = false;
 ///   For example, `GenImmix` is composed with `Gen`, `Gen` is composed with `CommonPlan`, `CommonPlan` is composed
 ///   with `BasePlan`.
 /// * add `#[post_scan]` to any space field that has some policy-specific post_scan_object(). For objects in those spaces,
-///   `post_scan_object()` in the policy will be called after `VM::VMScanning::scan_object()`.
+///   `post_scan_object()` in the policy will be called after `VM::scan_object()`.
 #[proc_macro_error]
 #[proc_macro_derive(PlanTraceObject, attributes(trace, post_scan, fallback_trace))]
 pub fn derive_plan_trace_object(input: TokenStream) -> TokenStream {

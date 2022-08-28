@@ -35,11 +35,10 @@ pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
-pub trait VMBinding: ObjectModel<VM = Self>
+pub trait VMBinding: ObjectModel<VM = Self> + Scanning<VM = Self>
 where
     Self: Sized + 'static + Send + Sync + Default,
 {
-    type VMScanning: Scanning<Self>;
     type VMCollection: Collection<Self>;
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
