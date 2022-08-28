@@ -6,7 +6,6 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::GCWork;
 use crate::scheduler::GCWorker;
 use crate::scheduler::WorkBucketStage;
-use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -47,7 +46,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]
         //     .add(ScanStackRoots::<ForwardingProcessEdges<VM>>::new());
-        for mutator in VM::VMActivePlan::mutators() {
+        for mutator in VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::SecondRoots]
                 .add(ScanStackRoot::<ForwardingProcessEdges<VM>>(mutator));
         }

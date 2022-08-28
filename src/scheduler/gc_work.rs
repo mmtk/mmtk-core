@@ -46,7 +46,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Prepare<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.prepare(worker.tls);
 
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in C::VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                 .add(PrepareMutator::<C::VM>::new(mutator));
         }
@@ -115,7 +115,7 @@ impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
         plan_mut.release(worker.tls);
 
-        for mutator in <C::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in C::VM::mutators() {
             mmtk.scheduler.work_buckets[WorkBucketStage::Release]
                 .add(ReleaseMutator::<C::VM>::new(mutator));
         }
@@ -192,7 +192,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             // Prepare mutators if necessary
             // FIXME: This test is probably redundant. JikesRVM requires to call `prepare_mutator` once after mutators are paused
             if !mmtk.plan.base().stacks_prepared() {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                for mutator in E::VM::mutators() {
                     E::VM::prepare_mutator(worker.tls, mutator.get_tls(), mutator);
                 }
             }
@@ -201,7 +201,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
                 mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                     .add(ScanStackRoots::<E>::new());
             } else {
-                for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+                for mutator in E::VM::mutators() {
                     mmtk.scheduler.work_buckets[WorkBucketStage::Prepare]
                         .add(ScanStackRoot::<E>(mutator));
                 }
@@ -278,7 +278,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoots<E> {
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         E::VM::scan_thread_roots(worker.tls, factory);
         E::VM::notify_initial_thread_scan_complete(false, worker.tls);
-        for mutator in <E::VM as VMBinding>::VMActivePlan::mutators() {
+        for mutator in E::VM::mutators() {
             mutator.flush();
         }
         mmtk.plan.common().base.set_gc_status(GcStatus::GcProper);
@@ -291,7 +291,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanStackRoot<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ScanStackRoot for mutator {:?}", self.0.get_tls());
         let base = &mmtk.plan.base();
-        let mutators = <E::VM as VMBinding>::VMActivePlan::number_of_mutators();
+        let mutators = E::VM::number_of_mutators();
         let factory = ProcessEdgesWorkRootsWorkFactory::<E>::new(mmtk);
         E::VM::scan_thread_root(worker.tls, unsafe { &mut *(self.0 as *mut _) }, factory);
         self.0.flush();

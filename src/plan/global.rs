@@ -25,7 +25,6 @@ use crate::util::options::PlanSelector;
 use crate::util::statistics::stats::Stats;
 use crate::util::ObjectReference;
 use crate::util::{VMMutatorThread, VMWorkerThread};
-use crate::vm::*;
 use downcast_rs::Downcast;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -663,7 +662,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             return self.vm_space.trace_object(queue, object);
         }
 
-        VM::VMActivePlan::vm_trace_object::<Q>(queue, object, worker)
+        VM::vm_trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, _tls: VMWorkerThread, _full_heap: bool) {

@@ -5,7 +5,6 @@ use crate::plan::Plan;
 use crate::policy::space::Space;
 use crate::util::constants::*;
 use crate::util::opaque_pointer::*;
-use crate::vm::ActivePlan;
 use crate::vm::VMBinding;
 use downcast_rs::Downcast;
 
@@ -188,7 +187,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
     fn alloc_slow_inline(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let tls = self.get_tls();
         let plan = self.get_plan().base();
-        let is_mutator = VM::VMActivePlan::is_mutator(tls);
+        let is_mutator = VM::is_mutator(tls);
         let stress_test = plan.is_stress_test_gc_enabled();
 
         // Information about the previous collection.

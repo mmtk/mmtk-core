@@ -251,9 +251,8 @@ pub fn free_with_size<VM: VMBinding>(mmtk: &MMTK<VM>, addr: Address, old_size: u
 /// However, if a binding uses counted malloc (which won't poll for GC), they may want to poll for GC manually.
 /// This function should only be used by mutator threads.
 pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
-    use crate::vm::ActivePlan;
     debug_assert!(
-        VM::VMActivePlan::is_mutator(tls.0),
+        VM::is_mutator(tls.0),
         "gc_poll() can only be called by a mutator thread."
     );
 
