@@ -5,8 +5,6 @@ use mmtk::vm::*;
 use std::sync::atomic::Ordering;
 use crate::DummyVM;
 
-pub struct VMObjectModel {}
-
 // This is intentionally set to a non-zero value to see if it breaks.
 // Change this if you want to test other values.
 #[cfg(target_pointer_width = "64")]
@@ -14,7 +12,9 @@ pub const OBJECT_REF_OFFSET: usize = 6;
 #[cfg(target_pointer_width = "32")]
 pub const OBJECT_REF_OFFSET: usize = 2;
 
-impl ObjectModel<DummyVM> for VMObjectModel {
+impl ObjectModel for DummyVM {
+    type VM = Self;
+
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec = VMLocalForwardingPointerSpec::in_header(0);
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = VMLocalForwardingBitsSpec::in_header(0);
