@@ -36,12 +36,14 @@ pub use self::scanning::Scanning;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding:
-    ObjectModel<VM = Self> + Scanning<VM = Self> + Collection<VM = Self> + ActivePlan<VM = Self>
+    ObjectModel<VM = Self>
+    + Scanning<VM = Self>
+    + Collection<VM = Self>
+    + ActivePlan<VM = Self>
+    + ReferenceGlue<VM = Self>
 where
     Self: Sized + 'static + Send + Sync + Default,
 {
-    type VMReferenceGlue: ReferenceGlue<Self>;
-
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
     /// Allowed minimal alignment.

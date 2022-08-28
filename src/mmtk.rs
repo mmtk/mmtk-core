@@ -11,7 +11,6 @@ use crate::util::options::Options;
 use crate::util::reference_processor::ReferenceProcessors;
 #[cfg(feature = "sanity")]
 use crate::util::sanity::sanity_checker::SanityChecker;
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::default::Default;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -82,8 +81,7 @@ pub struct MMTK<VM: VMBinding> {
     pub(crate) options: Arc<Options>,
     pub(crate) plan: Box<dyn Plan<VM = VM>>,
     pub(crate) reference_processors: ReferenceProcessors,
-    pub(crate) finalizable_processor:
-        Mutex<FinalizableProcessor<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType>>,
+    pub(crate) finalizable_processor: Mutex<FinalizableProcessor<VM::FinalizableType>>,
     pub(crate) scheduler: Arc<GCWorkScheduler<VM>>,
     #[cfg(feature = "sanity")]
     pub(crate) sanity_checker: Mutex<SanityChecker>,
@@ -123,9 +121,7 @@ impl<VM: VMBinding> MMTK<VM> {
             options,
             plan,
             reference_processors: ReferenceProcessors::new(),
-            finalizable_processor: Mutex::new(FinalizableProcessor::<
-                <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
-            >::new()),
+            finalizable_processor: Mutex::new(FinalizableProcessor::<VM::FinalizableType>::new()),
             scheduler,
             #[cfg(feature = "sanity")]
             sanity_checker: Mutex::new(SanityChecker::new()),

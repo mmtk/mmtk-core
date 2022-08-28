@@ -24,7 +24,6 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
-use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
@@ -582,10 +581,7 @@ pub fn harness_end<VM: VMBinding>(mmtk: &'static MMTK<VM>) {
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance
 /// * `object`: The object that has a finalizer
-pub fn add_finalizer<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-    object: <VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType,
-) {
+pub fn add_finalizer<VM: VMBinding>(mmtk: &'static MMTK<VM>, object: VM::FinalizableType) {
     if *mmtk.options.no_finalizer {
         warn!("add_finalizer() is called when no_finalizer = true");
     }
@@ -601,9 +597,7 @@ pub fn add_finalizer<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_finalized_object<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-) -> Option<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+pub fn get_finalized_object<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Option<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_finalized_object() is called when no_finalizer = true");
     }
@@ -621,9 +615,7 @@ pub fn get_finalized_object<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
-pub fn get_all_finalizers<VM: VMBinding>(
-    mmtk: &'static MMTK<VM>,
-) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+pub fn get_all_finalizers<VM: VMBinding>(mmtk: &'static MMTK<VM>) -> Vec<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_all_finalizers() is called when no_finalizer = true");
     }
@@ -643,7 +635,7 @@ pub fn get_all_finalizers<VM: VMBinding>(
 pub fn get_finalizers_for<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     object: ObjectReference,
-) -> Vec<<VM::VMReferenceGlue as ReferenceGlue<VM>>::FinalizableType> {
+) -> Vec<VM::FinalizableType> {
     if *mmtk.options.no_finalizer {
         warn!("get_finalizers() is called when no_finalizer = true");
     }
