@@ -441,30 +441,30 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 /// * `data_addr`: the address of the source data
 /// * `actual_val`: the actual content returned by the side metadata load operation
 ///
-#[cfg(feature = "extreme_assertions")]
-pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
-    match sanity_map.get(metadata_spec) {
-        Some(spec_sanity_map) => {
-            // A content of None is Ok because we may load before store
-            let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
-                *expected_val
-            } else {
-                0usize
-            };
-            assert!(
-                expected_val == actual_val,
-                "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
-                metadata_spec,
-                data_addr,
-                expected_val,
-                actual_val
-            );
-        }
-        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
+//     match sanity_map.get(metadata_spec) {
+//         Some(spec_sanity_map) => {
+//             // A content of None is Ok because we may load before store
+//             let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
+//                 *expected_val
+//             } else {
+//                 0usize
+//             };
+//             assert!(
+//                 expected_val == actual_val,
+//                 "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
+//                 metadata_spec,
+//                 data_addr,
+//                 expected_val,
+//                 actual_val
+//             );
+//         }
+//         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+//     }
+// }
 
 #[cfg(feature = "extreme_assertions")]
 use crate::util::metadata::metadata_val_traits::*;
@@ -504,19 +504,19 @@ pub fn typed_verify_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, dat
 /// * `data_addr`: the address of the source data
 /// * `metadata`: the metadata content to store
 ///
-#[cfg(feature = "extreme_assertions")]
-pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-    match sanity_map.get_mut(metadata_spec) {
-        Some(spec_sanity_map) => {
-            // Newly mapped memory including the side metadata memory is zeroed
-            let content = spec_sanity_map.entry(data_addr).or_insert(0);
-            *content = metadata;
-        }
-        None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+//     match sanity_map.get_mut(metadata_spec) {
+//         Some(spec_sanity_map) => {
+//             // Newly mapped memory including the side metadata memory is zeroed
+//             let content = spec_sanity_map.entry(data_addr).or_insert(0);
+//             *content = metadata;
+//         }
+//         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
+//     }
+// }
 
 #[cfg(feature = "extreme_assertions")]
 pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
@@ -534,29 +534,44 @@ pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, da
 }
 
 /// A helper function encapsulating the common parts of addition and subtraction
+// #[cfg(feature = "extreme_assertions")]
+// fn do_math(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val: usize,
+//     math_op: MathOp,
+// ) -> Result<usize> {
+//     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+//     match sanity_map.get_mut(metadata_spec) {
+//         Some(spec_sanity_map) => {
+//             // Newly mapped memory including the side metadata memory is zeroed
+//             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
+//             let old_val = *cur_val;
+//             match math_op {
+//                 MathOp::Add => *cur_val += val,
+//                 MathOp::Sub => *cur_val -= val,
+//             }
+//             Ok(old_val)
+//         }
+//         None => Err(Error::new(
+//             ErrorKind::InvalidInput,
+//             format!("Invalid Metadata Spec: {:#?}", metadata_spec),
+//         )),
+//     }
+// }
+
 #[cfg(feature = "extreme_assertions")]
-fn do_math(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val: usize,
-    math_op: MathOp,
-) -> Result<usize> {
+pub fn verify_update<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, old_val: T, new_val: T) {
+    verify_metadata_address_bound(metadata_spec, data_addr);
+
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
-            // Newly mapped memory including the side metadata memory is zeroed
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
-            let old_val = *cur_val;
-            match math_op {
-                MathOp::Add => *cur_val += val,
-                MathOp::Sub => *cur_val -= val,
-            }
-            Ok(old_val)
+            assert_eq!(old_val.to_usize().unwrap(), *cur_val, "Expected old value: {} but found {}", old_val, cur_val);
+            *cur_val = new_val.to_usize().unwrap();
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidInput,
-            format!("Invalid Metadata Spec: {:#?}", metadata_spec),
-        )),
+        None => panic!("Invalid metadata spec: {:#?}", metadata_spec),
     }
 }
 
@@ -571,49 +586,49 @@ fn do_math(
 /// * `val_to_add`: the number to be added to the old content
 /// * `actual_old_val`: the actual old content returned by the side metadata fetch and add operation
 ///
-#[cfg(feature = "extreme_assertions")]
-pub fn verify_add(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val_to_add: usize,
-    actual_old_val: usize,
-) {
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
-        Ok(expected_old_val) => {
-            assert!(
-                actual_old_val == expected_old_val,
-                "Expected (0x{:x}) but found (0x{:x})",
-                expected_old_val,
-                actual_old_val
-            );
-        }
-        Err(e) => panic!("{}", e),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn verify_add(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val_to_add: usize,
+//     actual_old_val: usize,
+// ) {
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
+//         Ok(expected_old_val) => {
+//             assert!(
+//                 actual_old_val == expected_old_val,
+//                 "Expected (0x{:x}) but found (0x{:x})",
+//                 expected_old_val,
+//                 actual_old_val
+//             );
+//         }
+//         Err(e) => panic!("{}", e),
+//     }
+// }
 
-#[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_add<T: MetadataValue>(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val_to_add: T,
-    actual_old_val: T,
-) {
-    let val_to_add: usize = val_to_add.to_usize().unwrap();
-    let actual_old_val: usize = actual_old_val.to_usize().unwrap();
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
-        Ok(expected_old_val) => {
-            assert!(
-                actual_old_val == expected_old_val,
-                "Expected (0x{:x}) but found (0x{:x})",
-                expected_old_val,
-                actual_old_val
-            );
-        }
-        Err(e) => panic!("{}", e),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn typed_verify_add<T: MetadataValue>(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val_to_add: T,
+//     actual_old_val: T,
+// ) {
+//     let val_to_add: usize = val_to_add.to_usize().unwrap();
+//     let actual_old_val: usize = actual_old_val.to_usize().unwrap();
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
+//         Ok(expected_old_val) => {
+//             assert!(
+//                 actual_old_val == expected_old_val,
+//                 "Expected (0x{:x}) but found (0x{:x})",
+//                 expected_old_val,
+//                 actual_old_val
+//             );
+//         }
+//         Err(e) => panic!("{}", e),
+//     }
+// }
 
 /// Commits a fetch and sub operation and ensures it returns the correct old side metadata content.
 /// Panics if:
@@ -626,49 +641,49 @@ pub fn typed_verify_add<T: MetadataValue>(
 /// * `val_to_sub`: the number to be subtracted from the old content
 /// * `actual_old_val`: the actual old content returned by the side metadata fetch and sub operation
 ///
-#[cfg(feature = "extreme_assertions")]
-pub fn verify_sub(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val_to_sub: usize,
-    actual_old_val: usize,
-) {
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
-        Ok(expected_old_val) => {
-            assert!(
-                actual_old_val == expected_old_val,
-                "Expected (0x{:x}) but found (0x{:x})",
-                expected_old_val,
-                actual_old_val
-            );
-        }
-        Err(e) => panic!("{}", e),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn verify_sub(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val_to_sub: usize,
+//     actual_old_val: usize,
+// ) {
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
+//         Ok(expected_old_val) => {
+//             assert!(
+//                 actual_old_val == expected_old_val,
+//                 "Expected (0x{:x}) but found (0x{:x})",
+//                 expected_old_val,
+//                 actual_old_val
+//             );
+//         }
+//         Err(e) => panic!("{}", e),
+//     }
+// }
 
-#[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_sub<T: MetadataValue>(
-    metadata_spec: &SideMetadataSpec,
-    data_addr: Address,
-    val_to_sub: T,
-    actual_old_val: T,
-) {
-    let val_to_add: usize = val_to_add.to_usize().unwrap();
-    let actual_old_val: usize = actual_old_val.to_usize().unwrap();
-    verify_metadata_address_bound(metadata_spec, data_addr);
-    match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
-        Ok(expected_old_val) => {
-            assert!(
-                actual_old_val == expected_old_val,
-                "Expected (0x{:x}) but found (0x{:x})",
-                expected_old_val,
-                actual_old_val
-            );
-        }
-        Err(e) => panic!("{}", e),
-    }
-}
+// #[cfg(feature = "extreme_assertions")]
+// pub fn typed_verify_sub<T: MetadataValue>(
+//     metadata_spec: &SideMetadataSpec,
+//     data_addr: Address,
+//     val_to_sub: T,
+//     actual_old_val: T,
+// ) {
+//     let val_to_add: usize = val_to_add.to_usize().unwrap();
+//     let actual_old_val: usize = actual_old_val.to_usize().unwrap();
+//     verify_metadata_address_bound(metadata_spec, data_addr);
+//     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
+//         Ok(expected_old_val) => {
+//             assert!(
+//                 actual_old_val == expected_old_val,
+//                 "Expected (0x{:x}) but found (0x{:x})",
+//                 expected_old_val,
+//                 actual_old_val
+//             );
+//         }
+//         Err(e) => panic!("{}", e),
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

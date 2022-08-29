@@ -141,7 +141,7 @@ impl_bitwise_ops_trait!(usize);
 // impl_atomic_trait!(AtomicU64, u64);
 
 /// The number type for load/store metadata.
-pub trait MetadataValue: Unsigned + Bits + BitwiseOps + ToPrimitive + Copy + FromPrimitive {
+pub trait MetadataValue: Unsigned + Bits + BitwiseOps + ToPrimitive + Copy + FromPrimitive + std::fmt::Display + std::fmt::Debug {
     // type AtomicType: MetadataAtomic;
     // fn as_atomic(&self) -> &Self::AtomicType;
     fn load(addr: Address) -> Self;

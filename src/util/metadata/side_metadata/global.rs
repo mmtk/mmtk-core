@@ -180,7 +180,7 @@ impl SideMetadataSpec {
             }
         }, |_v| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_load(metadata_spec, data_addr, _v);
+            sanity::typed_verify_load(self, data_addr, _v);
         })
     }
 
@@ -209,7 +209,7 @@ impl SideMetadataSpec {
             }
         }, |_| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+            sanity::typed_verify_store(self, data_addr, metadata);
         })
     }
 
@@ -228,7 +228,7 @@ impl SideMetadataSpec {
             }
         }, |_v| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_load(metadata_spec, data_addr, _v);
+            sanity::typed_verify_load(self, data_addr, _v);
         })
     }
 
@@ -257,7 +257,7 @@ impl SideMetadataSpec {
             }
         }, |_| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_store(metadata_spec, data_addr, metadata);
+            sanity::typed_verify_store(self, data_addr, metadata);
         })
     }
 
@@ -325,7 +325,8 @@ impl SideMetadataSpec {
             }
         }, |_old_val| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_add(self, data_addr, val, _old_val)
+            // sanity::typed_verify_add(self, data_addr, val, _old_val)
+            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val + val)
         })
     }
 
@@ -359,7 +360,8 @@ impl SideMetadataSpec {
             }
         }, |_old_val| {
             #[cfg(feature = "extreme_assertions")]
-            sanity::typed_verify_sub(self, data_addr, val, _old_val)
+            // sanity::typed_verify_sub(self, data_addr, val, _old_val)
+            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val - val)
         })
     }
 }
@@ -1225,7 +1227,7 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
         #[cfg(feature = "extreme_assertions")]
         {
             let data_addr = self.heap_range_start + (index << self.spec.log_bytes_in_region);
-            sanity::verify_load(&self.spec, data_addr, value as _);
+            sanity::typed_verify_load::<u8>(&self.spec, data_addr, value);
         }
         value
     }
