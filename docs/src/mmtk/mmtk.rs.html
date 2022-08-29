@@ -157,10 +157,20 @@
 <span id="155">155</span>
 <span id="156">156</span>
 <span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
 </pre><pre class="rust"><code><span class="doccomment">///! MMTk instance.</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SFTMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::edge_logger::EdgeLogger</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::finalizable_processor::FinalizableProcessor</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
@@ -245,7 +255,9 @@
         <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FinalizableProcessor</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VM::VMReferenceGlue</span> <span class="kw">as</span> <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="ident">::FinalizableType</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">sanity_checker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">SanityChecker</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">sanity_checker</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">SanityChecker</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">edge_logger</span>: <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>,
     <span class="ident">inside_harness</span>: <span class="ident">AtomicBool</span>,
 }
 
@@ -289,6 +301,8 @@
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
             <span class="ident">sanity_checker</span>: <span class="ident">Mutex::new</span>(<span class="ident">SanityChecker::new</span>()),
             <span class="ident">inside_harness</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;extreme_assertions&quot;</span>)]</span>
+            <span class="ident">edge_logger</span>: <span class="ident">EdgeLogger::new</span>(),
         }
     }
 

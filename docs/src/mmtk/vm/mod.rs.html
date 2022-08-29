@@ -69,6 +69,10 @@
 <span id="67">67</span>
 <span id="68">68</span>
 <span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
@@ -90,6 +94,7 @@
 
 <span class="kw">mod</span> <span class="ident">active_plan</span>;
 <span class="kw">mod</span> <span class="ident">collection</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">edge_shape</span>;
 <span class="kw">mod</span> <span class="ident">object_model</span>;
 <span class="kw">mod</span> <span class="ident">reference_glue</span>;
 <span class="kw">mod</span> <span class="ident">scanning</span>;
@@ -115,6 +120,9 @@
     <span class="kw">type</span> <span class="ident">VMCollection</span>: <span class="ident">Collection</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
     <span class="kw">type</span> <span class="ident">VMActivePlan</span>: <span class="ident">ActivePlan</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
     <span class="kw">type</span> <span class="ident">VMReferenceGlue</span>: <span class="ident">ReferenceGlue</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>;
+
+    <span class="doccomment">/// The type of edges in this VM.</span>
+    <span class="kw">type</span> <span class="ident">VMEdge</span>: <span class="ident">edge_shape::Edge</span>;
 
     <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.</span>
     <span class="kw">const</span> <span class="ident">ALIGNMENT_VALUE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xdead_beef</span>;

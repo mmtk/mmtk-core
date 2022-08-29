@@ -43,6 +43,20 @@
 <span id="41">41</span>
 <span id="42">42</span>
 <span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This is a simple module to log edges and check for duplicate edges.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! It uses a hash-set to keep track of edge, and is so very expensive.</span>
@@ -50,41 +64,55 @@
 <span class="doccomment">//!</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::edge_shape::Edge</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 <span class="kw">use</span> <span class="ident">std::sync::RwLock</span>;
 
-<span class="macro">lazy_static!</span> {
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> {
     <span class="comment">// A private hash-set to keep track of edges.</span>
-    <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">EDGE_LOG</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">RwLock::new</span>(<span class="ident">HashSet::new</span>());
+    <span class="ident">edge_log</span>: <span class="ident">RwLock</span><span class="op">&lt;</span><span class="ident">HashSet</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> {}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> <span class="ident">EdgeLogger</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">edge_log</span>: <span class="ident">Default::default</span>(),
+        }
+    }
+
+    <span class="doccomment">/// Logs an edge.</span>
+    <span class="doccomment">/// Panics if the edge was already logged.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `edge` - The edge to log.</span>
+    <span class="doccomment">///</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_edge</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>) {
+        <span class="macro">trace!</span>(<span class="string">&quot;log_edge({:?})&quot;</span>, <span class="ident">edge</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">edge_log</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
+        <span class="macro">assert!</span>(
+            <span class="ident">edge_log</span>.<span class="ident">insert</span>(<span class="ident">edge</span>),
+            <span class="string">&quot;duplicate edge ({:?}) detected&quot;</span>,
+            <span class="ident">edge</span>
+        );
+    }
+
+    <span class="doccomment">/// Reset the edge logger by clearing the hash-set of edges.</span>
+    <span class="doccomment">/// This function is called at the end of each GC iteration.</span>
+    <span class="doccomment">///</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">edge_log</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
+        <span class="ident">edge_log</span>.<span class="ident">clear</span>();
+    }
 }
 
 <span class="doccomment">/// Whether we should check duplicate edges. This depends on the actual plan.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">should_check_duplicate_edges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
     <span class="comment">// If a plan allows tracing duplicate edges, we should not run this check.</span>
     <span class="op">!</span><span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">may_trace_duplicate_edges</span>
-}
-
-<span class="doccomment">/// Logs an edge.</span>
-<span class="doccomment">/// Panics if the edge was already logged.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `edge` - The edge to log.</span>
-<span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">log_edge</span>(<span class="ident">edge</span>: <span class="ident">Address</span>) {
-    <span class="macro">trace!</span>(<span class="string">&quot;log_edge({})&quot;</span>, <span class="ident">edge</span>);
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="ident">EDGE_LOG</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-    <span class="macro">assert!</span>(<span class="ident">edge_log</span>.<span class="ident">insert</span>(<span class="ident">edge</span>), <span class="string">&quot;duplicate edge ({}) detected&quot;</span>, <span class="ident">edge</span>);
-}
-
-<span class="doccomment">/// Reset the edge logger by clearing the hash-set of edges.</span>
-<span class="doccomment">/// This function is called at the end of each GC iteration.</span>
-<span class="doccomment">///</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>() {
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edge_log</span> <span class="op">=</span> <span class="ident">EDGE_LOG</span>.<span class="ident">write</span>().<span class="ident">unwrap</span>();
-    <span class="ident">edge_log</span>.<span class="ident">clear</span>();
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>

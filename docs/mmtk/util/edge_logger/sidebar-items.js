@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["log_edge","Logs an edge. Panics if the edge was already logged."],["reset","Reset the edge logger by clearing the hash-set of edges. This function is called at the end of each GC iteration."],["should_check_duplicate_edges","Whether we should check duplicate edges. This depends on the actual plan."]],"struct":[["EDGE_LOG",""]]});
+initSidebarItems({"fn":[["should_check_duplicate_edges","Whether we should check duplicate edges. This depends on the actual plan."]],"struct":[["EdgeLogger",""]]});

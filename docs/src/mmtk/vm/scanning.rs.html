@@ -181,20 +181,22 @@
 <span id="179">179</span>
 <span id="180">180</span>
 <span id="181">181</span>
+<span id="182">182</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::edge_shape::Edge</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="doccomment">/// Callback trait of scanning functions that report edges.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EdgeVisitor</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Call this function for each edge.</span>
-    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">Address</span>);
+    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>);
 }
 
 <span class="doccomment">/// This lets us use closures as EdgeVisitor.</span>
-<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">Address</span>)<span class="op">&gt;</span> <span class="ident">EdgeVisitor</span> <span class="kw">for</span> <span class="ident">F</span> {
-    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">Address</span>) {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span>, <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">ES</span>)<span class="op">&gt;</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">F</span> {
+    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edge</span>: <span class="ident">ES</span>) {
         <span class="self">self</span>(<span class="ident">edge</span>)
     }
 }
@@ -230,14 +232,14 @@
 <span class="doccomment">///     it needs `Send` to be sent between threads.  `&#39;static` means it must not have</span>
 <span class="doccomment">///     references to variables with limited lifetime (such as local variables), because</span>
 <span class="doccomment">///     it needs to be moved between threads.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RootsWorkFactory</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">ES</span>: <span class="ident">Edge</span><span class="op">&gt;</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
     <span class="doccomment">/// Create work packets to handle root edges.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// The work packet may update the edges.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `edges`: A vector of edges.</span>
-    <span class="kw">fn</span> <span class="ident">create_process_edge_roots_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>);
+    <span class="kw">fn</span> <span class="ident">create_process_edge_roots_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ES</span><span class="op">&gt;</span>);
 
     <span class="doccomment">/// Create work packets to handle nodes pointed by root edges.</span>
     <span class="doccomment">///</span>
@@ -292,7 +294,7 @@
     <span class="doccomment">/// * `tls`: The VM-specific thread-local storage for the current worker.</span>
     <span class="doccomment">/// * `object`: The object to be scanned.</span>
     <span class="doccomment">/// * `edge_visitor`: Called back for each edge.</span>
-    <span class="kw">fn</span> <span class="ident">scan_object</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&gt;</span>(
+    <span class="kw">fn</span> <span class="ident">scan_object</span><span class="op">&lt;</span><span class="ident">EV</span>: <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span><span class="op">&gt;</span>(
         <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
         <span class="ident">edge_visitor</span>: <span class="kw-2">&amp;mut</span> <span class="ident">EV</span>,
@@ -335,7 +337,7 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
     <span class="doccomment">/// * `factory`: The VM uses it to create work packets for scanning roots.</span>
-    <span class="kw">fn</span> <span class="ident">scan_thread_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span>);
+    <span class="kw">fn</span> <span class="ident">scan_thread_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>);
 
     <span class="doccomment">/// Scan one mutator for roots.</span>
     <span class="doccomment">///</span>
@@ -346,7 +348,7 @@
     <span class="kw">fn</span> <span class="ident">scan_thread_root</span>(
         <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
         <span class="ident">mutator</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw-2">mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-        <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span>,
+        <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>,
     );
 
     <span class="doccomment">/// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)</span>
@@ -355,7 +357,7 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `tls`: The GC thread that is performing this scanning.</span>
     <span class="doccomment">/// * `factory`: The VM uses it to create work packets for scanning roots.</span>
-    <span class="kw">fn</span> <span class="ident">scan_vm_specific_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span>);
+    <span class="kw">fn</span> <span class="ident">scan_vm_specific_roots</span>(<span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">factory</span>: <span class="kw">impl</span> <span class="ident">RootsWorkFactory</span><span class="op">&lt;</span><span class="ident">VM::VMEdge</span><span class="op">&gt;</span>);
 
     <span class="doccomment">/// Return whether the VM supports return barriers. This is unused at the moment.</span>
     <span class="kw">fn</span> <span class="ident">supports_return_barrier</span>() -&gt; <span class="ident">bool</span>;

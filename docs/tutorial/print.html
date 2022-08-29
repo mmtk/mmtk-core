@@ -1180,7 +1180,7 @@ impl&lt;VM:VMBinding&gt; ProcessEdgesWork for MyGCProcessEdges&lt;VM&gt; {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
-    fn new(edges: Vec&lt;Address&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+    fn new(edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self { base, plan }
@@ -1269,7 +1269,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects&lt;Self&gt;;
 
-    fn new(edges: Vec&lt;Address&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
+    fn new(edges: Vec&lt;EdgeOf&lt;Self&gt;&gt;, roots: bool, mmtk: &amp;'static MMTK&lt;VM&gt;) -&gt; Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::&lt;MyGC&lt;VM&gt;&gt;().unwrap();
         Self { base, plan }

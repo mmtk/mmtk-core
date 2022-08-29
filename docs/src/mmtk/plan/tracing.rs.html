@@ -116,9 +116,9 @@
 
 <span class="kw">use</span> <span class="ident">std::mem</span>;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work::ProcessEdgesWork</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::{<span class="ident">EdgeOf</span>, <span class="ident">ProcessEdgesWork</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCWorker</span>, <span class="ident">WorkBucketStage</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::EdgeVisitor</span>;
 
 <span class="doccomment">/// This trait represents an object queue to enqueue objects during tracing.</span>
@@ -176,7 +176,7 @@
 
 <span class="doccomment">/// A transitive closure visitor to collect all the edges of an object.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> {
-    <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span>,
+    <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>,
 }
 
@@ -198,9 +198,9 @@
     }
 }
 
-<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">EdgeVisitor</span> <span class="kw">for</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span><span class="op">&gt;</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">Address</span>) {
+    <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">is_empty</span>() {
             <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">reserve</span>(<span class="ident">E::CAPACITY</span>);
         }
