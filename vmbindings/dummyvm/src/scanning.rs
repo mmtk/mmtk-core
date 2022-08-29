@@ -1,4 +1,5 @@
 use crate::DummyVM;
+use crate::edges::DummyVMEdge;
 use mmtk::util::opaque_pointer::*;
 use mmtk::util::ObjectReference;
 use mmtk::vm::EdgeVisitor;
@@ -9,20 +10,20 @@ use mmtk::Mutator;
 pub struct VMScanning {}
 
 impl Scanning<DummyVM> for VMScanning {
-    fn scan_thread_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory) {
+    fn scan_thread_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<DummyVMEdge>) {
         unimplemented!()
     }
     fn scan_thread_root(
         _tls: VMWorkerThread,
         _mutator: &'static mut Mutator<DummyVM>,
-        _factory: impl RootsWorkFactory,
+        _factory: impl RootsWorkFactory<DummyVMEdge>,
     ) {
         unimplemented!()
     }
-    fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory) {
+    fn scan_vm_specific_roots(_tls: VMWorkerThread, _factory: impl RootsWorkFactory<DummyVMEdge>) {
         unimplemented!()
     }
-    fn scan_object<EV: EdgeVisitor>(
+    fn scan_object<EV: EdgeVisitor<DummyVMEdge>>(
         _tls: VMWorkerThread,
         _object: ObjectReference,
         _edge_visitor: &mut EV,

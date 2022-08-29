@@ -43,7 +43,7 @@ impl<VM: VMBinding> GCWork<VM> for UpdateReferences<VM> {
         VM::VMScanning::prepare_for_roots_re_scanning();
         mmtk.plan.base().prepare_for_stack_scanning();
         #[cfg(feature = "extreme_assertions")]
-        crate::util::edge_logger::reset();
+        mmtk.edge_logger.reset();
 
         // TODO investigate why the following will create duplicate edges
         // scheduler.work_buckets[WorkBucketStage::RefForwarding]

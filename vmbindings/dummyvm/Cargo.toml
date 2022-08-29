@@ -17,6 +17,7 @@ mmtk = { path = "../../", version = "*" }
 libc = "0.2"
 lazy_static = "1.1"
 atomic_refcell = "0.1.7"
+atomic = "0.4.6"
 
 [features]
 default = []
