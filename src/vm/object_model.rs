@@ -4,7 +4,7 @@ use self::specs::*;
 use crate::util::metadata::header_metadata::HeaderMetadataSpec;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-
+use crate::util::metadata::MetadataValue;
 use crate::util::copy::*;
 
 /// VM-specific methods for object model.
@@ -19,8 +19,8 @@ use crate::util::copy::*;
 ///      will use side tables to store the metadata. The following section Side Specs Layout will discuss how to correctly create
 ///      side metadata specs.
 /// 2. In header metadata access: A binding
-///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
-///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
+///    need to further define the functions with suffix _metadata about how to access the bits in the header. We provide default implementations
+///    for those methods, assuming the bits in the spec are always available to MMTk. A binding could implement their
 ///    own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).
 /// 3. VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs
 ///    some object information for GC. A binding needs to implement them correctly.
@@ -94,13 +94,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.
     ///
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
-    ///
-    fn load_metadata(
+    #[inline(always)]
+    fn load_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        mask: Option<usize>,
+        mask: Option<T>,
         atomic_ordering: Option<Ordering>,
-    ) -> usize;
+    ) -> T {
+        metadata_spec.load::<T>(object, mask, atomic_ordering)
+    }
 
     /// A function to store a value to the specified per-object metadata.
     ///
@@ -111,14 +113,16 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
-    ///
-    fn store_metadata(
+    #[inline(always)]
+    fn store_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
-        mask: Option<usize>,
+        val: T,
+        mask: Option<T>,
         atomic_ordering: Option<Ordering>,
-    );
+    ) {
+        metadata_spec.store::<T>(object, val, mask, atomic_ordering)
+    }
 
     /// A function to atomically compare-and-exchange the specified per-object metadata's content.
     ///
@@ -133,16 +137,18 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `failure_order`: is the atomic ordering used if the operation fails.
     ///
     /// # Returns `true` if the operation is successful, and `false` otherwise.
-    ///
-    fn compare_exchange_metadata(
+    #[inline(always)]
+    fn compare_exchange_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        old_val: usize,
-        new_val: usize,
-        mask: Option<usize>,
+        old_val: T,
+        new_val: T,
+        mask: Option<T>,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool;
+    ) -> bool {
+        metadata_spec.compare_exchange::<T>(object, old_val, new_val, mask, success_order, failure_order)
+    }
 
     /// A function to atomically perform an add operation on the specified per-object metadata's content.
     ///
@@ -154,13 +160,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
     /// # Returns the old metadata value as a word.
-    ///
-    fn fetch_add_metadata(
+    #[inline(always)]
+    fn fetch_add_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
+        val: T,
         order: Ordering,
-    ) -> usize;
+    ) -> T {
+        metadata_spec.fetch_add::<T>(object, val, order)
+    }
 
     /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
     ///
@@ -172,13 +180,15 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     ///
     /// # Returns the old metadata value as a word.
-    ///
-    fn fetch_sub_metadata(
+    #[inline(always)]
+    fn fetch_sub_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
+        val: T,
         order: Ordering,
-    ) -> usize;
+    ) -> T {
+        metadata_spec.fetch_sub::<T>(object, val, order)
+    }
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)

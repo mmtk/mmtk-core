@@ -340,7 +340,7 @@ impl SideMetadataSpec {
                 let val_u8 = val.to_u8().unwrap();
 
                 let mut old_val = unsafe { meta_addr.load::<u8>() };
-                let mut new_sub_val = (((old_val & mask) >> lshift) -val_u8) & (mask >> lshift);
+                let mut new_sub_val = (((old_val & mask) >> lshift) - val_u8) & (mask >> lshift);
                 let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
 
                 while unsafe {
