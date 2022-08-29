@@ -106,6 +106,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         self.mutator_tls
     }
 
+    /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
     #[inline(always)]
     unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B {
         debug_assert!(self.barrier().is::<B>());

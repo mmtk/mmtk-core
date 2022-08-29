@@ -108,8 +108,7 @@ impl<VM: VMBinding> Barrier for GenObjectBarrier<VM> {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessModBuf::<
                 GenNurseryProcessEdges<VM>,
             >::new(
-                modbuf,
-                *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+                modbuf
             ));
         }
         let mut modbuf = vec![];

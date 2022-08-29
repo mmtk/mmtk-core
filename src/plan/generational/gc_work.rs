@@ -4,7 +4,7 @@ use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker};
 use crate::util::constants::LOG_BYTES_IN_ADDRESS;
-use crate::util::metadata::{store_metadata, MetadataSpec};
+use crate::util::metadata::store_metadata;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use crate::MMTK;
@@ -71,15 +71,13 @@ impl<VM: VMBinding> DerefMut for GenNurseryProcessEdges<VM> {
 pub struct ProcessModBuf<E: ProcessEdgesWork> {
     modbuf: Vec<ObjectReference>,
     phantom: PhantomData<E>,
-    meta: MetadataSpec,
 }
 
 impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
+    pub fn new(modbuf: Vec<ObjectReference>) -> Self {
         debug_assert!(!modbuf.is_empty());
         Self {
             modbuf,
-            meta,
             phantom: PhantomData,
         }
     }
@@ -90,7 +88,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Flip the per-object unlogged bits to "unlogged" state.
         for obj in &self.modbuf {
-            store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
+            store_metadata::<E::VM>(
+                &<E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+                *obj,
+                1,
+                None,
+                Some(Ordering::SeqCst),
+            );
         }
         // scan modbuf only if the current GC is a nursery GC
         if mmtk.plan.is_current_gc_nursery() {
