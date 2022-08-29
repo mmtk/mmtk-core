@@ -1,11 +1,9 @@
 use crate::util::alloc_bit;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
@@ -168,8 +166,7 @@ pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
-    load_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
         object,
         None,
         ordering,
@@ -212,8 +209,7 @@ pub fn set_alloc_bit(object: ObjectReference) {
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
         object,
         1,
         None,
@@ -252,8 +248,7 @@ pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
 
 #[allow(unused)]
 pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
         object,
         0,
         None,

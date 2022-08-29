@@ -16,7 +16,7 @@ use crate::util::heap::VMRequest;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{self, *};
 use crate::util::metadata::{
-    self, compare_exchange_metadata, load_metadata, store_metadata, MetadataSpec,
+    self, MetadataSpec,
 };
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
@@ -502,21 +502,19 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
-            let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
                 object,
                 None,
                 Some(Ordering::SeqCst),
-            ) as u8;
+            );
             if old_value == mark_state {
                 return false;
             }
 
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
                 object,
-                old_value as usize,
-                mark_state as usize,
+                old_value,
+                mark_state,
                 None,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
@@ -530,12 +528,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Check if an object is marked.
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
-        let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
             object,
             None,
             Some(Ordering::SeqCst),
-        ) as u8;
+        );
         old_value == mark_state
     }
 
@@ -682,10 +679,9 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     #[inline(always)]
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
         // Mark the object
-        store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
             obj,
-            self.get_space().mark_state as usize,
+            self.get_space().mark_state,
             None,
             Some(Ordering::SeqCst),
         );

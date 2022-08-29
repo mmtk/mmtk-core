@@ -4,8 +4,7 @@ use atomic::Ordering;
 
 use crate::scheduler::gc_work::*;
 use crate::scheduler::WorkBucketStage;
-use crate::util::metadata::load_metadata;
-use crate::util::metadata::{compare_exchange_metadata, MetadataSpec};
+use crate::util::metadata::MetadataSpec;
 use crate::util::*;
 use crate::MMTK;
 
@@ -69,8 +68,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
             // Try set the bit from 1 to 0 (log object). This may fail, if
             // 1. the bit is cleared by others, or
             // 2. other bits in the same byte may get modified if we use side metadata
-            if compare_exchange_metadata::<E::VM>(
-                &self.meta,
+            if self.meta.compare_exchange_metadata::<E::VM, u8>(
                 object,
                 1,
                 0,
@@ -82,7 +80,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
                 return true;
             } else {
                 let old_value =
-                    load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
+                    self.meta.load_metadata::<E::VM, u8>(object, None, Some(Ordering::SeqCst));
                 // If the bit is cleared before, someone else has logged the object. Return false.
                 if old_value == 0 {
                     return false;
@@ -104,7 +102,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn barrier(&mut self, obj: ObjectReference) {
-        if load_metadata::<E::VM>(&self.meta, obj, None, None) == 0 {
+        if self.meta.load_metadata::<E::VM, u8>(obj, None, None) == 0 {
             return;
         }
         self.barrier_slow(obj);
