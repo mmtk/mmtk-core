@@ -270,9 +270,9 @@ pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
 /// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata
 pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u128 {
     let meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        side_metadata::ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+
+    #[cfg(debug_assertions)]
+    metadata_spec.assert_metadata_mapped(data_addr);
 
     meta_addr.load::<u128>() as u128
 }

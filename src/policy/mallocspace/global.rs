@@ -7,7 +7,7 @@ use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
-    bzero_metadata, SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
 };
 use crate::util::metadata::MetadataSpec;
 use crate::util::opaque_pointer::*;
@@ -561,7 +561,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
 
         // Clear all the mark bits
-        bzero_metadata(&mark_bit_spec, chunk_start, BYTES_IN_CHUNK);
+        mark_bit_spec.bzero_metadata(chunk_start, BYTES_IN_CHUNK);
 
         // If we never updated empty_page_start, the entire chunk is empty.
         if empty_page_start.is_zero() {

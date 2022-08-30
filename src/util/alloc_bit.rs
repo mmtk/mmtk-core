@@ -67,5 +67,5 @@ pub unsafe fn is_alloced_object_unsafe(address: Address) -> bool {
 }
 
 pub fn bzero_alloc_bit(start: Address, size: usize) {
-    side_metadata::bzero_metadata(&ALLOC_SIDE_METADATA_SPEC, start, size);
+    ALLOC_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }

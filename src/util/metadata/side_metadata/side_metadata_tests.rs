@@ -234,14 +234,12 @@ mod tests {
                         )
                         .is_ok());
 
-                    ensure_metadata_is_mapped(&gspec, vm_layout_constants::HEAP_START);
-                    ensure_metadata_is_mapped(&lspec, vm_layout_constants::HEAP_START);
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    lspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
 
@@ -272,21 +270,17 @@ mod tests {
                         )
                         .is_ok());
 
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 8,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 16,
                     );
@@ -498,14 +492,14 @@ mod tests {
                     let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    bzero_metadata(&metadata_2_spec, data_addr, constants::BYTES_IN_PAGE);
+                    metadata_2_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
 
                     let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
                     let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
 
-                    bzero_metadata(&metadata_1_spec, data_addr, constants::BYTES_IN_PAGE);
+                    metadata_1_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
 
                     let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);

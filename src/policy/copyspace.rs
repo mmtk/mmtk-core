@@ -182,8 +182,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         if let MetadataSpec::OnSide(side_forwarding_status_table) =
             *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
         {
-            side_metadata::bzero_metadata(
-                &side_forwarding_status_table,
+            side_forwarding_status_table.bzero_metadata(
                 self.common.start,
                 self.pr.cursor() - self.common.start,
             );

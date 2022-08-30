@@ -608,7 +608,7 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     #[inline(always)]
     fn reset_object_mark(chunk: Chunk) {
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-            side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
+            side.bzero_metadata(chunk.start(), Chunk::BYTES);
         }
     }
 }

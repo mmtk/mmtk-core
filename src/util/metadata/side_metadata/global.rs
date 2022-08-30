@@ -103,7 +103,8 @@ impl SideMetadataSpec {
 
     /// Used only for debugging.
     /// This panics if the required metadata is not mapped
-    fn assert_metadata_mapped(&self, data_addr: Address) {
+    #[cfg(debug_assertions)]
+    pub(crate) fn assert_metadata_mapped(&self, data_addr: Address) {
         let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
 
         debug!(
@@ -125,6 +126,75 @@ impl SideMetadataSpec {
         }
     }
 
+    /// Bulk-zero a specific metadata for a chunk.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata_spec` - The specification of the target side metadata.
+    ///
+    /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
+    ///
+    pub fn bzero_metadata(&self, start: Address, size: usize) {
+        #[cfg(feature = "extreme_assertions")]
+        let _lock = sanity::SANITY_LOCK.lock().unwrap();
+
+        // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
+        #[cfg(not(feature = "global_alloc_bit"))]
+        debug_assert!(
+            start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(self, start) == 0
+        );
+
+        #[cfg(feature = "extreme_assertions")]
+        sanity::verify_bzero(self, start, size);
+
+        let meta_start = address_to_meta_address(self, start);
+        if cfg!(target_pointer_width = "64") || self.is_global {
+            memory::zero(
+                meta_start,
+                address_to_meta_address(self, start + size) - meta_start,
+            );
+        }
+        #[cfg(target_pointer_width = "32")]
+        if !metadata_spec.is_global {
+            // per chunk policy-specific metadata for 32-bits targets
+            let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
+                - start.align_down(BYTES_IN_CHUNK))
+                / BYTES_IN_CHUNK;
+            if chunk_num == 0 {
+                memory::zero(
+                    meta_start,
+                    address_to_meta_address(metadata_spec, start + size) - meta_start,
+                );
+            } else {
+                let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
+                // bzero the first sub-chunk
+                memory::zero(
+                    meta_start,
+                    address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
+                );
+                let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
+                let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
+                // bzero the last sub-chunk
+                memory::zero(
+                    last_meta_chunk,
+                    address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
+                );
+                let mut next_data_chunk = second_data_chunk;
+                // bzero all chunks in the middle
+                while next_data_chunk != last_data_chunk {
+                    memory::zero(
+                        address_to_meta_address(metadata_spec, next_data_chunk),
+                        metadata_bytes_per_chunk(
+                            metadata_spec.log_bytes_in_region,
+                            metadata_spec.log_num_of_bits,
+                        ),
+                    );
+                    next_data_chunk += BYTES_IN_CHUNK;
+                }
+            }
+        }
+    }
+
     /// This is a wrapper method for implementing side metadata access. It does nothing other than
     /// calling the access function with no overhead, but in debug builds,
     /// it includes multiple checks to make sure the access is sane.
@@ -142,7 +212,8 @@ impl SideMetadataSpec {
         let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
         // A few checks
-        if cfg!(debug_assertions) {
+        #[cfg(debug_assertions)]
+        {
             self.assert_value_type::<T>();
             self.assert_metadata_mapped(data_addr);
         }
@@ -691,16 +762,16 @@ impl SideMetadataContext {
 
 // Used only for debugging
 // Panics in the required metadata for data_addr is not mapped
-pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) {
-    let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
+// pub fn ensure_metadata_is_mapped(metadata_spec: &SideMetadataSpec, data_addr: Address) {
+//     let meta_start = address_to_meta_address(metadata_spec, data_addr).align_down(BYTES_IN_PAGE);
 
-    debug!(
-        "ensure_metadata_is_mapped({}).meta_start({})",
-        data_addr, meta_start
-    );
+//     debug!(
+//         "ensure_metadata_is_mapped({}).meta_start({})",
+//         data_addr, meta_start
+//     );
 
-    memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
-}
+//     memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
+// }
 
 // #[inline(always)]
 // pub fn load_atomic(metadata_spec: &SideMetadataSpec, data_addr: Address, order: Ordering) -> usize {
@@ -1324,66 +1395,66 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
 ///
 /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
 ///
-pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
-    #[cfg(feature = "extreme_assertions")]
-    let _lock = sanity::SANITY_LOCK.lock().unwrap();
+// pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
+//     #[cfg(feature = "extreme_assertions")]
+//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-    // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
-    #[cfg(not(feature = "global_alloc_bit"))]
-    debug_assert!(
-        start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
-    );
+//     // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
+//     #[cfg(not(feature = "global_alloc_bit"))]
+//     debug_assert!(
+//         start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
+//     );
 
-    #[cfg(feature = "extreme_assertions")]
-    sanity::verify_bzero(metadata_spec, start, size);
+//     #[cfg(feature = "extreme_assertions")]
+//     sanity::verify_bzero(metadata_spec, start, size);
 
-    let meta_start = address_to_meta_address(metadata_spec, start);
-    if cfg!(target_pointer_width = "64") || metadata_spec.is_global {
-        memory::zero(
-            meta_start,
-            address_to_meta_address(metadata_spec, start + size) - meta_start,
-        );
-    }
-    #[cfg(target_pointer_width = "32")]
-    if !metadata_spec.is_global {
-        // per chunk policy-specific metadata for 32-bits targets
-        let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
-            - start.align_down(BYTES_IN_CHUNK))
-            / BYTES_IN_CHUNK;
-        if chunk_num == 0 {
-            memory::zero(
-                meta_start,
-                address_to_meta_address(metadata_spec, start + size) - meta_start,
-            );
-        } else {
-            let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
-            // bzero the first sub-chunk
-            memory::zero(
-                meta_start,
-                address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
-            );
-            let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-            let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
-            // bzero the last sub-chunk
-            memory::zero(
-                last_meta_chunk,
-                address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
-            );
-            let mut next_data_chunk = second_data_chunk;
-            // bzero all chunks in the middle
-            while next_data_chunk != last_data_chunk {
-                memory::zero(
-                    address_to_meta_address(metadata_spec, next_data_chunk),
-                    metadata_bytes_per_chunk(
-                        metadata_spec.log_bytes_in_region,
-                        metadata_spec.log_num_of_bits,
-                    ),
-                );
-                next_data_chunk += BYTES_IN_CHUNK;
-            }
-        }
-    }
-}
+//     let meta_start = address_to_meta_address(metadata_spec, start);
+//     if cfg!(target_pointer_width = "64") || metadata_spec.is_global {
+//         memory::zero(
+//             meta_start,
+//             address_to_meta_address(metadata_spec, start + size) - meta_start,
+//         );
+//     }
+//     #[cfg(target_pointer_width = "32")]
+//     if !metadata_spec.is_global {
+//         // per chunk policy-specific metadata for 32-bits targets
+//         let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
+//             - start.align_down(BYTES_IN_CHUNK))
+//             / BYTES_IN_CHUNK;
+//         if chunk_num == 0 {
+//             memory::zero(
+//                 meta_start,
+//                 address_to_meta_address(metadata_spec, start + size) - meta_start,
+//             );
+//         } else {
+//             let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
+//             // bzero the first sub-chunk
+//             memory::zero(
+//                 meta_start,
+//                 address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
+//             );
+//             let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
+//             let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
+//             // bzero the last sub-chunk
+//             memory::zero(
+//                 last_meta_chunk,
+//                 address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
+//             );
+//             let mut next_data_chunk = second_data_chunk;
+//             // bzero all chunks in the middle
+//             while next_data_chunk != last_data_chunk {
+//                 memory::zero(
+//                     address_to_meta_address(metadata_spec, next_data_chunk),
+//                     metadata_bytes_per_chunk(
+//                         metadata_spec.log_bytes_in_region,
+//                         metadata_spec.log_num_of_bits,
+//                     ),
+//                 );
+//                 next_data_chunk += BYTES_IN_CHUNK;
+//             }
+//         }
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
