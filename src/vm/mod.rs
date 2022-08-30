@@ -19,6 +19,7 @@ use crate::util::constants::*;
 
 mod active_plan;
 mod collection;
+pub mod edge_shape;
 mod object_model;
 mod reference_glue;
 mod scanning;
@@ -44,6 +45,9 @@ where
     type VMCollection: Collection<Self>;
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
+
+    /// The type of edges in this VM.
+    type VMEdge: edge_shape::Edge;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;

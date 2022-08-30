@@ -6,6 +6,7 @@ use crate::scheduler::{gc_work::*, GCWork, GCWorker};
 use crate::util::constants::LOG_BYTES_IN_ADDRESS;
 use crate::util::metadata::store_metadata;
 use crate::util::{Address, ObjectReference};
+use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -23,7 +24,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let gen = base.plan().generational();
         Self { gen, base }
@@ -39,11 +40,11 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
             .trace_object_nursery(&mut self.base.nodes, object, worker)
     }
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
+    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+        let object = slot.load();
         let new_object = self.trace_object(object);
         debug_assert!(!self.gen.nursery.in_space(new_object));
-        unsafe { slot.store(new_object) };
+        slot.store(new_object);
     }
 
     #[inline(always)]
@@ -136,7 +137,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessArrayCopyModBuf<E> {
             let mut edges = vec![];
             for (addr, count) in &self.modbuf {
                 for i in 0..*count {
-                    edges.push(*addr + (i << LOG_BYTES_IN_ADDRESS));
+                    edges.push(<E::VM as VMBinding>::VMEdge::from_address(
+                        *addr + (i << LOG_BYTES_IN_ADDRESS),
+                    ));
                 }
             }
             // Forward entries
