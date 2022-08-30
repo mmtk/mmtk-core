@@ -17,6 +17,10 @@ pub enum DummyVMEdge {
 unsafe impl Send for DummyVMEdge {}
 
 impl Edge for DummyVMEdge {
+    fn from_address(_address: Address) -> Self {
+        unimplemented!()
+    }
+
     fn load(&self) -> ObjectReference {
         match self {
             DummyVMEdge::Simple(e) => e.load(),
@@ -65,6 +69,10 @@ pub mod only_64_bit {
     }
 
     impl Edge for CompressedOopEdge {
+        fn from_address(_address: Address) -> Self {
+            unimplemented!()
+        }
+
         fn load(&self) -> ObjectReference {
             let compressed = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let expanded = (compressed as usize) << 3;
@@ -115,6 +123,10 @@ impl OffsetEdge {
 }
 
 impl Edge for OffsetEdge {
+    fn from_address(_address: Address) -> Self {
+        unimplemented!()
+    }
+
     fn load(&self) -> ObjectReference {
         let middle = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let begin = middle - self.offset;
@@ -150,6 +162,10 @@ impl TaggedEdge {
 }
 
 impl Edge for TaggedEdge {
+    fn from_address(_address: Address) -> Self {
+        unimplemented!()
+    }
+
     fn load(&self) -> ObjectReference {
         let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let untagged = tagged & !Self::TAG_BITS_MASK;
