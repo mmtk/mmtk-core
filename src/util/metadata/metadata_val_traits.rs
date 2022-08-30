@@ -151,6 +151,8 @@ pub trait MetadataValue: Unsigned + Bits + BitwiseOps + ToPrimitive + Copy + Fro
     fn compare_exchange(addr: Address, current: Self, new: Self, success: Ordering, failure: Ordering) -> Result<Self, Self>;
     fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self;
     fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self;
+    fn fetch_and(addr: Address, value: Self, order: Ordering) -> Self;
+    fn fetch_or(addr: Address, value: Self, order: Ordering) -> Self;
     fn fetch_update<F>(addr: Address, set_order: Ordering, fetch_order: Ordering, f: F) -> Result<Self, Self> where F: FnMut(Self) -> Option<Self>;
 }
 macro_rules! impl_metadata_value_trait {
@@ -207,6 +209,16 @@ macro_rules! impl_metadata_value_trait {
             #[inline]
             fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self{
                 unsafe { addr.as_ref::<$atomic>() }.fetch_sub(value, order)
+            }
+
+            #[inline]
+            fn fetch_and(addr: Address, value: Self, order: Ordering) -> Self{
+                unsafe { addr.as_ref::<$atomic>() }.fetch_and(value, order)
+            }
+
+            #[inline]
+            fn fetch_or(addr: Address, value: Self, order: Ordering) -> Self{
+                unsafe { addr.as_ref::<$atomic>() }.fetch_or(value, order)
             }
 
             #[inline]

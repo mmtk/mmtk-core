@@ -175,17 +175,63 @@ impl MetadataSpec {
     ///
     #[inline(always)]
     pub fn fetch_sub_metadata<VM: VMBinding, T: MetadataValue>(
-        metadata_spec: &MetadataSpec,
+        &self,
         object: ObjectReference,
         val: T,
         order: Ordering,
     ) -> T {
-        match metadata_spec {
+        match self {
             MetadataSpec::OnSide(metadata_spec) => {
                 metadata_spec.fetch_sub_atomic(object.to_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 metadata_spec.fetch_sub(object, val, order)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_and_metadata<VM: VMBinding, T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        match self {
+            MetadataSpec::OnSide(metadata_spec) => {
+                metadata_spec.fetch_and_atomic(object.to_address(), val, order)
+            }
+            MetadataSpec::InHeader(metadata_spec) => {
+                metadata_spec.fetch_and(object, val, order)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_or_metadata<VM: VMBinding, T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        match self {
+            MetadataSpec::OnSide(metadata_spec) => {
+                metadata_spec.fetch_or_atomic(object.to_address(), val, order)
+            }
+            MetadataSpec::InHeader(metadata_spec) => {
+                metadata_spec.fetch_or(object, val, order)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_update_metadata<VM: VMBinding, T: MetadataValue>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, f: impl FnMut(T) -> Option<T> + Copy) -> std::result::Result<T, T> {
+        match self {
+            MetadataSpec::OnSide(metadata_spec) => {
+                metadata_spec.fetch_update_atomic(object.to_address(), set_order, fetch_order, f)
+            }
+            MetadataSpec::InHeader(metadata_spec) => {
+                metadata_spec.fetch_update(object, set_order, fetch_order, f)
             }
         }
     }

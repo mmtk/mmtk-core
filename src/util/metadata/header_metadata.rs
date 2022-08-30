@@ -202,30 +202,35 @@ impl HeaderMetadataSpec {
     }
 
     #[inline(always)]
+    fn fetch_update_bits<F: Fn(u8) -> u8>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, update: F) -> u8 {
+        let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
+        let bit_shift = self.bit_offset - (byte_offset << LOG_BITS_IN_BYTE);
+        let mask = ((1u8 << self.num_of_bits) - 1) << bit_shift;
+
+        // let new_metadata = ((val as u8) << bit_shift);
+        let byte_addr = object.to_address() + byte_offset;
+        loop {
+            unsafe {
+                let old_byte = byte_addr.atomic_load::<AtomicU8>(fetch_order);
+                let old_metadata = (old_byte & mask) >> bit_shift;
+                // new_metadata may contain overflow and should be and with the mask
+                let new_metadata = update(old_metadata) & (mask >> bit_shift);
+                let new_byte = (old_byte & !mask) | ((new_metadata as u8) << bit_shift);
+                if byte_addr
+                    .compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order)
+                    .is_ok()
+                {
+                    return old_metadata
+                }
+            }
+        }
+    }
+
+    #[inline(always)]
     pub fn fetch_add<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
-            let bit_shift = self.bit_offset - (byte_offset << LOG_BITS_IN_BYTE);
-            let mask = ((1u8 << self.num_of_bits) - 1) << bit_shift;
-
-            // let new_metadata = ((val as u8) << bit_shift);
-            let byte_addr = object.to_address() + byte_offset;
-            loop {
-                unsafe {
-                    let old_byte = byte_addr.atomic_load::<AtomicU8>(order);
-                    let old_metadata = (old_byte & mask) >> bit_shift;
-                    // new_metadata may contain overflow and should be and with the mask
-                    let new_metadata = (old_metadata + val.to_u8().unwrap()) & (mask >> bit_shift);
-                    let new_byte = (old_byte & !mask) | ((new_metadata as u8) << bit_shift);
-                    if byte_addr
-                        .compare_exchange::<AtomicU8>(old_byte, new_byte, order, order)
-                        .is_ok()
-                    {
-                        return FromPrimitive::from_u8(old_metadata).unwrap();
-                    }
-                }
-            }
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x + val.to_u8().unwrap())).unwrap()
         } else {
             let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
             T::fetch_add(object.to_address() + byte_offset, val, order)
@@ -236,30 +241,60 @@ impl HeaderMetadataSpec {
     pub fn fetch_sub<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x - val.to_u8().unwrap())).unwrap()
+        } else {
+            let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
+            T::fetch_sub(object.to_address() + byte_offset, val, order)
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_and<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+        self.assert_spec::<T>();
+        if self.num_of_bits < 8 {
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x & val.to_u8().unwrap())).unwrap()
+        } else {
+            let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
+            T::fetch_and(object.to_address() + byte_offset, val, order)
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_or<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+        self.assert_spec::<T>();
+        if self.num_of_bits < 8 {
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x | val.to_u8().unwrap())).unwrap()
+        } else {
+            let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
+            T::fetch_or(object.to_address() + byte_offset, val, order)
+        }
+    }
+
+    #[inline(always)]
+    pub fn fetch_update<T: MetadataValue>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, mut f: impl FnMut(T) -> Option<T> + Copy) -> std::result::Result<T, T> {
+        self.assert_spec::<T>();
+        if self.num_of_bits < 8 {
             let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
             let bit_shift = self.bit_offset - (byte_offset << LOG_BITS_IN_BYTE);
             let mask = ((1u8 << self.num_of_bits) - 1) << bit_shift;
-
-            // let new_metadata = ((val as u8) << bit_shift);
             let byte_addr = object.to_address() + byte_offset;
             loop {
-                unsafe {
-                    let old_byte = byte_addr.atomic_load::<AtomicU8>(order);
-                    let old_metadata = (old_byte & mask) >> bit_shift;
-                    // new_metadata may contain overflow and should be and with the mask
-                    let new_metadata = (old_metadata - val.to_u8().unwrap()) & (mask >> bit_shift);
-                    let new_byte = (old_byte & !mask) | ((new_metadata as u8) << bit_shift);
-                    if byte_addr
-                        .compare_exchange::<AtomicU8>(old_byte, new_byte, order, order)
-                        .is_ok()
-                    {
-                        return FromPrimitive::from_u8(old_metadata).unwrap();
+                let old_byte = unsafe { byte_addr.atomic_load::<AtomicU8>(fetch_order) };
+                let old_metadata = (old_byte & mask) >> bit_shift;
+                let old_metadata_val = FromPrimitive::from_u8(old_metadata).unwrap();
+                let new_metadata: Option<T> = f(old_metadata_val);
+                if let Some(new_metadata_to_set) = new_metadata {
+                    let new_byte = (old_byte & !mask) | ((new_metadata_to_set.to_u8().unwrap()) << bit_shift);
+                    if unsafe { byte_addr.compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order) }.is_ok() {
+                        return Ok(old_metadata_val);
                     }
+                } else {
+                    return Err(old_metadata_val)
                 }
             }
         } else {
             let byte_offset = self.bit_offset >> LOG_BITS_IN_BYTE;
-            T::fetch_sub(object.to_address() + byte_offset, val, order)
+            T::fetch_update(object.to_address() + byte_offset, set_order, fetch_order, f)
         }
     }
 }

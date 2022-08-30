@@ -190,6 +190,37 @@ pub trait ObjectModel<VM: VMBinding> {
         metadata_spec.fetch_sub::<T>(object, val, order)
     }
 
+    #[inline(always)]
+    fn fetch_and_metadata<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        metadata_spec.fetch_and::<T>(object, val, order)
+    }
+
+    #[inline(always)]
+    fn fetch_or_metadata<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        metadata_spec.fetch_or::<T>(object, val, order)
+    }
+
+    #[inline(always)]
+    fn fetch_update_metadata<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        f: impl FnMut(T) -> Option<T> + Copy,
+    ) -> std::result::Result<T, T> {
+        metadata_spec.fetch_update(object, set_order, fetch_order, f)
+    }
+
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)
     /// are used for copying.
