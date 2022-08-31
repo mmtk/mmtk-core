@@ -387,6 +387,7 @@ impl SideMetadataSpec {
         FromPrimitive::from_u8(old_val & mask).unwrap()
     }
 
+    /// Wraps around on overflow.
     #[inline(always)]
     pub fn fetch_add_atomic<T: MetadataValue>(&self, data_addr: Address, val: T, order: Ordering) -> T {
         self.side_metadata_access::<T, _, _, _>(data_addr, || {
@@ -412,14 +413,14 @@ impl SideMetadataSpec {
                 // }
 
                 // FromPrimitive::from_u8(old_val & mask).unwrap()
-                FromPrimitive::from_u8(self.fetch_update_bits(data_addr, meta_addr, order, order, |x: u8| x + val.to_u8().unwrap())).unwrap()
+                FromPrimitive::from_u8(self.fetch_update_bits(data_addr, meta_addr, order, order, |x: u8| x.wrapping_add(val.to_u8().unwrap()))).unwrap()
             } else {
                 T::fetch_add(meta_addr, val, order)
             }
         }, |_old_val| {
             #[cfg(feature = "extreme_assertions")]
             // sanity::typed_verify_add(self, data_addr, val, _old_val)
-            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val + val)
+            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val.wrapping_add(&val))
         })
     }
 
@@ -447,14 +448,14 @@ impl SideMetadataSpec {
                 // }
 
                 // FromPrimitive::from_u8(old_val & mask).unwrap()
-                FromPrimitive::from_u8(self.fetch_update_bits(data_addr, meta_addr, order, order, |x: u8| x - val.to_u8().unwrap())).unwrap()
+                FromPrimitive::from_u8(self.fetch_update_bits(data_addr, meta_addr, order, order, |x: u8| x.wrapping_sub(val.to_u8().unwrap()))).unwrap()
             } else {
                 T::fetch_sub(meta_addr, val, order)
             }
         }, |_old_val| {
             #[cfg(feature = "extreme_assertions")]
             // sanity::typed_verify_sub(self, data_addr, val, _old_val)
-            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val - val)
+            sanity::verify_update::<T>(self, data_addr, _old_val, _old_val.wrapping_sub(&val))
         })
     }
 
@@ -480,7 +481,7 @@ impl SideMetadataSpec {
             if self.log_num_of_bits < 3 {
                 FromPrimitive::from_u8(self.fetch_update_bits(data_addr, meta_addr, order, order, |x: u8| x | val.to_u8().unwrap())).unwrap()
             } else {
-                T::fetch_and(meta_addr, val, order)
+                T::fetch_or(meta_addr, val, order)
             }
         }, |_old_val| {
             #[cfg(feature = "extreme_assertions")]
@@ -489,7 +490,7 @@ impl SideMetadataSpec {
     }
 
     #[inline(always)]
-    pub fn fetch_update_atomic<T: MetadataValue>(&self, data_addr: Address, set_order: Ordering, fetch_order: Ordering, mut f: impl FnMut(T) -> Option<T> + Copy) -> std::result::Result<T, T> {
+    pub fn fetch_update_atomic<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(&self, data_addr: Address, set_order: Ordering, fetch_order: Ordering, mut f: F) -> std::result::Result<T, T> {
         self.side_metadata_access::<T, _, _, _>(data_addr, move || -> std::result::Result<T, T> {
             let meta_addr = address_to_meta_address(self, data_addr);
             if self.log_num_of_bits < 3 {
@@ -501,8 +502,8 @@ impl SideMetadataSpec {
                     match unsafe {
                         meta_addr.compare_exchange::<AtomicU8>(old_val, new_val, set_order, fetch_order)
                     } {
-                        x @ Ok(_) => {
-                            return x.map(|y| FromPrimitive::from_u8(y).unwrap()).map_err(|y| FromPrimitive::from_u8(y).unwrap())
+                        Ok(x) => {
+                            return Ok(FromPrimitive::from_u8((x & mask) >> lshift).unwrap());
                         }
                         Err(next_prev) => old_val = next_prev,
                     }
@@ -514,6 +515,7 @@ impl SideMetadataSpec {
         }, |_result| {
             #[cfg(feature = "extreme_assertions")]
             if let Ok(old_val) = _result {
+                println!("Ok({})", old_val);
                 sanity::verify_update::<T>(self, data_addr, old_val, f(old_val).unwrap())
             }
         })
@@ -1553,6 +1555,14 @@ mod tests {
     fn max_value(log_bits: usize) -> usize {
         (0..(1 << log_bits)).fold(0, |accum, x| { accum + (1 << x) })
     }
+    #[test]
+    fn test_max_value() {
+        assert_eq!(max_value(0), 1);
+        assert_eq!(max_value(1), 0b11);
+        assert_eq!(max_value(2), 0b1111);
+        assert_eq!(max_value(3), 255);
+        assert_eq!(max_value(4), 65535);
+    }
 
     macro_rules! test_side_metadata_access {
         ($tname: ident, $type: ty, $log_bits: expr) => {
@@ -1684,9 +1694,92 @@ mod tests {
                         // Store 0 to the side metadata
                         spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
 
+                        println!("load1");
                         let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
 
                         let old_val_from_fetch = spec.fetch_add_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+
+                        println!("load2");
+                        let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        assert_eq!(new_val, max_value);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_add_overflow>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store max to the side metadata
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+
+                        // add 1 to max value will cause overflow and wrap around to 0
+                        let old_val_from_fetch = spec.fetch_add_atomic::<$type>(data_addr, 1, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+
+                        let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        assert_eq!(new_val, 0);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_sub_1>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store 1 to the side metadata
+                        spec.store_atomic::<$type>(data_addr, 1, Ordering::SeqCst);
+
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+
+                        let old_val_from_fetch = spec.fetch_sub_atomic::<$type>(data_addr, 1, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+
+                        let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        assert_eq!(new_val, 0);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_sub_max>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store max to the side metadata
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+
+                        let old_val_from_fetch = spec.fetch_sub_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+
+                        let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        assert_eq!(new_val, 0);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_sub_overflow>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store 0 to the side metadata
+                        spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
+
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+
+                        // sub 1 from 0 will cause overflow, and wrap around to max
+                        let old_val_from_fetch = spec.fetch_sub_atomic::<$type>(data_addr, 1, Ordering::SeqCst);
                         assert_eq!(old_val_from_fetch, old_val);
 
                         let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
@@ -1694,33 +1787,110 @@ mod tests {
                     });
                 }
 
-                // #[test]
-                // fn [<$tname _fetch_add_overflow>]() {
-                //     test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
-                //         let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
-                //         let max_value: $type = max_value($log_bits) as _;
-                //         // Set the metadata byte(s) to all 1s
-                //         unsafe { *meta_ptr = <$type>::MAX; }
-                //         // Store max to the side metadata
-                //         spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                #[test]
+                fn [<$tname _fetch_and>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store all 1s to the side metadata
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
 
-                //         let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        // max and max should be max
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let old_val_from_fetch = spec.fetch_and_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
+                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX);
 
-                //         // add 1 to max value will cause overflow
-                //         let old_val_from_fetch = spec.fetch_add_atomic::<$type>(data_addr, 1, Ordering::SeqCst);
-                //         assert_eq!(old_val_from_fetch, old_val);
+                        // max and last_bit_zero should last_bit_zero
+                        let last_bit_zero = max_value - 1;
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let old_val_from_fetch = spec.fetch_and_atomic::<$type>(data_addr, last_bit_zero, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), last_bit_zero);
+                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX - 1);
+                    });
+                }
 
-                //         let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
-                //         assert_eq!(new_val, 0);
-                //         assert_eq!(unsafe { *meta_ptr }, <$type>::MAX & (!max_value));
-                //     });
-                // }
+                #[test]
+                fn [<$tname _fetch_or>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 0s
+                        unsafe { *meta_ptr = 0; }
+                        // Store 0 to the side metadata
+                        spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
+
+                        // 0 or 0 should be 0
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let old_val_from_fetch = spec.fetch_or_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), 0);
+                        assert_eq!(unsafe { *meta_ptr }, 0);
+
+                        // 0 and max should max
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let old_val_from_fetch = spec.fetch_or_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+                        assert_eq!(old_val_from_fetch, old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
+                        assert_eq!(unsafe { *meta_ptr }, max_value);
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_update_success>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store all 1s to the side metadata
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        // update from max to zero
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let fetch_res = spec.fetch_update_atomic::<$type, _>(data_addr, Ordering::SeqCst, Ordering::SeqCst, |_x: $type| Some(0));
+                        assert!(fetch_res.is_ok());
+                        assert_eq!(fetch_res.unwrap(), old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), 0);
+                        // Only the affected bits are set to 0
+                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX & (!max_value));
+                    });
+                }
+
+                #[test]
+                fn [<$tname _fetch_update_fail>]() {
+                    test_side_metadata($log_bits, |spec, data_addr, meta_addr| {
+                        let meta_ptr: *mut $type = meta_addr.to_mut_ptr();
+                        let max_value: $type = max_value($log_bits) as _;
+                        // Set the metadata byte(s) to all 1s
+                        unsafe { *meta_ptr = <$type>::MAX; }
+                        // Store all 1s to the side metadata
+                        spec.store_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
+
+                        // update from max to zero
+                        let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
+                        let fetch_res = spec.fetch_update_atomic::<$type, _>(data_addr, Ordering::SeqCst, Ordering::SeqCst, |_x: $type| None);
+                        assert!(fetch_res.is_err());
+                        assert_eq!(fetch_res.err().unwrap(), old_val);
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
+                        // Only the affected bits are set to 0
+                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX);
+                    });
+                }
             }
         }
     }
 
     test_side_metadata_access!(test_1bit, u8, 0);
     test_side_metadata_access!(test_2bits, u8, 1);
+    test_side_metadata_access!(test_u4, u8, 2);
     test_side_metadata_access!(test_u8, u8, 3);
+    test_side_metadata_access!(test_u16, u16, 4);
+    test_side_metadata_access!(test_u32, u32, 5);
     test_side_metadata_access!(test_u64, u64, 6);
+    // test_side_metadata_access!(test_usize, usize, 6);
 }
