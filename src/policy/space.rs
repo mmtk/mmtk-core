@@ -30,7 +30,6 @@ use crate::util::memory;
 use crate::util::alloc_bit;
 
 use crate::vm::VMBinding;
-use std::fmt::{Error, Write};
 use std::marker::PhantomData;
 use std::sync::Mutex;
 
@@ -624,62 +623,66 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 }
 
-// Print the VM map for a space.
-// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.
-#[allow(unused)]
-pub(crate) fn print_vm_map<VM: VMBinding, W: Write>(
-    space: &dyn Space<VM>,
-    out: &mut W,
-) -> Result<(), Error> {
-    let common = space.common();
-    write!(out, "{} ", common.name)?;
-    if common.immortal {
-        write!(out, "I")?;
-    } else {
-        write!(out, " ")?;
-    }
-    if common.movable {
-        write!(out, " ")?;
-    } else {
-        write!(out, "N")?;
-    }
-    write!(out, " ");
-    if common.contiguous {
-        write!(
-            out,
-            "{}->{}",
-            common.start,
-            common.start + common.extent - 1
-        )?;
-        match common.vmrequest {
-            VMRequest::Extent { extent, .. } => {
-                write!(out, " E {}", extent)?;
-            }
-            VMRequest::Fraction { frac, .. } => {
-                write!(out, " F {}", frac)?;
-            }
-            _ => {}
+impl<VM: VMBinding> dyn Space<VM> {
+    /// Print the VM map for a space.
+    /// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.
+    /// This method can be invoked on a &dyn Space (space.as_space() will return &dyn Space).
+    #[allow(unused)]
+    pub(crate) fn print_vm_map(
+        &self,
+        out: &mut impl std::fmt::Write,
+    ) -> Result<(), std::fmt::Error> {
+        let common = self.common();
+        write!(out, "{} ", common.name)?;
+        if common.immortal {
+            write!(out, "I")?;
+        } else {
+            write!(out, " ")?;
         }
-    } else {
-        let mut a = space
-            .get_page_resource()
-            .common()
-            .get_head_discontiguous_region();
-        while !a.is_zero() {
+        if common.movable {
+            write!(out, " ")?;
+        } else {
+            write!(out, "N")?;
+        }
+        write!(out, " ")?;
+        if common.contiguous {
             write!(
                 out,
                 "{}->{}",
-                a,
-                a + common.vm_map().get_contiguous_region_size(a) - 1
+                common.start,
+                common.start + common.extent - 1
             )?;
-            a = common.vm_map().get_next_contiguous_region(a);
-            if !a.is_zero() {
-                write!(out, " ")?;
+            match common.vmrequest {
+                VMRequest::Extent { extent, .. } => {
+                    write!(out, " E {}", extent)?;
+                }
+                VMRequest::Fraction { frac, .. } => {
+                    write!(out, " F {}", frac)?;
+                }
+                _ => {}
+            }
+        } else {
+            let mut a = self
+                .get_page_resource()
+                .common()
+                .get_head_discontiguous_region();
+            while !a.is_zero() {
+                write!(
+                    out,
+                    "{}->{}",
+                    a,
+                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
+                )?;
+                a = self.common().vm_map().get_next_contiguous_region(a);
+                if !a.is_zero() {
+                    write!(out, " ")?;
+                }
             }
         }
+        writeln!(out)?;
+
+        Ok(())
     }
-    writeln!(out);
-    Ok(())
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);
