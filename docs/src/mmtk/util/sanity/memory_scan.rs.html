@@ -34,9 +34,15 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 
+<span class="comment">// This is legacy code, and no one is using this. Using gdb can achieve the same thing for debugging.</span>
+<span class="comment">// The JikesRVM binding still declares this method and we need to remove it from JikesRVM.</span>
+<span class="attribute">#[<span class="ident">deprecated</span>]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_region</span>() {
     <span class="kw">loop</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">buf</span> <span class="op">=</span> <span class="ident">String::new</span>();

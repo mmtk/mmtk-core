@@ -267,8 +267,6 @@
 <span id="265">265</span>
 <span id="266">266</span>
 <span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::counter</span>::<span class="kw-2">*</span>;
@@ -433,7 +431,7 @@
             }
             <span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">increment_phase</span>();
         } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">exceeded_phase_limit</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="macro">println!</span>(<span class="string">&quot;Warning: number of GC phases exceeds MAX_PHASES&quot;</span>);
+            <span class="macro">eprintln!</span>(<span class="string">&quot;Warning: number of GC phases exceeds MAX_PHASES&quot;</span>);
             <span class="self">self</span>.<span class="ident">exceeded_phase_limit</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
         }
     }
@@ -449,7 +447,7 @@
             }
             <span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">increment_phase</span>();
         } <span class="kw">else</span> <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">exceeded_phase_limit</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) {
-            <span class="macro">println!</span>(<span class="string">&quot;Warning: number of GC phases exceeds MAX_PHASES&quot;</span>);
+            <span class="macro">eprintln!</span>(<span class="string">&quot;Warning: number of GC phases exceeds MAX_PHASES&quot;</span>);
             <span class="self">self</span>.<span class="ident">exceeded_phase_limit</span>.<span class="ident">store</span>(<span class="bool-val">true</span>, <span class="ident">Ordering::SeqCst</span>);
         }
     }
@@ -503,9 +501,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let</span> <span class="ident">counters</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">counters</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_gathering_stats</span>() {
-            <span class="macro">println!</span>(<span class="string">&quot;Error: calling Stats.startAll() while stats running&quot;</span>);
-            <span class="macro">println!</span>(<span class="string">&quot;       verbosity &gt; 0 and the harness mechanism may be conflicting&quot;</span>);
-            <span class="macro">debug_assert!</span>(<span class="bool-val">false</span>);
+            <span class="macro">panic!</span>(<span class="string">&quot;calling Stats.startAll() while stats running&quot;</span>);
         }
         <span class="self">self</span>.<span class="ident">shared</span>.<span class="ident">set_gathering_stats</span>(<span class="bool-val">true</span>);
 

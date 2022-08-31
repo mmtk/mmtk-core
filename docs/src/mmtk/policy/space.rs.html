@@ -849,6 +849,16 @@
 <span id="847">847</span>
 <span id="848">848</span>
 <span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
@@ -1459,51 +1469,6 @@
         <span class="macro">panic!</span>(<span class="string">&quot;A copying space should override this method&quot;</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">print_vm_map</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>();
-        <span class="macro">print!</span>(<span class="string">&quot;{} &quot;</span>, <span class="ident">common</span>.<span class="ident">name</span>);
-        <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">immortal</span> {
-            <span class="macro">print!</span>(<span class="string">&quot;I&quot;</span>);
-        } <span class="kw">else</span> {
-            <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
-        }
-        <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">movable</span> {
-            <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
-        } <span class="kw">else</span> {
-            <span class="macro">print!</span>(<span class="string">&quot;N&quot;</span>);
-        }
-        <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
-        <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">contiguous</span> {
-            <span class="macro">print!</span>(<span class="string">&quot;{}-&gt;{}&quot;</span>, <span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">common</span>.<span class="ident">extent</span> <span class="op">-</span> <span class="number">1</span>);
-            <span class="kw">match</span> <span class="ident">common</span>.<span class="ident">vmrequest</span> {
-                <span class="ident">VMRequest::Extent</span> { <span class="ident">extent</span>, .. } =&gt; {
-                    <span class="macro">print!</span>(<span class="string">&quot; E {}&quot;</span>, <span class="ident">extent</span>);
-                }
-                <span class="ident">VMRequest::Fraction</span> { <span class="ident">frac</span>, .. } =&gt; {
-                    <span class="macro">print!</span>(<span class="string">&quot; F {}&quot;</span>, <span class="ident">frac</span>);
-                }
-                <span class="kw">_</span> =&gt; {}
-            }
-        } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>
-                .<span class="ident">get_page_resource</span>()
-                .<span class="ident">common</span>()
-                .<span class="ident">get_head_discontiguous_region</span>();
-            <span class="kw">while</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
-                <span class="macro">print!</span>(
-                    <span class="string">&quot;{}-&gt;{}&quot;</span>,
-                    <span class="ident">a</span>,
-                    <span class="ident">a</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_contiguous_region_size</span>(<span class="ident">a</span>) <span class="op">-</span> <span class="number">1</span>
-                );
-                <span class="ident">a</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_next_contiguous_region</span>(<span class="ident">a</span>);
-                <span class="kw">if</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
-                    <span class="macro">print!</span>(<span class="string">&quot; &quot;</span>);
-                }
-            }
-        }
-        <span class="macro">println!</span>();
-    }
-
     <span class="doccomment">/// Ensure that the current space&#39;s metadata context does not have any issues.</span>
     <span class="doccomment">/// Panics with a suitable message if any issue is detected.</span>
     <span class="doccomment">/// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.</span>
@@ -1517,6 +1482,66 @@
         <span class="ident">side_metadata_sanity_checker</span>
             .<span class="ident">verify_metadata_context</span>(<span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">common</span>().<span class="ident">metadata</span>)
     }
+}
+
+<span class="doccomment">/// Print the VM map for a space.</span>
+<span class="doccomment">/// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.</span>
+<span class="doccomment">/// This method can be invoked on a &amp;dyn Space (space.as_space() will return &amp;dyn Space).</span>
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">print_vm_map</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">out</span>: <span class="kw-2">&amp;mut</span> <span class="kw">impl</span> <span class="ident">std::fmt::Write</span>,
+) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">std::fmt::Error</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">space</span>.<span class="ident">common</span>();
+    <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot;{} &quot;</span>, <span class="ident">common</span>.<span class="ident">name</span>)<span class="question-mark">?</span>;
+    <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">immortal</span> {
+        <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot;I&quot;</span>)<span class="question-mark">?</span>;
+    } <span class="kw">else</span> {
+        <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    }
+    <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">movable</span> {
+        <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    } <span class="kw">else</span> {
+        <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot;N&quot;</span>)<span class="question-mark">?</span>;
+    }
+    <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">contiguous</span> {
+        <span class="macro">write!</span>(
+            <span class="ident">out</span>,
+            <span class="string">&quot;{}-&gt;{}&quot;</span>,
+            <span class="ident">common</span>.<span class="ident">start</span>,
+            <span class="ident">common</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">common</span>.<span class="ident">extent</span> <span class="op">-</span> <span class="number">1</span>
+        )<span class="question-mark">?</span>;
+        <span class="kw">match</span> <span class="ident">common</span>.<span class="ident">vmrequest</span> {
+            <span class="ident">VMRequest::Extent</span> { <span class="ident">extent</span>, .. } =&gt; {
+                <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; E {}&quot;</span>, <span class="ident">extent</span>)<span class="question-mark">?</span>;
+            }
+            <span class="ident">VMRequest::Fraction</span> { <span class="ident">frac</span>, .. } =&gt; {
+                <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; F {}&quot;</span>, <span class="ident">frac</span>)<span class="question-mark">?</span>;
+            }
+            <span class="kw">_</span> =&gt; {}
+        }
+    } <span class="kw">else</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">a</span> <span class="op">=</span> <span class="ident">space</span>
+            .<span class="ident">get_page_resource</span>()
+            .<span class="ident">common</span>()
+            .<span class="ident">get_head_discontiguous_region</span>();
+        <span class="kw">while</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
+            <span class="macro">write!</span>(
+                <span class="ident">out</span>,
+                <span class="string">&quot;{}-&gt;{}&quot;</span>,
+                <span class="ident">a</span>,
+                <span class="ident">a</span> <span class="op">+</span> <span class="ident">space</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_contiguous_region_size</span>(<span class="ident">a</span>) <span class="op">-</span> <span class="number">1</span>
+            )<span class="question-mark">?</span>;
+            <span class="ident">a</span> <span class="op">=</span> <span class="ident">space</span>.<span class="ident">common</span>().<span class="ident">vm_map</span>().<span class="ident">get_next_contiguous_region</span>(<span class="ident">a</span>);
+            <span class="kw">if</span> <span class="op">!</span><span class="ident">a</span>.<span class="ident">is_zero</span>() {
+                <span class="macro">write!</span>(<span class="ident">out</span>, <span class="string">&quot; &quot;</span>)<span class="question-mark">?</span>;
+            }
+        }
+    }
+    <span class="macro">writeln!</span>(<span class="ident">out</span>)<span class="question-mark">?</span>;
+
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="macro">impl_downcast!</span>(<span class="ident">Space</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">where</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>);
@@ -1563,9 +1588,6 @@
     <span class="kw">pub</span> <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
     <span class="kw">pub</span> <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span>,
 }
-
-<span class="doccomment">/// Print debug info for SFT. Should be false when committed.</span>
-<span class="kw">const</span> <span class="ident">DEBUG_SPACE</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) <span class="op">&amp;&amp;</span> <span class="bool-val">false</span>;
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
@@ -1656,15 +1678,13 @@
             <span class="macro">panic!</span>(<span class="string">&quot;failed to mmap meta memory&quot;</span>);
         }
 
-        <span class="kw">if</span> <span class="ident">DEBUG_SPACE</span> {
-            <span class="macro">println!</span>(
-                <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
-                <span class="ident">rtn</span>.<span class="ident">name</span>,
-                <span class="ident">start</span>,
-                <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>,
-                <span class="ident">extent</span>
-            );
-        }
+        <span class="macro">debug!</span>(
+            <span class="string">&quot;Created space {} [{}, {}) for {} bytes&quot;</span>,
+            <span class="ident">rtn</span>.<span class="ident">name</span>,
+            <span class="ident">start</span>,
+            <span class="ident">start</span> <span class="op">+</span> <span class="ident">extent</span>,
+            <span class="ident">extent</span>
+        );
 
         <span class="ident">rtn</span>
     }
