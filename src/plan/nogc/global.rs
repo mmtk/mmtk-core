@@ -80,7 +80,7 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
     }
 
     fn handle_user_collection_request(&self, _tls: VMMutatorThread, _force: bool) {
-        println!("Warning: User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
+        warn!("User attempted a collection request, but it is not supported in NoGC. The request is ignored.");
     }
 }
 
