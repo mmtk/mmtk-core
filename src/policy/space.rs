@@ -30,6 +30,7 @@ use crate::util::memory;
 use crate::util::alloc_bit;
 
 use crate::vm::VMBinding;
+use std::fmt::{Error, Write};
 use std::marker::PhantomData;
 use std::sync::Mutex;
 
@@ -608,58 +609,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         panic!("A copying space should override this method")
     }
 
-    fn print_vm_map(&self) -> String {
-        let mut ret = String::new();
-        let common = self.common();
-        ret.push_str(common.name);
-        ret.push(' ');
-        if common.immortal {
-            ret.push('I');
-        } else {
-            ret.push(' ');
-        }
-        if common.movable {
-            ret.push(' ');
-        } else {
-            ret.push('N');
-        }
-        ret.push(' ');
-        if common.contiguous {
-            ret.push_str(&format!(
-                "{}->{}",
-                common.start,
-                common.start + common.extent - 1
-            ));
-            match common.vmrequest {
-                VMRequest::Extent { extent, .. } => {
-                    ret.push_str(&format!(" E {}", extent));
-                }
-                VMRequest::Fraction { frac, .. } => {
-                    ret.push_str(&format!(" F {}", frac));
-                }
-                _ => {}
-            }
-        } else {
-            let mut a = self
-                .get_page_resource()
-                .common()
-                .get_head_discontiguous_region();
-            while !a.is_zero() {
-                ret.push_str(&format!(
-                    "{}->{}",
-                    a,
-                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
-                ));
-                a = self.common().vm_map().get_next_contiguous_region(a);
-                if !a.is_zero() {
-                    ret.push(' ');
-                }
-            }
-        }
-        ret.push('\n');
-        ret
-    }
-
     /// Ensure that the current space's metadata context does not have any issues.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
@@ -673,6 +622,64 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
+}
+
+// Print the VM map for a space.
+// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.
+#[allow(unused)]
+pub(crate) fn print_vm_map<VM: VMBinding, W: Write>(
+    space: &dyn Space<VM>,
+    out: &mut W,
+) -> Result<(), Error> {
+    let common = space.common();
+    write!(out, "{} ", common.name)?;
+    if common.immortal {
+        write!(out, "I")?;
+    } else {
+        write!(out, " ")?;
+    }
+    if common.movable {
+        write!(out, " ")?;
+    } else {
+        write!(out, "N")?;
+    }
+    write!(out, " ");
+    if common.contiguous {
+        write!(
+            out,
+            "{}->{}",
+            common.start,
+            common.start + common.extent - 1
+        )?;
+        match common.vmrequest {
+            VMRequest::Extent { extent, .. } => {
+                write!(out, " E {}", extent)?;
+            }
+            VMRequest::Fraction { frac, .. } => {
+                write!(out, " F {}", frac)?;
+            }
+            _ => {}
+        }
+    } else {
+        let mut a = space
+            .get_page_resource()
+            .common()
+            .get_head_discontiguous_region();
+        while !a.is_zero() {
+            write!(
+                out,
+                "{}->{}",
+                a,
+                a + common.vm_map().get_contiguous_region_size(a) - 1
+            )?;
+            a = common.vm_map().get_next_contiguous_region(a);
+            if !a.is_zero() {
+                write!(out, " ")?;
+            }
+        }
+    }
+    writeln!(out);
+    Ok(())
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);
