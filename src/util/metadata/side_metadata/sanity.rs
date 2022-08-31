@@ -470,12 +470,26 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 use crate::util::metadata::metadata_val_traits::*;
 
 #[cfg(feature = "extreme_assertions")]
-fn truncate_value<T: MetadataValue>(metadata_spec: &SideMetadataSpec, val: usize) -> usize {
+fn truncate_value<T: MetadataValue>(log_num_of_bits: usize, val: usize) -> usize {
     // truncate the val if metadata's bits is fewer than the type's bits
-    if metadata_spec.log_num_of_bits < T::LOG2 as usize {
-        val & ((1 << (metadata_spec.log_num_of_bits + 1)) - 1)
+    if log_num_of_bits < T::LOG2 as usize {
+        val & ((1 << (1 << log_num_of_bits)) - 1)
     } else {
         val
+    }
+}
+
+#[cfg(feature = "extreme_assertions")]
+#[cfg(test)]
+mod truncate_tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate() {
+        assert_eq!(truncate_value::<u8>(2, 0), 0);
+        assert_eq!(truncate_value::<u8>(2, 15), 15);
+        assert_eq!(truncate_value::<u8>(2, 16), 0);
+        assert_eq!(truncate_value::<u8>(2, 17), 1);
     }
 }
 
@@ -532,7 +546,7 @@ pub fn typed_verify_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, dat
 pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
     let metadata: usize = metadata.to_usize().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
-    let new_val_wrapped = truncate_value::<T>(metadata_spec, metadata);
+    let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, metadata);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
@@ -576,7 +590,8 @@ pub fn verify_update<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_ad
     verify_metadata_address_bound(metadata_spec, data_addr);
 
     // truncate the new_val if metadata's bits is fewer than the type's bits
-    let new_val_wrapped = truncate_value::<T>(metadata_spec, new_val.to_usize().unwrap());
+    let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_usize().unwrap());
+    println!("verify_update old = {} new = {} wrapped = {:x}", old_val, new_val, new_val_wrapped);
 
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {

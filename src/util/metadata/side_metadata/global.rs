@@ -1694,13 +1694,11 @@ mod tests {
                         // Store 0 to the side metadata
                         spec.store_atomic::<$type>(data_addr, 0, Ordering::SeqCst);
 
-                        println!("load1");
                         let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
 
                         let old_val_from_fetch = spec.fetch_add_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
                         assert_eq!(old_val_from_fetch, old_val);
 
-                        println!("load2");
                         let new_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
                         assert_eq!(new_val, max_value);
                     });
@@ -1885,12 +1883,12 @@ mod tests {
         }
     }
 
-    test_side_metadata_access!(test_1bit, u8, 0);
-    test_side_metadata_access!(test_2bits, u8, 1);
+    test_side_metadata_access!(test_u1, u8, 0);
+    test_side_metadata_access!(test_u2, u8, 1);
     test_side_metadata_access!(test_u4, u8, 2);
     test_side_metadata_access!(test_u8, u8, 3);
     test_side_metadata_access!(test_u16, u16, 4);
     test_side_metadata_access!(test_u32, u32, 5);
     test_side_metadata_access!(test_u64, u64, 6);
-    // test_side_metadata_access!(test_usize, usize, 6);
+    test_side_metadata_access!(test_usize, usize, if cfg!(target_pointer_width = "64") { 6 } else if cfg!(target_pointer_width = "32") { 5 } else { unreachable!() });
 }
