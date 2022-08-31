@@ -608,28 +608,34 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         panic!("A copying space should override this method")
     }
 
-    fn print_vm_map(&self) {
+    fn print_vm_map(&self) -> String {
+        let mut ret = String::new();
         let common = self.common();
-        print!("{} ", common.name);
+        ret.push_str(common.name);
+        ret.push(' ');
         if common.immortal {
-            print!("I");
+            ret.push('I');
         } else {
-            print!(" ");
+            ret.push(' ');
         }
         if common.movable {
-            print!(" ");
+            ret.push(' ');
         } else {
-            print!("N");
+            ret.push('N');
         }
-        print!(" ");
+        ret.push(' ');
         if common.contiguous {
-            print!("{}->{}", common.start, common.start + common.extent - 1);
+            ret.push_str(&format!(
+                "{}->{}",
+                common.start,
+                common.start + common.extent - 1
+            ));
             match common.vmrequest {
                 VMRequest::Extent { extent, .. } => {
-                    print!(" E {}", extent);
+                    ret.push_str(&format!(" E {}", extent));
                 }
                 VMRequest::Fraction { frac, .. } => {
-                    print!(" F {}", frac);
+                    ret.push_str(&format!(" F {}", frac));
                 }
                 _ => {}
             }
@@ -639,18 +645,19 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                 .common()
                 .get_head_discontiguous_region();
             while !a.is_zero() {
-                print!(
+                ret.push_str(&format!(
                     "{}->{}",
                     a,
                     a + self.common().vm_map().get_contiguous_region_size(a) - 1
-                );
+                ));
                 a = self.common().vm_map().get_next_contiguous_region(a);
                 if !a.is_zero() {
-                    print!(" ");
+                    ret.push(' ');
                 }
             }
         }
-        println!();
+        ret.push('\n');
+        ret
     }
 
     /// Ensure that the current space's metadata context does not have any issues.
@@ -712,9 +719,6 @@ pub struct SpaceOptions {
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
-
-/// Print debug info for SFT. Should be false when committed.
-const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
@@ -805,15 +809,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
             panic!("failed to mmap meta memory");
         }
 
-        if DEBUG_SPACE {
-            println!(
-                "Created space {} [{}, {}) for {} bytes",
-                rtn.name,
-                start,
-                start + extent,
-                extent
-            );
-        }
+        debug!(
+            "Created space {} [{}, {}) for {} bytes",
+            rtn.name,
+            start,
+            start + extent,
+            extent
+        );
 
         rtn
     }

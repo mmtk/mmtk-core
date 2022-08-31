@@ -162,7 +162,7 @@ impl Stats {
             }
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-            println!("Warning: number of GC phases exceeds MAX_PHASES");
+            eprintln!("Warning: number of GC phases exceeds MAX_PHASES");
             self.exceeded_phase_limit.store(true, Ordering::SeqCst);
         }
     }
@@ -178,7 +178,7 @@ impl Stats {
             }
             self.shared.increment_phase();
         } else if !self.exceeded_phase_limit.load(Ordering::SeqCst) {
-            println!("Warning: number of GC phases exceeds MAX_PHASES");
+            eprintln!("Warning: number of GC phases exceeds MAX_PHASES");
             self.exceeded_phase_limit.store(true, Ordering::SeqCst);
         }
     }
@@ -232,9 +232,7 @@ impl Stats {
     pub fn start_all(&self) {
         let counters = self.counters.lock().unwrap();
         if self.get_gathering_stats() {
-            println!("Error: calling Stats.startAll() while stats running");
-            println!("       verbosity > 0 and the harness mechanism may be conflicting");
-            debug_assert!(false);
+            panic!("calling Stats.startAll() while stats running");
         }
         self.shared.set_gathering_stats(true);
 

@@ -1,6 +1,9 @@
 use crate::util::Address;
 use crate::util::ObjectReference;
 
+// This is legacy code, and no one is using this. Using gdb can achieve the same thing for debugging.
+// The JikesRVM binding still declares this method and we need to remove it from JikesRVM.
+#[deprecated]
 pub fn scan_region() {
     loop {
         let mut buf = String::new();
