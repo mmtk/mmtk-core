@@ -2,7 +2,10 @@ name: Generate doc
 
 # Triggerred when a new commit is pushed to master
 on:
-  push:
+  # push:
+  #   branches:
+  #     - master
+  pull_request:
     branches:
       - master
 
@@ -24,9 +27,17 @@ jobs:
       - name: Generate rustdoc
         run: ./.github/scripts/ci-doc.sh
       - name: Copy docs
+        # docs/ is the root for github pages.
+        # The generated docs are put to docs/ (i.e. root for github pages)
+        # mmtk external API: /external
+        # mmtk internal API: /internal
+        # porting guide: /portingguide
+        # tutorial: /tutorial
         run: |
           mkdir -p to_publish/docs
-          cp -r target/doc/* to_publish/docs/
+          cp -r target/mmtk-internal/doc/* to_publish/docs/
+          mv to_publish/docs/mmtk to_publish/docs/internal
+          cp -r target/mmtk-external/doc/mmtk to_publish/docs/external
           cp -r docs/portingguide/book to_publish/docs/portingguide
           cp -r docs/tutorial/book to_publish/docs/tutorial
       - name: Deploy to Github Page

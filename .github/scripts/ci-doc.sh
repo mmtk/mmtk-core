@@ -1,11 +1,13 @@
 . $(dirname "$0")/ci-common.sh
 
+# rustdoc.yml will copy the docs from respective directories to a directory for publishing.
+# If the output path is changed in this script, we need to update rustdoc.yml as well.
+
 # Check cargo doc
-# We generate docs including private items so it would be easier for MMTk developers (GC implementers). However,
-# this could be confusing to MMTk users (binding implementers), as they may find items in the doc which
-# are not visible to a binding. If we exclude private items, the doc would be easier for the users, but would hide
-# implementation details for developers.
-cargo doc --features $non_exclusive_features --no-deps --document-private-items
+# We generate two versions of docs: one with only public items for binding developers for our API, and
+# the other with both public and private items for MMTk developers (GC implementers).
+cargo doc --features $non_exclusive_features --no-deps --document-private-items --target-dir target/mmtk-internal
+cargo doc --features $non_exclusive_features --no-deps --target-dir target/mmtk-external
 
 # Check tutorial code
 tutorial_code_dir=$project_root/docs/tutorial/code/mygc_semispace
