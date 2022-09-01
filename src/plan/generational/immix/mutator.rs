@@ -1,12 +1,11 @@
 pub(super) use super::super::ALLOCATOR_MAPPING;
-use crate::plan::generational::barrier::GenObjectBarrier;
+use crate::plan::barriers::ObjectBarrier;
+use crate::plan::generational::barrier::GenObjectBarrierSemantics;
 use crate::plan::generational::create_gen_space_mapping;
-use crate::plan::generational::gc_work::GenNurseryProcessEdges;
 use crate::plan::generational::immix::GenImmix;
 use crate::plan::mutator_context::Mutator;
 use crate::plan::mutator_context::MutatorConfig;
 use crate::plan::AllocationSemantics;
-use crate::scheduler::ProcessEdgesWork;
 use crate::util::alloc::allocators::Allocators;
 use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
@@ -41,11 +40,10 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
-        barrier: Box::new(GenObjectBarrier::new(
+        barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk,
             &genimmix.gen,
-            GenNurseryProcessEdges::<VM>::CAPACITY,
-        )),
+        ))),
         mutator_tls,
         config,
         plan: genimmix,

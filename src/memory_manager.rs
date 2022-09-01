@@ -14,7 +14,6 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
-use crate::plan::GenObjectBarrier;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -239,25 +238,6 @@ pub fn object_reference_write_slow<VM: VMBinding>(
     mutator
         .barrier()
         .object_reference_write_slow(src, slot, target);
-}
-
-/// The *specialized* generational object barrier *slow-path* by MMTk.
-/// VM bindings can choose to either invoke a generic slow-path, or this specialized slow-path.
-/// This function can only be used for generation GC, and can be called either *before* or *after* the store operation.
-///
-/// Arguments:
-/// * `mutator`: The mutator for the current thread.
-/// * `src`: The modified source object.
-#[inline(always)]
-pub fn object_barrier_slow_generational<VM: VMBinding>(
-    mutator: &'static mut Mutator<VM>,
-    src: ObjectReference,
-) {
-    unsafe {
-        mutator
-            .barrier_impl::<GenObjectBarrier<VM>>()
-            .gen_object_reference_write_slow(src);
-    }
 }
 
 /// The *subsuming* array-copy barrier by MMTk.

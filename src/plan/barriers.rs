@@ -1,6 +1,12 @@
 //! Read/Write barrier implementations.
 
-use crate::util::*;
+use crate::util::metadata::{compare_exchange_metadata, load_metadata};
+use crate::vm::ObjectModel;
+use crate::{
+    util::{metadata::MetadataSpec, *},
+    vm::VMBinding,
+};
+use atomic::Ordering;
 use downcast_rs::Downcast;
 
 /// BarrierSelector describes which barrier to use.
@@ -82,4 +88,98 @@ pub struct NoBarrier;
 
 impl Barrier for NoBarrier {}
 
-pub use super::generational::barrier::GenObjectBarrier;
+pub trait BarrierSemantics: 'static + Send {
+    type VM: VMBinding;
+
+    const UNLOG_BIT_SPEC: MetadataSpec =
+        *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
+
+    fn flush(&mut self);
+
+    fn object_reference_write_slow(
+        &mut self,
+        src: ObjectReference,
+        slot: Address,
+        target: ObjectReference,
+    );
+
+    fn array_copy_slow(&mut self, src: Address, dst: Address, count: usize);
+}
+
+pub struct ObjectBarrier<S: BarrierSemantics> {
+    semantics: S,
+}
+
+impl<S: BarrierSemantics> ObjectBarrier<S> {
+    pub fn new(semantics: S) -> Self {
+        Self { semantics }
+    }
+
+    /// Attepmt to atomically log an object.
+    /// Returns true if the object is not logged previously.
+    #[inline(always)]
+    fn object_is_unlogged(&self, object: ObjectReference) -> bool {
+        load_metadata::<S::VM>(&S::UNLOG_BIT_SPEC, object, None, None) != 0
+    }
+
+    /// Attepmt to atomically log an object.
+    /// Returns true if the object is not logged previously.
+    #[inline(always)]
+    fn log_object(&self, object: ObjectReference) -> bool {
+        loop {
+            let old_value =
+                load_metadata::<S::VM>(&S::UNLOG_BIT_SPEC, object, None, Some(Ordering::SeqCst));
+            if old_value == 0 {
+                return false;
+            }
+            if compare_exchange_metadata::<S::VM>(
+                &S::UNLOG_BIT_SPEC,
+                object,
+                1,
+                0,
+                None,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                return true;
+            }
+        }
+    }
+}
+
+impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
+    fn flush(&mut self) {
+        self.semantics.flush();
+    }
+
+    #[inline(always)]
+    fn object_reference_write_post(
+        &mut self,
+        src: ObjectReference,
+        slot: Address,
+        target: ObjectReference,
+    ) {
+        if self.object_is_unlogged(src) {
+            self.object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    #[inline(always)]
+    fn object_reference_write_slow(
+        &mut self,
+        src: ObjectReference,
+        slot: Address,
+        target: ObjectReference,
+    ) {
+        if self.log_object(src) {
+            self.semantics
+                .object_reference_write_slow(src, slot, target);
+        }
+    }
+
+    #[inline(always)]
+    fn array_copy_post(&mut self, src: Address, dst: Address, count: usize) {
+        debug_assert!(!dst.is_zero());
+        self.semantics.array_copy_slow(src, dst, count);
+    }
+}
