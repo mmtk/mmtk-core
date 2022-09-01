@@ -4,6 +4,8 @@ use crate::plan::barriers::BarrierSemantics;
 use crate::policy::space::Space;
 use crate::scheduler::ProcessEdgesWork;
 use crate::scheduler::WorkBucketStage;
+use crate::util::constants::BYTES_IN_ADDRESS;
+use crate::util::constants::LOG_BYTES_IN_ADDRESS;
 use crate::util::*;
 use crate::vm::VMBinding;
 use crate::MMTK;
@@ -75,12 +77,18 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
         }
     }
 
-    fn array_copy_slow(&mut self, _src: Address, dst: Address, count: usize) {
+    fn memory_region_copy_slow(&mut self, _src: Address, dst: Address, bytes: usize) {
         debug_assert!(!dst.is_zero());
         // Only enqueue array slices in mature spaces
         if !self.gen.nursery.address_in_space(dst) {
             // enqueue
-            self.arraycopy_modbuf.push((dst, count));
+            debug_assert_eq!(
+                bytes & (BYTES_IN_ADDRESS - 1),
+                0,
+                "bytes should be a multiple of words"
+            );
+            self.arraycopy_modbuf
+                .push((dst, bytes >> LOG_BYTES_IN_ADDRESS));
             // flush if the buffer is full
             if self.arraycopy_modbuf.len() >= self.capacity {
                 self.flush();

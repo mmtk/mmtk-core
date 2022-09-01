@@ -240,57 +240,67 @@ pub fn object_reference_write_slow<VM: VMBinding>(
         .object_reference_write_slow(src, slot, target);
 }
 
-/// The *subsuming* array-copy barrier by MMTk.
+/// The *subsuming* memory region copy barrier by MMTk.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// For static languages, the data in the memory should all be valid pointers.
+/// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: Start address of the copy source.
 /// * `dst`: Start address of the copy destination.
-/// * `count`: Number of elements to copy.
+/// * `bytes`: Number of bytes to copy.
 #[inline(always)]
-pub fn array_copy<VM: VMBinding>(
+pub fn memory_region_copy<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: Address,
     dst: Address,
-    count: usize,
+    bytes: usize,
 ) {
-    mutator.barrier().array_copy(src, dst, count);
+    mutator.barrier().memory_region_copy(src, dst, bytes);
 }
 
-/// The *generic* array-copy *pre* barrier by MMTk, which we expect a binding to call
+/// The *generic* memory region copy *pre* barrier by MMTk, which we expect a binding to call
 /// *before* they modify an object.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// For static languages, the data in the memory should all be valid pointers.
+/// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: Start address of the copy source.
 /// * `dst`: Start address of the copy destination.
-/// * `count`: Number of elements to copy.
+/// * `bytes`: The memory size to copy, in bytes.
 #[inline(always)]
-pub fn array_copy_pre<VM: VMBinding>(
+pub fn memory_region_copy_pre<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: Address,
     dst: Address,
     count: usize,
 ) {
-    mutator.barrier().array_copy_pre(src, dst, count);
+    mutator.barrier().memory_region_copy_pre(src, dst, count);
 }
 
-/// The *generic* array-copy *post* barrier by MMTk, which we expect a binding to call
+/// The *generic* memory region copy *post* barrier by MMTk, which we expect a binding to call
 /// *after* they modify an object.
+/// *before* they modify an object.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// For static languages, the data in the memory should all be valid pointers.
+/// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: Start address of the copy source.
 /// * `dst`: Start address of the copy destination.
-/// * `count`: Number of elements to copy.
+/// * `bytes`: The memory size to copy, in bytes.
 #[inline(always)]
-pub fn array_copy_post<VM: VMBinding>(
+pub fn memory_region_copy_post<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
     src: Address,
     dst: Address,
     count: usize,
 ) {
-    mutator.barrier().array_copy_post(src, dst, count);
+    mutator.barrier().memory_region_copy_post(src, dst, count);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided

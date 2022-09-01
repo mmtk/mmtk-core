@@ -67,17 +67,17 @@ pub trait Barrier: 'static + Send + Downcast {
     }
 
     /// Subsuming barrier for array copy
-    fn array_copy(&mut self, src: Address, dst: Address, count: usize) {
-        self.array_copy_pre(src, dst, count);
-        unsafe { std::ptr::copy::<ObjectReference>(src.to_ptr(), dst.to_mut_ptr(), count) };
-        self.array_copy_post(src, dst, count);
+    fn memory_region_copy(&mut self, src: Address, dst: Address, bytes: usize) {
+        self.memory_region_copy_pre(src, dst, bytes);
+        unsafe { std::ptr::copy::<u8>(src.to_ptr(), dst.to_mut_ptr(), bytes) };
+        self.memory_region_copy_post(src, dst, bytes);
     }
 
     /// Full pre-barrier for array copy
-    fn array_copy_pre(&mut self, _src: Address, _dst: Address, _count: usize) {}
+    fn memory_region_copy_pre(&mut self, _src: Address, _dst: Address, _bytes: usize) {}
 
     /// Full post-barrier for array copy
-    fn array_copy_post(&mut self, _src: Address, _dst: Address, _count: usize) {}
+    fn memory_region_copy_post(&mut self, _src: Address, _dst: Address, _bytes: usize) {}
 }
 
 impl_downcast!(Barrier);
@@ -103,7 +103,7 @@ pub trait BarrierSemantics: 'static + Send {
         target: ObjectReference,
     );
 
-    fn array_copy_slow(&mut self, src: Address, dst: Address, count: usize);
+    fn memory_region_copy_slow(&mut self, src: Address, dst: Address, bytes: usize);
 }
 
 pub struct ObjectBarrier<S: BarrierSemantics> {
@@ -178,8 +178,8 @@ impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
     }
 
     #[inline(always)]
-    fn array_copy_post(&mut self, src: Address, dst: Address, count: usize) {
+    fn memory_region_copy_post(&mut self, src: Address, dst: Address, bytes: usize) {
         debug_assert!(!dst.is_zero());
-        self.semantics.array_copy_slow(src, dst, count);
+        self.semantics.memory_region_copy_slow(src, dst, bytes);
     }
 }
