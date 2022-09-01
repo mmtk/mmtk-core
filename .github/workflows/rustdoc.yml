@@ -26,15 +26,15 @@ jobs:
       - name: Copy docs
         # docs/ is the root for github pages.
         # The generated docs are put to docs/ (i.e. root for github pages)
-        # mmtk public API: docs/public-api
-        # mmtk full API: docs/full-api
+        # mmtk public doc: docs/public-doc
+        # mmtk full doc: docs/full-doc
         # porting guide: docs/portingguide
         # tutorial: docs/tutorial
         run: |
           mkdir -p to_publish/docs
           cp -r target/mmtk-full/doc/* to_publish/docs/
-          mv to_publish/docs/mmtk to_publish/docs/full-api
-          cp -r target/mmtk-public/doc/mmtk to_publish/docs/public-api
+          mv to_publish/docs/mmtk to_publish/docs/full-doc
+          cp -r target/mmtk-public/doc/mmtk to_publish/docs/public-doc
           cp -r docs/portingguide/book to_publish/docs/portingguide
           cp -r docs/tutorial/book to_publish/docs/tutorial
       - name: Deploy to Github Page
