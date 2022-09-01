@@ -5,8 +5,14 @@ on:
     branches:
       - master
 
+# The follow workflow is from https://github.com/Enselic/cargo-public-api/blob/main/docs/CI-EXAMPLES.md
+
+# The workflow may fail if we change the public API in a pull request.
+# We allow fail on this action. But we should manually check if the changes are reasonable when we see a failed action.
+# It would be good if the workflow returns a neutral status when we find API changes. But it is currently not
+# possible with Github actions.
 jobs:
-  deny-public-api-changes:
+  check-public-api-changes:
     runs-on: ubuntu-latest
     steps:
       # Full git history needed

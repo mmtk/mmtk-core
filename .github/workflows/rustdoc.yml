@@ -2,10 +2,7 @@ name: Generate doc
 
 # Triggerred when a new commit is pushed to master
 on:
-  # push:
-  #   branches:
-  #     - master
-  pull_request:
+  push:
     branches:
       - master
 
