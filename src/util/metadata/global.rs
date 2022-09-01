@@ -59,7 +59,7 @@ impl MetadataSpec {
                 }
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.load(object, mask, atomic_ordering)
+                VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask, atomic_ordering)
             }
         }
     }
@@ -93,7 +93,7 @@ impl MetadataSpec {
                 }
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.store(object, val, mask, atomic_ordering)
+                VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask, atomic_ordering)
             }
         }
     }
@@ -130,7 +130,7 @@ impl MetadataSpec {
                 success_order,
                 failure_order,
             ),
-            MetadataSpec::InHeader(metadata_spec) => metadata_spec.compare_exchange(object, old_val, new_val, mask, success_order, failure_order)
+            MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::compare_exchange_metadata::<T>(metadata_spec, object, old_val, new_val, mask, success_order, failure_order)
         }
     }
 
@@ -157,7 +157,7 @@ impl MetadataSpec {
                 metadata_spec.fetch_add_atomic(object.to_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.fetch_add(object, val, order)
+                VM::VMObjectModel::fetch_add_metadata::<T>(metadata_spec, object, val, order)
             }
         }
     }
@@ -185,7 +185,7 @@ impl MetadataSpec {
                 metadata_spec.fetch_sub_atomic(object.to_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.fetch_sub(object, val, order)
+                VM::VMObjectModel::fetch_sub_metadata::<T>(metadata_spec, object, val, order)
             }
         }
     }
@@ -202,7 +202,7 @@ impl MetadataSpec {
                 metadata_spec.fetch_and_atomic(object.to_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.fetch_and(object, val, order)
+                VM::VMObjectModel::fetch_and_metadata::<T>(metadata_spec, object, val, order)
             }
         }
     }
@@ -219,7 +219,7 @@ impl MetadataSpec {
                 metadata_spec.fetch_or_atomic(object.to_address(), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.fetch_or(object, val, order)
+                VM::VMObjectModel::fetch_or_metadata::<T>(metadata_spec, object, val, order)
             }
         }
     }
@@ -231,7 +231,7 @@ impl MetadataSpec {
                 metadata_spec.fetch_update_atomic(object.to_address(), set_order, fetch_order, f)
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                metadata_spec.fetch_update(object, set_order, fetch_order, f)
+                VM::VMObjectModel::fetch_update_metadata(metadata_spec, object, set_order, fetch_order, f)
             }
         }
     }
