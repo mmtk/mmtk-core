@@ -6,8 +6,8 @@
 # Check cargo doc
 # We generate two versions of docs: one with only public items for binding developers for our API, and
 # the other with both public and private items for MMTk developers (GC implementers).
-cargo doc --features $non_exclusive_features --no-deps --document-private-items --target-dir target/mmtk-internal
-cargo doc --features $non_exclusive_features --no-deps --target-dir target/mmtk-external
+cargo doc --features $non_exclusive_features --no-deps --target-dir target/mmtk-public
+cargo doc --features $non_exclusive_features --no-deps --document-private-items --target-dir target/mmtk-full
 
 # Check tutorial code
 tutorial_code_dir=$project_root/docs/tutorial/code/mygc_semispace
