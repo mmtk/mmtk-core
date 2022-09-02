@@ -23,6 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::edge_shape::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
@@ -177,7 +178,7 @@ pub fn post_alloc<VM: VMBinding>(
 pub fn object_reference_write<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: Address,
+    slot: VM::VMEdge,
     target: ObjectReference,
 ) {
     mutator.barrier().object_reference_write(src, slot, target);
@@ -202,7 +203,7 @@ pub fn object_reference_write<VM: VMBinding>(
 pub fn object_reference_write_pre<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: Address,
+    slot: VM::VMEdge,
     target: ObjectReference,
 ) {
     mutator
@@ -229,7 +230,7 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 pub fn object_reference_write_post<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     src: ObjectReference,
-    slot: Address,
+    slot: VM::VMEdge,
     target: ObjectReference,
 ) {
     mutator
@@ -248,17 +249,18 @@ pub fn object_reference_write_post<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
-/// * `src`: Start address of the copy source.
-/// * `dst`: Start address of the copy destination.
-/// * `bytes`: Number of bytes to copy.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
 #[inline(always)]
 pub fn memory_region_copy<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
-    src: Address,
-    dst: Address,
-    bytes: usize,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
 ) {
-    mutator.barrier().memory_region_copy(src, dst, bytes);
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy(src, dst);
 }
 
 /// The *generic* memory region copy *pre* barrier by MMTk, which we expect a binding to call
@@ -273,17 +275,18 @@ pub fn memory_region_copy<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
-/// * `src`: Start address of the copy source.
-/// * `dst`: Start address of the copy destination.
-/// * `bytes`: The memory size to copy, in bytes.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
 #[inline(always)]
 pub fn memory_region_copy_pre<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
-    src: Address,
-    dst: Address,
-    count: usize,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
 ) {
-    mutator.barrier().memory_region_copy_pre(src, dst, count);
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_pre(src, dst);
 }
 
 /// The *generic* memory region copy *post* barrier by MMTk, which we expect a binding to call
@@ -298,17 +301,18 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
-/// * `src`: Start address of the copy source.
-/// * `dst`: Start address of the copy destination.
-/// * `bytes`: The memory size to copy, in bytes.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
 #[inline(always)]
 pub fn memory_region_copy_post<VM: VMBinding>(
     mutator: &'static mut Mutator<VM>,
-    src: Address,
-    dst: Address,
-    count: usize,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
 ) {
-    mutator.barrier().memory_region_copy_post(src, dst, count);
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_post(src, dst);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided

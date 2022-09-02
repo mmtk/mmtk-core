@@ -1,6 +1,7 @@
 //! Read/Write barrier implementations.
 
 use crate::util::metadata::{compare_exchange_metadata, load_metadata};
+use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::ObjectModel;
 use crate::{
     util::{metadata::MetadataSpec, *},
@@ -23,18 +24,18 @@ impl BarrierSelector {
     }
 }
 
-pub trait Barrier: 'static + Send + Downcast {
+pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn flush(&mut self) {}
 
     /// Subsuming barrier for object reference write
     fn object_reference_write(
         &mut self,
         src: ObjectReference,
-        slot: Address,
+        slot: VM::VMEdge,
         target: ObjectReference,
     ) {
         self.object_reference_write_pre(src, slot, target);
-        unsafe { slot.store(target) };
+        slot.store(target);
         self.object_reference_write_post(src, slot, target);
     }
 
@@ -42,7 +43,7 @@ pub trait Barrier: 'static + Send + Downcast {
     fn object_reference_write_pre(
         &mut self,
         _src: ObjectReference,
-        _slot: Address,
+        _slot: VM::VMEdge,
         _target: ObjectReference,
     ) {
     }
@@ -51,7 +52,7 @@ pub trait Barrier: 'static + Send + Downcast {
     fn object_reference_write_post(
         &mut self,
         _src: ObjectReference,
-        _slot: Address,
+        _slot: VM::VMEdge,
         _target: ObjectReference,
     ) {
     }
@@ -61,32 +62,32 @@ pub trait Barrier: 'static + Send + Downcast {
     fn object_reference_write_slow(
         &mut self,
         _src: ObjectReference,
-        _slot: Address,
+        _slot: VM::VMEdge,
         _target: ObjectReference,
     ) {
     }
 
     /// Subsuming barrier for array copy
-    fn memory_region_copy(&mut self, src: Address, dst: Address, bytes: usize) {
-        self.memory_region_copy_pre(src, dst, bytes);
-        unsafe { std::ptr::copy::<u8>(src.to_ptr(), dst.to_mut_ptr(), bytes) };
-        self.memory_region_copy_post(src, dst, bytes);
+    fn memory_region_copy(&mut self, src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
+        self.memory_region_copy_pre(src.clone(), dst.clone());
+        VM::VMMemorySlice::copy(&src, &dst);
+        self.memory_region_copy_post(src, dst);
     }
 
     /// Full pre-barrier for array copy
-    fn memory_region_copy_pre(&mut self, _src: Address, _dst: Address, _bytes: usize) {}
+    fn memory_region_copy_pre(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
 
     /// Full post-barrier for array copy
-    fn memory_region_copy_post(&mut self, _src: Address, _dst: Address, _bytes: usize) {}
+    fn memory_region_copy_post(&mut self, _src: VM::VMMemorySlice, _dst: VM::VMMemorySlice) {}
 }
 
-impl_downcast!(Barrier);
+impl_downcast!(Barrier<VM> where VM: VMBinding);
 
 /// Empty barrier implementation.
 /// For GCs that do not need any barriers
 pub struct NoBarrier;
 
-impl Barrier for NoBarrier {}
+impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 
 pub trait BarrierSemantics: 'static + Send {
     type VM: VMBinding;
@@ -99,11 +100,15 @@ pub trait BarrierSemantics: 'static + Send {
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        slot: Address,
+        slot: <Self::VM as VMBinding>::VMEdge,
         target: ObjectReference,
     );
 
-    fn memory_region_copy_slow(&mut self, src: Address, dst: Address, bytes: usize);
+    fn memory_region_copy_slow(
+        &mut self,
+        src: <Self::VM as VMBinding>::VMMemorySlice,
+        dst: <Self::VM as VMBinding>::VMMemorySlice,
+    );
 }
 
 pub struct ObjectBarrier<S: BarrierSemantics> {
@@ -147,7 +152,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     }
 }
 
-impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
+impl<S: BarrierSemantics> Barrier<S::VM> for ObjectBarrier<S> {
     fn flush(&mut self) {
         self.semantics.flush();
     }
@@ -156,7 +161,7 @@ impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
     fn object_reference_write_post(
         &mut self,
         src: ObjectReference,
-        slot: Address,
+        slot: <S::VM as VMBinding>::VMEdge,
         target: ObjectReference,
     ) {
         if self.object_is_unlogged(src) {
@@ -168,7 +173,7 @@ impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        slot: Address,
+        slot: <S::VM as VMBinding>::VMEdge,
         target: ObjectReference,
     ) {
         if self.log_object(src) {
@@ -178,8 +183,11 @@ impl<S: BarrierSemantics> Barrier for ObjectBarrier<S> {
     }
 
     #[inline(always)]
-    fn memory_region_copy_post(&mut self, src: Address, dst: Address, bytes: usize) {
-        debug_assert!(!dst.is_zero());
-        self.semantics.memory_region_copy_slow(src, dst, bytes);
+    fn memory_region_copy_post(
+        &mut self,
+        src: <S::VM as VMBinding>::VMMemorySlice,
+        dst: <S::VM as VMBinding>::VMMemorySlice,
+    ) {
+        self.semantics.memory_region_copy_slow(src, dst);
     }
 }

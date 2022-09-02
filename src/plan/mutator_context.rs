@@ -57,7 +57,7 @@ impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
 #[repr(C)]
 pub struct Mutator<VM: VMBinding> {
     pub allocators: Allocators<VM>,
-    pub barrier: Box<dyn Barrier>,
+    pub barrier: Box<dyn Barrier<VM>>,
     /// The mutator thread that is bound with this Mutator struct.
     pub mutator_tls: VMMutatorThread,
     pub plan: &'static dyn Plan<VM = VM>,
@@ -108,14 +108,14 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
 
     /// Used by specialized barrier slow-path calls to avoid dynamic dispatches.
     #[inline(always)]
-    unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B {
+    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B {
         debug_assert!(self.barrier().is::<B>());
         let (payload, _vptr) = std::mem::transmute::<_, (*mut B, *mut ())>(self.barrier());
         &mut *payload
     }
 
     #[inline(always)]
-    fn barrier(&mut self) -> &mut dyn Barrier {
+    fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
     }
 }
@@ -144,12 +144,12 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     }
     fn get_tls(&self) -> VMMutatorThread;
     /// Get active barrier trait object
-    fn barrier(&mut self) -> &mut dyn Barrier;
+    fn barrier(&mut self) -> &mut dyn Barrier<VM>;
     /// Force cast the barrier trait object to a concrete implementation.
     ///
     /// # Safety
     /// The safety of this function is ensured by a down-cast check.
-    unsafe fn barrier_impl<B: Barrier>(&mut self) -> &mut B;
+    unsafe fn barrier_impl<B: Barrier<VM>>(&mut self) -> &mut B;
 }
 
 /// This is used for plans to indicate the number of allocators reserved for the plan.

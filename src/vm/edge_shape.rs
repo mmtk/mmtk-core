@@ -1,8 +1,9 @@
-use std::fmt::Debug;
 use std::hash::Hash;
+use std::{fmt::Debug, ops::Range};
 
 use atomic::Atomic;
 
+use crate::util::constants::BYTES_IN_ADDRESS;
 use crate::util::{Address, ObjectReference};
 
 /// An abstract edge.  An edge holds an object reference.  When we load from it, we get an
@@ -135,4 +136,67 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
         std::mem::size_of::<SimpleEdge>(),
         std::mem::size_of::<*mut libc::c_void>()
     );
+}
+
+pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone {
+    type Edge: Edge;
+    type EdgeIterator: Iterator<Item = Self::Edge>;
+    fn iter_edges(&self) -> Self::EdgeIterator;
+    fn copy(src: &Self, tgt: &Self);
+    fn start(&self) -> Address;
+    fn bytes(&self) -> usize;
+}
+
+pub struct AddressRangeIterator {
+    cursor: Address,
+    limit: Address,
+}
+
+impl Iterator for AddressRangeIterator {
+    type Item = Address;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let edge = self.cursor;
+            self.cursor += BYTES_IN_ADDRESS;
+            Some(edge)
+        }
+    }
+}
+
+impl MemorySlice for Range<Address> {
+    type Edge = Address;
+    type EdgeIterator = AddressRangeIterator;
+
+    #[inline]
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        AddressRangeIterator {
+            cursor: self.start,
+            limit: self.end,
+        }
+    }
+
+    #[inline]
+    fn start(&self) -> Address {
+        self.start
+    }
+
+    #[inline]
+    fn bytes(&self) -> usize {
+        self.end - self.start
+    }
+
+    #[inline]
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        unsafe {
+            let bytes = tgt.bytes();
+            let src = src.start.to_ptr::<u8>();
+            let tgt = tgt.start.to_mut_ptr::<u8>();
+            std::ptr::copy(src, tgt, bytes)
+        }
+    }
 }

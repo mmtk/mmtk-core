@@ -5,8 +5,8 @@ use crate::plan::{Queue, VectorQueue};
 use crate::policy::space::Space;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::BYTES_IN_ADDRESS;
-use crate::util::constants::LOG_BYTES_IN_ADDRESS;
 use crate::util::*;
+use crate::vm::edge_shape::MemorySlice;
 use crate::vm::VMBinding;
 use crate::MMTK;
 
@@ -23,7 +23,7 @@ pub struct GenObjectBarrierSemantics<VM: VMBinding> {
     /// Object modbuf. Contains a list of objects that may contain pointers to the nursery space.
     modbuf: VectorQueue<ObjectReference>,
     /// Array-copy modbuf. Contains a list of sub-arrays or array slices that may contain pointers to the nursery space.
-    region_modbuf: VectorQueue<(Address, usize)>,
+    region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
 impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
@@ -67,7 +67,7 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
-        _slot: Address,
+        _slot: VM::VMEdge,
         _target: ObjectReference,
     ) {
         // enqueue the object
@@ -75,18 +75,16 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
         self.modbuf.is_full().then(|| self.flush_modbuf());
     }
 
-    fn memory_region_copy_slow(&mut self, _src: Address, dst: Address, bytes: usize) {
-        debug_assert!(!dst.is_zero());
+    fn memory_region_copy_slow(&mut self, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
         // Only enqueue array slices in mature spaces
-        if !self.gen.nursery.address_in_space(dst) {
+        if !self.gen.nursery.address_in_space(dst.start()) {
             // enqueue
             debug_assert_eq!(
-                bytes & (BYTES_IN_ADDRESS - 1),
+                dst.bytes() & (BYTES_IN_ADDRESS - 1),
                 0,
                 "bytes should be a multiple of words"
             );
-            self.region_modbuf
-                .enqueue((dst, bytes >> LOG_BYTES_IN_ADDRESS));
+            self.region_modbuf.enqueue(dst);
             self.region_modbuf
                 .is_full()
                 .then(|| self.flush_region_modbuf());

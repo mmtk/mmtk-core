@@ -3,10 +3,9 @@ use atomic::Ordering;
 use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker};
-use crate::util::constants::LOG_BYTES_IN_ADDRESS;
 use crate::util::metadata::store_metadata;
-use crate::util::{Address, ObjectReference};
-use crate::vm::edge_shape::Edge;
+use crate::util::ObjectReference;
+use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::*;
 use crate::MMTK;
 use std::marker::PhantomData;
@@ -115,12 +114,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
 /// This work packet forwards and updates each entry in the recorded slices.
 pub struct ProcessRegionModBuf<E: ProcessEdgesWork> {
     /// A list of `(start_address, bytes)` tuple.
-    modbuf: Vec<(Address, usize)>,
+    modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>,
     phantom: PhantomData<E>,
 }
 
 impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
-    pub fn new(modbuf: Vec<(Address, usize)>) -> Self {
+    pub fn new(modbuf: Vec<<E::VM as VMBinding>::VMMemorySlice>) -> Self {
         Self {
             modbuf,
             phantom: PhantomData,
@@ -135,11 +134,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
         if mmtk.plan.is_current_gc_nursery() {
             // Collect all the entries in all the slices
             let mut edges = vec![];
-            for (addr, count) in &self.modbuf {
-                for i in 0..*count {
-                    edges.push(<E::VM as VMBinding>::VMEdge::from_address(
-                        *addr + (i << LOG_BYTES_IN_ADDRESS),
-                    ));
+            for slice in &self.modbuf {
+                for edge in slice.iter_edges() {
+                    edges.push(edge);
                 }
             }
             // Forward entries
