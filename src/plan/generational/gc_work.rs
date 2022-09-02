@@ -100,8 +100,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
         // scan modbuf only if the current GC is a nursery GC
         if mmtk.plan.is_current_gc_nursery() {
             // Scan objects in the modbuf and forward pointers
-            let mut modbuf = vec![];
-            ::std::mem::swap(&mut modbuf, &mut self.modbuf);
+            let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
                 &mut ScanObjects::<E>::new(modbuf, false, false),
                 worker,

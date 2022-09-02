@@ -162,6 +162,12 @@ pub fn post_alloc<VM: VMBinding>(
 /// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
 ///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use either `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
+///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
 /// * `src`: The modified source object.
@@ -178,8 +184,14 @@ pub fn object_reference_write<VM: VMBinding>(
 }
 
 /// The write barrier by MMTk. This is a *pre* write barrier, which we expect a binding to call
-/// *before* they modify an object. For performance reasons, a VM should implement the write barrier
+/// *before* it modifies an object. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use either `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
@@ -199,8 +211,14 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 }
 
 /// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
-/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
+/// *after* it modifies an object. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use either `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
@@ -219,31 +237,14 @@ pub fn object_reference_write_post<VM: VMBinding>(
         .object_reference_write_post(src, slot, target);
 }
 
-/// The *generic* write barrier *slow-path* by MMTk. This can be either a *pre* or a *post* write barrier slow-path,
-/// depending on the implementation of the barrier. For example, an object barrier may expect this
-/// function will be called after the store operation.
-///
-/// Arguments:
-/// * `mutator`: The mutator for the current thread.
-/// * `src`: The modified source object.
-/// * `slot`: The location of the field to be modified.
-/// * `target`: The target for the write operation.
-#[inline(always)]
-pub fn object_reference_write_slow<VM: VMBinding>(
-    mutator: &mut Mutator<VM>,
-    src: ObjectReference,
-    slot: Address,
-    target: ObjectReference,
-) {
-    mutator
-        .barrier()
-        .object_reference_write_slow(src, slot, target);
-}
-
 /// The *subsuming* memory region copy barrier by MMTk.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// For static languages, the data in the memory should all be valid pointers.
 /// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
@@ -261,10 +262,14 @@ pub fn memory_region_copy<VM: VMBinding>(
 }
 
 /// The *generic* memory region copy *pre* barrier by MMTk, which we expect a binding to call
-/// *before* they modify an object.
+/// *before* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// For static languages, the data in the memory should all be valid pointers.
 /// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
@@ -282,11 +287,14 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 }
 
 /// The *generic* memory region copy *post* barrier by MMTk, which we expect a binding to call
-/// *after* they modify an object.
-/// *before* they modify an object.
+/// *after* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// For static languages, the data in the memory should all be valid pointers.
 /// For dynamic languages, the binding should be able to filter out the non-reference values within the memory region.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
