@@ -201,3 +201,23 @@ impl MemorySlice for Range<Address> {
         }
     }
 }
+
+#[test]
+fn address_range_iteration() {
+    let src: Vec<usize> = (0..32).map(|i| i).collect();
+    let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+    for (i, v) in src_slice.iter_edges().enumerate() {
+        assert_eq!(i, unsafe { v.load::<usize>() })
+    }
+}
+
+#[test]
+fn memory_copy_on_address_ranges() {
+    let src = [1u8; 17];
+    let mut dst = [0u8; 17];
+    let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+    let dst_slice =
+        Address::from_mut_ptr(&mut dst[0])..Address::from_mut_ptr(&mut dst[0]) + src.len();
+    MemorySlice::copy(&src_slice, &dst_slice);
+    assert_eq!(dst.iter().sum::<u8>(), 17);
+}
