@@ -203,7 +203,7 @@ impl MemorySlice for Range<Address> {
 
 #[test]
 fn address_range_iteration() {
-    let src: Vec<usize> = (0..32).map(|i| i).collect();
+    let src: Vec<usize> = (0..32).collect();
     let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
     for (i, v) in src_slice.iter_edges().enumerate() {
         assert_eq!(i, unsafe { v.load::<usize>() })
