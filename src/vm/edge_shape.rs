@@ -144,7 +144,17 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     /// Size of the memory slice
     fn bytes(&self) -> usize;
     /// Memory copy support
-    fn copy(src: &Self, tgt: &Self);
+    #[inline]
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        // Raw memory copy
+        unsafe {
+            let bytes = tgt.bytes();
+            let src = src.start().to_ptr::<u8>();
+            let tgt = tgt.start().to_mut_ptr::<u8>();
+            std::ptr::copy(src, tgt, bytes)
+        }
+    }
 }
 
 /// Iterate edges within `Range<Address>`.
@@ -188,17 +198,6 @@ impl MemorySlice for Range<Address> {
     #[inline]
     fn bytes(&self) -> usize {
         self.end - self.start
-    }
-
-    #[inline]
-    fn copy(src: &Self, tgt: &Self) {
-        debug_assert_eq!(src.bytes(), tgt.bytes());
-        unsafe {
-            let bytes = tgt.bytes();
-            let src = src.start.to_ptr::<u8>();
-            let tgt = tgt.start.to_mut_ptr::<u8>();
-            std::ptr::copy(src, tgt, bytes)
-        }
     }
 }
 

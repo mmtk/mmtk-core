@@ -1,7 +1,7 @@
 use atomic::Atomic;
 use mmtk::{
     util::{Address, ObjectReference},
-    vm::edge_shape::{Edge, SimpleEdge},
+    vm::edge_shape::{Edge, MemorySlice, SimpleEdge},
 };
 
 /// If a VM supports multiple kinds of edges, we can use tagged union to represent all of them.
@@ -34,6 +34,56 @@ impl Edge for DummyVMEdge {
             DummyVMEdge::Compressed(e) => e.store(object),
             DummyVMEdge::Offset(e) => e.store(object),
             DummyVMEdge::Tagged(e) => e.store(object),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DummyVMMemorySlice(*mut [ObjectReference]);
+
+unsafe impl Send for DummyVMMemorySlice {}
+
+impl MemorySlice for DummyVMMemorySlice {
+    type Edge = DummyVMEdge;
+    type EdgeIterator = DummyVMMemorySliceIterator;
+
+    #[inline]
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        DummyVMMemorySliceIterator {
+            cursor: unsafe { (*self.0).as_mut_ptr_range().start },
+            limit: unsafe { (*self.0).as_mut_ptr_range().end },
+        }
+    }
+
+    #[inline]
+    fn start(&self) -> Address {
+        Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
+    }
+
+    #[inline]
+    fn bytes(&self) -> usize {
+        unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+    }
+}
+
+pub struct DummyVMMemorySliceIterator {
+    cursor: *mut ObjectReference,
+    limit: *mut ObjectReference,
+}
+
+impl Iterator for DummyVMMemorySliceIterator {
+    type Item = DummyVMEdge;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let edge = self.cursor;
+            self.cursor = unsafe { self.cursor.add(1) };
+            Some(DummyVMEdge::Simple(SimpleEdge::from_address(
+                Address::from_ptr(edge),
+            )))
         }
     }
 }
