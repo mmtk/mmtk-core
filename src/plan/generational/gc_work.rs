@@ -114,12 +114,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
 /// The array-copy modbuf contains a list of array slices in mature space(s) that
 /// may contain pointers to the nursery space.
 /// This work packet forwards and updates each entry in the recorded slices.
-pub struct ProcessArrayCopyModBuf<E: ProcessEdgesWork> {
+pub struct ProcessRegionModBuf<E: ProcessEdgesWork> {
+    /// A list of `(start_address, bytes)` tuple.
     modbuf: Vec<(Address, usize)>,
     phantom: PhantomData<E>,
 }
 
-impl<E: ProcessEdgesWork> ProcessArrayCopyModBuf<E> {
+impl<E: ProcessEdgesWork> ProcessRegionModBuf<E> {
     pub fn new(modbuf: Vec<(Address, usize)>) -> Self {
         Self {
             modbuf,
@@ -128,7 +129,7 @@ impl<E: ProcessEdgesWork> ProcessArrayCopyModBuf<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessArrayCopyModBuf<E> {
+impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC

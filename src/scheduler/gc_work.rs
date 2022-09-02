@@ -376,13 +376,9 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
         &*self.mmtk.plan
     }
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
+    /// Return `None` if the nodes buffer is empty.
     #[inline]
-    pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
-        debug_assert!(
-            !self.nodes.is_empty(),
-            "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
-        );
-
+    pub fn pop_nodes(&mut self) -> Option<Vec<ObjectReference>> {
         self.nodes.take()
     }
 }
@@ -458,11 +454,9 @@ pub trait ProcessEdgesWork:
     /// this method will simply return with no work packet created.
     #[cold]
     fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
+        if let Some(nodes) = self.pop_nodes() {
+            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
         }
-        let nodes = self.pop_nodes();
-        self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
     }
 
     #[inline]
@@ -636,23 +630,26 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         //
         // If this is a root packet, the `scanned_root_objects` variable will hold those root
         // objects which are traced for the first time.
-        let scanned_root_objects = self.roots().then(|| {
-            // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = Self::E::new(vec![], false, mmtk);
+        let scanned_root_objects = self
+            .roots()
+            .then(|| {
+                // We create an instance of E to use its `trace_object` method and its object queue.
+                let mut process_edges_work = Self::E::new(vec![], false, mmtk);
 
-            for object in buffer.iter().copied() {
-                let new_object = process_edges_work.trace_object(object);
-                debug_assert_eq!(
-                    object, new_object,
-                    "Object moved while tracing root unmovable root object: {} -> {}",
-                    object, new_object
-                );
-            }
+                for object in buffer.iter().copied() {
+                    let new_object = process_edges_work.trace_object(object);
+                    debug_assert_eq!(
+                        object, new_object,
+                        "Object moved while tracing root unmovable root object: {} -> {}",
+                        object, new_object
+                    );
+                }
 
-            // This contains root objects that are visited the first time.
-            // It is sufficient to only scan these objects.
-            process_edges_work.nodes.take()
-        });
+                // This contains root objects that are visited the first time.
+                // It is sufficient to only scan these objects.
+                process_edges_work.pop_nodes()
+            })
+            .flatten();
 
         // If it is a root packet, scan the nodes that are first scanned;
         // otherwise, scan the nodes in the buffer.
@@ -697,8 +694,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
             // Create work packets to scan adjacent objects.  We skip ProcessEdgesWork and create
             // object-scanning packets directly, because the edges are already traced.
-            if !process_edges_work.nodes.is_empty() {
-                let next_nodes = process_edges_work.nodes.take();
+            if let Some(next_nodes) = process_edges_work.nodes.take() {
                 let make_packet = |nodes| {
                     let work_packet = self.make_another(nodes);
                     memory_manager::add_work_packet(mmtk, WorkBucketStage::Closure, work_packet);
