@@ -56,12 +56,6 @@ pub trait Edge: Copy + Send + Debug + PartialEq + Eq + Hash {
     fn prefetch_store(&self) {
         // no-op by default
     }
-
-    /// Create a edge from an address.
-    ///
-    /// Arguments:
-    /// *   `address`: The address in memory where an `ObjectReference` is stored.
-    fn from_address(address: Address) -> Self;
 }
 
 /// A simple edge implementation that represents a word-sized slot where an ObjectReference value
@@ -73,6 +67,17 @@ pub struct SimpleEdge {
 }
 
 impl SimpleEdge {
+    /// Create a simple edge from an address.
+    ///
+    /// Arguments:
+    /// *   `address`: The address in memory where an `ObjectReference` is stored.
+    #[inline(always)]
+    pub fn from_address(address: Address) -> Self {
+        Self {
+            slot_addr: address.to_mut_ptr(),
+        }
+    }
+
     /// Get the address of the edge.
     ///
     /// Return the address at which the `ObjectReference` is stored.
@@ -85,13 +90,6 @@ impl SimpleEdge {
 unsafe impl Send for SimpleEdge {}
 
 impl Edge for SimpleEdge {
-    #[inline(always)]
-    fn from_address(address: Address) -> Self {
-        Self {
-            slot_addr: address.to_mut_ptr(),
-        }
-    }
-
     #[inline(always)]
     fn load(&self) -> ObjectReference {
         unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) }
@@ -115,11 +113,6 @@ impl Edge for SimpleEdge {
 /// `SimpleEdge`.
 impl Edge for Address {
     #[inline(always)]
-    fn from_address(address: Address) -> Self {
-        address
-    }
-
-    #[inline(always)]
     fn load(&self) -> ObjectReference {
         unsafe { Address::load(*self) }
     }
@@ -138,15 +131,23 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
     );
 }
 
-pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone {
+/// A abstract memory slice represents a piece of **heap** memory.
+pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     type Edge: Edge;
     type EdgeIterator: Iterator<Item = Self::Edge>;
+    /// Iterate _valid_ object edges within the slice.
+    ///
+    /// For dynamic languages, the binding may need to filter out invalid edges.
     fn iter_edges(&self) -> Self::EdgeIterator;
-    fn copy(src: &Self, tgt: &Self);
+    /// Start address of the memory slice
     fn start(&self) -> Address;
+    /// Size of the memory slice
     fn bytes(&self) -> usize;
+    /// Memory copy support
+    fn copy(src: &Self, tgt: &Self);
 }
 
+/// Iterate edges within `Range<Address>`.
 pub struct AddressRangeIterator {
     cursor: Address,
     limit: Address,
