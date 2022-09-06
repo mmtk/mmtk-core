@@ -95,13 +95,22 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     #[inline(always)]
-    fn load_metadata<T: MetadataValue>(
+    unsafe fn load_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         mask: Option<T>,
-        atomic_ordering: Option<Ordering>,
     ) -> T {
-        metadata_spec.load::<T>(object, mask, atomic_ordering)
+        metadata_spec.load::<T>(object, mask)
+    }
+
+    #[inline(always)]
+    fn load_metadata_atomic<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) -> T {
+        metadata_spec.load_atomic::<T>(object, mask, ordering)
     }
 
     /// A function to store a value to the specified per-object metadata.
@@ -114,14 +123,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     #[inline(always)]
-    fn store_metadata<T: MetadataValue>(
+    unsafe fn store_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         val: T,
         mask: Option<T>,
-        atomic_ordering: Option<Ordering>,
     ) {
-        metadata_spec.store::<T>(object, val, mask, atomic_ordering)
+        metadata_spec.store::<T>(object, val, mask)
+    }
+
+    #[inline(always)]
+    fn store_metadata_atomic<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) {
+        metadata_spec.store_atomic::<T>(object, val, mask, ordering)
     }
 
     /// A function to atomically compare-and-exchange the specified per-object metadata's content.

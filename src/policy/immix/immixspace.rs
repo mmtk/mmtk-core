@@ -502,10 +502,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     #[inline(always)]
     fn attempt_mark(&self, object: ObjectReference, mark_state: u8) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             if old_value == mark_state {
                 return false;
@@ -528,10 +528,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Check if an object is marked.
     #[inline(always)]
     fn is_marked(&self, object: ObjectReference, mark_state: u8) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         old_value == mark_state
     }
@@ -679,11 +679,11 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
     #[inline(always)]
     fn post_copy(&mut self, obj: ObjectReference, _bytes: usize) {
         // Mark the object
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
             obj,
             self.get_space().mark_state,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {

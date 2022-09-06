@@ -50,20 +50,20 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_metadata::<VM, u8>(
+        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
             object,
             new_value,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
 
         // If this object is freshly allocated, we do not set it as unlogged
@@ -259,10 +259,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             } else {
                 MARK_BIT
             };
-            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_metadata::<VM, u8>(
+            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & mask;
             if mark_bit == value {
@@ -283,20 +283,20 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         ) & MARK_BIT
             == value
     }
 
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::Relaxed),
+            Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
     }
@@ -304,10 +304,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// Move a given object out of nursery
     fn clear_nursery(&self, object: ObjectReference) {
         loop {
-            let old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_metadata::<VM, u8>(
+            let old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::Relaxed),
+                Ordering::Relaxed,
             );
             let new_val = old_val & !NURSERY_BIT;
             if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.compare_exchange_metadata::<VM, u8>(

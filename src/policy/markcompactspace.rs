@@ -261,10 +261,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit != 0 {
@@ -286,10 +286,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_clear_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit == 0 {
@@ -311,10 +311,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     pub fn is_marked(object: ObjectReference) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let mark_bit = old_value & GC_MARK_BIT_MASK;
         mark_bit != 0

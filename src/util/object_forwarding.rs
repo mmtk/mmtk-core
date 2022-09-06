@@ -82,19 +82,19 @@ pub fn forward_object<VM: VMBinding>(
     #[cfg(feature = "global_alloc_bit")]
     crate::util::alloc_bit::set_alloc_bit(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
-        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_metadata::<VM, usize>(
+        VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
             new_object.to_address().as_usize() | ((FORWARDED as usize) << shift),
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         )
     } else {
         write_forwarding_pointer::<VM>(object, new_object);
-        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
             object,
             FORWARDED as u8,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
     }
     #[cfg(debug_assertions)]
@@ -105,10 +105,10 @@ pub fn forward_object<VM: VMBinding>(
 /// Return the forwarding bits for a given `ObjectReference`.
 #[inline]
 pub fn get_forwarding_status<VM: VMBinding>(object: ObjectReference) -> u8 {
-    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_metadata::<VM, u8>(
+    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.load_atomic::<VM, u8>(
         object,
         None,
-        Some(Ordering::SeqCst),
+        Ordering::SeqCst,
     )
 }
 
@@ -135,11 +135,11 @@ pub fn state_is_being_forwarded(forwarding_bits: u8) -> bool {
 /// Zero the forwarding bits of an object.
 /// This function is used on new objects.
 pub fn clear_forwarding_bits<VM: VMBinding>(object: ObjectReference) {
-    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_metadata::<VM, u8>(
+    VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
         object,
         0,
         None,
-        Some(Ordering::SeqCst),
+        Ordering::SeqCst,
     )
 }
 
@@ -153,10 +153,10 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
     );
 
     unsafe {
-        Address::from_usize(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_metadata::<VM, usize>(
+        Address::from_usize(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
             object,
             Some(FORWARDING_POINTER_MASK),
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         ))
         .to_object_reference()
     }
@@ -176,11 +176,11 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     );
 
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
-    VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_metadata::<VM, usize>(
+    VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
         new_object.to_address().as_usize(),
         Some(FORWARDING_POINTER_MASK),
-        Some(Ordering::SeqCst),
+        Ordering::SeqCst,
     )
 }
 

@@ -39,10 +39,10 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     }
     #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         old_value == self.mark_state
     }
@@ -54,17 +54,17 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
             object,
             new_value,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
 
         if self.common.needs_log_bit {
@@ -176,10 +176,10 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
 
     fn test_and_mark(object: ObjectReference, value: u8) -> bool {
         loop {
-            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             if old_value == value {
                 return false;

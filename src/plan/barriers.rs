@@ -80,7 +80,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
                 return true;
             } else {
                 let old_value =
-                    self.meta.load_metadata::<E::VM, u8>(object, None, Some(Ordering::SeqCst));
+                    self.meta.load_atomic::<E::VM, u8>(object, None, Ordering::SeqCst);
                 // If the bit is cleared before, someone else has logged the object. Return false.
                 if old_value == 0 {
                     return false;
@@ -102,7 +102,7 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn barrier(&mut self, obj: ObjectReference) {
-        if self.meta.load_metadata::<E::VM, u8>(obj, None, None) == 0 {
+        if unsafe { self.meta.load::<E::VM, u8>(obj, None) == 0 } {
             return;
         }
         self.barrier_slow(obj);

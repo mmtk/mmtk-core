@@ -44,22 +44,30 @@ impl MetadataSpec {
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     ///
     #[inline(always)]
-    pub fn load_metadata<VM: VMBinding, T: MetadataValue>(
+    pub unsafe fn load<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
         mask: Option<T>,
-        atomic_ordering: Option<Ordering>,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => {
-                if let Some(order) = atomic_ordering {
-                    metadata_spec.load_atomic(object.to_address(), order)
-                } else {
-                    unsafe { metadata_spec.load(object.to_address()) }
-                }
-            }
+            MetadataSpec::OnSide(metadata_spec) => { metadata_spec.load(object.to_address()) }
             MetadataSpec::InHeader(metadata_spec) => {
-                VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask, atomic_ordering)
+                VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn load_atomic<VM: VMBinding, T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) -> T {
+        match self {
+            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load_atomic(object.to_address(), ordering),
+            MetadataSpec::InHeader(metadata_spec) => {
+                VM::VMObjectModel::load_metadata_atomic::<T>(metadata_spec, object, mask, ordering)
             }
         }
     }
@@ -75,25 +83,36 @@ impl MetadataSpec {
     /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
     #[inline(always)]
-    pub fn store_metadata<VM: VMBinding, T: MetadataValue>(
+    pub unsafe fn store<VM: VMBinding, T: MetadataValue>(
         &self,
         object: ObjectReference,
         val: T,
         mask: Option<T>,
-        atomic_ordering: Option<Ordering>,
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                if let Some(order) = atomic_ordering {
-                    metadata_spec.store_atomic(object.to_address(), val, order);
-                } else {
-                    unsafe {
                         metadata_spec.store(object.to_address(), val);
-                    }
-                }
             }
             MetadataSpec::InHeader(metadata_spec) => {
-                VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask, atomic_ordering)
+                VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn store_atomic<VM: VMBinding, T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) {
+        match self {
+            MetadataSpec::OnSide(metadata_spec) => {
+                    metadata_spec.store_atomic(object.to_address(), val, ordering);
+            }
+            MetadataSpec::InHeader(metadata_spec) => {
+                VM::VMObjectModel::store_metadata_atomic::<T>(metadata_spec, object, val, mask, ordering)
             }
         }
     }

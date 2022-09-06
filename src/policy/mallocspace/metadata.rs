@@ -165,11 +165,18 @@ pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
     is_meta_space_mapped_for_address(addr) && alloc_bit::is_alloced_object(addr)
 }
 
-pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_metadata::<VM, u8>(
+pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
         object,
         None,
         ordering,
+    ) == 1
+}
+
+pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(
+        object,
+        None,
     ) == 1
 }
 
@@ -208,12 +215,20 @@ pub fn set_alloc_bit(object: ObjectReference) {
     alloc_bit::set_alloc_bit(object);
 }
 
-pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
+pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
         object,
         1,
         None,
         ordering,
+    );
+}
+
+pub unsafe fn set_mark_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(
+        object,
+        1,
+        None,
     );
 }
 
@@ -247,12 +262,11 @@ pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
 }
 
 #[allow(unused)]
-pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_metadata::<VM, u8>(
+pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(
         object,
         0,
         None,
-        ordering,
     );
 }
 

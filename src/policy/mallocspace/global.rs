@@ -60,7 +60,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
     }
 
     fn is_live(&self, object: ObjectReference) -> bool {
-        is_marked::<VM>(object, Some(Ordering::SeqCst))
+        is_marked::<VM>(object, Ordering::SeqCst)
     }
 
     fn is_movable(&self) -> bool {
@@ -316,9 +316,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             address,
         );
 
-        if !is_marked::<VM>(object, None) {
+        // TODO: Why do we use non-atomic load her?
+        if !unsafe { is_marked_unsafe::<VM>(object) }{
             let chunk_start = conversions::chunk_align_down(address);
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
+            set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
         }
@@ -404,7 +405,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
     fn sweep_object(&self, object: ObjectReference, empty_page_start: &mut Address) -> bool {
         let (obj_start, offset_malloc, bytes) = Self::get_malloc_addr_size(object);
 
-        if !is_marked::<VM>(object, None) {
+        // We are the only thrad that is dealing with the object. We can use non-atomic methods for the metadata.
+        if !unsafe { is_marked_unsafe::<VM>(object) } {
             // Dead object
             trace!("Object {} has been allocated but not marked", object);
 
@@ -551,7 +553,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 }
 
                 debug_assert!(
-                    is_marked::<VM>(object, None),
+                    unsafe { is_marked_unsafe::<VM>(object) },
                     "Dead object = {} found after sweep",
                     object
                 );
@@ -610,8 +612,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             let live = !self.sweep_object(object, &mut empty_page_start);
             if live {
-                // Live object. Unset mark bit
-                unset_mark_bit::<VM>(object, None);
+                // Live object. Unset mark bit.
+                // We should be the only thread that access this chunk, it is okay to use non-atomic store.
+                unsafe { unset_mark_bit::<VM>(object) };
 
                 #[cfg(debug_assertions)]
                 {
