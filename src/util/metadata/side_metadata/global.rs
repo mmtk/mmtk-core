@@ -152,7 +152,7 @@ impl SideMetadataSpec {
             );
         }
         #[cfg(target_pointer_width = "32")]
-        if !metadata_spec.is_global {
+        if !self.is_global {
             // per chunk policy-specific metadata for 32-bits targets
             let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
                 - start.align_down(BYTES_IN_CHUNK))
@@ -160,30 +160,30 @@ impl SideMetadataSpec {
             if chunk_num == 0 {
                 memory::zero(
                     meta_start,
-                    address_to_meta_address(metadata_spec, start + size) - meta_start,
+                    address_to_meta_address(self, start + size) - meta_start,
                 );
             } else {
                 let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
                 // bzero the first sub-chunk
                 memory::zero(
                     meta_start,
-                    address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
+                    address_to_meta_address(self, second_data_chunk) - meta_start,
                 );
                 let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-                let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
+                let last_meta_chunk = address_to_meta_address(self, last_data_chunk);
                 // bzero the last sub-chunk
                 memory::zero(
                     last_meta_chunk,
-                    address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
+                    address_to_meta_address(self, start + size) - last_meta_chunk,
                 );
                 let mut next_data_chunk = second_data_chunk;
                 // bzero all chunks in the middle
                 while next_data_chunk != last_data_chunk {
                     memory::zero(
-                        address_to_meta_address(metadata_spec, next_data_chunk),
+                        address_to_meta_address(self, next_data_chunk),
                         metadata_bytes_per_chunk(
-                            metadata_spec.log_bytes_in_region,
-                            metadata_spec.log_num_of_bits,
+                            self.log_bytes_in_region,
+                            self.log_num_of_bits,
                         ),
                     );
                     next_data_chunk += BYTES_IN_CHUNK;
@@ -1120,7 +1120,7 @@ mod tests {
         })
     }
 
-    fn max_value(log_bits: usize) -> usize {
+    fn max_value(log_bits: usize) -> u64 {
         (0..(1 << log_bits)).fold(0, |accum, x| accum + (1 << x))
     }
     #[test]

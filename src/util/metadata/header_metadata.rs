@@ -668,7 +668,7 @@ mod tests {
     impl_with_object!(u64);
     impl_with_object!(usize);
 
-    fn max_value(n_bits: usize) -> usize {
+    fn max_value(n_bits: usize) -> u64 {
         (0..n_bits).fold(0, |accum, x| accum + (1 << x))
     }
 
