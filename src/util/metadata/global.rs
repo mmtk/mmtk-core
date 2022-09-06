@@ -1,11 +1,10 @@
-use crate::util::metadata::side_metadata;
+use super::header_metadata::HeaderMetadataSpec;
+use crate::util::metadata::metadata_val_traits::*;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use atomic::Ordering;
-use crate::util::metadata::metadata_val_traits::*;
-use super::header_metadata::HeaderMetadataSpec;
 
 /// This struct stores the specification of a metadata bit-set.
 /// It is used as an input to the (inline) functions provided by the side metadata module.
@@ -32,17 +31,18 @@ impl MetadataSpec {
         }
     }
 
-    /// A function to load the specified metadata's content.
+    /// A function to non-atomically load the specified metadata's content.
     ///
     /// # Arguments:
     ///
     /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    /// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.
     ///
     /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     ///
+    /// # Safety
+    /// This is a non-atomic load, thus not thread-safe.
     #[inline(always)]
     pub unsafe fn load<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -50,13 +50,23 @@ impl MetadataSpec {
         mask: Option<T>,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => { metadata_spec.load(object.to_address()) }
+            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(object.to_address()),
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask)
             }
         }
     }
 
+    /// A function to atomically load the specified metadata's content.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is the ordering for the load operation.
+    ///
+    /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
     #[inline(always)]
     pub fn load_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -65,14 +75,16 @@ impl MetadataSpec {
         ordering: Ordering,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load_atomic(object.to_address(), ordering),
+            MetadataSpec::OnSide(metadata_spec) => {
+                metadata_spec.load_atomic(object.to_address(), ordering)
+            }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata_atomic::<T>(metadata_spec, object, mask, ordering)
             }
         }
     }
 
-    /// A function to store a value to the specified metadata.
+    /// A function to non-atomically store a value to the specified metadata.
     ///
     /// # Arguments:
     ///
@@ -80,8 +92,9 @@ impl MetadataSpec {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
+    /// # Safety
+    /// This is a non-atomic store, thus not thread-safe.
     #[inline(always)]
     pub unsafe fn store<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -91,7 +104,7 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                        metadata_spec.store(object.to_address(), val);
+                metadata_spec.store(object.to_address(), val);
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask)
@@ -99,6 +112,15 @@ impl MetadataSpec {
         }
     }
 
+    /// A function to atomically store a value to the specified metadata.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the new metadata value to be stored.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is the ordering for the store operation.
     #[inline(always)]
     pub fn store_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -109,11 +131,15 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                    metadata_spec.store_atomic(object.to_address(), val, ordering);
+                metadata_spec.store_atomic(object.to_address(), val, ordering);
             }
-            MetadataSpec::InHeader(metadata_spec) => {
-                VM::VMObjectModel::store_metadata_atomic::<T>(metadata_spec, object, val, mask, ordering)
-            }
+            MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::store_metadata_atomic::<T>(
+                metadata_spec,
+                object,
+                val,
+                mask,
+                ordering,
+            ),
         }
     }
 
@@ -149,7 +175,17 @@ impl MetadataSpec {
                 success_order,
                 failure_order,
             ),
-            MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::compare_exchange_metadata::<T>(metadata_spec, object, old_val, new_val, mask, success_order, failure_order)
+            MetadataSpec::InHeader(metadata_spec) => {
+                VM::VMObjectModel::compare_exchange_metadata::<T>(
+                    metadata_spec,
+                    object,
+                    old_val,
+                    new_val,
+                    mask,
+                    success_order,
+                    failure_order,
+                )
+            }
         }
     }
 
@@ -244,14 +280,24 @@ impl MetadataSpec {
     }
 
     #[inline(always)]
-    pub fn fetch_update_metadata<VM: VMBinding, T: MetadataValue>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, f: impl FnMut(T) -> Option<T> + Copy) -> std::result::Result<T, T> {
+    pub fn fetch_update_metadata<VM: VMBinding, T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        f: impl FnMut(T) -> Option<T> + Copy,
+    ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
                 metadata_spec.fetch_update_atomic(object.to_address(), set_order, fetch_order, f)
             }
-            MetadataSpec::InHeader(metadata_spec) => {
-                VM::VMObjectModel::fetch_update_metadata(metadata_spec, object, set_order, fetch_order, f)
-            }
+            MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::fetch_update_metadata(
+                metadata_spec,
+                object,
+                set_order,
+                fetch_order,
+                f,
+            ),
         }
     }
 }

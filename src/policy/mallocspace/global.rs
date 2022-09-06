@@ -317,7 +317,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         // TODO: Why do we use non-atomic load her?
-        if !unsafe { is_marked_unsafe::<VM>(object) }{
+        if !unsafe { is_marked_unsafe::<VM>(object) } {
             let chunk_start = conversions::chunk_align_down(address);
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);

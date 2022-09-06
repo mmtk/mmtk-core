@@ -4,7 +4,7 @@ use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
 use crate::vm::*;
 use spin::{Mutex, MutexGuard};

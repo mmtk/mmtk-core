@@ -494,7 +494,11 @@ mod truncate_tests {
 }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: T) {
+pub fn typed_verify_load<T: MetadataValue>(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    actual_val: T,
+) {
     let actual_val: usize = actual_val.to_usize().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
@@ -543,7 +547,11 @@ pub fn typed_verify_load<T: MetadataValue>(metadata_spec: &SideMetadataSpec, dat
 // }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: T) {
+pub fn typed_verify_store<T: MetadataValue>(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    metadata: T,
+) {
     let metadata: usize = metadata.to_usize().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, metadata);
@@ -586,18 +594,33 @@ pub fn typed_verify_store<T: MetadataValue>(metadata_spec: &SideMetadataSpec, da
 // }
 
 #[cfg(feature = "extreme_assertions")]
-pub fn verify_update<T: MetadataValue>(metadata_spec: &SideMetadataSpec, data_addr: Address, old_val: T, new_val: T) {
+pub fn verify_update<T: MetadataValue>(
+    metadata_spec: &SideMetadataSpec,
+    data_addr: Address,
+    old_val: T,
+    new_val: T,
+) {
     verify_metadata_address_bound(metadata_spec, data_addr);
 
     // truncate the new_val if metadata's bits is fewer than the type's bits
-    let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_usize().unwrap());
-    println!("verify_update old = {} new = {} wrapped = {:x}", old_val, new_val, new_val_wrapped);
+    let new_val_wrapped =
+        truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_usize().unwrap());
+    println!(
+        "verify_update old = {} new = {} wrapped = {:x}",
+        old_val, new_val, new_val_wrapped
+    );
 
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
-            assert_eq!(old_val.to_usize().unwrap(), *cur_val, "Expected old value: {} but found {}", old_val, cur_val);
+            assert_eq!(
+                old_val.to_usize().unwrap(),
+                *cur_val,
+                "Expected old value: {} but found {}",
+                old_val,
+                cur_val
+            );
             *cur_val = new_val_wrapped;
         }
         None => panic!("Invalid metadata spec: {:#?}", metadata_spec),

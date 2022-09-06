@@ -786,7 +786,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         if !self.modbuf.is_empty() {
             for obj in &self.modbuf {
-                self.meta.store_atomic::<E::VM, u8>(*obj, 1, None, Ordering::SeqCst);
+                self.meta
+                    .store_atomic::<E::VM, u8>(*obj, 1, None, Ordering::SeqCst);
             }
         }
         if mmtk.plan.is_current_gc_nursery() {

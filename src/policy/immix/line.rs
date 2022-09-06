@@ -1,6 +1,6 @@
 use super::block::Block;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::{
     util::{Address, ObjectReference},
     vm::*,

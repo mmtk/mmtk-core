@@ -79,8 +79,9 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
                 // We just logged the object
                 return true;
             } else {
-                let old_value =
-                    self.meta.load_atomic::<E::VM, u8>(object, None, Ordering::SeqCst);
+                let old_value = self
+                    .meta
+                    .load_atomic::<E::VM, u8>(object, None, Ordering::SeqCst);
                 // If the bit is cleared before, someone else has logged the object. Return false.
                 if old_value == 0 {
                     return false;

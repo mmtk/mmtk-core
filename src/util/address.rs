@@ -314,6 +314,10 @@ impl Address {
         self.0 as *mut T
     }
 
+    /// converts the Address to a Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
     pub unsafe fn as_ref<'a, T>(self) -> &'a T {
         &*self.to_mut_ptr()
     }

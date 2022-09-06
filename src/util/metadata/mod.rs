@@ -220,24 +220,10 @@
 
 mod global;
 pub mod header_metadata;
-pub mod side_metadata;
 mod metadata_val_traits;
+pub mod side_metadata;
 pub use metadata_val_traits::*;
 
 pub(crate) mod log_bit;
 
 pub use global::*;
-
-// We currently only support metadata that has a length equal to or smaller than the architecture's word size.
-// That means we do not support metadata of more than 8 bytes, and we do not support side metadata of 8 bytes on 32 bits architectures.
-// This macro is used to check word size. It makes sure that the given block is only executed on 64 bits architectures, and panics on other architectures.
-macro_rules! only_available_on_64bits {
-    ($b: block) => {
-        if cfg!(target_pointer_width = "64")
-        $b
-        else {
-            panic!("MMTk only supports such operations for 8-bytes side metadata on 64 bits architures.")
-        }
-    }
-}
-pub(crate) use only_available_on_64bits;

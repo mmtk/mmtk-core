@@ -1,4 +1,3 @@
-use crate::util::metadata::*;
 use crate::util::ObjectReference;
 use crate::vm::VMBinding;
 use crate::vm::VMGlobalLogBitSpec;

@@ -1,17 +1,12 @@
-use std::fmt;
-use std::sync::atomic::AtomicU16;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::AtomicUsize;
-
 use atomic::Ordering;
+use std::fmt;
+use std::sync::atomic::AtomicU8;
 
 use crate::util::constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE};
-use crate::util::metadata::only_available_on_64bits;
-use crate::util::ObjectReference;
 use crate::util::metadata::metadata_val_traits::*;
-use num_traits::{FromPrimitive, ToPrimitive};
 use crate::util::Address;
+use crate::util::ObjectReference;
+use num_traits::FromPrimitive;
 
 const LOG_BITS_IN_U16: usize = 4;
 const BITS_IN_U16: usize = 1 << LOG_BITS_IN_U16;
@@ -45,13 +40,17 @@ impl HeaderMetadataSpec {
         } else if self.num_of_bits < 8 {
             debug_assert!(
                 (self.bit_offset >> LOG_BITS_IN_BYTE)
-                    == ((self.bit_offset + self.num_of_bits as isize - 1)
-                        >> LOG_BITS_IN_BYTE),
+                    == ((self.bit_offset + self.num_of_bits as isize - 1) >> LOG_BITS_IN_BYTE),
                 "Metadata << 8-bits: ({:?}) stretches over two bytes!",
                 self
             );
         } else if self.num_of_bits >= 8 && self.num_of_bits <= 64 {
-            debug_assert!(self.bit_offset.trailing_zeros() >= T::LOG2, "{:?}: bit_offset must be aligned to {}", self, 1 << T::LOG2);
+            debug_assert!(
+                self.bit_offset.trailing_zeros() >= T::LOG2,
+                "{:?}: bit_offset must be aligned to {}",
+                self,
+                1 << T::LOG2
+            );
         } else {
             // num_of_bits larger than 64
             unreachable!("Metadata that is larger than 64-bits is not supported")
@@ -87,7 +86,12 @@ impl HeaderMetadataSpec {
     #[inline(always)]
     fn set_bits_to_u8(&self, orig_val: u8, set_val: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
-        debug_assert!(set_val <= (1 << self.num_of_bits) - 1, "{:b} exceeds the maximum value of {} bits in the spec", set_val, self.num_of_bits);
+        debug_assert!(
+            set_val < (1 << self.num_of_bits),
+            "{:b} exceeds the maximum value of {} bits in the spec",
+            set_val,
+            self.num_of_bits
+        );
         let (bit_shift, mask) = self.get_shift_and_mask_for_bits();
         (orig_val & !mask) | (set_val << bit_shift)
     }
@@ -98,19 +102,37 @@ impl HeaderMetadataSpec {
         val & ((1 << self.num_of_bits) - 1)
     }
 
+    /// This function provides a default implementation for the `load_metadata` method from the `ObjectModel` trait.
+    ///
+    /// # Safety
+    /// This is a non-atomic load, thus not thread-safe.
     #[inline(always)]
-    pub unsafe fn load<T: MetadataValue>(&self, object: ObjectReference, optional_mask: Option<T>) -> T {
+    pub unsafe fn load<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        optional_mask: Option<T>,
+    ) -> T {
         self.load_inner::<T>(object, optional_mask, None)
     }
 
+    /// This function provides a default implementation for the `load_metadata_atomic` method from the `ObjectModel` trait.
     #[inline(always)]
-    pub fn load_atomic<T: MetadataValue>(&self, object: ObjectReference, optional_mask: Option<T>, ordering: Ordering) -> T {
+    pub fn load_atomic<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        optional_mask: Option<T>,
+        ordering: Ordering,
+    ) -> T {
         self.load_inner::<T>(object, optional_mask, Some(ordering))
     }
 
-    /// This function provides a default implementation for the `load_metadata` method from the `ObjectModel` trait.
     #[inline(always)]
-    fn load_inner<T: MetadataValue>(&self, object: ObjectReference, optional_mask: Option<T>, atomic_ordering: Option<Ordering>) -> T {
+    fn load_inner<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        optional_mask: Option<T>,
+        atomic_ordering: Option<Ordering>,
+    ) -> T {
         self.assert_mask::<T>(optional_mask);
         self.assert_spec::<T>();
 
@@ -142,21 +164,44 @@ impl HeaderMetadataSpec {
         }
     }
 
-    #[inline(always)]
-    pub unsafe fn store<T: MetadataValue>(&self, object: ObjectReference, val: T, optional_mask: Option<T>) {
-        self.store_inner::<T>(object, val, optional_mask, None)
-    }
-
-    #[inline(always)]
-    pub fn store_atomic<T: MetadataValue>(&self, object: ObjectReference, val: T, optional_mask: Option<T>, ordering: Ordering) {
-        self.store_inner::<T>(object, val, optional_mask, Some(ordering))
-    }
-
     /// This function provides a default implementation for the `store_metadata` method from the `ObjectModel` trait.
     ///
     /// Note: this function does compare-and-swap in a busy loop. So, unlike `compare_exchange_metadata`, this operation will always success.
+    ///
+    /// # Safety
+    /// This is a non-atomic store, thus not thread-safe.
     #[inline(always)]
-    fn store_inner<T: MetadataValue>(&self, object: ObjectReference, val: T, optional_mask: Option<T>, atomic_ordering: Option<Ordering>) {
+    pub unsafe fn store<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        optional_mask: Option<T>,
+    ) {
+        self.store_inner::<T>(object, val, optional_mask, None)
+    }
+
+    /// This function provides a default implementation for the `store_metadata_atomic` method from the `ObjectModel` trait.
+    ///
+    /// Note: this function does compare-and-swap in a busy loop. So, unlike `compare_exchange_metadata`, this operation will always success.
+    #[inline(always)]
+    pub fn store_atomic<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        optional_mask: Option<T>,
+        ordering: Ordering,
+    ) {
+        self.store_inner::<T>(object, val, optional_mask, Some(ordering))
+    }
+
+    #[inline(always)]
+    fn store_inner<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        optional_mask: Option<T>,
+        atomic_ordering: Option<Ordering>,
+    ) {
         self.assert_mask::<T>(optional_mask);
         self.assert_spec::<T>();
 
@@ -214,15 +259,25 @@ impl HeaderMetadataSpec {
     }
 
     #[inline(always)]
-    pub fn compare_exchange<T: MetadataValue>(&self, object: ObjectReference, old_metadata: T, new_metadata: T, optional_mask: Option<T>, success_order: Ordering, failure_order: Ordering) -> bool {
+    pub fn compare_exchange<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        old_metadata: T,
+        new_metadata: T,
+        optional_mask: Option<T>,
+        success_order: Ordering,
+        failure_order: Ordering,
+    ) -> bool {
         self.assert_spec::<T>();
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(object);
             unsafe {
                 let real_old_byte = byte_addr.atomic_load::<AtomicU8>(success_order);
-                let expected_old_byte = self.set_bits_to_u8(real_old_byte, old_metadata.to_u8().unwrap());
-                let expected_new_byte = self.set_bits_to_u8(expected_old_byte, new_metadata.to_u8().unwrap());
+                let expected_old_byte =
+                    self.set_bits_to_u8(real_old_byte, old_metadata.to_u8().unwrap());
+                let expected_new_byte =
+                    self.set_bits_to_u8(expected_old_byte, new_metadata.to_u8().unwrap());
                 byte_addr
                     .compare_exchange::<AtomicU8>(
                         expected_old_byte,
@@ -235,7 +290,7 @@ impl HeaderMetadataSpec {
         } else {
             let addr = self.meta_addr(object);
             let (old_metadata, new_metadata) = if let Some(mask) = optional_mask {
-                let old_byte = T::load_atomic(addr, success_order);
+                let old_byte = unsafe { T::load_atomic(addr, success_order) };
                 let expected_new_byte = old_byte.bitand(mask.inv()).bitor(new_metadata);
                 let expected_old_byte = old_byte.bitand(mask.inv()).bitor(old_metadata);
                 (expected_old_byte, expected_new_byte)
@@ -244,15 +299,26 @@ impl HeaderMetadataSpec {
             };
 
             unsafe {
-                T::compare_exchange(addr, old_metadata, new_metadata, success_order, failure_order).is_ok()
+                T::compare_exchange(
+                    addr,
+                    old_metadata,
+                    new_metadata,
+                    success_order,
+                    failure_order,
+                )
+                .is_ok()
             }
         }
     }
 
     #[inline(always)]
-    fn fetch_update_bits<F: Fn(u8) -> u8>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, update: F) -> u8 {
-        let (bit_shift, mask) = self.get_shift_and_mask_for_bits();
-
+    fn fetch_update_bits<F: Fn(u8) -> u8>(
+        &self,
+        object: ObjectReference,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        update: F,
+    ) -> u8 {
         // let new_metadata = ((val as u8) << bit_shift);
         let byte_addr = self.meta_addr(object);
         loop {
@@ -267,54 +333,92 @@ impl HeaderMetadataSpec {
                     .compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order)
                     .is_ok()
                 {
-                    return old_metadata
+                    return old_metadata;
                 }
             }
         }
     }
 
     #[inline(always)]
-    pub fn fetch_add<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+    pub fn fetch_add<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x.wrapping_add(val.to_u8().unwrap()))).unwrap()
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| {
+                x.wrapping_add(val.to_u8().unwrap())
+            }))
+            .unwrap()
         } else {
-            T::fetch_add(self.meta_addr(object), val, order)
+            unsafe { T::fetch_add(self.meta_addr(object), val, order) }
         }
     }
 
     #[inline(always)]
-    pub fn fetch_sub<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+    pub fn fetch_sub<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x.wrapping_sub(val.to_u8().unwrap()))).unwrap()
+            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| {
+                x.wrapping_sub(val.to_u8().unwrap())
+            }))
+            .unwrap()
         } else {
-            T::fetch_sub(self.meta_addr(object), val, order)
+            unsafe { T::fetch_sub(self.meta_addr(object), val, order) }
         }
     }
 
     #[inline(always)]
-    pub fn fetch_and<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+    pub fn fetch_and<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x & val.to_u8().unwrap())).unwrap()
+            FromPrimitive::from_u8(
+                self.fetch_update_bits(object, order, order, |x: u8| x & val.to_u8().unwrap()),
+            )
+            .unwrap()
         } else {
-            T::fetch_and(self.meta_addr(object), val, order)
+            unsafe { T::fetch_and(self.meta_addr(object), val, order) }
         }
     }
 
     #[inline(always)]
-    pub fn fetch_or<T: MetadataValue>(&self, object: ObjectReference, val: T, order: Ordering) -> T {
+    pub fn fetch_or<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| x | val.to_u8().unwrap())).unwrap()
+            FromPrimitive::from_u8(
+                self.fetch_update_bits(object, order, order, |x: u8| x | val.to_u8().unwrap()),
+            )
+            .unwrap()
         } else {
-            T::fetch_or(self.meta_addr(object), val, order)
+            unsafe { T::fetch_or(self.meta_addr(object), val, order) }
         }
     }
 
     #[inline(always)]
-    pub fn fetch_update<T: MetadataValue>(&self, object: ObjectReference, set_order: Ordering, fetch_order: Ordering, mut f: impl FnMut(T) -> Option<T> + Copy) -> std::result::Result<T, T> {
+    pub fn fetch_update<T: MetadataValue>(
+        &self,
+        object: ObjectReference,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        mut f: impl FnMut(T) -> Option<T> + Copy,
+    ) -> std::result::Result<T, T> {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(object);
@@ -324,18 +428,28 @@ impl HeaderMetadataSpec {
                 let old_metadata_val = FromPrimitive::from_u8(old_metadata).unwrap();
                 // new_metadata may contain overflow and should be and with the mask
                 // TODO: do we really need this?
-                let new_metadata: Option<u8> = f(old_metadata_val).map(|byte| self.truncate_u8(byte.to_u8().unwrap()));
+                let new_metadata: Option<u8> =
+                    f(old_metadata_val).map(|byte| self.truncate_u8(byte.to_u8().unwrap()));
                 if let Some(new_metadata_to_set) = new_metadata {
                     let new_byte = self.set_bits_to_u8(old_byte, new_metadata_to_set);
-                    if unsafe { byte_addr.compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order) }.is_ok() {
+                    if unsafe {
+                        byte_addr.compare_exchange::<AtomicU8>(
+                            old_byte,
+                            new_byte,
+                            set_order,
+                            fetch_order,
+                        )
+                    }
+                    .is_ok()
+                    {
                         return Ok(old_metadata_val);
                     }
                 } else {
-                    return Err(old_metadata_val)
+                    return Err(old_metadata_val);
                 }
             }
         } else {
-            T::fetch_update(self.meta_addr(object), set_order, fetch_order, f)
+            unsafe { T::fetch_update(self.meta_addr(object), set_order, fetch_order, f) }
         }
     }
 }
@@ -359,26 +473,44 @@ mod tests {
 
     #[test]
     fn test_valid_specs() {
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 1,
+        };
         spec.assert_spec::<u8>();
 
-        let spec = HeaderMetadataSpec { bit_offset: 99, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 99,
+            num_of_bits: 1,
+        };
         spec.assert_spec::<u8>();
 
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 8 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 8,
+        };
         spec.assert_spec::<u8>();
 
-        let spec = HeaderMetadataSpec { bit_offset: 8, num_of_bits: 8 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 8,
+            num_of_bits: 8,
+        };
         spec.assert_spec::<u8>();
 
-        let spec = HeaderMetadataSpec { bit_offset: 32, num_of_bits: 8 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 32,
+            num_of_bits: 8,
+        };
         spec.assert_spec::<u8>();
     }
 
     #[test]
     #[should_panic]
     fn test_spec_at_unaligned_offset() {
-        let spec = HeaderMetadataSpec { bit_offset: 8, num_of_bits: 16 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 8,
+            num_of_bits: 16,
+        };
         spec.assert_spec::<u16>();
     }
 
@@ -386,49 +518,73 @@ mod tests {
     #[should_panic]
     fn test_bits_spec_across_byte() {
         // bits across byte boundary
-        let spec = HeaderMetadataSpec { bit_offset: 7, num_of_bits: 2 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 7,
+            num_of_bits: 2,
+        };
         spec.assert_spec::<u8>();
     }
 
     #[test]
     fn test_get_bits_from_u8() {
         // 1 bit
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b1));
         assert_eq!(spec.get_bits_from_u8(0b0000_0001), 1);
         assert_eq!(spec.get_bits_from_u8(0b1111_1110), 0);
 
-        let spec = HeaderMetadataSpec { bit_offset: 1, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 1,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (1, 0b10));
         assert_eq!(spec.get_bits_from_u8(0b0000_0010), 1);
         assert_eq!(spec.get_bits_from_u8(0b1111_1101), 0);
 
-        let spec = HeaderMetadataSpec { bit_offset: 7, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 7,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (7, 0b1000_0000));
         assert_eq!(spec.get_bits_from_u8(0b1000_0000), 1);
         assert_eq!(spec.get_bits_from_u8(0b0111_1111), 0);
 
         // 1 bit in the next byte
-        let spec = HeaderMetadataSpec { bit_offset: 8, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 8,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b1));
         assert_eq!(spec.get_bits_from_u8(0b0000_0001), 1);
         assert_eq!(spec.get_bits_from_u8(0b1111_1110), 0);
 
         // 2 bits
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 2 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 2,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b11));
         assert_eq!(spec.get_bits_from_u8(0b0000_0011), 0b11);
         assert_eq!(spec.get_bits_from_u8(0b0000_0010), 0b10);
         assert_eq!(spec.get_bits_from_u8(0b1111_1110), 0b10);
 
-        let spec = HeaderMetadataSpec { bit_offset: 6, num_of_bits: 2 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 6,
+            num_of_bits: 2,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (6, 0b1100_0000));
         assert_eq!(spec.get_bits_from_u8(0b1100_0000), 0b11);
         assert_eq!(spec.get_bits_from_u8(0b1000_0000), 0b10);
         assert_eq!(spec.get_bits_from_u8(0b1011_1111), 0b10);
 
         // 2 bits in the next byte
-        let spec = HeaderMetadataSpec { bit_offset: 8, num_of_bits: 2 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 8,
+            num_of_bits: 2,
+        };
         assert_eq!(spec.get_shift_and_mask_for_bits(), (0, 0b0000_0011));
         assert_eq!(spec.get_bits_from_u8(0b0000_0011), 0b11);
         assert_eq!(spec.get_bits_from_u8(0b0000_0010), 0b10);
@@ -438,18 +594,27 @@ mod tests {
     #[test]
     fn test_set_bits_to_u8() {
         // 1 bit
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.set_bits_to_u8(0b0000_0000, 1), 0b0000_0001);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 1), 0b1111_1111);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 0), 0b1111_1110);
 
-        let spec = HeaderMetadataSpec { bit_offset: 1, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 1,
+            num_of_bits: 1,
+        };
         assert_eq!(spec.set_bits_to_u8(0b0000_0000, 1), 0b0000_0010);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 1), 0b1111_1111);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 0), 0b1111_1101);
 
         // 2 bit
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 2 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 2,
+        };
         assert_eq!(spec.set_bits_to_u8(0b0000_0000, 0b11), 0b0000_0011);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 0b11), 0b1111_1111);
         assert_eq!(spec.set_bits_to_u8(0b1111_1111, 0b10), 0b1111_1110);
@@ -460,7 +625,10 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_set_bits_to_u8_exceeds_bits() {
-        let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: 1 };
+        let spec = HeaderMetadataSpec {
+            bit_offset: 0,
+            num_of_bits: 1,
+        };
         spec.set_bits_to_u8(0, 0b11);
     }
 
@@ -501,7 +669,7 @@ mod tests {
     impl_with_object!(usize);
 
     fn max_value(n_bits: usize) -> usize {
-        (0..n_bits).fold(0, |accum, x| { accum + (1 << x) })
+        (0..n_bits).fold(0, |accum, x| accum + (1 << x))
     }
 
     macro_rules! test_header_metadata_access {
@@ -692,7 +860,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_add>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
                         let max_value = max_value($num_of_bits) as $type;
 
@@ -724,9 +892,8 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_sub>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
-                        let max_value = max_value($num_of_bits) as $type;
 
                         unsafe { spec.store::<$type>(obj, 1, None) };
                         let old_val = unsafe { spec.load::<$type>(obj, None) };
@@ -740,7 +907,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_sub_overflow>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
                         let max_value = max_value($num_of_bits) as $type;
 
@@ -755,7 +922,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_and>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
                         let max_value = max_value($num_of_bits) as $type;
 
@@ -770,7 +937,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_or>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
                         let max_value = max_value($num_of_bits) as $type;
 
@@ -785,7 +952,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_update_success>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
                         let max_value = max_value($num_of_bits) as $type;
 
@@ -801,7 +968,7 @@ mod tests {
 
                 #[test]
                 fn [<$tname _fetch_update_fail>]() {
-                    [<with_ $type _obj>](|obj, ptr| {
+                    [<with_ $type _obj>](|obj, _| {
                         let spec = HeaderMetadataSpec { bit_offset: 0, num_of_bits: $num_of_bits };
 
                         let old_val = unsafe { spec.load::<$type>(obj, None) };
@@ -824,7 +991,17 @@ mod tests {
     test_header_metadata_access!(test_u16, u16, 16);
     test_header_metadata_access!(test_u32, u32, 32);
     test_header_metadata_access!(test_u64, u64, 64);
-    test_header_metadata_access!(test_usize, usize, if cfg!(target_pointer_width = "64") { 64 } else if cfg!(target_pointer_width = "32") { 32 } else { unreachable!() });
+    test_header_metadata_access!(
+        test_usize,
+        usize,
+        if cfg!(target_pointer_width = "64") {
+            64
+        } else if cfg!(target_pointer_width = "32") {
+            32
+        } else {
+            unreachable!()
+        }
+    );
 }
 
 // /// This function provides a default implementation for the `load_metadata` method from the `ObjectModel` trait.

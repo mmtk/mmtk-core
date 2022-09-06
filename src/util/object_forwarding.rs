@@ -153,11 +153,13 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
     );
 
     unsafe {
-        Address::from_usize(VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
-            object,
-            Some(FORWARDING_POINTER_MASK),
-            Ordering::SeqCst,
-        ))
+        Address::from_usize(
+            VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
+                object,
+                Some(FORWARDING_POINTER_MASK),
+                Ordering::SeqCst,
+            ),
+        )
         .to_object_reference()
     }
 }

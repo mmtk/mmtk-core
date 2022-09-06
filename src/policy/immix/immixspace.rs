@@ -14,10 +14,8 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, *};
-use crate::util::metadata::{
-    self, MetadataSpec,
-};
+use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::util::metadata::{self, MetadataSpec};
 use crate::util::object_forwarding as ForwardingWord;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
