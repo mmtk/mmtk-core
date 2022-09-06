@@ -262,7 +262,8 @@ impl<VM: VMBinding> Gen<VM> {
     /// Check a plan to see if the next GC should be a full heap GC.
     ///
     /// Note that this function should be called after all spaces have been released. This is
-    /// required as we may get incorrect values since this function uses [`get_available_pages`]
+    /// required as we may get incorrect values since this function uses
+    /// [`get_available_pages`](crate::plan::Plan::get_available_pages)
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         plan.get_available_pages()
