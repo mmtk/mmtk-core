@@ -431,42 +431,6 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
     }
 }
 
-/// Ensures a side metadata load operation returns the correct side metadata content.
-/// Panics if:
-/// 1 - the metadata spec is not valid,
-/// 2 - data address is not valid,
-/// 3 - the loaded side metadata content is not equal to the correct content.
-///
-/// Arguments:
-/// * `metadata_spec`: the metadata spec to verify the loaded content for
-/// * `data_addr`: the address of the source data
-/// * `actual_val`: the actual content returned by the side metadata load operation
-///
-// #[cfg(feature = "extreme_assertions")]
-// pub fn verify_load(metadata_spec: &SideMetadataSpec, data_addr: Address, actual_val: usize) {
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
-//     match sanity_map.get(metadata_spec) {
-//         Some(spec_sanity_map) => {
-//             // A content of None is Ok because we may load before store
-//             let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
-//                 *expected_val
-//             } else {
-//                 0usize
-//             };
-//             assert!(
-//                 expected_val == actual_val,
-//                 "verify_load({:#?}, {}) -> Expected (0x{:x}) but found (0x{:x})",
-//                 metadata_spec,
-//                 data_addr,
-//                 expected_val,
-//                 actual_val
-//             );
-//         }
-//         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
-//     }
-// }
-
 #[cfg(feature = "extreme_assertions")]
 use crate::util::metadata::metadata_val_traits::*;
 
@@ -494,8 +458,18 @@ mod truncate_tests {
     }
 }
 
+/// Ensures a side metadata load operation returns the correct side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - data address is not valid,
+/// 3 - the loaded side metadata content is not equal to the correct content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the loaded content for
+/// * `data_addr`: the address of the source data
+/// * `actual_val`: the actual content returned by the side metadata load operation
 #[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_load<T: MetadataValue>(
+pub fn verify_load<T: MetadataValue>(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     actual_val: T,
@@ -532,23 +506,8 @@ pub fn typed_verify_load<T: MetadataValue>(
 /// * `metadata_spec`: the metadata spec to commit the store operation for
 /// * `data_addr`: the address of the source data
 /// * `metadata`: the metadata content to store
-///
-// #[cfg(feature = "extreme_assertions")]
-// pub fn verify_store(metadata_spec: &SideMetadataSpec, data_addr: Address, metadata: usize) {
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-//     match sanity_map.get_mut(metadata_spec) {
-//         Some(spec_sanity_map) => {
-//             // Newly mapped memory including the side metadata memory is zeroed
-//             let content = spec_sanity_map.entry(data_addr).or_insert(0);
-//             *content = metadata;
-//         }
-//         None => panic!("Invalid Metadata Spec: {:#?}", metadata_spec),
-//     }
-// }
-
 #[cfg(feature = "extreme_assertions")]
-pub fn typed_verify_store<T: MetadataValue>(
+pub fn verify_store<T: MetadataValue>(
     metadata_spec: &SideMetadataSpec,
     data_addr: Address,
     metadata: T,
@@ -567,33 +526,16 @@ pub fn typed_verify_store<T: MetadataValue>(
     }
 }
 
-/// A helper function encapsulating the common parts of addition and subtraction
-// #[cfg(feature = "extreme_assertions")]
-// fn do_math(
-//     metadata_spec: &SideMetadataSpec,
-//     data_addr: Address,
-//     val: usize,
-//     math_op: MathOp,
-// ) -> Result<usize> {
-//     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
-//     match sanity_map.get_mut(metadata_spec) {
-//         Some(spec_sanity_map) => {
-//             // Newly mapped memory including the side metadata memory is zeroed
-//             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
-//             let old_val = *cur_val;
-//             match math_op {
-//                 MathOp::Add => *cur_val += val,
-//                 MathOp::Sub => *cur_val -= val,
-//             }
-//             Ok(old_val)
-//         }
-//         None => Err(Error::new(
-//             ErrorKind::InvalidInput,
-//             format!("Invalid Metadata Spec: {:#?}", metadata_spec),
-//         )),
-//     }
-// }
-
+/// Commits an update operation and ensures it returns the correct old side metadata content.
+/// Panics if:
+/// 1 - the metadata spec is not valid,
+/// 2 - the old side metadata content is not equal to the correct old content.
+///
+/// Arguments:
+/// * `metadata_spec`: the metadata spec to verify the old content for
+/// * `data_addr`: the address of the source data
+/// * `old_val`: the expected old value
+/// * `new_val`: the new value the metadata should hold.
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_update<T: MetadataValue>(
     metadata_spec: &SideMetadataSpec,
@@ -627,116 +569,6 @@ pub fn verify_update<T: MetadataValue>(
         None => panic!("Invalid metadata spec: {:#?}", metadata_spec),
     }
 }
-
-/// Commits a fetch and add operation and ensures it returns the correct old side metadata content.
-/// Panics if:
-/// 1 - the metadata spec is not valid,
-/// 2 - the old side metadata content is not equal to the correct old content.
-///
-/// Arguments:
-/// * `metadata_spec`: the metadata spec to verify the old content for
-/// * `data_addr`: the address of the source data
-/// * `val_to_add`: the number to be added to the old content
-/// * `actual_old_val`: the actual old content returned by the side metadata fetch and add operation
-///
-// #[cfg(feature = "extreme_assertions")]
-// pub fn verify_add(
-//     metadata_spec: &SideMetadataSpec,
-//     data_addr: Address,
-//     val_to_add: usize,
-//     actual_old_val: usize,
-// ) {
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
-//         Ok(expected_old_val) => {
-//             assert!(
-//                 actual_old_val == expected_old_val,
-//                 "Expected (0x{:x}) but found (0x{:x})",
-//                 expected_old_val,
-//                 actual_old_val
-//             );
-//         }
-//         Err(e) => panic!("{}", e),
-//     }
-// }
-
-// #[cfg(feature = "extreme_assertions")]
-// pub fn typed_verify_add<T: MetadataValue>(
-//     metadata_spec: &SideMetadataSpec,
-//     data_addr: Address,
-//     val_to_add: T,
-//     actual_old_val: T,
-// ) {
-//     let val_to_add: usize = val_to_add.to_usize().unwrap();
-//     let actual_old_val: usize = actual_old_val.to_usize().unwrap();
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     match do_math(metadata_spec, data_addr, val_to_add, MathOp::Add) {
-//         Ok(expected_old_val) => {
-//             assert!(
-//                 actual_old_val == expected_old_val,
-//                 "Expected (0x{:x}) but found (0x{:x})",
-//                 expected_old_val,
-//                 actual_old_val
-//             );
-//         }
-//         Err(e) => panic!("{}", e),
-//     }
-// }
-
-/// Commits a fetch and sub operation and ensures it returns the correct old side metadata content.
-/// Panics if:
-/// 1 - the metadata spec is not valid,
-/// 2 - the old side metadata content is not equal to the correct old content.
-///
-/// Arguments:
-/// * `metadata_spec`: the metadata spec to verify the old content for
-/// * `data_addr`: the address of the source data
-/// * `val_to_sub`: the number to be subtracted from the old content
-/// * `actual_old_val`: the actual old content returned by the side metadata fetch and sub operation
-///
-// #[cfg(feature = "extreme_assertions")]
-// pub fn verify_sub(
-//     metadata_spec: &SideMetadataSpec,
-//     data_addr: Address,
-//     val_to_sub: usize,
-//     actual_old_val: usize,
-// ) {
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
-//         Ok(expected_old_val) => {
-//             assert!(
-//                 actual_old_val == expected_old_val,
-//                 "Expected (0x{:x}) but found (0x{:x})",
-//                 expected_old_val,
-//                 actual_old_val
-//             );
-//         }
-//         Err(e) => panic!("{}", e),
-//     }
-// }
-
-// #[cfg(feature = "extreme_assertions")]
-// pub fn typed_verify_sub<T: MetadataValue>(
-//     metadata_spec: &SideMetadataSpec,
-//     data_addr: Address,
-//     val_to_sub: T,
-//     actual_old_val: T,
-// ) {
-//     let val_to_add: usize = val_to_add.to_usize().unwrap();
-//     let actual_old_val: usize = actual_old_val.to_usize().unwrap();
-//     verify_metadata_address_bound(metadata_spec, data_addr);
-//     match do_math(metadata_spec, data_addr, val_to_sub, MathOp::Sub) {
-//         Ok(expected_old_val) => {
-//             assert!(
-//                 actual_old_val == expected_old_val,
-//                 "Expected (0x{:x}) but found (0x{:x})",
-//                 expected_old_val,
-//                 actual_old_val
-//             );
-//         }
-//         Err(e) => panic!("{}", e),
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
