@@ -1,3 +1,5 @@
+//! This module provides a default implementation of the access functions for in-header metadata.
+
 use atomic::Ordering;
 use std::fmt;
 use std::sync::atomic::AtomicU8;
@@ -15,8 +17,6 @@ const BITS_IN_U32: usize = 1 << LOG_BITS_IN_U32;
 const LOG_BITS_IN_U64: usize = 6;
 const BITS_IN_U64: usize = 1 << LOG_BITS_IN_U64;
 
-/// This module provides a default implementation of the access functions for in-header metadata.
-
 /// This struct stores the specification of a header metadata bit-set.
 /// It supports either bits metadata of 1-7 bits in the same byte, or u8/u16/u32/u64 at an offset of their natural alignment.
 ///
@@ -28,12 +28,18 @@ pub struct HeaderMetadataSpec {
 }
 
 impl HeaderMetadataSpec {
-    #[inline(always)]
+    /// We only allow mask for u8/u16/u32/u64/usize. If a mask is used with a spec that does not allow it, this method will panic.
+    ///
+    /// We allow using mask for certain operations. The reason for mask is that for header metadata, we may have overlapping metadata specs. For example,
+    /// a forwarding pointer is pointer-size, but its last 2 bits could be used as forwarding bits. In that case, all accesses to the forwarding pointer
+    /// spec should be used with a mask to make sure that we exclude the forwarding bits.
+    #[cfg(debug_assertions)]
     fn assert_mask<T: MetadataValue>(&self, mask: Option<T>) {
         debug_assert!(mask.is_none() || self.num_of_bits >= 8, "optional_mask is only supported for 8X-bits in-header metadata. Problematic MetadataSpec: ({:?})", self);
     }
 
-    #[inline(always)]
+    /// Assert if this is a valid spec.
+    #[cfg(debug_assertions)]
     fn assert_spec<T: MetadataValue>(&self) {
         if self.num_of_bits == 0 {
             panic!("Metadata of 0 bits is not allowed.");
@@ -67,6 +73,10 @@ impl HeaderMetadataSpec {
         object.to_address() + self.byte_offset()
     }
 
+    // Some common methods for header metadata that is smaller than 1 byte.
+
+    /// Get the bit shift (the bit distance from the lowest bit to the bits location defined in the spec),
+    /// and the mask (used to extract value for the bits defined in the spec).
     #[inline(always)]
     fn get_shift_and_mask_for_bits(&self) -> (isize, u8) {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
@@ -76,15 +86,17 @@ impl HeaderMetadataSpec {
         (bit_shift, mask)
     }
 
+    /// Extract bits from a raw byte, and put it to the lowest bits.
     #[inline(always)]
-    fn get_bits_from_u8(&self, byte_val: u8) -> u8 {
+    fn get_bits_from_u8(&self, raw_byte: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         let (bit_shift, mask) = self.get_shift_and_mask_for_bits();
-        (byte_val & mask) >> bit_shift
+        (raw_byte & mask) >> bit_shift
     }
 
+    /// Set bits to a raw byte. `set_val` has the valid value in its lowest bits.
     #[inline(always)]
-    fn set_bits_to_u8(&self, orig_val: u8, set_val: u8) -> u8 {
+    fn set_bits_to_u8(&self, raw_byte: u8, set_val: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         debug_assert!(
             set_val < (1 << self.num_of_bits),
@@ -93,11 +105,12 @@ impl HeaderMetadataSpec {
             self.num_of_bits
         );
         let (bit_shift, mask) = self.get_shift_and_mask_for_bits();
-        (orig_val & !mask) | (set_val << bit_shift)
+        (raw_byte & !mask) | (set_val << bit_shift)
     }
 
+    /// Truncate a value based on the spec.
     #[inline(always)]
-    fn truncate_u8(&self, val: u8) -> u8 {
+    fn truncate_bits_in_u8(&self, val: u8) -> u8 {
         debug_assert!(self.num_of_bits < BITS_IN_BYTE);
         val & ((1 << self.num_of_bits) - 1)
     }
@@ -133,8 +146,11 @@ impl HeaderMetadataSpec {
         optional_mask: Option<T>,
         atomic_ordering: Option<Ordering>,
     ) -> T {
-        self.assert_mask::<T>(optional_mask);
-        self.assert_spec::<T>();
+        #[cfg(debug_assertions)]
+        {
+            self.assert_mask::<T>(optional_mask);
+            self.assert_spec::<T>();
+        }
 
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
         let res: T = if self.num_of_bits < 8 {
@@ -202,8 +218,11 @@ impl HeaderMetadataSpec {
         optional_mask: Option<T>,
         atomic_ordering: Option<Ordering>,
     ) {
-        self.assert_mask::<T>(optional_mask);
-        self.assert_spec::<T>();
+        #[cfg(debug_assertions)]
+        {
+            self.assert_mask::<T>(optional_mask);
+            self.assert_spec::<T>();
+        }
 
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask, and compare_exchange is required
         if self.num_of_bits < 8 {
@@ -258,6 +277,9 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `compare_exchange_metadata` method from the `ObjectModel` trait.
+    ///
+    /// Note: this function only does fetch and exclusive store once, without any busy waiting in a loop.
     #[inline(always)]
     pub fn compare_exchange<T: MetadataValue>(
         &self,
@@ -268,6 +290,7 @@ impl HeaderMetadataSpec {
         success_order: Ordering,
         failure_order: Ordering,
     ) -> bool {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
         if self.num_of_bits < 8 {
@@ -311,8 +334,9 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// Inner method for fetch_add/sub/and/or on bits.
     #[inline(always)]
-    fn fetch_update_bits<F: Fn(u8) -> u8>(
+    fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
         object: ObjectReference,
         set_order: Ordering,
@@ -325,9 +349,9 @@ impl HeaderMetadataSpec {
             unsafe {
                 let old_byte = byte_addr.atomic_load::<AtomicU8>(fetch_order);
                 let old_metadata = self.get_bits_from_u8(old_byte);
-                // new_metadata may contain overflow and should be and with the mask
+                // new_metadata may contain overflow and need to be truncated
                 // TODO: do we really need this?
-                let new_metadata = self.truncate_u8(update(old_metadata));
+                let new_metadata = self.truncate_bits_in_u8(update(old_metadata));
                 let new_byte = self.set_bits_to_u8(old_byte, new_metadata);
                 if byte_addr
                     .compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order)
@@ -339,6 +363,7 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.
     #[inline(always)]
     pub fn fetch_add<T: MetadataValue>(
         &self,
@@ -346,9 +371,10 @@ impl HeaderMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| {
+            FromPrimitive::from_u8(self.fetch_ops_on_bits(object, order, order, |x: u8| {
                 x.wrapping_add(val.to_u8().unwrap())
             }))
             .unwrap()
@@ -357,6 +383,7 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `fetch_sub` method from the `ObjectModel` trait.
     #[inline(always)]
     pub fn fetch_sub<T: MetadataValue>(
         &self,
@@ -364,9 +391,10 @@ impl HeaderMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_update_bits(object, order, order, |x: u8| {
+            FromPrimitive::from_u8(self.fetch_ops_on_bits(object, order, order, |x: u8| {
                 x.wrapping_sub(val.to_u8().unwrap())
             }))
             .unwrap()
@@ -375,6 +403,7 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `fetch_and` method from the `ObjectModel` trait.
     #[inline(always)]
     pub fn fetch_and<T: MetadataValue>(
         &self,
@@ -382,10 +411,11 @@ impl HeaderMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
             FromPrimitive::from_u8(
-                self.fetch_update_bits(object, order, order, |x: u8| x & val.to_u8().unwrap()),
+                self.fetch_ops_on_bits(object, order, order, |x: u8| x & val.to_u8().unwrap()),
             )
             .unwrap()
         } else {
@@ -393,6 +423,7 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `fetch_or` method from the `ObjectModel` trait.
     #[inline(always)]
     pub fn fetch_or<T: MetadataValue>(
         &self,
@@ -400,10 +431,11 @@ impl HeaderMetadataSpec {
         val: T,
         order: Ordering,
     ) -> T {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
             FromPrimitive::from_u8(
-                self.fetch_update_bits(object, order, order, |x: u8| x | val.to_u8().unwrap()),
+                self.fetch_ops_on_bits(object, order, order, |x: u8| x | val.to_u8().unwrap()),
             )
             .unwrap()
         } else {
@@ -411,6 +443,8 @@ impl HeaderMetadataSpec {
         }
     }
 
+    /// This function provides a default implementation for the `fetch_update` method from the `ObjectModel` trait.
+    /// The semantics is the same as Rust's `fetch_update` on atomic types.
     #[inline(always)]
     pub fn fetch_update<T: MetadataValue>(
         &self,
@@ -419,6 +453,7 @@ impl HeaderMetadataSpec {
         fetch_order: Ordering,
         mut f: impl FnMut(T) -> Option<T> + Copy,
     ) -> std::result::Result<T, T> {
+        #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(object);
@@ -426,10 +461,10 @@ impl HeaderMetadataSpec {
                 let old_byte = unsafe { byte_addr.atomic_load::<AtomicU8>(fetch_order) };
                 let old_metadata = self.get_bits_from_u8(old_byte);
                 let old_metadata_val = FromPrimitive::from_u8(old_metadata).unwrap();
-                // new_metadata may contain overflow and should be and with the mask
+                // new_metadata may contain overflow and need to be truncated
                 // TODO: do we really need this?
                 let new_metadata: Option<u8> =
-                    f(old_metadata_val).map(|byte| self.truncate_u8(byte.to_u8().unwrap()));
+                    f(old_metadata_val).map(|byte| self.truncate_bits_in_u8(byte.to_u8().unwrap()));
                 if let Some(new_metadata_to_set) = new_metadata {
                     let new_byte = self.set_bits_to_u8(old_byte, new_metadata_to_set);
                     if unsafe {

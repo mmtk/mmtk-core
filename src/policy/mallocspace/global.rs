@@ -316,7 +316,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             address,
         );
 
-        // TODO: Why do we use non-atomic load her?
+        // TODO: Why do we use non-atomic load here?
         if !unsafe { is_marked_unsafe::<VM>(object) } {
             let chunk_start = conversions::chunk_align_down(address);
             set_mark_bit::<VM>(object, Ordering::SeqCst);
@@ -405,7 +405,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     fn sweep_object(&self, object: ObjectReference, empty_page_start: &mut Address) -> bool {
         let (obj_start, offset_malloc, bytes) = Self::get_malloc_addr_size(object);
 
-        // We are the only thrad that is dealing with the object. We can use non-atomic methods for the metadata.
+        // We are the only thread that is dealing with the object. We can use non-atomic methods for the metadata.
         if !unsafe { is_marked_unsafe::<VM>(object) } {
             // Dead object
             trace!("Object {} has been allocated but not marked", object);

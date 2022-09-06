@@ -103,6 +103,9 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
 
     #[inline(always)]
     fn barrier(&mut self, obj: ObjectReference) {
+        // Perform a quick non-atomic load for performance.
+        // It is okay if this check fails occasionally and
+        // the execution goes to the slowpath, we can take care of that in the slowpath.
         if unsafe { self.meta.load::<E::VM, u8>(obj, None) == 0 } {
             return;
         }

@@ -130,7 +130,6 @@ impl SideMetadataSpec {
     /// # Arguments
     ///
     /// * `metadata_spec` - The specification of the target side metadata.
-    ///
     /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
     ///
     pub fn bzero_metadata(&self, start: Address, size: usize) {
@@ -181,10 +180,7 @@ impl SideMetadataSpec {
                 while next_data_chunk != last_data_chunk {
                     memory::zero(
                         address_to_meta_address(self, next_data_chunk),
-                        metadata_bytes_per_chunk(
-                            self.log_bytes_in_region,
-                            self.log_num_of_bits,
-                        ),
+                        metadata_bytes_per_chunk(self.log_bytes_in_region, self.log_num_of_bits),
                     );
                     next_data_chunk += BYTES_IN_CHUNK;
                 }
@@ -408,7 +404,7 @@ impl SideMetadataSpec {
     }
 
     #[inline(always)]
-    fn fetch_update_bits<F: Fn(u8) -> u8>(
+    fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
         data_addr: Address,
         meta_addr: Address,
@@ -449,26 +445,7 @@ impl SideMetadataSpec {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
                 if bits_num_log < 3 {
-                    // let lshift = meta_byte_lshift(self, data_addr);
-                    // let mask = meta_byte_mask(self) << lshift;
-                    // let val_u8 = val.to_u8().unwrap();
-
-                    // let mut old_val = unsafe { meta_addr.load::<u8>() };
-                    // let mut new_sub_val = (((old_val & mask) >> lshift) + val_u8) & (mask >> lshift);
-                    // let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
-
-                    // while unsafe {
-                    //     meta_addr
-                    //         .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                    //         .is_err()
-                    // } {
-                    //     old_val = unsafe { meta_addr.load::<u8>() };
-                    //     new_sub_val = (((old_val & mask) >> lshift) + val_u8) & (mask >> lshift);
-                    //     new_val = (old_val & !mask) | (new_sub_val << lshift);
-                    // }
-
-                    // FromPrimitive::from_u8(old_val & mask).unwrap()
-                    FromPrimitive::from_u8(self.fetch_update_bits(
+                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
                         data_addr,
                         meta_addr,
                         order,
@@ -500,26 +477,7 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
-                    // let lshift = meta_byte_lshift(self, data_addr);
-                    // let mask = meta_byte_mask(self) << lshift;
-                    // let val_u8 = val.to_u8().unwrap();
-
-                    // let mut old_val = unsafe { meta_addr.load::<u8>() };
-                    // let mut new_sub_val = (((old_val & mask) >> lshift) - val_u8) & (mask >> lshift);
-                    // let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
-
-                    // while unsafe {
-                    //     meta_addr
-                    //         .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                    //         .is_err()
-                    // } {
-                    //     old_val = unsafe { meta_addr.load::<u8>() };
-                    //     new_sub_val = (((old_val & mask) >> lshift) - val_u8) & (mask >> lshift);
-                    //     new_val = (old_val & !mask) | (new_sub_val << lshift);
-                    // }
-
-                    // FromPrimitive::from_u8(old_val & mask).unwrap()
-                    FromPrimitive::from_u8(self.fetch_update_bits(
+                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
                         data_addr,
                         meta_addr,
                         order,
@@ -551,7 +509,7 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
-                    FromPrimitive::from_u8(self.fetch_update_bits(
+                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
                         data_addr,
                         meta_addr,
                         order,
@@ -582,7 +540,7 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
-                    FromPrimitive::from_u8(self.fetch_update_bits(
+                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
                         data_addr,
                         meta_addr,
                         order,
@@ -951,75 +909,6 @@ impl<const ENTRIES: usize> MetadataByteArrayRef<ENTRIES> {
         value
     }
 }
-
-/// Bulk-zero a specific metadata for a chunk.
-///
-/// # Arguments
-///
-/// * `metadata_spec` - The specification of the target side metadata.
-///
-/// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
-///
-// pub fn bzero_metadata(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
-//     #[cfg(feature = "extreme_assertions")]
-//     let _lock = sanity::SANITY_LOCK.lock().unwrap();
-
-//     // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
-//     #[cfg(not(feature = "global_alloc_bit"))]
-//     debug_assert!(
-//         start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(metadata_spec, start) == 0
-//     );
-
-//     #[cfg(feature = "extreme_assertions")]
-//     sanity::verify_bzero(metadata_spec, start, size);
-
-//     let meta_start = address_to_meta_address(metadata_spec, start);
-//     if cfg!(target_pointer_width = "64") || metadata_spec.is_global {
-//         memory::zero(
-//             meta_start,
-//             address_to_meta_address(metadata_spec, start + size) - meta_start,
-//         );
-//     }
-//     #[cfg(target_pointer_width = "32")]
-//     if !metadata_spec.is_global {
-//         // per chunk policy-specific metadata for 32-bits targets
-//         let chunk_num = ((start + size).align_down(BYTES_IN_CHUNK)
-//             - start.align_down(BYTES_IN_CHUNK))
-//             / BYTES_IN_CHUNK;
-//         if chunk_num == 0 {
-//             memory::zero(
-//                 meta_start,
-//                 address_to_meta_address(metadata_spec, start + size) - meta_start,
-//             );
-//         } else {
-//             let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
-//             // bzero the first sub-chunk
-//             memory::zero(
-//                 meta_start,
-//                 address_to_meta_address(metadata_spec, second_data_chunk) - meta_start,
-//             );
-//             let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-//             let last_meta_chunk = address_to_meta_address(metadata_spec, last_data_chunk);
-//             // bzero the last sub-chunk
-//             memory::zero(
-//                 last_meta_chunk,
-//                 address_to_meta_address(metadata_spec, start + size) - last_meta_chunk,
-//             );
-//             let mut next_data_chunk = second_data_chunk;
-//             // bzero all chunks in the middle
-//             while next_data_chunk != last_data_chunk {
-//                 memory::zero(
-//                     address_to_meta_address(metadata_spec, next_data_chunk),
-//                     metadata_bytes_per_chunk(
-//                         metadata_spec.log_bytes_in_region,
-//                         metadata_spec.log_num_of_bits,
-//                     ),
-//                 );
-//                 next_data_chunk += BYTES_IN_CHUNK;
-//             }
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

@@ -23,6 +23,8 @@ impl_bits_trait!(u32);
 impl_bits_trait!(u64);
 impl_bits_trait!(usize);
 
+/// Describes bitwise operations.
+/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/232
 pub trait BitwiseOps {
     fn bitand(self, other: Self) -> Self;
     fn bitor(self, other: Self) -> Self;
@@ -53,94 +55,9 @@ impl_bitwise_ops_trait!(u32);
 impl_bitwise_ops_trait!(u64);
 impl_bitwise_ops_trait!(usize);
 
-/// Atomic trait used for metadata.
-/// Ideally we should use atomic_traits or atomic. However, for those traits,
-/// their associate non-atomic type is a general type rather than a type of numbers.
-// pub trait MetadataAtomic: Sized {
-//     type NonAtomicType: MetadataValue;
-
-//     fn load(&self, order: Ordering) -> Self::NonAtomicType;
-//     fn store(&self, value: Self::NonAtomicType, order: Ordering);
-//     fn compare_exchange(
-//         &self,
-//         current: Self::NonAtomicType,
-//         new: Self::NonAtomicType,
-//         success: Ordering,
-//         failure: Ordering,
-//     ) -> Result<Self::NonAtomicType, Self::NonAtomicType>;
-//     fn fetch_add(&self, value: Self::NonAtomicType, order: Ordering) -> Self::NonAtomicType;
-//     fn fetch_sub(&self, value: Self::NonAtomicType, order: Ordering) -> Self::NonAtomicType;
-//     fn fetch_update<F>(
-//         &self,
-//         set_order: Ordering,
-//         fetch_order: Ordering,
-//         f: F,
-//     ) -> Result<Self::NonAtomicType, Self::NonAtomicType>
-//     where
-//         F: FnMut(Self::NonAtomicType) -> Option<Self::NonAtomicType>;
-// }
-// macro_rules! impl_atomic_trait {
-//     ($atomic:ty, $non_atomic:ty) => {
-//         impl MetadataAtomic for $atomic {
-//             type NonAtomicType = $non_atomic;
-
-//             #[inline]
-//             fn load(&self, order: Ordering) -> Self::NonAtomicType {
-//                 <$atomic>::load(self, order)
-//             }
-
-//             #[inline]
-//             fn store(&self, value: Self::NonAtomicType, order: Ordering) {
-//                 <$atomic>::store(self, value, order)
-//             }
-
-//             #[inline]
-//             fn compare_exchange(
-//                 &self,
-//                 current: Self::NonAtomicType,
-//                 new: Self::NonAtomicType,
-//                 success: Ordering,
-//                 failure: Ordering,
-//             ) -> Result<Self::NonAtomicType, Self::NonAtomicType> {
-//                 <$atomic>::compare_exchange(
-//                     self,
-//                     current,
-//                     new,
-//                     success,
-//                     failure,
-//                 )
-//             }
-
-//             #[inline]
-//             fn fetch_add(&self, value: Self::NonAtomicType, order: Ordering) -> Self::NonAtomicType{
-//                 <$atomic>::fetch_add(self, value, order)
-//             }
-
-//             #[inline]
-//             fn fetch_sub(&self, value: Self::NonAtomicType, order: Ordering) -> Self::NonAtomicType{
-//                 <$atomic>::fetch_sub(self, value, order)
-//             }
-
-//             #[inline]
-//             fn fetch_update<F>(
-//                 &self,
-//                 set_order: Ordering,
-//                 fetch_order: Ordering,
-//                 f: F,
-//             ) -> Result<Self::NonAtomicType, Self::NonAtomicType>
-//             where
-//                 F: FnMut(Self::NonAtomicType) -> Option<Self::NonAtomicType> {
-//                 <$atomic>::fetch_update(self, set_order, fetch_order, f)
-//             }
-//         }
-//     }
-// }
-// impl_atomic_trait!(AtomicU8, u8);
-// impl_atomic_trait!(AtomicU16, u16);
-// impl_atomic_trait!(AtomicU32, u32);
-// impl_atomic_trait!(AtomicU64, u64);
-
-/// The number type for load/store metadata.
+/// The number type for accessing metadata.
+/// It requires a few traits from num-traits and a few traits we defined above.
+/// The methods in this trait are mostly about atomically accessing such types.
 pub trait MetadataValue:
     Unsigned
     + WrappingAdd
@@ -216,13 +133,6 @@ pub trait MetadataValue:
 macro_rules! impl_metadata_value_trait {
     ($non_atomic: ty, $atomic: ty) => {
         impl MetadataValue for $non_atomic {
-            // type AtomicType = $atomic;
-
-            // #[inline(always)]
-            // fn as_atomic(&self) -> &$atomic {
-            //     unsafe { std::mem::transmute(self) }
-            // }
-
             #[inline]
             unsafe fn load(addr: Address) -> Self {
                 addr.load::<$non_atomic>()
