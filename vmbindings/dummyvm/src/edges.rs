@@ -47,7 +47,6 @@ impl MemorySlice for DummyVMMemorySlice {
     type Edge = DummyVMEdge;
     type EdgeIterator = DummyVMMemorySliceIterator;
 
-    #[inline]
     fn iter_edges(&self) -> Self::EdgeIterator {
         DummyVMMemorySliceIterator {
             cursor: unsafe { (*self.0).as_mut_ptr_range().start },
@@ -55,14 +54,28 @@ impl MemorySlice for DummyVMMemorySlice {
         }
     }
 
-    #[inline]
     fn start(&self) -> Address {
         Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
     }
 
-    #[inline]
     fn bytes(&self) -> usize {
         unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+    }
+
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        debug_assert_eq!(
+            src.bytes() & ((1 << LOG_BYTES_IN_ADDRESS) - 1),
+            0,
+            "bytes are not a multiple of words"
+        );
+        // Raw memory copy
+        unsafe {
+            let words = tgt.bytes() >> LOG_BYTES_IN_ADDRESS;
+            let src = src.start().to_ptr::<usize>();
+            let tgt = tgt.start().to_mut_ptr::<usize>();
+            std::ptr::copy(src, tgt, words)
+        }
     }
 }
 

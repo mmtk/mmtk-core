@@ -3,7 +3,7 @@ use std::{fmt::Debug, ops::Range};
 
 use atomic::Atomic;
 
-use crate::util::constants::BYTES_IN_ADDRESS;
+use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
 /// An abstract edge.  An edge holds an object reference.  When we load from it, we get an
@@ -144,17 +144,7 @@ pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     /// Size of the memory slice
     fn bytes(&self) -> usize;
     /// Memory copy support
-    #[inline]
-    fn copy(src: &Self, tgt: &Self) {
-        debug_assert_eq!(src.bytes(), tgt.bytes());
-        // Raw memory copy
-        unsafe {
-            let bytes = tgt.bytes();
-            let src = src.start().to_ptr::<u8>();
-            let tgt = tgt.start().to_mut_ptr::<u8>();
-            std::ptr::copy(src, tgt, bytes)
-        }
-    }
+    fn copy(src: &Self, tgt: &Self);
 }
 
 /// Iterate edges within `Range<Address>`.
@@ -198,6 +188,23 @@ impl MemorySlice for Range<Address> {
     #[inline]
     fn bytes(&self) -> usize {
         self.end - self.start
+    }
+
+    #[inline]
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        debug_assert_eq!(
+            src.bytes() & ((1 << LOG_BYTES_IN_ADDRESS) - 1),
+            0,
+            "bytes are not a multiple of words"
+        );
+        // Raw memory copy
+        unsafe {
+            let words = tgt.bytes() >> LOG_BYTES_IN_ADDRESS;
+            let src = src.start().to_ptr::<usize>();
+            let tgt = tgt.start().to_mut_ptr::<usize>();
+            std::ptr::copy(src, tgt, words)
+        }
     }
 }
 
