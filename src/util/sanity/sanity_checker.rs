@@ -4,7 +4,7 @@ use crate::util::ObjectReference;
 use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::MMTK;
-use crate::{scheduler::*, Queue};
+use crate::{scheduler::*, ObjectQueue};
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
