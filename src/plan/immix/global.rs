@@ -38,7 +38,7 @@ pub struct Immix<VM: VMBinding> {
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
+    moves_objects: crate::policy::immix::DEFRAG,
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
