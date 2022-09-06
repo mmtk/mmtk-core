@@ -81,6 +81,13 @@ global_alloc_bit = []
 # conservative garbage collection support
 is_mmtk_object = ["global_alloc_bit"]
 
+# The following two features are useful for using Immix for VMs that do not support moving GC.
+
+# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
+immix_no_defrag = []
+# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+immix_smaller_block = []
+
 # Run sanity GC
 sanity = []
 # Run analysis
