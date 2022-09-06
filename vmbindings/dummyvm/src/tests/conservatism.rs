@@ -13,7 +13,7 @@ lazy_static! {
 }
 
 fn basic_filter(addr: Address) -> bool {
-    !addr.is_zero() && addr.as_usize() % ALLOC_BIT_REGION_SIZE == OBJECT_REF_OFFSET
+    !addr.is_zero() && addr.as_usize() % ALLOC_BIT_REGION_SIZE == (OBJECT_REF_OFFSET % ALLOC_BIT_REGION_SIZE)
 }
 
 fn assert_filter_pass(addr: Address) {
