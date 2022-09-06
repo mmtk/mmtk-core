@@ -80,6 +80,11 @@
 <span id="78">78</span>
 <span id="79">79</span>
 <span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><pre class="rust"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE</span>;
@@ -99,9 +104,14 @@
 <span class="comment">// This is made public, as VM bingdings may need to use this.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x1000_0000</span>) };
+
+<span class="comment">// FIXME: The 64-bit base address is changed from 0x0600_0000_0000 to 0x0c00_0000_0000 so that it</span>
+<span class="comment">// is less likely to overlap with any space.  But it does not solve the problem completely.</span>
+<span class="comment">// If there are more spaces, it will still overlap with some spaces.</span>
+<span class="comment">// See: https://github.com/mmtk/mmtk-core/issues/458</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>: <span class="ident">Address</span> <span class="op">=</span>
-    <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0600_0000_0000usize</span>) };
+    <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_0c00_0000_0000usize</span>) };
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">GLOBAL_SIDE_METADATA_BASE_OFFSET</span>: <span class="ident">SideMetadataOffset</span> <span class="op">=</span>
     <span class="ident">SideMetadataOffset::addr</span>(<span class="ident">GLOBAL_SIDE_METADATA_BASE_ADDRESS</span>);

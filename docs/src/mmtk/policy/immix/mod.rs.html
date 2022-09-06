@@ -53,7 +53,7 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">BLOCK_ONLY</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
 
 <span class="doccomment">/// Opportunistic copying</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFRAG</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">DEFRAG</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="op">!</span><span class="macro">cfg!</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_no_defrag&quot;</span>);
 
 <span class="doccomment">/// Mark lines when scanning objects.</span>
 <span class="doccomment">/// Otherwise, do it at mark time.</span>

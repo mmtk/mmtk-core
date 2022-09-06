@@ -217,7 +217,7 @@
 }
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">IMMIX_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
-    <span class="ident">moves_objects</span>: <span class="bool-val">true</span>,
+    <span class="ident">moves_objects</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::DEFRAG</span>,
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
