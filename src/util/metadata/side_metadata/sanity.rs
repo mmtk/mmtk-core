@@ -38,7 +38,8 @@ lazy_static! {
     /// This is a two-level hashmap to store the metadata content for verification purposes.
     /// It keeps a map from side metadata specifications to a second hashmap
     /// which maps data addresses to their current metadata content.
-    static ref CONTENT_SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, usize>>> =
+    /// Use u64 to store side metadata values, as u64 is the max length of side metadata we support.
+    static ref CONTENT_SANITY_MAP: RwLock<HashMap<SideMetadataSpec, HashMap<Address, u64>>> =
         RwLock::new(HashMap::new());
     pub(crate) static ref SANITY_LOCK: Mutex<()> = Mutex::new(());
 }
@@ -470,7 +471,7 @@ pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usiz
 use crate::util::metadata::metadata_val_traits::*;
 
 #[cfg(feature = "extreme_assertions")]
-fn truncate_value<T: MetadataValue>(log_num_of_bits: usize, val: usize) -> usize {
+fn truncate_value<T: MetadataValue>(log_num_of_bits: usize, val: u64) -> u64 {
     // truncate the val if metadata's bits is fewer than the type's bits
     if log_num_of_bits < T::LOG2 as usize {
         val & ((1 << (1 << log_num_of_bits)) - 1)
@@ -499,7 +500,7 @@ pub fn typed_verify_load<T: MetadataValue>(
     data_addr: Address,
     actual_val: T,
 ) {
-    let actual_val: usize = actual_val.to_usize().unwrap();
+    let actual_val: u64 = actual_val.to_u64().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
     match sanity_map.get(metadata_spec) {
@@ -508,7 +509,7 @@ pub fn typed_verify_load<T: MetadataValue>(
             let expected_val = if let Some(expected_val) = spec_sanity_map.get(&data_addr) {
                 *expected_val
             } else {
-                0usize
+                0u64
             };
             assert!(
                 expected_val == actual_val,
@@ -552,7 +553,7 @@ pub fn typed_verify_store<T: MetadataValue>(
     data_addr: Address,
     metadata: T,
 ) {
-    let metadata: usize = metadata.to_usize().unwrap();
+    let metadata: u64 = metadata.to_u64().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, metadata);
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
@@ -604,7 +605,7 @@ pub fn verify_update<T: MetadataValue>(
 
     // truncate the new_val if metadata's bits is fewer than the type's bits
     let new_val_wrapped =
-        truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_usize().unwrap());
+        truncate_value::<T>(metadata_spec.log_num_of_bits, new_val.to_u64().unwrap());
     println!(
         "verify_update old = {} new = {} wrapped = {:x}",
         old_val, new_val, new_val_wrapped
@@ -615,7 +616,7 @@ pub fn verify_update<T: MetadataValue>(
         Some(spec_sanity_map) => {
             let cur_val = spec_sanity_map.entry(data_addr).or_insert(0);
             assert_eq!(
-                old_val.to_usize().unwrap(),
+                old_val.to_u64().unwrap(),
                 *cur_val,
                 "Expected old value: {} but found {}",
                 old_val,
