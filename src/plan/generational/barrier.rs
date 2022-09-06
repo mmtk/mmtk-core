@@ -1,7 +1,7 @@
 //! Generational read/write barrier implementations.
 
 use crate::plan::barriers::BarrierSemantics;
-use crate::plan::{Queue, VectorQueue};
+use crate::plan::VectorQueue;
 use crate::policy::space::Space;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::BYTES_IN_ADDRESS;
@@ -38,8 +38,8 @@ impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
 
     #[cold]
     fn flush_modbuf(&mut self) {
-        if let Some(buf) = self.modbuf.take() {
-            debug_assert!(!buf.is_empty());
+        let buf = self.modbuf.take();
+        if !buf.is_empty() {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(ProcessModBuf::<GenNurseryProcessEdges<VM>>::new(buf));
         }
@@ -47,7 +47,8 @@ impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
 
     #[cold]
     fn flush_region_modbuf(&mut self) {
-        if let Some(buf) = self.region_modbuf.take() {
+        let buf = self.region_modbuf.take();
+        if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
                 .add(ProcessRegionModBuf::<GenNurseryProcessEdges<VM>>::new(buf));
@@ -71,7 +72,7 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
         _target: ObjectReference,
     ) {
         // enqueue the object
-        self.modbuf.enqueue(src);
+        self.modbuf.push(src);
         self.modbuf.is_full().then(|| self.flush_modbuf());
     }
 
@@ -84,7 +85,7 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
                 0,
                 "bytes should be a multiple of words"
             );
-            self.region_modbuf.enqueue(dst);
+            self.region_modbuf.push(dst);
             self.region_modbuf
                 .is_full()
                 .then(|| self.flush_region_modbuf());

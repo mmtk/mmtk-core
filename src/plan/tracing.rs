@@ -7,15 +7,10 @@ use crate::util::ObjectReference;
 use crate::vm::EdgeVisitor;
 
 /// This trait represents an object queue to enqueue objects during tracing.
-pub trait Queue<T> {
+pub trait ObjectQueue {
     /// Enqueue an object into the queue.
-    /// Returns `true` if the queue reaches it's capacity.
-    fn enqueue(&mut self, value: T);
+    fn enqueue(&mut self, object: ObjectReference);
 }
-
-pub trait ObjectQueue: Queue<ObjectReference> {}
-
-impl<T: Queue<ObjectReference>> ObjectQueue for T {}
 
 pub type VectorObjectQueue = VectorQueue<ObjectReference>;
 
@@ -40,12 +35,8 @@ impl<T> VectorQueue<T> {
     }
 
     /// Return the contents of the underlying vector.  It will empty the queue.
-    pub fn take(&mut self) -> Option<Vec<T>> {
-        if self.buffer.is_empty() {
-            None
-        } else {
-            Some(std::mem::take(&mut self.buffer))
-        }
+    pub fn take(&mut self) -> Vec<T> {
+        std::mem::take(&mut self.buffer)
     }
 
     /// Consume this `VectorObjectQueue` and return its underlying vector.
@@ -58,6 +49,14 @@ impl<T> VectorQueue<T> {
     pub fn is_full(&self) -> bool {
         self.buffer.len() >= Self::CAPACITY
     }
+
+    #[inline(always)]
+    pub fn push(&mut self, v: T) {
+        if self.buffer.is_empty() {
+            self.buffer.reserve(Self::CAPACITY);
+        }
+        self.buffer.push(v);
+    }
 }
 
 impl<T> Default for VectorQueue<T> {
@@ -66,13 +65,10 @@ impl<T> Default for VectorQueue<T> {
     }
 }
 
-impl<T> Queue<T> for VectorQueue<T> {
+impl ObjectQueue for VectorQueue<ObjectReference> {
     #[inline(always)]
-    fn enqueue(&mut self, v: T) {
-        if self.buffer.is_empty() {
-            self.buffer.reserve(Self::CAPACITY);
-        }
-        self.buffer.push(v);
+    fn enqueue(&mut self, v: ObjectReference) {
+        self.push(v);
     }
 }
 
@@ -91,7 +87,8 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 
     fn flush(&mut self) {
-        if let Some(buf) = self.buffer.take() {
+        let buf = self.buffer.take();
+        if !buf.is_empty() {
             self.worker.add_work(
                 WorkBucketStage::Closure,
                 E::new(buf, false, self.worker.mmtk),
@@ -103,7 +100,7 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
 impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
     #[inline(always)]
     fn visit_edge(&mut self, slot: EdgeOf<E>) {
-        self.buffer.enqueue(slot);
+        self.buffer.push(slot);
         if self.buffer.is_full() {
             self.flush();
         }
