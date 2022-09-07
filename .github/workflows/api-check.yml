@@ -28,4 +28,8 @@ jobs:
 
       # Install and run cargo public-api and deny any API diff
       - run: cargo install cargo-public-api
-      - run: cargo public-api --diff-git-checkouts ${GITHUB_BASE_REF} ${GITHUB_HEAD_REF} --deny=all
+      - run: cargo public-api > pr-api.txt
+      - run: |
+          git checkout ${GITHUB_BASE_REF}
+          cargo public-api > trunk-api.txt
+      - run: diff trunk-api.txt pr-api.txt
