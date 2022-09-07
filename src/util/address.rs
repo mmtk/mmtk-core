@@ -239,6 +239,7 @@ impl Address {
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
@@ -247,6 +248,7 @@ impl Address {
     /// atomic operation: store
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
         let loc = &*(self.0 as *const T);
         loc.store(val, order)
@@ -255,6 +257,7 @@ impl Address {
     /// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn compare_exchange<T: Atomic>(
         self,
         old: T::Type,
@@ -318,6 +321,7 @@ impl Address {
     ///
     /// # Safety
     /// The caller must guarantee the address actually points to a Rust object.
+    #[inline(always)]
     pub unsafe fn as_ref<'a, T>(self) -> &'a T {
         &*self.to_mut_ptr()
     }

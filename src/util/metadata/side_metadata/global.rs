@@ -116,6 +116,7 @@ impl SideMetadataSpec {
 
     /// Used only for debugging.
     /// Assert if the given MetadataValue type matches the spec.
+    #[cfg(debug_assertions)]
     fn assert_value_type<T: MetadataValue>(&self) {
         let log_b = self.log_num_of_bits;
         match log_b {

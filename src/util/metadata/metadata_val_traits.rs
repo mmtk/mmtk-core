@@ -133,27 +133,27 @@ pub trait MetadataValue:
 macro_rules! impl_metadata_value_trait {
     ($non_atomic: ty, $atomic: ty) => {
         impl MetadataValue for $non_atomic {
-            #[inline]
+            #[inline(always)]
             unsafe fn load(addr: Address) -> Self {
                 addr.load::<$non_atomic>()
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn load_atomic(addr: Address, order: Ordering) -> Self {
                 addr.as_ref::<$atomic>().load(order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn store(addr: Address, value: Self) {
                 addr.store::<$non_atomic>(value)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn store_atomic(addr: Address, value: Self, order: Ordering) {
                 addr.as_ref::<$atomic>().store(value, order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn compare_exchange(
                 addr: Address,
                 current: Self,
@@ -165,27 +165,27 @@ macro_rules! impl_metadata_value_trait {
                     .compare_exchange(current, new, success, failure)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn fetch_add(addr: Address, value: Self, order: Ordering) -> Self {
                 addr.as_ref::<$atomic>().fetch_add(value, order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn fetch_sub(addr: Address, value: Self, order: Ordering) -> Self {
                 addr.as_ref::<$atomic>().fetch_sub(value, order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn fetch_and(addr: Address, value: Self, order: Ordering) -> Self {
                 addr.as_ref::<$atomic>().fetch_and(value, order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn fetch_or(addr: Address, value: Self, order: Ordering) -> Self {
                 addr.as_ref::<$atomic>().fetch_or(value, order)
             }
 
-            #[inline]
+            #[inline(always)]
             unsafe fn fetch_update<F>(
                 addr: Address,
                 set_order: Ordering,
