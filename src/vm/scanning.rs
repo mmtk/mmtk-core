@@ -1,8 +1,10 @@
 use crate::plan::Mutator;
+use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::edge_shape::Edge;
 use crate::vm::VMBinding;
+use crate::AllocationSemantics;
 
 /// Callback trait of scanning functions that report edges.
 pub trait EdgeVisitor<ES: Edge> {
@@ -29,6 +31,46 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self(object)
     }
+}
+
+pub trait BufferHandler {
+    /// Call this function to retain buffers.
+    ///
+    /// Arguments:
+    /// * `buffer`: The address of the buffer
+    /// * `size`: The size of the buffer
+    /// * `alignment`: The alignment of the buffer
+    /// * `offset`: Offset associated with the alignment.
+    ///
+    /// Returns the new address of the buffer.  Copying GC may move the buffer to a different
+    /// place, but will preserve its size, alignment and copy its content.  If that happens, the
+    /// return value is the new address.  If the buffer is not copied, the return value is the
+    /// original address.
+    fn retain_buffer(
+        &mut self,
+        buffer: Address,
+        size: usize,
+        alignment: usize,
+        offset: isize,
+    ) -> Address;
+
+    /// Call this function to allocate a new buffer during GC.
+    ///
+    /// Arguments:
+    /// * `size`: The size of the buffer
+    /// * `alignment`: The alignment of the buffer
+    /// * `semantics`: The allocation semantics of the buffer.
+    /// * `offset`: Offset associated with the alignment.
+    ///   May be different from the owning object.
+    ///
+    /// Returns the address of the new buffer.
+    fn allocate_buffer(
+        &mut self,
+        size: usize,
+        alignment: usize,
+        offset: isize,
+        semantics: AllocationSemantics,
+    ) -> Address;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.
@@ -137,6 +179,30 @@ pub trait Scanning<VM: VMBinding> {
         _object_tracer: &mut OT,
     ) {
         unreachable!("scan_object_and_trace_edges() will not be called when support_edge_enqueue() is always true.")
+    }
+
+    /// Return `true` if an object owns any buffers.
+    ///
+    /// If `true`, MMTk core will call `handle_buffers` on the object.
+    fn has_buffers(_object: ObjectReference) -> bool {
+        false
+    }
+
+    /// Handle buffers in the object.
+    ///
+    /// If the VM wants to retain a buffer owned by the object, it shall call
+    /// `handler.retain_buffer` on each field that holds a pointer to a buffer, and re-assign the
+    /// returned value to that field.
+    ///
+    /// If the VM wants to discard a buffer, it simply ignores the buffer.  MMTk core will consider
+    /// the buffer dead if not retained.
+    ///
+    /// If the VM wants to resize a buffer, it shall allocate a new buffer using
+    /// `handler.allocate_buffer`, and keep its pointer in one of is fields so that it can be
+    /// retained in subsequent GCs.  Note that this function is called by a **GC worker thread**,
+    /// and GC threads cannot call `Mutator::alloc` (or its alias `memory_manager::alloc`).
+    fn handle_buffers(_object: ObjectReference, _handler: impl BufferHandler) {
+        unreachable!("retain_buffers() will not be called when has_buffers() is always false.")
     }
 
     /// MMTk calls this method at the first time during a collection that thread's stacks
