@@ -1,4 +1,5 @@
 use atomic::Atomic;
+use mmtk::util::constants::LOG_BYTES_IN_ADDRESS;
 use mmtk::{
     util::{Address, ObjectReference},
     vm::edge_shape::{Edge, MemorySlice, SimpleEdge},
