@@ -27,16 +27,26 @@ jobs:
           profile: minimal
 
       # Install a specific version of cargo-public-api
-      - run: cargo install cargo-public-api --version 0.17.0
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api --version 0.17.0
       # We cannot compare two branches using 'cargo public-api --diff-git-checkouts ${GITHUB_BASE_REF} ${GITHUB_HEAD_REF}',
-      # as cargo-public-api cannot check out ${GITHUB_HEAD_REF} if the PR is from a fork.
-      # This is how Github checkout action deals with pull requests from a fork: it checks out the repo from the main repo (not the fork repo), so
-      # the branches in the forked repo are not fetched. Then the action gets a merge commit for the PR.
+      # as the Github checkout action does not actually fetch the branch from the forked repo, and cargo-public-api cannot
+      # check out ${GITHUB_HEAD_REF} if the PR is from a fork.
       # So we get API dumped to text files, and diff the text files.
-      - run: |
+      - name: Dump public API for PR
+        run: |
           cargo +nightly-2022-09-06 public-api > pr-api.txt
-      - run: |
+      - name: Dump public API for trunk
+        run: |
           git checkout ${GITHUB_BASE_REF}
           cargo +nightly-2022-09-06 public-api > trunk-api.txt
+      - name: Save dumped API files as artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: public-api
+          path: |
+            trunk-api.txt
+            pr-api.txt
       # If there is any difference, this will fail
-      - run: diff trunk-api.txt pr-api.txt
+      - name: API diff
+        run: diff trunk-api.txt pr-api.txt
