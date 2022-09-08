@@ -248,6 +248,11 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `reference`: The object to be queried.
     fn get_type_descriptor(reference: ObjectReference) -> &'static [i8];
 
+    /// This is the worst case expansion that can occur due to object size increasing while
+    /// copying. This constant is used to calculate whether a nursery has grown larger than the
+    /// mature space for generational plans.
+    const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
+
     /// For our allocation result `[cell, cell + bytes)`, if a binding's
     /// definition of `ObjectReference` may point outside the cell (i.e. `object_ref >= cell + bytes`),
     /// the binding needs to provide a `Some` value for this constant and

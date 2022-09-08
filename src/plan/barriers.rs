@@ -24,21 +24,23 @@ impl BarrierSelector {
 }
 
 /// For field writes in HotSpot, we cannot always get the source object pointer and the field address
-pub enum WriteTarget {
+pub enum BarrierWriteTarget {
     Object(ObjectReference),
     Slot(Address),
 }
 
 pub trait Barrier: 'static + Send {
     fn flush(&mut self);
-    fn post_write_barrier(&mut self, target: WriteTarget);
+    fn post_write_barrier(&mut self, target: BarrierWriteTarget);
+    fn post_write_barrier_slow(&mut self, target: BarrierWriteTarget);
 }
 
 pub struct NoBarrier;
 
 impl Barrier for NoBarrier {
     fn flush(&mut self) {}
-    fn post_write_barrier(&mut self, _target: WriteTarget) {}
+    fn post_write_barrier(&mut self, _target: BarrierWriteTarget) {}
+    fn post_write_barrier_slow(&mut self, _target: BarrierWriteTarget) {}
 }
 
 pub struct ObjectRememberingBarrier<E: ProcessEdgesWork> {
@@ -64,11 +66,9 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
     #[inline(always)]
     fn log_object(&self, object: ObjectReference) -> bool {
         loop {
-            let old_value =
-                load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
-            if old_value == 0 {
-                return false;
-            }
+            // Try set the bit from 1 to 0 (log object). This may fail, if
+            // 1. the bit is cleared by others, or
+            // 2. other bits in the same byte may get modified if we use side metadata
             if compare_exchange_metadata::<E::VM>(
                 &self.meta,
                 object,
@@ -78,7 +78,15 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
                 Ordering::SeqCst,
                 Ordering::SeqCst,
             ) {
+                // We just logged the object
                 return true;
+            } else {
+                let old_value =
+                    load_metadata::<E::VM>(&self.meta, object, None, Some(Ordering::SeqCst));
+                // If the bit is cleared before, someone else has logged the object. Return false.
+                if old_value == 0 {
+                    return false;
+                }
             }
         }
     }
@@ -92,6 +100,19 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
                 self.flush();
             }
         }
+    }
+
+    #[inline(always)]
+    fn barrier(&mut self, obj: ObjectReference) {
+        if load_metadata::<E::VM>(&self.meta, obj, None, None) == 0 {
+            return;
+        }
+        self.barrier_slow(obj);
+    }
+
+    #[inline(never)]
+    fn barrier_slow(&mut self, obj: ObjectReference) {
+        self.enqueue_node(obj);
     }
 }
 
@@ -112,9 +133,17 @@ impl<E: ProcessEdgesWork> Barrier for ObjectRememberingBarrier<E> {
     }
 
     #[inline(always)]
-    fn post_write_barrier(&mut self, target: WriteTarget) {
+    fn post_write_barrier(&mut self, target: BarrierWriteTarget) {
         match target {
-            WriteTarget::Object(obj) => {
+            BarrierWriteTarget::Object(obj) => self.barrier(obj),
+            _ => unreachable!(),
+        }
+    }
+
+    #[inline(always)]
+    fn post_write_barrier_slow(&mut self, target: BarrierWriteTarget) {
+        match target {
+            BarrierWriteTarget::Object(obj) => {
                 self.enqueue_node(obj);
             }
             _ => unreachable!(),

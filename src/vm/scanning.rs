@@ -1,17 +1,18 @@
 use crate::plan::Mutator;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
-use crate::util::{Address, ObjectReference};
+use crate::vm::edge_shape::Edge;
 use crate::vm::VMBinding;
 
 /// Callback trait of scanning functions that report edges.
-pub trait EdgeVisitor {
+pub trait EdgeVisitor<ES: Edge> {
     /// Call this function for each edge.
-    fn visit_edge(&mut self, edge: Address);
+    fn visit_edge(&mut self, edge: ES);
 }
 
 /// This lets us use closures as EdgeVisitor.
-impl<F: FnMut(Address)> EdgeVisitor for F {
-    fn visit_edge(&mut self, edge: Address) {
+impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
+    fn visit_edge(&mut self, edge: ES) {
         self(edge)
     }
 }
@@ -47,14 +48,14 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
 ///     it needs `Send` to be sent between threads.  `'static` means it must not have
 ///     references to variables with limited lifetime (such as local variables), because
 ///     it needs to be moved between threads.
-pub trait RootsWorkFactory: Clone + Send + 'static {
+pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     /// Create work packets to handle root edges.
     ///
     /// The work packet may update the edges.
     ///
     /// Arguments:
     /// * `edges`: A vector of edges.
-    fn create_process_edge_roots_work(&mut self, edges: Vec<Address>);
+    fn create_process_edge_roots_work(&mut self, edges: Vec<ES>);
 
     /// Create work packets to handle nodes pointed by root edges.
     ///
@@ -109,7 +110,7 @@ pub trait Scanning<VM: VMBinding> {
     /// * `tls`: The VM-specific thread-local storage for the current worker.
     /// * `object`: The object to be scanned.
     /// * `edge_visitor`: Called back for each edge.
-    fn scan_object<EV: EdgeVisitor>(
+    fn scan_object<EV: EdgeVisitor<VM::VMEdge>>(
         tls: VMWorkerThread,
         object: ObjectReference,
         edge_visitor: &mut EV,
@@ -152,7 +153,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
-    fn scan_thread_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
+    fn scan_thread_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory<VM::VMEdge>);
 
     /// Scan one mutator for roots.
     ///
@@ -163,7 +164,7 @@ pub trait Scanning<VM: VMBinding> {
     fn scan_thread_root(
         tls: VMWorkerThread,
         mutator: &'static mut Mutator<VM>,
-        factory: impl RootsWorkFactory,
+        factory: impl RootsWorkFactory<VM::VMEdge>,
     );
 
     /// Scan VM-specific roots. The creation of all root scan tasks (except thread scanning)
@@ -172,7 +173,7 @@ pub trait Scanning<VM: VMBinding> {
     /// Arguments:
     /// * `tls`: The GC thread that is performing this scanning.
     /// * `factory`: The VM uses it to create work packets for scanning roots.
-    fn scan_vm_specific_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory);
+    fn scan_vm_specific_roots(tls: VMWorkerThread, factory: impl RootsWorkFactory<VM::VMEdge>);
 
     /// Return whether the VM supports return barriers. This is unused at the moment.
     fn supports_return_barrier() -> bool;

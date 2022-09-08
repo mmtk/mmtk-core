@@ -1,4 +1,4 @@
-use super::layout::vm_layout_constants::BYTES_IN_CHUNK;
+use super::layout::vm_layout_constants::{BYTES_IN_CHUNK, PAGES_IN_CHUNK};
 use crate::policy::space::required_chunks;
 use crate::util::address::Address;
 use crate::util::conversions::*;
@@ -57,6 +57,15 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
     fn reserve_pages(&self, pages: usize) -> usize {
         self.common().accounting.reserve(pages);
         pages
+    }
+
+    fn get_available_physical_pages(&self) -> usize {
+        let sync = self.sync.lock().unwrap();
+        let mut rtn = bytes_to_pages(sync.sentinel - sync.cursor);
+        if !self.common.contiguous {
+            rtn += self.common.vm_map.get_available_discontiguous_chunks() * PAGES_IN_CHUNK;
+        }
+        rtn
     }
 
     fn alloc_pages(

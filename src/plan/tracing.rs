@@ -3,9 +3,9 @@
 
 use std::mem;
 
-use crate::scheduler::gc_work::ProcessEdgesWork;
+use crate::scheduler::gc_work::{EdgeOf, ProcessEdgesWork};
 use crate::scheduler::{GCWorker, WorkBucketStage};
-use crate::util::{Address, ObjectReference};
+use crate::util::ObjectReference;
 use crate::vm::EdgeVisitor;
 
 /// This trait represents an object queue to enqueue objects during tracing.
@@ -63,7 +63,7 @@ impl ObjectQueue for VectorObjectQueue {
 
 /// A transitive closure visitor to collect all the edges of an object.
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
-    buffer: Vec<Address>,
+    buffer: Vec<EdgeOf<E>>,
     worker: &'a mut GCWorker<E::VM>,
 }
 
@@ -85,9 +85,9 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
     }
 }
 
-impl<'a, E: ProcessEdgesWork> EdgeVisitor for ObjectsClosure<'a, E> {
+impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
     #[inline(always)]
-    fn visit_edge(&mut self, slot: Address) {
+    fn visit_edge(&mut self, slot: EdgeOf<E>) {
         if self.buffer.is_empty() {
             self.buffer.reserve(E::CAPACITY);
         }

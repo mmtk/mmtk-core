@@ -1,6 +1,7 @@
 use crate::plan::Plan;
 use crate::scheduler::gc_work::*;
-use crate::util::{Address, ObjectReference};
+use crate::util::ObjectReference;
+use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::MMTK;
 use crate::{scheduler::*, ObjectQueue};
@@ -9,20 +10,20 @@ use std::ops::{Deref, DerefMut};
 use std::sync::atomic::Ordering;
 
 #[allow(dead_code)]
-pub struct SanityChecker {
+pub struct SanityChecker<ES: Edge> {
     /// Visited objects
     refs: HashSet<ObjectReference>,
     /// Cached root edges for sanity root scanning
-    roots: Vec<Vec<Address>>,
+    roots: Vec<Vec<ES>>,
 }
 
-impl Default for SanityChecker {
+impl<ES: Edge> Default for SanityChecker<ES> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl SanityChecker {
+impl<ES: Edge> SanityChecker<ES> {
     pub fn new() -> Self {
         Self {
             refs: HashSet::new(),
@@ -31,7 +32,7 @@ impl SanityChecker {
     }
 
     /// Cache a list of root edges to the sanity checker.
-    pub fn add_roots(&mut self, roots: Vec<Address>) {
+    pub fn add_roots(&mut self, roots: Vec<ES>) {
         self.roots.push(roots)
     }
 
@@ -164,7 +165,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
     type ScanObjectsWorkType = ScanObjects<Self>;
 
     const OVERWRITE_REFERENCE: bool = false;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         Self {
             base: ProcessEdgesBase::new(edges, roots, mmtk),
             // ..Default::default()

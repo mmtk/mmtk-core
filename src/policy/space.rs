@@ -211,8 +211,24 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
         #[cfg(debug_assertions)]
         if !new_chunk {
-            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})", start, bytes, new_chunk, start, SFT_MAP.get(start).name());
-            debug_assert!(SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}", start, bytes, new_chunk, start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
+            debug_assert!(
+                SFT_MAP.get(start).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start,
+                SFT_MAP.get(start).name()
+            );
+            debug_assert!(
+                SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start + bytes - 1,
+                SFT_MAP.get(start + bytes - 1).name()
+            );
         }
 
         if new_chunk {
@@ -245,6 +261,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         data_pages + meta_pages
     }
 
+    /// Return the number of physical pages available.
+    fn available_physical_pages(&self) -> usize {
+        self.get_page_resource().get_available_physical_pages()
+    }
+
     fn get_name(&self) -> &'static str {
         self.common().name
     }
@@ -257,51 +278,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     /// This is only needed for plans that use SFTProcessEdges
     fn set_copy_for_sft_trace(&mut self, _semantics: Option<CopySemantics>) {
         panic!("A copying space should override this method")
-    }
-
-    fn print_vm_map(&self) {
-        let common = self.common();
-        print!("{} ", common.name);
-        if common.immortal {
-            print!("I");
-        } else {
-            print!(" ");
-        }
-        if common.movable {
-            print!(" ");
-        } else {
-            print!("N");
-        }
-        print!(" ");
-        if common.contiguous {
-            print!("{}->{}", common.start, common.start + common.extent - 1);
-            match common.vmrequest {
-                VMRequest::Extent { extent, .. } => {
-                    print!(" E {}", extent);
-                }
-                VMRequest::Fraction { frac, .. } => {
-                    print!(" F {}", frac);
-                }
-                _ => {}
-            }
-        } else {
-            let mut a = self
-                .get_page_resource()
-                .common()
-                .get_head_discontiguous_region();
-            while !a.is_zero() {
-                print!(
-                    "{}->{}",
-                    a,
-                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
-                );
-                a = self.common().vm_map().get_next_contiguous_region(a);
-                if !a.is_zero() {
-                    print!(" ");
-                }
-            }
-        }
-        println!();
     }
 
     /// Ensure that the current space's metadata context does not have any issues.
@@ -317,6 +293,66 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
+}
+
+/// Print the VM map for a space.
+/// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.
+/// This method can be invoked on a &dyn Space (space.as_space() will return &dyn Space).
+#[allow(unused)]
+pub(crate) fn print_vm_map<VM: VMBinding>(
+    space: &dyn Space<VM>,
+    out: &mut impl std::fmt::Write,
+) -> Result<(), std::fmt::Error> {
+    let common = space.common();
+    write!(out, "{} ", common.name)?;
+    if common.immortal {
+        write!(out, "I")?;
+    } else {
+        write!(out, " ")?;
+    }
+    if common.movable {
+        write!(out, " ")?;
+    } else {
+        write!(out, "N")?;
+    }
+    write!(out, " ")?;
+    if common.contiguous {
+        write!(
+            out,
+            "{}->{}",
+            common.start,
+            common.start + common.extent - 1
+        )?;
+        match common.vmrequest {
+            VMRequest::Extent { extent, .. } => {
+                write!(out, " E {}", extent)?;
+            }
+            VMRequest::Fraction { frac, .. } => {
+                write!(out, " F {}", frac)?;
+            }
+            _ => {}
+        }
+    } else {
+        let mut a = space
+            .get_page_resource()
+            .common()
+            .get_head_discontiguous_region();
+        while !a.is_zero() {
+            write!(
+                out,
+                "{}->{}",
+                a,
+                a + space.common().vm_map().get_contiguous_region_size(a) - 1
+            )?;
+            a = space.common().vm_map().get_next_contiguous_region(a);
+            if !a.is_zero() {
+                write!(out, " ")?;
+            }
+        }
+    }
+    writeln!(out)?;
+
+    Ok(())
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);
@@ -363,9 +399,6 @@ pub struct SpaceOptions {
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
-
-/// Print debug info for SFT. Should be false when committed.
-const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
@@ -456,15 +489,13 @@ impl<VM: VMBinding> CommonSpace<VM> {
             panic!("failed to mmap meta memory");
         }
 
-        if DEBUG_SPACE {
-            println!(
-                "Created space {} [{}, {}) for {} bytes",
-                rtn.name,
-                start,
-                start + extent,
-                extent
-            );
-        }
+        debug!(
+            "Created space {} [{}, {}) for {} bytes",
+            rtn.name,
+            start,
+            start + extent,
+            extent
+        );
 
         rtn
     }

@@ -16,6 +16,7 @@ pub mod api;
 
 #[cfg(test)]
 mod tests;
+mod edges;
 
 #[derive(Default)]
 pub struct DummyVM;
@@ -26,6 +27,7 @@ impl VMBinding for DummyVM {
     type VMCollection = collection::VMCollection;
     type VMActivePlan = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
+    type VMEdge = edges::DummyVMEdge;
 
     /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;

@@ -9,10 +9,7 @@ pub struct VMObjectModel {}
 
 // This is intentionally set to a non-zero value to see if it breaks.
 // Change this if you want to test other values.
-#[cfg(target_pointer_width = "64")]
-pub const OBJECT_REF_OFFSET: usize = 6;
-#[cfg(target_pointer_width = "32")]
-pub const OBJECT_REF_OFFSET: usize = 2;
+pub const OBJECT_REF_OFFSET: usize = 4;
 
 impl ObjectModel<DummyVM> for VMObjectModel {
     const GLOBAL_LOG_BIT_SPEC: VMGlobalLogBitSpec = VMGlobalLogBitSpec::in_header(0);
