@@ -182,7 +182,7 @@ impl SideMetadataContext {
         #[cfg(feature = "global_alloc_bit")]
         ret.push(ALLOC_SIDE_METADATA_SPEC);
 
-        #[cfg(feature = "chunk_based_dense_sft_table")]
+        #[cfg(feature = "chunk_based_dense_sft_map")]
         ret.push(crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX);
 
         ret.extend_from_slice(specs);

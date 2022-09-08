@@ -39,6 +39,7 @@ pfm = { version = "0.1.0-beta.1", optional = true }
 atomic_refcell = "0.1.7"
 strum = "0.24"
 strum_macros = "0.24"
+cfg-if = "1.0"
 
 [dev-dependencies]
 rand = "0.7.3"
@@ -92,15 +93,10 @@ work_packet_stats = []
 # Count the malloc'd memory into the heap size
 malloc_counted_size = []
 
-# Using chunk based dense SFT table. Usually we do not use this SFT map implementation. Our other implementations
-# generally performs better. However, in some cases (e.g. we need to manage library malloc results as if it is part of our heap),
-# we will have to use this.
-chunk_based_dense_sft_table = []
-
 # Use library malloc as the freelist allocator for mark sweep. This will makes mark sweep slower. As malloc may return addresses outside our
-# normal heap range, we will have to use chunk-based SFT table. Turning on this feature will enable `chunk_based_dense_sft_table`,
+# normal heap range, we will have to use chunk-based SFT table. Turning on this feature will enable `chunk_based_dense_sft_map`,
 # which affects all the plans in the build. This is only meant to be experimental use.
-malloc_mark_sweep = ["chunk_based_dense_sft_table"]
+malloc_mark_sweep = ["chunk_based_dense_sft_map"]
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
@@ -113,6 +109,20 @@ malloc_mark_sweep = ["chunk_based_dense_sft_table"]
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
 malloc_hoard = ["hoard-sys"]
+
+# Group:sft_map
+# Only one of the following feature should be enabled to force using one SFT map implementation. If none is choosen,
+# we will use the default implementation based on the pointer width.
+
+# Using chunk based dense SFT map. We maintain a small table (one entry for each space), and use side metadata to store
+# the table index for each chunk.
+chunk_based_dense_sft_map = []
+# Using chunk based sparse SFT map. We have a large table and each entry is mapped to a chunk. We compute the chunk index,
+# and use it to access the map. The table is huge when used on 64 bits, and will impose large overhead at booting.
+chunk_based_sparse_sft_map = []
+# Using space SFT map. We maintain a small table (one entry for each space), and compute an index from an object.
+# This requires the space to be contiguous, and in a specific address range so we can extract the index from it.
+space_sft_map = []
 
 # If there are more groups, they should be inserted above this line
 # Group:end

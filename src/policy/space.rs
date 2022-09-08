@@ -110,7 +110,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     };
 
                     // The scope of the lock is important in terms of performance when we have many allocator threads.
-                    if cfg!(feature = "chunk_based_dense_sft_table") {
+                    if cfg!(feature = "chunk_based_dense_sft_map") {
                         // chunk-based dense sft map will use side metadata, so we have to initialize side metadata first.
                         map_sidemetadata();
                         // then grow space, which will use the side metadata we mapped above

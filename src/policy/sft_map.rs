@@ -54,19 +54,26 @@ pub trait SFTMap {
     }
 }
 
-// On 64bits and when chunk-based dense sft table is not forced, we use space map, which has best performance for 64bits.
-#[cfg(all(
-    target_pointer_width = "64",
-    not(feature = "chunk_based_dense_sft_table")
-))]
-pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
-// On 64bits and when chunk-based dense sft table is enabled, we use the dense chunk map.
-#[cfg(all(target_pointer_width = "64", feature = "chunk_based_dense_sft_table"))]
-pub type SFTMapType<'a> = dense_chunk_map::SFTDenseChunkMap<'a>;
-
-// On 32bits, we use sparse chunk map.
-#[cfg(target_pointer_width = "32")]
-pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
+cfg_if::cfg_if! {
+    // If any specific implementation is selected, we use it
+    if #[cfg(feature = "chunk_based_dense_sft_map")] {
+        pub type SFTMapType<'a> = dense_chunk_map::SFTDenseChunkMap<'a>;
+    } else if #[cfg(feature = "chunk_based_sparse_sft_map")] {
+        pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
+    } else if #[cfg(feature = "space_sft_map")] {
+        pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
+    }
+    // Otherwise use a default implementation based on the pointer width
+    else if #[cfg(target_pointer_width = "64")] {
+        pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
+    } else if #[cfg(target_pointer_width = "32")] {
+        pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
+    }
+    // Unknown cases
+    else {
+        unreachable!();
+    }
+}
 
 #[allow(dead_code)]
 #[cfg(target_pointer_width = "64")] // This impl only works for 64 bits: 1. the mask is designed for our 64bit heap range, 2. on 64bits, all our spaces are contiguous.
