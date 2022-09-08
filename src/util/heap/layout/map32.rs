@@ -284,13 +284,10 @@ impl Map32 {
         self.next_link[chunk as usize] = 0;
         for offset in 0..chunks {
             let index = (chunk + offset) as usize;
-            debug!(
-                "Clear descriptor for Chunk {}",
-                conversions::chunk_index_to_address(index)
-            );
+            let chunk_start = conversions::chunk_index_to_address(index);
+            debug!("Clear descriptor for Chunk {}", chunk_start);
             self.descriptor_map[index] = SpaceDescriptor::UNINITIALIZED;
-            SFT_MAP.clear_by_index(index);
-            // VM.barriers.objectArrayStoreNoGCBarrier(spaceMap, chunk + offset, null);
+            SFT_MAP.clear(chunk_start);
         }
         chunks as _
     }

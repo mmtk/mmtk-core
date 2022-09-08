@@ -1,4 +1,5 @@
 use super::sft::*;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 #[cfg(debug_assertions)]
 use crate::util::ObjectReference;
@@ -14,6 +15,9 @@ pub trait SFTMap {
     /// Instead, they assume the address has a valid entry in the SFT. If an address could be arbitary, they should call this
     /// method as a pre-check before they call any other methods in the trait.
     fn has_sft_entry(&self, addr: Address) -> bool;
+
+    /// Get the side metadata spec this SFT map uses.
+    fn get_side_metadata(&self) -> Option<&SideMetadataSpec>;
 
     /// Get SFT for the address. The address must have a valid SFT entry in the table.
     fn get(&self, address: Address) -> &dyn SFT;
@@ -55,23 +59,15 @@ pub trait SFTMap {
 }
 
 cfg_if::cfg_if! {
-    // If any specific implementation is selected, we use it
-    if #[cfg(feature = "chunk_based_dense_sft_map")] {
+    if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
+        // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
         pub type SFTMapType<'a> = dense_chunk_map::SFTDenseChunkMap<'a>;
-    } else if #[cfg(feature = "chunk_based_sparse_sft_map")] {
-        pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
-    } else if #[cfg(feature = "space_sft_map")] {
-        pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
-    }
-    // Otherwise use a default implementation based on the pointer width
-    else if #[cfg(target_pointer_width = "64")] {
+    } else if #[cfg(target_pointer_width = "64")] {
         pub type SFTMapType<'a> = space_map::SFTSpaceMap<'a>;
     } else if #[cfg(target_pointer_width = "32")] {
         pub type SFTMapType<'a> = sparse_chunk_map::SFTSparseChunkMap<'a>;
-    }
-    // Unknown cases
-    else {
-        unreachable!();
+    } else {
+        compile_err!("Cannot figure out which SFT map to use.");
     }
 }
 
@@ -95,6 +91,10 @@ mod space_map {
             // Address::ZERO is mapped to index 0, and Address::MAX is mapped to index 31 (TABLE_SIZE-1)
             // So any address has an SFT entry.
             true
+        }
+
+        fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
+            None
         }
 
         fn get(&self, address: Address) -> &'a dyn SFT {
@@ -255,6 +255,10 @@ mod dense_chunk_map {
             }
         }
 
+        fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
+            Some(&crate::util::metadata::side_metadata::spec_defs::SFT_DENSE_CHUNK_MAP_INDEX)
+        }
+
         fn get(&self, address: Address) -> &dyn SFT {
             self.sft[Self::addr_to_index(address)]
         }
@@ -367,6 +371,10 @@ mod sparse_chunk_map {
             addr.chunk_index() < MAX_CHUNKS
         }
 
+        fn get_side_metadata(&self) -> Option<&SideMetadataSpec> {
+            None
+        }
+
         fn get(&self, address: Address) -> &'a dyn SFT {
             debug_assert!(address.chunk_index() < MAX_CHUNKS);
             let res = unsafe { *self.sft.get_unchecked(address.chunk_index()) };
@@ -466,20 +474,6 @@ mod sparse_chunk_map {
             }
 
             res
-        }
-
-        // Currently only used by 32 bits vm map
-        #[allow(dead_code)]
-        pub fn clear_by_index(&self, chunk_idx: usize) {
-            if DEBUG_SFT {
-                let chunk_start = chunk_index_to_address(chunk_idx);
-                debug!(
-                    "Clear SFT for chunk {} by index (was {})",
-                    chunk_start,
-                    self.get(chunk_start).name()
-                );
-            }
-            self.set(chunk_idx, &EMPTY_SPACE_SFT)
         }
 
         fn set(&self, chunk: usize, sft: &(dyn SFT + Sync + 'static)) {
