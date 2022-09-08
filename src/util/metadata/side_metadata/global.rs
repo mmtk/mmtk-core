@@ -130,8 +130,8 @@ impl SideMetadataSpec {
     ///
     /// # Arguments
     ///
-    /// * `metadata_spec` - The specification of the target side metadata.
-    /// * `chunk_start` - The starting address of the chunk whose metadata is being zeroed.
+    /// * `start`: The starting address of a memory region. The side metadata starting from this data address will be zeroed.
+    /// * `size`: The size of the memory region.
     ///
     pub fn bzero_metadata(&self, start: Address, size: usize) {
         #[cfg(feature = "extreme_assertions")]

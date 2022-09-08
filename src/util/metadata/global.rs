@@ -36,7 +36,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     ///
@@ -61,7 +60,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the ordering for the load operation.
@@ -87,7 +85,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
@@ -115,11 +112,10 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    /// * `atomic_ordering`: is the ordering for the store operation.
+    /// * `ordering`: is the ordering for the store operation.
     #[inline(always)]
     pub fn store_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -147,7 +143,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `old_val`: is the expected current value of the metadata.
     /// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.
@@ -192,7 +187,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
@@ -219,7 +213,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
@@ -246,7 +239,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
@@ -273,7 +265,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
@@ -300,7 +291,6 @@ impl MetadataSpec {
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
