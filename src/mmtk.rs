@@ -161,4 +161,8 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn get_options(&self) -> &Options {
         &self.options
     }
+
+    pub fn test(&self) {
+        panic!("test only")
+    }
 }
