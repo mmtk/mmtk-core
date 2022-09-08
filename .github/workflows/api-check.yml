@@ -18,39 +18,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # # Install nightly
-      # # The nightly version needs to match the cargo-public-api version.
-      # # Check here: https://github.com/Enselic/cargo-public-api#compatibility-matrix
-      # - uses: actions-rs/toolchain@v1
-      #   with:
-      #     toolchain: nightly-2022-09-06
-      #     profile: minimal
-
-      # # Install a specific version of cargo-public-api
-      # - name: Install cargo-public-api
-      #   run: cargo install cargo-public-api --version 0.17.0
-      # # We cannot compare two branches using 'cargo public-api --diff-git-checkouts ${GITHUB_BASE_REF} ${GITHUB_HEAD_REF}',
-      # # as the Github checkout action does not actually fetch the branch from the forked repo, and cargo-public-api cannot
-      # # check out ${GITHUB_HEAD_REF} if the PR is from a fork.
-      # # So we get API dumped to text files, and diff the text files.
-      # - name: Dump public API for PR
-      #   run: |
-      #     cargo +nightly-2022-09-06 public-api > pr-api.txt
-      # - name: Dump public API for trunk
-      #   run: |
-      #     git checkout ${GITHUB_BASE_REF}
-      #     cargo +nightly-2022-09-06 public-api > trunk-api.txt
-      # - name: Save dumped API files as artifacts
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: public-api
-      #     path: |
-      #       trunk-api.txt
-      #       pr-api.txt
-      # # If there is any difference, this will fail
-      # - name: API diff
-      #   run: diff trunk-api.txt pr-api.txt
-
       # Install nightly
       - uses: actions-rs/toolchain@v1
         with:
