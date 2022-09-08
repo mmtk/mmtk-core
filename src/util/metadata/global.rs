@@ -32,14 +32,13 @@ impl MetadataSpec {
     }
 
     /// A function to non-atomically load the specified metadata's content.
+    /// Returns the metadata value.
     ///
     /// # Arguments:
     ///
     /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    ///
-    /// # Returns the metadata value.
     ///
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
@@ -58,6 +57,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically load the specified metadata's content.
+    /// Returns the metadata value.
     ///
     /// # Arguments:
     ///
@@ -66,7 +66,6 @@ impl MetadataSpec {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `atomic_ordering`: is the ordering for the load operation.
     ///
-    /// # Returns the metadata value.
     #[inline(always)]
     pub fn load_atomic<VM: VMBinding, T: MetadataValue>(
         &self,
@@ -144,6 +143,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically compare-and-exchange the specified metadata's content.
+    /// Returns `true` if the operation is successful, and `false` otherwise.
     ///
     /// # Arguments:
     ///
@@ -154,8 +154,6 @@ impl MetadataSpec {
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
-    ///
-    /// # Returns `true` if the operation is successful, and `false` otherwise.
     ///
     #[inline(always)]
     pub fn compare_exchange_metadata<VM: VMBinding, T: MetadataValue>(
@@ -190,6 +188,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically perform an add operation on the specified metadata's content.
+    /// Returns the old metadata value.
     ///
     /// # Arguments:
     ///
@@ -197,8 +196,6 @@ impl MetadataSpec {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value.
     ///
     #[inline(always)]
     pub fn fetch_add_metadata<VM: VMBinding, T: MetadataValue>(
@@ -218,6 +215,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically perform a subtract operation on the specified metadata's content.
+    /// Returns the old metadata value.
     ///
     /// # Arguments:
     ///
@@ -225,8 +223,6 @@ impl MetadataSpec {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value.
     ///
     #[inline(always)]
     pub fn fetch_sub_metadata<VM: VMBinding, T: MetadataValue>(
@@ -246,6 +242,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically perform a bit-and operation on the specified metadata's content.
+    /// Returns the old metadata value.
     ///
     /// # Arguments:
     ///
@@ -253,8 +250,6 @@ impl MetadataSpec {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-and with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value.
     ///
     #[inline(always)]
     pub fn fetch_and_metadata<VM: VMBinding, T: MetadataValue>(
@@ -274,6 +269,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically perform a bit-or operation on the specified metadata's content.
+    /// Returns the old metadata value.
     ///
     /// # Arguments:
     ///
@@ -281,8 +277,6 @@ impl MetadataSpec {
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value.
     ///
     #[inline(always)]
     pub fn fetch_or_metadata<VM: VMBinding, T: MetadataValue>(
@@ -302,6 +296,7 @@ impl MetadataSpec {
     }
 
     /// A function to atomically perform an update operation on the specified metadata's content. The semantics are the same as Rust's `fetch_update` on atomic types.
+    /// Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).
     ///
     /// # Arguments:
     ///
@@ -310,8 +305,6 @@ impl MetadataSpec {
     /// * `val`: is the value to bit-or with the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
     /// * `f`: the update function. The function may be called multiple times.
-    ///
-    /// # Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).
     ///
     #[inline(always)]
     pub fn fetch_update_metadata<VM: VMBinding, T: MetadataValue>(
