@@ -15,6 +15,8 @@ pub trait ObjectQueue {
 pub type VectorObjectQueue = VectorQueue<ObjectReference>;
 
 /// An implementation of `ObjectQueue` using a `Vec`.
+///
+/// This can also be used as a buffer. For example, the mark stack or the write barrier mod-buffer.
 pub struct VectorQueue<T> {
     /// Enqueued nodes.
     buffer: Vec<T>,

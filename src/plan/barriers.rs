@@ -11,6 +11,11 @@ use atomic::Ordering;
 use downcast_rs::Downcast;
 
 /// BarrierSelector describes which barrier to use.
+///
+/// This is used as an *indicator* for each plan to enable the correct barrier.
+/// For example, immix can use this selector to enable different barriers for analysis.
+///
+/// VM bindings may also use this to enable the correct fast-path, if the fast-path is implemented in the binding.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BarrierSelector {
     NoBarrier,
@@ -24,6 +29,17 @@ impl BarrierSelector {
     }
 }
 
+/// A barrier is a combination of fast-path behaviour + slow-path semantics.
+/// This trait exposes generic barrier interfaces. The implementations will define their
+/// own fast-path code and slow-path semantics.
+///
+/// Normally, a binding will call these generic barrier interfaces (`object_reference_write` and `memory_region_copy`) for subsuming barrier calls.
+///
+/// If a subsuming barrier cannot be easily deployed due to platform limitations, the binding may chosse to call both `object_reference_write_pre` and `object_reference_write_post`
+/// barrier before and after the store operation.
+///
+/// As a performance optimization, the binding may also choose to port the fast-path to the VM side,
+/// and call the slow-path (`object_reference_write_slow`) only if necessary.
 pub trait Barrier<VM: VMBinding>: 'static + Send + Downcast {
     fn flush(&mut self) {}
 
@@ -85,18 +101,29 @@ impl_downcast!(Barrier<VM> where VM: VMBinding);
 
 /// Empty barrier implementation.
 /// For GCs that do not need any barriers
+///
+/// Note that since NoBarrier noes nothing but the object field write itself, it has no slow-path semantics (i.e. an no-op slow-path).
 pub struct NoBarrier;
 
 impl<VM: VMBinding> Barrier<VM> for NoBarrier {}
 
+/// A barrier semantics defines the barrier slow-path behaviour. For example, how an object barrier processes it's modbufs.
+/// Specifically, it defines the slow-path call interfaces and a call to flush buffers.
+///
+/// A barrier is a combination of fast-path behaviour + slow-path semantics.
+/// The fast-path code will decide whether to call the slow-path calls.
 pub trait BarrierSemantics: 'static + Send {
     type VM: VMBinding;
 
     const UNLOG_BIT_SPEC: MetadataSpec =
         *<Self::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.as_spec();
 
+    /// Flush thread-local buffers or remembered sets.
+    /// Normally this is called by the slow-path implementation whenever the thread-local buffers are full.
+    /// This will also be called externally by the VM, when the thread is being destroyed.
     fn flush(&mut self);
 
+    /// Slow-path call for object field write operations.
     fn object_reference_write_slow(
         &mut self,
         src: ObjectReference,
@@ -104,6 +131,7 @@ pub trait BarrierSemantics: 'static + Send {
         target: ObjectReference,
     );
 
+    /// Slow-path call for mempry slice copy operations. For example, array-copy operations.
     fn memory_region_copy_slow(
         &mut self,
         src: <Self::VM as VMBinding>::VMMemorySlice,
@@ -111,6 +139,7 @@ pub trait BarrierSemantics: 'static + Send {
     );
 }
 
+/// Generic object barrier with a type argument defining it's slow-path behaviour.
 pub struct ObjectBarrier<S: BarrierSemantics> {
     semantics: S,
 }

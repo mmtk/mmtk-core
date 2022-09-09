@@ -48,6 +48,7 @@ where
 
     /// The type of edges in this VM.
     type VMEdge: edge_shape::Edge;
+    /// The type of heap memory slice in this VM.
     type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.

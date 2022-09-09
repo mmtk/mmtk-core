@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::{fmt::Debug, ops::Range};
 
 use atomic::Atomic;
@@ -208,22 +209,64 @@ impl MemorySlice for Range<Address> {
     }
 }
 
-#[test]
-fn address_range_iteration() {
-    let src: Vec<usize> = (0..32).collect();
-    let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
-    for (i, v) in src_slice.iter_edges().enumerate() {
-        assert_eq!(i, unsafe { v.load::<usize>() })
+/// Memory slice type with empty implementations.
+/// For VMs that do not use the memory slice type.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct UnimplementedMemorySlice<E: Edge = SimpleEdge>(PhantomData<E>);
+
+/// Edge iterator for `UnimplementedMemorySlice`.
+pub struct UnimplementedMemorySliceEdgeIterator<E: Edge>(PhantomData<E>);
+
+impl<E: Edge> Iterator for UnimplementedMemorySliceEdgeIterator<E> {
+    type Item = E;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
     }
 }
 
-#[test]
-fn memory_copy_on_address_ranges() {
-    let src = [1u8; 32];
-    let mut dst = [0u8; 32];
-    let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
-    let dst_slice =
-        Address::from_mut_ptr(&mut dst[0])..Address::from_mut_ptr(&mut dst[0]) + src.len();
-    MemorySlice::copy(&src_slice, &dst_slice);
-    assert_eq!(dst.iter().sum::<u8>(), src.len() as u8);
+impl<E: Edge> MemorySlice for UnimplementedMemorySlice<E> {
+    type Edge = E;
+    type EdgeIterator = UnimplementedMemorySliceEdgeIterator<E>;
+
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        unimplemented!()
+    }
+
+    fn start(&self) -> Address {
+        unimplemented!()
+    }
+
+    fn bytes(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn copy(_src: &Self, _tgt: &Self) {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn address_range_iteration() {
+        let src: Vec<usize> = (0..32).collect();
+        let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+        for (i, v) in src_slice.iter_edges().enumerate() {
+            assert_eq!(i, unsafe { v.load::<usize>() })
+        }
+    }
+
+    #[test]
+    fn memory_copy_on_address_ranges() {
+        let src = [1u8; 32];
+        let mut dst = [0u8; 32];
+        let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+        let dst_slice =
+            Address::from_mut_ptr(&mut dst[0])..Address::from_mut_ptr(&mut dst[0]) + src.len();
+        MemorySlice::copy(&src_slice, &dst_slice);
+        assert_eq!(dst.iter().sum::<u8>(), src.len() as u8);
+    }
 }
