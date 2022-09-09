@@ -342,12 +342,11 @@ impl SideMetadataSpec {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
                     let metadata_u8 = metadata.to_u8().unwrap();
-                    let _res = unsafe {
+                    let _ = unsafe {
                         <u8 as MetadataValue>::fetch_update(meta_addr, order, order, |v: u8| {
                             Some((v & !mask) | (metadata_u8 << lshift))
                         })
                     };
-                    debug_assert!(_res.is_ok());
                 } else {
                     unsafe {
                         T::store_atomic(meta_addr, metadata, order);

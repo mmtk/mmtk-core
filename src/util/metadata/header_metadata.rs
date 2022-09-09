@@ -229,18 +229,11 @@ impl HeaderMetadataSpec {
             let val_u8 = val.to_u8().unwrap();
             let byte_addr = self.meta_addr(object);
             if let Some(order) = atomic_ordering {
-                unsafe {
-                    loop {
-                        let old_byte_val = byte_addr.atomic_load::<AtomicU8>(order);
-                        let new_byte_val = self.set_bits_to_u8(old_byte_val, val_u8);
-                        if byte_addr
-                            .compare_exchange::<AtomicU8>(old_byte_val, new_byte_val, order, order)
-                            .is_ok()
-                        {
-                            break;
-                        }
-                    }
-                }
+                let _ = unsafe {
+                    <u8 as MetadataValue>::fetch_update(byte_addr, order, order, |old_val: u8| {
+                        Some(self.set_bits_to_u8(old_val, val_u8))
+                    })
+                };
             } else {
                 unsafe {
                     let old_byte_val = byte_addr.load::<u8>();
@@ -254,13 +247,9 @@ impl HeaderMetadataSpec {
                 if let Some(order) = atomic_ordering {
                     // if the optional mask is provided (e.g. for forwarding pointer), we need to use compare_exchange
                     if let Some(mask) = optional_mask {
-                        loop {
-                            let old_val = T::load_atomic(addr, order);
-                            let new_val = old_val.bitand(mask.inv()).bitor(val.bitand(mask));
-                            if T::compare_exchange(addr, old_val, new_val, order, order).is_ok() {
-                                break;
-                            }
-                        }
+                        let _ = T::fetch_update(addr, order, order, |old_val: T| {
+                            Some(old_val.bitand(mask.inv()).bitor(val.bitand(mask)))
+                        });
                     } else {
                         T::store_atomic(addr, val, order);
                     }
@@ -334,7 +323,8 @@ impl HeaderMetadataSpec {
         }
     }
 
-    /// Inner method for fetch_add/sub/and/or on bits.
+    /// Inner method for fetch_add/sub on bits.
+    /// For fetch_and/or, we don't necessarily need this method. We could directly do fetch_and/or on the u8.
     #[inline(always)]
     fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
@@ -414,10 +404,13 @@ impl HeaderMetadataSpec {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(
-                self.fetch_ops_on_bits(object, order, order, |x: u8| x & val.to_u8().unwrap()),
-            )
-            .unwrap()
+            let (_, mask) = self.get_shift_and_mask_for_bits();
+            let new_val = val.to_u8().unwrap() | !mask;
+            // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
+            let old_raw_byte =
+                unsafe { <u8 as MetadataValue>::fetch_and(self.meta_addr(object), new_val, order) };
+            let old_val = self.get_bits_from_u8(old_raw_byte);
+            FromPrimitive::from_u8(old_val).unwrap()
         } else {
             unsafe { T::fetch_and(self.meta_addr(object), val, order) }
         }
@@ -434,10 +427,13 @@ impl HeaderMetadataSpec {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(
-                self.fetch_ops_on_bits(object, order, order, |x: u8| x | val.to_u8().unwrap()),
-            )
-            .unwrap()
+            let (_, mask) = self.get_shift_and_mask_for_bits();
+            let new_val = val.to_u8().unwrap() & mask;
+            // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
+            let old_raw_byte =
+                unsafe { <u8 as MetadataValue>::fetch_or(self.meta_addr(object), new_val, order) };
+            let old_val = self.get_bits_from_u8(old_raw_byte);
+            FromPrimitive::from_u8(old_val).unwrap()
         } else {
             unsafe { T::fetch_or(self.meta_addr(object), val, order) }
         }
@@ -457,32 +453,26 @@ impl HeaderMetadataSpec {
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
             let byte_addr = self.meta_addr(object);
-            loop {
-                let old_byte = unsafe { byte_addr.atomic_load::<AtomicU8>(fetch_order) };
-                let old_metadata = self.get_bits_from_u8(old_byte);
-                let old_metadata_val = FromPrimitive::from_u8(old_metadata).unwrap();
-                // new_metadata may contain overflow and need to be truncated
-                // TODO: do we really need this?
-                let new_metadata: Option<u8> =
-                    f(old_metadata_val).map(|byte| self.truncate_bits_in_u8(byte.to_u8().unwrap()));
-                if let Some(new_metadata_to_set) = new_metadata {
-                    let new_byte = self.set_bits_to_u8(old_byte, new_metadata_to_set);
-                    if unsafe {
-                        byte_addr.compare_exchange::<AtomicU8>(
-                            old_byte,
-                            new_byte,
-                            set_order,
-                            fetch_order,
-                        )
-                    }
-                    .is_ok()
-                    {
-                        return Ok(old_metadata_val);
-                    }
-                } else {
-                    return Err(old_metadata_val);
-                }
+            unsafe {
+                <u8 as MetadataValue>::fetch_update(
+                    byte_addr,
+                    set_order,
+                    fetch_order,
+                    |raw_byte: u8| {
+                        let old_metadata = self.get_bits_from_u8(raw_byte);
+                        match f(FromPrimitive::from_u8(old_metadata).unwrap()) {
+                            Some(new_val) => {
+                                let new_metadata =
+                                    self.truncate_bits_in_u8(new_val.to_u8().unwrap());
+                                Some(self.set_bits_to_u8(raw_byte, new_metadata))
+                            }
+                            None => None,
+                        }
+                    },
+                )
             }
+            .map(|raw_byte| FromPrimitive::from_u8(self.get_bits_from_u8(raw_byte)).unwrap())
+            .map_err(|raw_byte| FromPrimitive::from_u8(self.get_bits_from_u8(raw_byte)).unwrap())
         } else {
             unsafe { T::fetch_update(self.meta_addr(object), set_order, fetch_order, f) }
         }
