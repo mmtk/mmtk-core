@@ -84,7 +84,10 @@ impl From<Block> for Address {
 }
 
 impl Region for Block {
+    #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
+    #[cfg(feature = "immix_smaller_block")]
+    const LOG_BYTES: usize = 13;
 }
 
 impl Block {

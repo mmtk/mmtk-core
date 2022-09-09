@@ -185,6 +185,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
+        #[cfg(feature = "immix_no_defrag")]
+        info!(
+            "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
+            name,
+            Block::LOG_BYTES
+        );
+
         super::validate_features();
         let common = CommonSpace::new(
             SpaceOptions {
