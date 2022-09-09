@@ -337,19 +337,10 @@ impl SideMetadataSpec {
                     let lshift = meta_byte_lshift(self, data_addr);
                     let mask = meta_byte_mask(self) << lshift;
                     let metadata_u8 = metadata.to_u8().unwrap();
-                    let mut old_val = unsafe { meta_addr.load::<u8>() };
-                    let mut new_val = (old_val & !mask) | (metadata_u8 << lshift);
-
-                    while unsafe {
-                        meta_addr
-                            .compare_exchange::<AtomicU8>(old_val, new_val, order, order)
-                            .is_err()
-                    } {
-                        old_val = unsafe { meta_addr.load::<u8>() };
-                        new_val = (old_val & !mask) | (metadata_u8 << lshift);
-                    }
+                    let _res = unsafe { <u8 as MetadataValue>::fetch_update(meta_addr, order, order, |v: u8| Some((v & !mask) | (metadata_u8 << lshift))) };
+                    debug_assert!(_res.is_ok());
                 } else {
-                    unsafe { T::store_atomic(meta_addr, metadata, order) }
+                    unsafe { T::store_atomic(meta_addr, metadata, order); }
                 }
             },
             |_| {
@@ -427,21 +418,14 @@ impl SideMetadataSpec {
     ) -> u8 {
         let lshift = meta_byte_lshift(self, data_addr);
         let mask = meta_byte_mask(self) << lshift;
-        let mut old_val = unsafe { meta_addr.load::<u8>() };
-        let mut new_sub_val = update((old_val & mask) >> lshift) & (mask >> lshift);
-        let mut new_val = (old_val & !mask) | (new_sub_val << lshift);
 
-        while unsafe {
-            meta_addr
-                .compare_exchange::<AtomicU8>(old_val, new_val, set_order, fetch_order)
-                .is_err()
-        } {
-            old_val = unsafe { meta_addr.load::<u8>() };
-            new_sub_val = update((old_val & mask) >> lshift) & (mask >> lshift);
-            new_val = (old_val & !mask) | (new_sub_val << lshift);
-        }
-
-        FromPrimitive::from_u8(old_val & mask).unwrap()
+        let old_raw_byte = unsafe { <u8 as MetadataValue>::fetch_update(meta_addr, set_order, fetch_order, |raw_byte: u8| {
+            let old_val = (raw_byte & mask) >> lshift;
+            let new_val = update(old_val);
+            let new_raw_byte = (raw_byte & !mask) | ((new_val & (mask >> lshift)) << lshift);
+            Some(new_raw_byte)
+        }) }.unwrap();
+        (old_raw_byte & mask) >> lshift
     }
 
     /// Wraps around on overflow.
@@ -473,7 +457,6 @@ impl SideMetadataSpec {
             },
             |_old_val| {
                 #[cfg(feature = "extreme_assertions")]
-                // sanity::typed_verify_add(self, data_addr, val, _old_val)
                 sanity::verify_update::<T>(self, data_addr, _old_val, _old_val.wrapping_add(&val))
             },
         )
@@ -506,7 +489,6 @@ impl SideMetadataSpec {
             },
             |_old_val| {
                 #[cfg(feature = "extreme_assertions")]
-                // sanity::typed_verify_sub(self, data_addr, val, _old_val)
                 sanity::verify_update::<T>(self, data_addr, _old_val, _old_val.wrapping_sub(&val))
             },
         )
@@ -525,14 +507,13 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
-                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
-                        data_addr,
-                        meta_addr,
-                        order,
-                        order,
-                        |x: u8| x & val.to_u8().unwrap(),
-                    ))
-                    .unwrap()
+                    let lshift = meta_byte_lshift(self, data_addr);
+                    let mask = meta_byte_mask(self) << lshift;
+                    // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
+                    let new_val = val.to_u8().unwrap() | !mask;
+                    let old_raw_byte = unsafe { <u8 as MetadataValue>::fetch_and(meta_addr, new_val, order) };
+                    let old_val = (old_raw_byte & mask) >> lshift;
+                    FromPrimitive::from_u8(old_val).unwrap()
                 } else {
                     unsafe { T::fetch_and(meta_addr, val, order) }
                 }
@@ -557,14 +538,13 @@ impl SideMetadataSpec {
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
-                    FromPrimitive::from_u8(self.fetch_ops_on_bits(
-                        data_addr,
-                        meta_addr,
-                        order,
-                        order,
-                        |x: u8| x | val.to_u8().unwrap(),
-                    ))
-                    .unwrap()
+                    let lshift = meta_byte_lshift(self, data_addr);
+                    let mask = meta_byte_mask(self) << lshift;
+                    // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 0, and do fetch_or
+                    let new_val = val.to_u8().unwrap() & mask;
+                    let old_raw_byte = unsafe { <u8 as MetadataValue>::fetch_or(meta_addr, new_val, order) };
+                    let old_val = (old_raw_byte & mask) >> lshift;
+                    FromPrimitive::from_u8(old_val).unwrap()
                 } else {
                     unsafe { T::fetch_or(meta_addr, val, order) }
                 }
@@ -1273,9 +1253,9 @@ mod tests {
                         // max and max should be max
                         let old_val = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
                         let old_val_from_fetch = spec.fetch_and_atomic::<$type>(data_addr, max_value, Ordering::SeqCst);
-                        assert_eq!(old_val_from_fetch, old_val);
-                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value);
-                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX);
+                        assert_eq!(old_val_from_fetch, old_val, "old values do not match");
+                        assert_eq!(spec.load_atomic::<$type>(data_addr, Ordering::SeqCst), max_value, "load values do not match");
+                        assert_eq!(unsafe { *meta_ptr }, <$type>::MAX, "raw values do not match");
 
                         // max and last_bit_zero should last_bit_zero
                         let last_bit_zero = max_value - 1;
