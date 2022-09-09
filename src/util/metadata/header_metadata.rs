@@ -333,24 +333,22 @@ impl HeaderMetadataSpec {
         fetch_order: Ordering,
         update: F,
     ) -> u8 {
-        // let new_metadata = ((val as u8) << bit_shift);
         let byte_addr = self.meta_addr(object);
-        loop {
-            unsafe {
-                let old_byte = byte_addr.atomic_load::<AtomicU8>(fetch_order);
-                let old_metadata = self.get_bits_from_u8(old_byte);
-                // new_metadata may contain overflow and need to be truncated
-                // TODO: do we really need this?
-                let new_metadata = self.truncate_bits_in_u8(update(old_metadata));
-                let new_byte = self.set_bits_to_u8(old_byte, new_metadata);
-                if byte_addr
-                    .compare_exchange::<AtomicU8>(old_byte, new_byte, set_order, fetch_order)
-                    .is_ok()
-                {
-                    return old_metadata;
-                }
-            }
+        let old_raw_byte = unsafe {
+            <u8 as MetadataValue>::fetch_update(
+                byte_addr,
+                set_order,
+                fetch_order,
+                |raw_byte: u8| {
+                    let old_metadata = self.get_bits_from_u8(raw_byte);
+                    let new_metadata = self.truncate_bits_in_u8(update(old_metadata));
+                    let new_byte = self.set_bits_to_u8(raw_byte, new_metadata);
+                    Some(new_byte)
+                },
+            )
         }
+        .unwrap();
+        self.get_bits_from_u8(old_raw_byte)
     }
 
     /// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.
