@@ -67,7 +67,9 @@ where
     F: FnOnce(),
 {
     // If one test fails, the lock will become poisoned. We would want to continue for other tests anyway.
-    let _guard = SERIAL_TEST_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _guard = SERIAL_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     f();
 }
 
