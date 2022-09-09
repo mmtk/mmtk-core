@@ -115,12 +115,18 @@ impl SideMetadataSpec {
     }
 
     /// Used only for debugging.
-    /// Assert if the given MetadataValue type matches the spec.
+    /// * Assert if the given MetadataValue type matches the spec.
+    /// * Assert if the provided value is valid in the spec.
     #[cfg(debug_assertions)]
-    fn assert_value_type<T: MetadataValue>(&self) {
+    fn assert_value_type<T: MetadataValue>(&self, val: Option<T>) {
         let log_b = self.log_num_of_bits;
         match log_b {
-            _ if log_b < 3 => assert_eq!(T::LOG2, 3),
+            _ if log_b < 3 => {
+                assert_eq!(T::LOG2, 3);
+                if let Some(v) = val {
+                    assert!(v.to_u8().unwrap() < (1 << (1 << log_b)), "Input value {:?} is invalid for the spec {:?}", v, self);
+                }
+            }
             3..=6 => assert_eq!(T::LOG2, log_b as u32),
             _ => unreachable!("side metadata > {}-bits is not supported", 1 << log_b),
         }
@@ -196,12 +202,13 @@ impl SideMetadataSpec {
     /// * check if the side metadata memory is mapped.
     /// * check if the side metadata content is correct based on a sanity map (only for extreme assertions).
     #[inline(always)]
-    #[allow(unused_variables)] // data_addr is not used in release build
-    fn side_metadata_access<T: MetadataValue, R: Copy, F: FnMut() -> R, V: FnMut(R)>(
+    #[allow(unused_variables)] // data_addr/input is not used in release build
+    fn side_metadata_access<T: MetadataValue, R: Copy, F: FnOnce() -> R, V: FnOnce(R)>(
         &self,
         data_addr: Address,
-        mut access_func: F,
-        mut verify_func: V,
+        input: Option<T>,
+        access_func: F,
+        verify_func: V,
     ) -> R {
         // With extreme assertions, we maintain a sanity table for each side metadata access. For whatever we store in
         // side metadata, we store in the sanity table. So we can use that table to check if its results are conssitent
@@ -214,7 +221,7 @@ impl SideMetadataSpec {
         // A few checks
         #[cfg(debug_assertions)]
         {
-            self.assert_value_type::<T>();
+            self.assert_value_type::<T>(input);
             self.assert_metadata_mapped(data_addr);
         }
 
@@ -239,6 +246,7 @@ impl SideMetadataSpec {
     pub unsafe fn load<T: MetadataValue>(&self, data_addr: Address) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            None,
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -271,6 +279,7 @@ impl SideMetadataSpec {
     pub unsafe fn store<T: MetadataValue>(&self, data_addr: Address, metadata: T) {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(metadata),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -296,6 +305,7 @@ impl SideMetadataSpec {
     pub fn load_atomic<T: MetadataValue>(&self, data_addr: Address, order: Ordering) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            None,
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -319,6 +329,7 @@ impl SideMetadataSpec {
     pub fn store_atomic<T: MetadataValue>(&self, data_addr: Address, metadata: T, order: Ordering) {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(metadata),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -359,6 +370,7 @@ impl SideMetadataSpec {
     ) -> bool {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(new_metadata),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -442,6 +454,7 @@ impl SideMetadataSpec {
     ) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(val),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 let bits_num_log = self.log_num_of_bits;
@@ -475,6 +488,7 @@ impl SideMetadataSpec {
     ) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(val),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
@@ -507,6 +521,7 @@ impl SideMetadataSpec {
     ) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(val),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
@@ -538,6 +553,7 @@ impl SideMetadataSpec {
     ) -> T {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            Some(val),
             || {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
@@ -570,6 +586,7 @@ impl SideMetadataSpec {
     ) -> std::result::Result<T, T> {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
+            None,
             move || -> std::result::Result<T, T> {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
