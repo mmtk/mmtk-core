@@ -270,14 +270,17 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             if mark_bit != 0 {
                 return false;
             }
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_value,
-                1,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
@@ -296,14 +299,17 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 return false;
             }
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_value,
-                0,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }

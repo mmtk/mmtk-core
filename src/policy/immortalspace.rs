@@ -185,14 +185,17 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
                 return false;
             }
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_value,
-                old_value ^ GC_MARK_BIT_MASK,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    old_value ^ GC_MARK_BIT_MASK,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }

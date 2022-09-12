@@ -368,7 +368,7 @@ impl SideMetadataSpec {
         new_metadata: T,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool {
+    ) -> std::result::Result<T, T> {
         self.side_metadata_access::<T, _, _, _>(
             data_addr,
             Some(new_metadata),
@@ -386,15 +386,15 @@ impl SideMetadataSpec {
                         (expected_old_byte & !mask) | ((new_metadata.to_u8().unwrap()) << lshift);
 
                     unsafe {
-                        meta_addr
-                            .compare_exchange::<AtomicU8>(
-                                expected_old_byte,
-                                expected_new_byte,
-                                success_order,
-                                failure_order,
-                            )
-                            .is_ok()
+                        meta_addr.compare_exchange::<AtomicU8>(
+                            expected_old_byte,
+                            expected_new_byte,
+                            success_order,
+                            failure_order,
+                        )
                     }
+                    .map(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
+                    .map_err(|x| FromPrimitive::from_u8((x & mask) >> lshift).unwrap())
                 } else {
                     unsafe {
                         T::compare_exchange(
@@ -405,12 +405,11 @@ impl SideMetadataSpec {
                             failure_order,
                         )
                     }
-                    .is_ok()
                 }
             },
-            |_success| {
+            |_res| {
                 #[cfg(feature = "extreme_assertions")]
-                if _success {
+                if _res.is_ok() {
                     sanity::verify_store(self, data_addr, new_metadata);
                 }
             },
@@ -1110,7 +1109,8 @@ mod tests {
 
                         let new_val = 0;
                         let res = spec.compare_exchange_atomic::<$type>(data_addr, old_val, new_val, Ordering::SeqCst, Ordering::SeqCst);
-                        assert!(res);
+                        assert!(res.is_ok());
+                        assert_eq!(res.unwrap(), old_val, "old vals do not match");
 
                         let after_update = spec.load_atomic::<$type>(data_addr, Ordering::SeqCst);
                         assert_eq!(after_update, new_val);
@@ -1137,7 +1137,8 @@ mod tests {
 
                         let new_val = 0;
                         let res = spec.compare_exchange_atomic::<$type>(data_addr, old_val, new_val, Ordering::SeqCst, Ordering::SeqCst);
-                        assert!(!res);
+                        assert!(res.is_err());
+                        assert_eq!(res.err().unwrap(), 0);
                         let bits_after_cas = unsafe { *meta_ptr };
                         assert_eq!(bits_before_cas, bits_after_cas);
                     });

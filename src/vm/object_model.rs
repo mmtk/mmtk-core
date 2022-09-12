@@ -190,7 +190,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool {
+    ) -> std::result::Result<T, T> {
         metadata_spec.compare_exchange::<T>(
             object,
             old_val,

@@ -278,7 +278,7 @@ impl HeaderMetadataSpec {
         optional_mask: Option<T>,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool {
+    ) -> Result<T, T> {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
@@ -297,7 +297,8 @@ impl HeaderMetadataSpec {
                         success_order,
                         failure_order,
                     )
-                    .is_ok()
+                    .map(|x| FromPrimitive::from_u8(x).unwrap())
+                    .map_err(|x| FromPrimitive::from_u8(x).unwrap())
             }
         } else {
             let addr = self.meta_addr(object);
@@ -318,7 +319,6 @@ impl HeaderMetadataSpec {
                     success_order,
                     failure_order,
                 )
-                .is_ok()
             }
         }
     }
@@ -858,8 +858,9 @@ mod tests {
                         assert_eq!(old_val, 0);
 
                         let max_value = max_value($num_of_bits) as $type;
-                        let success = spec.compare_exchange::<$type>(obj, old_val, max_value, None, Ordering::SeqCst, Ordering::SeqCst);
-                        assert!(success);
+                        let res = spec.compare_exchange::<$type>(obj, old_val, max_value, None, Ordering::SeqCst, Ordering::SeqCst);
+                        assert!(res.is_ok());
+                        assert_eq!(res.unwrap(), old_val);
                         assert_eq!(unsafe { spec.load::<$type>(obj, None) }, max_value);
                     })
                 }
@@ -875,8 +876,9 @@ mod tests {
                         unsafe { spec.store::<$type>(obj, 1, None) };
 
                         let max_value = max_value($num_of_bits) as $type;
-                        let success = spec.compare_exchange::<$type>(obj, old_val, max_value, None, Ordering::SeqCst, Ordering::SeqCst);
-                        assert!(!success);
+                        let res = spec.compare_exchange::<$type>(obj, old_val, max_value, None, Ordering::SeqCst, Ordering::SeqCst);
+                        assert!(res.is_err());
+                        assert_eq!(res.err().unwrap(), 1);
                         assert_eq!(unsafe { spec.load::<$type>(obj, None) }, 1);
                     })
                 }

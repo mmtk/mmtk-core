@@ -25,14 +25,16 @@ pub fn attempt_to_forward<VM: VMBinding>(object: ObjectReference) -> u8 {
     loop {
         let old_value = get_forwarding_status::<VM>(object);
         if old_value != FORWARDING_NOT_TRIGGERED_YET
-            || VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_value,
-                BEING_FORWARDED,
-                None,
-                Ordering::SeqCst,
-                Ordering::Relaxed,
-            )
+            || VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    BEING_FORWARDED,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
         {
             return old_value;
         }

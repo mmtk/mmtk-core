@@ -159,7 +159,7 @@ impl MetadataSpec {
         mask: Option<T>,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool {
+    ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => metadata_spec.compare_exchange_atomic(
                 object.to_address(),

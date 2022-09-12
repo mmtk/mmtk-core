@@ -268,14 +268,17 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             if mark_bit == value {
                 return false;
             }
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_value,
-                old_value & !LOS_BIT_MASK | value,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    old_value & !LOS_BIT_MASK | value,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
@@ -310,14 +313,17 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 Ordering::Relaxed,
             );
             let new_val = old_val & !NURSERY_BIT;
-            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.compare_exchange_metadata::<VM, u8>(
-                object,
-                old_val,
-                new_val,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_val,
+                    new_val,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }

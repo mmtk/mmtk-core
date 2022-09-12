@@ -68,14 +68,18 @@ impl<E: ProcessEdgesWork> ObjectRememberingBarrier<E> {
             // Try set the bit from 1 to 0 (log object). This may fail, if
             // 1. the bit is cleared by others, or
             // 2. other bits in the same byte may get modified if we use side metadata
-            if self.meta.compare_exchange_metadata::<E::VM, u8>(
-                object,
-                1,
-                0,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if self
+                .meta
+                .compare_exchange_metadata::<E::VM, u8>(
+                    object,
+                    1,
+                    0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 // We just logged the object
                 return true;
             } else {
