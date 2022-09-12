@@ -458,14 +458,10 @@ impl HeaderMetadataSpec {
                     fetch_order,
                     |raw_byte: u8| {
                         let old_metadata = self.get_bits_from_u8(raw_byte);
-                        match f(FromPrimitive::from_u8(old_metadata).unwrap()) {
-                            Some(new_val) => {
-                                let new_metadata =
-                                    self.truncate_bits_in_u8(new_val.to_u8().unwrap());
-                                Some(self.set_bits_to_u8(raw_byte, new_metadata))
-                            }
-                            None => None,
-                        }
+                        f(FromPrimitive::from_u8(old_metadata).unwrap()).map(|new_val| {
+                            let new_metadata = self.truncate_bits_in_u8(new_val.to_u8().unwrap());
+                            self.set_bits_to_u8(raw_byte, new_metadata)
+                        })
                     },
                 )
             }

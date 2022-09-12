@@ -601,14 +601,10 @@ impl SideMetadataSpec {
                             fetch_order,
                             |raw_byte: u8| {
                                 let old_val = (raw_byte & mask) >> lshift;
-                                match f(FromPrimitive::from_u8(old_val).unwrap()) {
-                                    Some(new_val) => {
-                                        let new_raw_byte = (raw_byte & !mask)
-                                            | ((new_val.to_u8().unwrap() << lshift) & mask);
-                                        Some(new_raw_byte)
-                                    }
-                                    None => None,
-                                }
+                                f(FromPrimitive::from_u8(old_val).unwrap()).map(|new_val| {
+                                    (raw_byte & !mask)
+                                        | ((new_val.to_u8().unwrap() << lshift) & mask)
+                                })
                             },
                         )
                     }
