@@ -20,12 +20,11 @@ use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
@@ -57,9 +56,10 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         &MARKCOMPACT_CONSTRAINTS
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
-        self.mc_space.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.mc_space);
+        ret
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -177,12 +177,8 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
+        let mut heap = HeapMeta::new(&options);
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]

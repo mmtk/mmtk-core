@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -11,6 +11,7 @@ readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
 rust-version = "1.57.0"
+build = "build.rs"
 
 [lib]
 name = "mmtk"
@@ -19,7 +20,7 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.13.0", path = "macros/" }
+mmtk-macros = { version = "0.14.0", path = "macros/" }
 
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
@@ -43,6 +44,9 @@ strum_macros = "0.24"
 [dev-dependencies]
 rand = "0.7.3"
 
+[build-dependencies]
+built = { version = "0.5.1", features = ["git2"] }
+
 [features]
 default = []
 
@@ -57,9 +61,18 @@ perf_counter = ["pfm"]
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
 
-# spaces
+# spaces with different semantics
+
+# A VM-allocated/managed space. A binding could use this for their boot image, metadata space, etc.
+# FIXME: This is not properly implemented yet (it is only working for JikesRVM): https://github.com/mmtk/mmtk-core/issues/415
+# If a binding would need to trace/scan objects that is allocated and managed by the VM, `ActivePlan::vm_trace_object()` is an alternative.
 vm_space = []
+
+# A readonly space.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
+# A code space with execution permission.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
 # metadata
@@ -67,6 +80,13 @@ global_alloc_bit = []
 
 # conservative garbage collection support
 is_mmtk_object = ["global_alloc_bit"]
+
+# The following two features are useful for using Immix for VMs that do not support moving GC.
+
+# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
+immix_no_defrag = []
+# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+immix_smaller_block = []
 
 # Run sanity GC
 sanity = []

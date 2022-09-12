@@ -73,7 +73,7 @@ impl FixtureContent for SingleObject {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
         // 1MB heap
-        mmtk_gc_init(MB);
+        mmtk_init(MB);
         mmtk_initialize_collection(VMThread::UNINITIALIZED);
         // Make sure GC does not run during test.
         mmtk_disable_collection();
@@ -101,11 +101,42 @@ impl FixtureContent for MMTKSingleton {
     fn create() -> Self {
         const MB: usize = 1024 * 1024;
         // 1MB heap
-        mmtk_gc_init(MB);
+        mmtk_init(MB);
         mmtk_initialize_collection(VMThread::UNINITIALIZED);
 
         MMTKSingleton {
             mmtk: &crate::SINGLETON,
         }
+    }
+}
+
+pub struct TwoObjects {
+    pub objref1: ObjectReference,
+    pub objref2: ObjectReference,
+}
+
+impl FixtureContent for TwoObjects {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        let size = 128;
+        let semantics = AllocationSemantics::Default;
+
+        let addr = mmtk_alloc(handle, size, 8, 0, semantics);
+        assert!(!addr.is_zero());
+
+        let objref1 = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        mmtk_post_alloc(handle, objref1, size, semantics);
+
+        let objref2 = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        mmtk_post_alloc(handle, objref2, size, semantics);
+
+        TwoObjects { objref1, objref2 }
     }
 }

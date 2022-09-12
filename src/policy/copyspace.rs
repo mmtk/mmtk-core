@@ -94,8 +94,8 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.common
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -204,10 +204,13 @@ impl<VM: VMBinding> CopySpace<VM> {
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            crate::util::alloc_bit::bzero_alloc_bit(
-                self.common.start,
-                current_chunk + BYTES_IN_CHUNK - self.common.start,
-            );
+            // If we have allocated something into this space, we need to clear its alloc bit.
+            if current_chunk != self.common.start {
+                crate::util::alloc_bit::bzero_alloc_bit(
+                    self.common.start,
+                    current_chunk + BYTES_IN_CHUNK - self.common.start,
+                );
+            }
         } else {
             unimplemented!();
         }

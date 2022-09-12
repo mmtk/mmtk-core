@@ -2,6 +2,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use libc::c_char;
+use std::sync::atomic::Ordering;
 use std::ffi::CStr;
 use mmtk::memory_manager;
 use mmtk::AllocationSemantics;
@@ -9,17 +10,23 @@ use mmtk::util::{ObjectReference, Address};
 use mmtk::util::opaque_pointer::*;
 use mmtk::scheduler::{GCController, GCWorker};
 use mmtk::Mutator;
-use mmtk::MMTK;
 use crate::DummyVM;
 use crate::SINGLETON;
+use crate::BUILDER;
 
 #[no_mangle]
-pub extern "C" fn mmtk_gc_init(heap_size: usize) {
-    // # Safety
-    // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
-    #[allow(clippy::cast_ref_to_mut)]
-    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
-    memory_manager::gc_init(singleton_mut, heap_size)
+pub extern "C" fn mmtk_init(heap_size: usize) {
+    // set heap size first
+    {
+        let mut builder = BUILDER.lock().unwrap();
+        let success = builder.options.heap_size.set(heap_size);
+        assert!(success, "Failed to set heap size to {}", heap_size);
+    }
+
+    // Make sure MMTk has not yet been initialized
+    assert!(!crate::MMTK_INITIALIZED.load(Ordering::SeqCst));
+    // Initialize MMTk here
+    lazy_static::initialize(&SINGLETON);
 }
 
 #[no_mangle]
@@ -155,7 +162,8 @@ pub extern "C" fn mmtk_harness_end() {
 pub extern "C" fn mmtk_process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    memory_manager::process(&SINGLETON, name_str.to_str().unwrap(), value_str.to_str().unwrap())
+    let mut builder = BUILDER.lock().unwrap();
+    memory_manager::process(&mut builder, name_str.to_str().unwrap(), value_str.to_str().unwrap())
 }
 
 #[no_mangle]

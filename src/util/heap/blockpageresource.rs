@@ -2,6 +2,7 @@ use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
 use crate::util::address::Address;
 use crate::util::constants::*;
+use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
@@ -61,6 +62,12 @@ impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
     fn adjust_for_metadata(&self, pages: usize) -> usize {
         pages // No legacy metadata support
     }
+
+    fn get_available_physical_pages(&self) -> usize {
+        debug_assert!(self.common.contiguous);
+        let _sync = self.sync.lock().unwrap();
+        bytes_to_pages(self.limit - self.highwater.load(Ordering::SeqCst))
+    }
 }
 
 impl<VM: VMBinding> BlockPageResource<VM> {
@@ -69,6 +76,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         start: Address,
         bytes: usize,
         vm_map: &'static VMMap,
+        num_workers: usize,
     ) -> Self {
         let growable = cfg!(target_pointer_width = "64");
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
@@ -78,15 +86,10 @@ impl<VM: VMBinding> BlockPageResource<VM> {
             // Highwater starts from the start address of the contiguous space
             highwater: Atomic::new(start),
             limit: (start + bytes).align_up(BYTES_IN_CHUNK),
-            block_queue: BlockQueue::new(),
+            block_queue: BlockQueue::new(num_workers),
             sync: Mutex::new(()),
             _p: PhantomData,
         }
-    }
-
-    /// Initialize BlockPageResource. Called during `gc_init`.
-    pub fn init(&mut self, num_workers: usize) {
-        self.block_queue.init(num_workers);
     }
 
     /// Grow contiguous space
@@ -312,20 +315,13 @@ pub struct BlockQueue<Block> {
 
 impl<Block: Debug + Copy> BlockQueue<Block> {
     /// Create a BlockQueue
-    pub fn new() -> Self {
+    pub fn new(num_workers: usize) -> Self {
         Self {
             head_global_freed_blocks: Default::default(),
             global_freed_blocks: Default::default(),
-            worker_local_freed_blocks: vec![],
+            worker_local_freed_blocks: (0..num_workers).map(|_| BlockArray::new()).collect(),
             count: AtomicUsize::new(0),
         }
-    }
-
-    /// Initialize the thread-local queues
-    pub fn init(&mut self, num_workers: usize) {
-        let mut worker_local_freed_blocks = vec![];
-        worker_local_freed_blocks.resize_with(num_workers, || BlockArray::new());
-        self.worker_local_freed_blocks = worker_local_freed_blocks;
     }
 
     /// Add a BlockArray to the global pool

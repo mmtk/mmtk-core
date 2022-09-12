@@ -1,6 +1,6 @@
 //! Mutator context for each application thread.
 
-use crate::plan::barriers::{Barrier, WriteTarget};
+use crate::plan::barriers::Barrier;
 use crate::plan::global::Plan;
 use crate::plan::AllocationSemantics;
 use crate::policy::space::Space;
@@ -135,10 +135,6 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
     }
     fn get_tls(&self) -> VMMutatorThread;
     fn barrier(&mut self) -> &mut dyn Barrier;
-
-    fn record_modified_node(&mut self, obj: ObjectReference) {
-        self.barrier().post_write_barrier(WriteTarget::Object(obj));
-    }
 }
 
 /// This is used for plans to indicate the number of allocators reserved for the plan.

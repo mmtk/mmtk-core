@@ -22,6 +22,15 @@ jobs:
       - name: Publish sub crates
         run: |
           cargo publish --manifest-path=macros/Cargo.toml
+      # Publish MMTk core.
+      # As mmtk-core depends on the crate we just publish above, in practice there could be
+      # a delay before we can find the exact version for the dependent crate on crates.io.
+      # The script will retry publish for 5 times with 60 seconds between the retries.
       - name: Public mmtk-core
         run: |
-          cargo publish
+          for n in {1..5}; do
+            echo "Attempt #"$n
+            cargo publish && break
+            echo "Wait for Retry #"$n
+            sleep 60
+          done

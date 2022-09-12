@@ -382,7 +382,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     fn as_space(&self) -> &dyn Space<VM>;
     fn as_sft(&self) -> &(dyn SFT + Sync + 'static);
     fn get_page_resource(&self) -> &dyn PageResource<VM>;
-    fn init(&mut self, vm_map: &'static VMMap);
+
+    /// Initialize entires in SFT map for the space. This is called when the Space object
+    /// has a non-moving address, as we will use the address to set sft.
+    /// Currently after we create a boxed plan, spaces in the plan have a non-moving address.
+    fn initialize_sft(&self);
 
     fn acquire(&self, tls: VMThread, pages: usize) -> Address {
         trace!("Space.acquire, tls={:?}", tls);
@@ -535,8 +539,24 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         // If this is not a new chunk, the SFT for [start, start + bytes) should alreayd be initialized.
         #[cfg(debug_assertions)]
         if !new_chunk {
-            debug_assert!(SFT_MAP.get(start).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})", start, bytes, new_chunk, start, SFT_MAP.get(start).name());
-            debug_assert!(SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME, "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {}", start, bytes, new_chunk, start + bytes - 1, SFT_MAP.get(start + bytes - 1).name());
+            debug_assert!(
+                SFT_MAP.get(start).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start,
+                SFT_MAP.get(start).name()
+            );
+            debug_assert!(
+                SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME,
+                "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
+                start,
+                bytes,
+                new_chunk,
+                start + bytes - 1,
+                SFT_MAP.get(start + bytes - 1).name()
+            );
         }
 
         if new_chunk {
@@ -544,10 +564,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         }
     }
 
-    /**
-     *  Ensure this space is marked as mapped -- used when the space is already
-     *  mapped (e.g. for a vm image which is externally mmapped.)
-     */
+    /// Ensure this space is marked as mapped -- used when the space is already
+    /// mapped (e.g. for a vm image which is externally mmapped.)
     fn ensure_mapped(&self) {
         if self
             .common()
@@ -558,7 +576,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             // TODO(Javad): handle meta space allocation failure
             panic!("failed to mmap meta memory");
         }
-        SFT_MAP.update(self.as_sft(), self.common().start, self.common().extent);
+
         use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
@@ -569,6 +587,11 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         let data_pages = self.get_page_resource().reserved_pages();
         let meta_pages = self.common().metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
+    }
+
+    /// Return the number of physical pages available.
+    fn available_physical_pages(&self) -> usize {
+        self.get_page_resource().get_available_physical_pages()
     }
 
     fn get_name(&self) -> &'static str {
@@ -585,51 +608,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         panic!("A copying space should override this method")
     }
 
-    fn print_vm_map(&self) {
-        let common = self.common();
-        print!("{} ", common.name);
-        if common.immortal {
-            print!("I");
-        } else {
-            print!(" ");
-        }
-        if common.movable {
-            print!(" ");
-        } else {
-            print!("N");
-        }
-        print!(" ");
-        if common.contiguous {
-            print!("{}->{}", common.start, common.start + common.extent - 1);
-            match common.vmrequest {
-                VMRequest::Extent { extent, .. } => {
-                    print!(" E {}", extent);
-                }
-                VMRequest::Fraction { frac, .. } => {
-                    print!(" F {}", frac);
-                }
-                _ => {}
-            }
-        } else {
-            let mut a = self
-                .get_page_resource()
-                .common()
-                .get_head_discontiguous_region();
-            while !a.is_zero() {
-                print!(
-                    "{}->{}",
-                    a,
-                    a + self.common().vm_map().get_contiguous_region_size(a) - 1
-                );
-                a = self.common().vm_map().get_next_contiguous_region(a);
-                if !a.is_zero() {
-                    print!(" ");
-                }
-            }
-        }
-        println!();
-    }
-
     /// Ensure that the current space's metadata context does not have any issues.
     /// Panics with a suitable message if any issue is detected.
     /// It also initialises the sanity maps which will then be used if the `extreme_assertions` feature is active.
@@ -643,6 +621,66 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         side_metadata_sanity_checker
             .verify_metadata_context(std::any::type_name::<Self>(), &self.common().metadata)
     }
+}
+
+/// Print the VM map for a space.
+/// Space needs to be object-safe, so it cannot have methods that use extra generic type paramters. So this method is placed outside the Space trait.
+/// This method can be invoked on a &dyn Space (space.as_space() will return &dyn Space).
+#[allow(unused)]
+pub(crate) fn print_vm_map<VM: VMBinding>(
+    space: &dyn Space<VM>,
+    out: &mut impl std::fmt::Write,
+) -> Result<(), std::fmt::Error> {
+    let common = space.common();
+    write!(out, "{} ", common.name)?;
+    if common.immortal {
+        write!(out, "I")?;
+    } else {
+        write!(out, " ")?;
+    }
+    if common.movable {
+        write!(out, " ")?;
+    } else {
+        write!(out, "N")?;
+    }
+    write!(out, " ")?;
+    if common.contiguous {
+        write!(
+            out,
+            "{}->{}",
+            common.start,
+            common.start + common.extent - 1
+        )?;
+        match common.vmrequest {
+            VMRequest::Extent { extent, .. } => {
+                write!(out, " E {}", extent)?;
+            }
+            VMRequest::Fraction { frac, .. } => {
+                write!(out, " F {}", frac)?;
+            }
+            _ => {}
+        }
+    } else {
+        let mut a = space
+            .get_page_resource()
+            .common()
+            .get_head_discontiguous_region();
+        while !a.is_zero() {
+            write!(
+                out,
+                "{}->{}",
+                a,
+                a + space.common().vm_map().get_contiguous_region_size(a) - 1
+            )?;
+            a = space.common().vm_map().get_next_contiguous_region(a);
+            if !a.is_zero() {
+                write!(out, " ")?;
+            }
+        }
+    }
+    writeln!(out)?;
+
+    Ok(())
 }
 
 impl_downcast!(Space<VM> where VM: VMBinding);
@@ -689,9 +727,6 @@ pub struct SpaceOptions {
     pub vmrequest: VMRequest,
     pub side_metadata_specs: SideMetadataContext,
 }
-
-/// Print debug info for SFT. Should be false when committed.
-const DEBUG_SPACE: bool = cfg!(debug_assertions) && false;
 
 impl<VM: VMBinding> CommonSpace<VM> {
     pub fn new(
@@ -772,31 +807,31 @@ impl<VM: VMBinding> CommonSpace<VM> {
         // VM.memory.setHeapRange(index, start, start.plus(extent));
         vm_map.insert(start, extent, rtn.descriptor);
 
-        if DEBUG_SPACE {
-            println!(
-                "Created space {} [{}, {}) for {} bytes",
-                rtn.name,
-                start,
-                start + extent,
-                extent
-            );
+        // For contiguous space, we know its address range so we reserve metadata memory for its range.
+        if rtn
+            .metadata
+            .try_map_metadata_address_range(rtn.start, rtn.extent)
+            .is_err()
+        {
+            // TODO(Javad): handle meta space allocation failure
+            panic!("failed to mmap meta memory");
         }
+
+        debug!(
+            "Created space {} [{}, {}) for {} bytes",
+            rtn.name,
+            start,
+            start + extent,
+            extent
+        );
 
         rtn
     }
 
-    pub fn init(&self, space: &dyn Space<VM>) {
+    pub fn initialize_sft(&self, sft: &(dyn SFT + Sync + 'static)) {
         // For contiguous space, we eagerly initialize SFT map based on its address range.
         if self.contiguous {
-            if self
-                .metadata
-                .try_map_metadata_address_range(self.start, self.extent)
-                .is_err()
-            {
-                // TODO(Javad): handle meta space allocation failure
-                panic!("failed to mmap meta memory");
-            }
-            SFT_MAP.update(space.as_sft(), self.start, self.extent);
+            SFT_MAP.update(sft, self.start, self.extent);
         }
     }
 

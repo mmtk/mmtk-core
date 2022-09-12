@@ -1,3 +1,33 @@
+0.14.0 (2022-08-08)
+===
+
+API
+---
+* `ProcessEdgesWork` is no longer exposed in the `Scanning` trait. Instead, `RootsWorkFactory` is introduced
+  for the bindings to create more work packets.
+* `Collection::stop_all_mutators()` now provides a callback `mutator_visitor`. The implementation is required
+  to call `mutator_visitor` for each mutator once it is stopped. This requirement was implicit prior to this change.
+* Now MMTk creation is done in the builder pattern:
+  * `MMTKBuilder` is introduced. Command line argument processing API (`process()` and `process_bulk()`) now
+    takes `&MMTKBuilder` as an argument instead of `&MMTK`.
+  * `gc_init()` is renamed to `mmtk_init()`. `mmtk_init()` now takes `&MMTKBuilder` as an argument,
+    and returns an MMTk instance `Box<MMTK>`.
+  * `heap_size` (which used to be an argument for `gc_init()`) is now an MMTk option.
+  * All the options now can be set through the command line argument processing API.
+* Node enqueuing is supported:
+  * Add `Scanning::support_edge_enqueuing()`. A binding may return `false` if they cannot do edge scanning for certain objects.
+  * For objects that cannot be enqueued as edges, `Scanning::scan_object_and_trace_edges()` will be called.
+
+
+Scheduler
+---
+* Fixed a bug that may cause deadlock when GC workers are parked and the coordinator is still executing work.
+
+Misc
+---
+* `Plan::gc_init()` and `Space::init()` are removed. Initialization is now properly done in the respective constructors.
+
+
 0.13.0 (2022-06-27)
 ===
 

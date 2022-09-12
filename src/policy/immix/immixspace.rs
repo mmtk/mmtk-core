@@ -109,13 +109,8 @@ impl<VM: VMBinding> Space<VM> for ImmixSpace<VM> {
     fn common(&self) -> &CommonSpace<VM> {
         &self.common
     }
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        super::validate_features();
-        // Initialize the block queues in `reusable_blocks` and `pr`.
-        self.reusable_blocks.init(self.scheduler.num_workers());
-        #[cfg(target_pointer_width = "64")]
-        self.pr.init(self.scheduler.num_workers());
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
     fn release_multiple_pages(&mut self, _start: Address) {
         panic!("immixspace only releases pages enmasse")
@@ -195,6 +190,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
         global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
+        #[cfg(feature = "immix_no_defrag")]
+        info!(
+            "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
+            name,
+            Block::LOG_BYTES
+        );
+
+        super::validate_features();
         let common = CommonSpace::new(
             SpaceOptions {
                 name,
@@ -225,12 +228,13 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 common.start,
                 common.extent,
                 vm_map,
+                scheduler.num_workers(),
             ),
             common,
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            reusable_blocks: BlockList::default(),
+            reusable_blocks: BlockList::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,

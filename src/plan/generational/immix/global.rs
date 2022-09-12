@@ -15,9 +15,8 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 
@@ -103,9 +102,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.collection_required(self, space_full, space)
     }
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.gen.gc_init(heap_size, vm_map);
-        self.immix.init(vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.gen.get_spaces();
+        ret.push(&self.immix);
+        ret
     }
 
     // GenImmixMatureProcessEdges<VM, { TraceKind::Defrag }> and GenImmixMatureProcessEdges<VM, { TraceKind::Fast }>
@@ -114,7 +114,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     #[allow(clippy::if_same_then_else)]
     #[allow(clippy::branches_sharing_code)]
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<Self::VM>) {
-        let is_full_heap = self.request_full_heap_collection();
+        let is_full_heap = self.requires_full_heap_collection();
 
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
@@ -167,6 +167,14 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         }
         self.last_gc_was_full_heap
             .store(full_heap, Ordering::Relaxed);
+
+        // TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker
+        // NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is
+        // called _after_ all spaces have been released (including ones in `gen`) as otherwise we
+        // may get incorrect results since the function uses values such as available pages that
+        // will change dependant on which spaces have been released
+        self.gen
+            .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -184,6 +192,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             .get_total_pages()
             .saturating_sub(self.get_reserved_pages()))
             >> 1
+    }
+
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.immix.available_physical_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -207,10 +219,10 @@ impl<VM: VMBinding> GenImmix<VM> {
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         // We have no specific side metadata for copying. So just use the ones from generational.
         let global_metadata_specs =
             crate::plan::generational::new_generational_global_metadata_specs::<VM>();
@@ -253,8 +265,7 @@ impl<VM: VMBinding> GenImmix<VM> {
         genimmix
     }
 
-    fn request_full_heap_collection(&self) -> bool {
-        self.gen
-            .request_full_heap_collection(self.get_total_pages(), self.get_reserved_pages())
+    fn requires_full_heap_collection(&self) -> bool {
+        self.gen.requires_full_heap_collection(self)
     }
 }

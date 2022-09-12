@@ -16,7 +16,7 @@ pub const MAX_IMMIX_OBJECT_SIZE: usize = Block::BYTES >> 1;
 pub const BLOCK_ONLY: bool = false;
 
 /// Opportunistic copying
-pub const DEFRAG: bool = true;
+pub const DEFRAG: bool = !cfg!(feature = "immix_no_defrag");
 
 /// Mark lines when scanning objects.
 /// Otherwise, do it at mark time.

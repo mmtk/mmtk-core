@@ -15,10 +15,9 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;
@@ -47,8 +46,10 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
 impl<VM: VMBinding> Plan for MarkSweep<VM> {
     type VM = VM;
 
-    fn gc_init(&mut self, heap_size: usize, vm_map: &'static VMMap) {
-        self.common.gc_init(heap_size, vm_map);
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.ms);
+        ret
     }
 
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
@@ -94,12 +95,8 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
-    ) -> Self {
-        let heap = HeapMeta::new(HEAP_START, HEAP_END);
+    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
+        let heap = HeapMeta::new(&options);
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]
