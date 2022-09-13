@@ -165,7 +165,7 @@ pub fn post_alloc<VM: VMBinding>(
 ///
 /// For a correct barrier implementation, a VM binding needs to choose one of the following options:
 /// * Use subsuming barrier `object_reference_write`
-/// * Use both `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
 /// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
 /// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
@@ -190,7 +190,7 @@ pub fn object_reference_write<VM: VMBinding>(
 ///
 /// For a correct barrier implementation, a VM binding needs to choose one of the following options:
 /// * Use subsuming barrier `object_reference_write`
-/// * Use both `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
 /// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
 /// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
@@ -217,7 +217,7 @@ pub fn object_reference_write_pre<VM: VMBinding>(
 ///
 /// For a correct barrier implementation, a VM binding needs to choose one of the following options:
 /// * Use subsuming barrier `object_reference_write`
-/// * Use both `object_reference_write_pre` or `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
 /// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
 /// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
@@ -241,7 +241,7 @@ pub fn object_reference_write_post<VM: VMBinding>(
 /// The *subsuming* memory region copy barrier by MMTk.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be  to filter out invalid pointers on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -267,7 +267,7 @@ pub fn memory_region_copy<VM: VMBinding>(
 /// *before* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be  to filter out invalid pointers on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
@@ -293,7 +293,7 @@ pub fn memory_region_copy_pre<VM: VMBinding>(
 /// *after* it performs memory copy.
 /// This is called when the VM tries to copy a piece of heap memory to another.
 /// The data within the slice does not necessarily to be all valid pointers,
-/// but the VM binding will be  to filter out invalid pointers on edge iteration.
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
 ///
 /// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
 /// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,

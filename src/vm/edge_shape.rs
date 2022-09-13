@@ -136,9 +136,7 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
 pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
     type Edge: Edge;
     type EdgeIterator: Iterator<Item = Self::Edge>;
-    /// Iterate _valid_ object edges within the slice.
-    ///
-    /// For dynamic languages, the binding may need to filter out invalid edges.
+    /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
     fn iter_edges(&self) -> Self::EdgeIterator;
     /// Start address of the memory slice
     fn start(&self) -> Address;

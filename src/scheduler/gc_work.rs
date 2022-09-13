@@ -376,7 +376,6 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
         &*self.mmtk.plan
     }
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
-    /// Return `None` if the nodes buffer is empty.
     #[inline]
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
         self.nodes.take()
