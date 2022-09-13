@@ -15,4 +15,3 @@ pub const MAX_SPACES: usize = 1 << LOG_MAX_SPACES;
  * size of this constant is 41 (assuming 4k pages).
  */
 pub const LOG_SPACE_SIZE_64: usize = 41;
-type a = UnimplementedMemorySlice;
