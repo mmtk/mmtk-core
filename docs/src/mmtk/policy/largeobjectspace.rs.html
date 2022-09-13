@@ -335,11 +335,6 @@
 <span id="333">333</span>
 <span id="334">334</span>
 <span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
@@ -353,11 +348,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">FreeListPageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::compare_exchange_metadata</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::load_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::store_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::treadmill::TreadMill</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -366,16 +358,16 @@
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">const</span> <span class="ident">PAGE_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="op">!</span>(<span class="ident">BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>);
-<span class="kw">const</span> <span class="ident">MARK_BIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b01</span>;
-<span class="kw">const</span> <span class="ident">NURSERY_BIT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b10</span>;
-<span class="kw">const</span> <span class="ident">LOS_BIT_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b11</span>;
+<span class="kw">const</span> <span class="ident">MARK_BIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b01</span>;
+<span class="kw">const</span> <span class="ident">NURSERY_BIT</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b10</span>;
+<span class="kw">const</span> <span class="ident">LOS_BIT_MASK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b11</span>;
 
 <span class="doccomment">/// This type implements a policy for large objects. Each instance corresponds</span>
 <span class="doccomment">/// to one Treadmill space.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">pr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">mark_state</span>: <span class="ident">usize</span>,
+    <span class="ident">mark_state</span>: <span class="ident">u8</span>,
     <span class="ident">in_nursery_gc</span>: <span class="ident">bool</span>,
     <span class="ident">treadmill</span>: <span class="ident">TreadMill</span>,
 }
@@ -395,22 +387,20 @@
         <span class="bool-val">true</span>
     }
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>) {
-        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+        <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::SeqCst</span>,
         );
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_value</span> <span class="op">=</span> (<span class="ident">old_value</span> <span class="op">&amp;</span> (<span class="op">!</span><span class="ident">LOS_BIT_MASK</span>)) <span class="op">|</span> <span class="self">self</span>.<span class="ident">mark_state</span>;
         <span class="kw">if</span> <span class="ident">alloc</span> {
             <span class="ident">new_value</span> <span class="op">|</span><span class="op">=</span> <span class="ident">NURSERY_BIT</span>;
         }
-        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+        <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
             <span class="ident">new_value</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::SeqCst</span>,
         );
 
         <span class="comment">// If this object is freshly allocated, we do not set it as unlogged</span>
@@ -599,55 +589,54 @@
         <span class="self">self</span>.<span class="ident">acquire</span>(<span class="ident">tls</span>, <span class="ident">pages</span>)
     }
 
-    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+    <span class="kw">fn</span> <span class="ident">test_and_mark</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">mask</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">in_nursery_gc</span> {
                 <span class="ident">LOS_BIT_MASK</span>
             } <span class="kw">else</span> {
                 <span class="ident">MARK_BIT</span>
             };
-            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
                 <span class="ident">object</span>,
                 <span class="prelude-val">None</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+                <span class="ident">Ordering::SeqCst</span>,
             );
             <span class="kw">let</span> <span class="ident">mark_bit</span> <span class="op">=</span> <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="ident">mask</span>;
             <span class="kw">if</span> <span class="ident">mark_bit</span> <span class="op">==</span> <span class="ident">value</span> {
                 <span class="kw">return</span> <span class="bool-val">false</span>;
             }
-            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
-                <span class="ident">object</span>,
-                <span class="ident">old_value</span>,
-                <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">LOS_BIT_MASK</span> <span class="op">|</span> <span class="ident">value</span>,
-                <span class="prelude-val">None</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-            ) {
+            <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>
+                .<span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
+                    <span class="ident">object</span>,
+                    <span class="ident">old_value</span>,
+                    <span class="ident">old_value</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">LOS_BIT_MASK</span> <span class="op">|</span> <span class="ident">value</span>,
+                    <span class="prelude-val">None</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                )
+                .<span class="ident">is_ok</span>()
+            {
                 <span class="kw">break</span>;
             }
         }
         <span class="bool-val">true</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">test_mark_bit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+    <span class="kw">fn</span> <span class="ident">test_mark_bit</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">value</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::SeqCst</span>,
         ) <span class="op">&amp;</span> <span class="ident">MARK_BIT</span>
             <span class="op">==</span> <span class="ident">value</span>
     }
 
     <span class="doccomment">/// Check if a given object is in nursery</span>
     <span class="kw">fn</span> <span class="ident">is_in_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+        <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::Relaxed</span>),
+            <span class="ident">Ordering::Relaxed</span>,
         ) <span class="op">&amp;</span> <span class="ident">NURSERY_BIT</span>
             <span class="op">==</span> <span class="ident">NURSERY_BIT</span>
     }
@@ -655,22 +644,23 @@
     <span class="doccomment">/// Move a given object out of nursery</span>
     <span class="kw">fn</span> <span class="ident">clear_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
         <span class="kw">loop</span> {
-            <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
+            <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
                 <span class="ident">object</span>,
                 <span class="prelude-val">None</span>,
-                <span class="prelude-val">Some</span>(<span class="ident">Ordering::Relaxed</span>),
+                <span class="ident">Ordering::Relaxed</span>,
             );
             <span class="kw">let</span> <span class="ident">new_val</span> <span class="op">=</span> <span class="ident">old_val</span> <span class="op">&amp;</span> <span class="op">!</span><span class="ident">NURSERY_BIT</span>;
-            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>,
-                <span class="ident">object</span>,
-                <span class="ident">old_val</span>,
-                <span class="ident">new_val</span>,
-                <span class="prelude-val">None</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-            ) {
+            <span class="kw">if</span> <span class="ident">VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC</span>
+                .<span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
+                    <span class="ident">object</span>,
+                    <span class="ident">old_val</span>,
+                    <span class="ident">new_val</span>,
+                    <span class="prelude-val">None</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                )
+                .<span class="ident">is_ok</span>()
+            {
                 <span class="kw">break</span>;
             }
         }

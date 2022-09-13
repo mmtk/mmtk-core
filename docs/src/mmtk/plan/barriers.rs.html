@@ -152,14 +152,23 @@
 <span id="150">150</span>
 <span id="151">151</span>
 <span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Read/Write barrier implementations.</span>
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::WorkBucketStage</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::load_metadata</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{<span class="ident">compare_exchange_metadata</span>, <span class="ident">MetadataSpec</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::MetadataSpec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::MMTK</span>;
 
@@ -223,20 +232,24 @@
             <span class="comment">// Try set the bit from 1 to 0 (log object). This may fail, if</span>
             <span class="comment">// 1. the bit is cleared by others, or</span>
             <span class="comment">// 2. other bits in the same byte may get modified if we use side metadata</span>
-            <span class="kw">if</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>,
-                <span class="ident">object</span>,
-                <span class="number">1</span>,
-                <span class="number">0</span>,
-                <span class="prelude-val">None</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-            ) {
+            <span class="kw">if</span> <span class="self">self</span>
+                .<span class="ident">meta</span>
+                .<span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
+                    <span class="ident">object</span>,
+                    <span class="number">1</span>,
+                    <span class="number">0</span>,
+                    <span class="prelude-val">None</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                )
+                .<span class="ident">is_ok</span>()
+            {
                 <span class="comment">// We just logged the object</span>
                 <span class="kw">return</span> <span class="bool-val">true</span>;
             } <span class="kw">else</span> {
-                <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span>
-                    <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>));
+                <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="self">self</span>
+                    .<span class="ident">meta</span>
+                    .<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">E::VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="ident">Ordering::SeqCst</span>);
                 <span class="comment">// If the bit is cleared before, someone else has logged the object. Return false.</span>
                 <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">==</span> <span class="number">0</span> {
                     <span class="kw">return</span> <span class="bool-val">false</span>;
@@ -258,7 +271,14 @@
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">obj</span>: <span class="ident">ObjectReference</span>) {
-        <span class="kw">if</span> <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">meta</span>, <span class="ident">obj</span>, <span class="prelude-val">None</span>, <span class="prelude-val">None</span>) <span class="op">==</span> <span class="number">0</span> {
+        <span class="comment">// Perform a relaxed load for performance.</span>
+        <span class="comment">// It is okay if this check fails occasionally and</span>
+        <span class="comment">// the execution goes to the slowpath, we can take care of that in the slowpath.</span>
+        <span class="kw">if</span> <span class="self">self</span>
+            .<span class="ident">meta</span>
+            .<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">E::VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">obj</span>, <span class="prelude-val">None</span>, <span class="ident">Ordering::Relaxed</span>)
+            <span class="op">==</span> <span class="number">0</span>
+        {
             <span class="kw">return</span>;
         }
         <span class="self">self</span>.<span class="ident">barrier_slow</span>(<span class="ident">obj</span>);

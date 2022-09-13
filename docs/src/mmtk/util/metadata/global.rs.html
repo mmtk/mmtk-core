@@ -217,14 +217,136 @@
 <span id="215">215</span>
 <span id="216">216</span>
 <span id="217">217</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>;
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::header_metadata::HeaderMetadataSpec</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::metadata_val_traits</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
-
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::header_metadata::HeaderMetadataSpec</span>;
 
 <span class="doccomment">/// This struct stores the specification of a metadata bit-set.</span>
 <span class="doccomment">/// It is used as an input to the (inline) functions provided by the side metadata module.</span>
@@ -250,171 +372,295 @@
             <span class="ident">MetadataSpec::InHeader</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Expect a side spec&quot;</span>),
         }
     }
-}
 
-<span class="doccomment">/// A function to load the specified metadata&#39;s content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
-<span class="doccomment">/// * `object`: is a reference to the target object.</span>
-<span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
-<span class="doccomment">/// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
-    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-    <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">usize</span> {
-    <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
-                <span class="ident">side_metadata::load_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">order</span>)
-            } <span class="kw">else</span> {
-                <span class="kw">unsafe</span> { <span class="ident">side_metadata::load</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>()) }
+    <span class="doccomment">/// A function to non-atomically load the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// This is a non-atomic load, thus not thread-safe.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">metadata_spec</span>.<span class="ident">load</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()),
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::load_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">mask</span>)
             }
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">VM::VMObjectModel::load_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">mask</span>, <span class="ident">atomic_ordering</span>)
-        }
     }
-}
 
-<span class="doccomment">/// A function to store a value to the specified metadata.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
-<span class="doccomment">/// * `object`: is a reference to the target object.</span>
-<span class="doccomment">/// * `val`: is the new metadata value to be stored.</span>
-<span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
-<span class="doccomment">/// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
-    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">val</span>: <span class="ident">usize</span>,
-    <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-    <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-) {
-    <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
-                <span class="ident">side_metadata::store_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>);
-            } <span class="kw">else</span> {
-                <span class="kw">unsafe</span> {
-                    <span class="ident">side_metadata::store</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>);
-                }
+    <span class="doccomment">/// A function to atomically load the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">/// * `atomic_ordering`: is the ordering for the load operation.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_atomic</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">load_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">ordering</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::load_metadata_atomic</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">mask</span>, <span class="ident">ordering</span>)
             }
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">VM::VMObjectModel::store_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">mask</span>, <span class="ident">atomic_ordering</span>);
+    }
+
+    <span class="doccomment">/// A function to non-atomically store a value to the specified metadata.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the new metadata value to be stored.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// This is a non-atomic store, thus not thread-safe.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    ) {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">store</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>);
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::store_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">mask</span>)
+            }
         }
     }
-}
 
-<span class="doccomment">/// A function to atomically compare-and-exchange the specified metadata&#39;s content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
-<span class="doccomment">/// * `object`: is a reference to the target object.</span>
-<span class="doccomment">/// * `old_val`: is the expected current value of the metadata.</span>
-<span class="doccomment">/// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.</span>
-<span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
-<span class="doccomment">/// * `success_order`: is the atomic ordering used if the operation is successful.</span>
-<span class="doccomment">/// * `failure_order`: is the atomic ordering used if the operation fails.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Returns `true` if the operation is successful, and `false` otherwise.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
-    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">old_val</span>: <span class="ident">usize</span>,
-    <span class="ident">new_val</span>: <span class="ident">usize</span>,
-    <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-    <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
-    <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
-) -&gt; <span class="ident">bool</span> {
-    <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">side_metadata::compare_exchange_atomic</span>(
-            <span class="ident">metadata_spec</span>,
-            <span class="ident">object</span>.<span class="ident">to_address</span>(),
-            <span class="ident">old_val</span>,
-            <span class="ident">new_val</span>,
-            <span class="ident">success_order</span>,
-            <span class="ident">failure_order</span>,
-        ),
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">VM::VMObjectModel::compare_exchange_metadata</span>(
-            <span class="ident">metadata_spec</span>,
-            <span class="ident">object</span>,
-            <span class="ident">old_val</span>,
-            <span class="ident">new_val</span>,
-            <span class="ident">mask</span>,
-            <span class="ident">success_order</span>,
-            <span class="ident">failure_order</span>,
-        ),
-    }
-}
-
-<span class="doccomment">/// A function to atomically perform an add operation on the specified metadata&#39;s content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
-<span class="doccomment">/// * `object`: is a reference to the target object.</span>
-<span class="doccomment">/// * `val`: is the value to be added to the current value of the metadata.</span>
-<span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Returns the old metadata value as a word.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
-    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">val</span>: <span class="ident">usize</span>,
-    <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) -&gt; <span class="ident">usize</span> {
-    <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">side_metadata::fetch_add_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
-        }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">VM::VMObjectModel::fetch_add_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    <span class="doccomment">/// A function to atomically store a value to the specified metadata.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the new metadata value to be stored.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">/// * `ordering`: is the ordering for the store operation.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_atomic</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
+    ) {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">store_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">ordering</span>);
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">VM::VMObjectModel::store_metadata_atomic</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
+                <span class="ident">metadata_spec</span>,
+                <span class="ident">object</span>,
+                <span class="ident">val</span>,
+                <span class="ident">mask</span>,
+                <span class="ident">ordering</span>,
+            ),
         }
     }
-}
 
-<span class="doccomment">/// A function to atomically perform a subtract operation on the specified metadata&#39;s content.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Arguments:</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
-<span class="doccomment">/// * `object`: is a reference to the target object.</span>
-<span class="doccomment">/// * `val`: is the value to be subtracted from the current value of the metadata.</span>
-<span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// # Returns the old metadata value as a word.</span>
-<span class="doccomment">///</span>
-<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">MetadataSpec</span>,
-    <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">val</span>: <span class="ident">usize</span>,
-    <span class="ident">order</span>: <span class="ident">Ordering</span>,
-) -&gt; <span class="ident">usize</span> {
-    <span class="kw">match</span> <span class="ident">metadata_spec</span> {
-        <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">side_metadata::fetch_sub_atomic</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
+    <span class="doccomment">/// A function to atomically compare-and-exchange the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns `true` if the operation is successful, and `false` otherwise.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `old_val`: is the expected current value of the metadata.</span>
+    <span class="doccomment">/// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">/// * `success_order`: is the atomic ordering used if the operation is successful.</span>
+    <span class="doccomment">/// * `failure_order`: is the atomic ordering used if the operation fails.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">old_val</span>: <span class="ident">T</span>,
+        <span class="ident">new_val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
+        <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">metadata_spec</span>.<span class="ident">compare_exchange_atomic</span>(
+                <span class="ident">object</span>.<span class="ident">to_address</span>(),
+                <span class="ident">old_val</span>,
+                <span class="ident">new_val</span>,
+                <span class="ident">success_order</span>,
+                <span class="ident">failure_order</span>,
+            ),
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
+                    <span class="ident">metadata_spec</span>,
+                    <span class="ident">object</span>,
+                    <span class="ident">old_val</span>,
+                    <span class="ident">new_val</span>,
+                    <span class="ident">mask</span>,
+                    <span class="ident">success_order</span>,
+                    <span class="ident">failure_order</span>,
+                )
+            }
         }
-        <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
-            <span class="ident">VM::VMObjectModel::fetch_sub_metadata</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    }
+
+    <span class="doccomment">/// A function to atomically perform an add operation on the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to be added to the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">fetch_add_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::fetch_add_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+        }
+    }
+
+    <span class="doccomment">/// A function to atomically perform a subtract operation on the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to be subtracted from the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">fetch_sub_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::fetch_sub_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+        }
+    }
+
+    <span class="doccomment">/// A function to atomically perform a bit-and operation on the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-and with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_and_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">fetch_and_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::fetch_and_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+        }
+    }
+
+    <span class="doccomment">/// A function to atomically perform a bit-or operation on the specified metadata&#39;s content.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-or with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_or_metadata</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span>, <span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">fetch_or_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">VM::VMObjectModel::fetch_or_metadata</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">metadata_spec</span>, <span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+            }
+        }
+    }
+
+    <span class="doccomment">/// A function to atomically perform an update operation on the specified metadata&#39;s content. The semantics are the same as Rust&#39;s `fetch_update` on atomic types.</span>
+    <span class="doccomment">/// Returns a Result of Ok(previous_value) if the function returned Some(_), else Err(previous_value).</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-or with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">/// * `f`: the update function. The function may be called multiple times.</span>
+    <span class="doccomment">///</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_update_metadata</span><span class="op">&lt;</span>
+        <span class="ident">VM</span>: <span class="ident">VMBinding</span>,
+        <span class="ident">T</span>: <span class="ident">MetadataValue</span>,
+        <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">T</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Copy</span>,
+    <span class="op">&gt;</span>(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
+        <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
+        <span class="ident">f</span>: <span class="ident">F</span>,
+    ) -&gt; <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="kw">match</span> <span class="self">self</span> {
+            <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">metadata_spec</span>) =&gt; {
+                <span class="ident">metadata_spec</span>.<span class="ident">fetch_update_atomic</span>(<span class="ident">object</span>.<span class="ident">to_address</span>(), <span class="ident">set_order</span>, <span class="ident">fetch_order</span>, <span class="ident">f</span>)
+            }
+            <span class="ident">MetadataSpec::InHeader</span>(<span class="ident">metadata_spec</span>) =&gt; <span class="ident">VM::VMObjectModel::fetch_update_metadata</span>(
+                <span class="ident">metadata_spec</span>,
+                <span class="ident">object</span>,
+                <span class="ident">set_order</span>,
+                <span class="ident">fetch_order</span>,
+                <span class="ident">f</span>,
+            ),
         }
     }
 }

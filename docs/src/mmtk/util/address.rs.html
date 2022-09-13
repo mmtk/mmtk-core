@@ -541,6 +541,18 @@
 <span id="539">539</span>
 <span id="540">540</span>
 <span id="541">541</span>
+<span id="542">542</span>
+<span id="543">543</span>
+<span id="544">544</span>
+<span id="545">545</span>
+<span id="546">546</span>
+<span id="547">547</span>
+<span id="548">548</span>
+<span id="549">549</span>
+<span id="550">550</span>
+<span id="551">551</span>
+<span id="552">552</span>
+<span id="553">553</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
@@ -782,6 +794,7 @@
     <span class="doccomment">/// atomic operation: load</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">atomic_load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T::Type</span> {
         <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>);
         <span class="ident">loc</span>.<span class="ident">load</span>(<span class="ident">order</span>)
@@ -790,6 +803,7 @@
     <span class="doccomment">/// atomic operation: store</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">atomic_store</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">val</span>: <span class="ident">T::Type</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) {
         <span class="kw">let</span> <span class="ident">loc</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">T</span>);
         <span class="ident">loc</span>.<span class="ident">store</span>(<span class="ident">val</span>, <span class="ident">order</span>)
@@ -798,6 +812,7 @@
     <span class="doccomment">/// atomic operation: compare and exchange usize</span>
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">compare_exchange</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">Atomic</span><span class="op">&gt;</span>(
         <span class="self">self</span>,
         <span class="ident">old</span>: <span class="ident">T::Type</span>,
@@ -855,6 +870,15 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_mut_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">*mut</span> <span class="ident">T</span> {
         <span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>
+    }
+
+    <span class="doccomment">/// converts the Address to a Rust reference</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The caller must guarantee the address actually points to a Rust object.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">as_ref</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">T</span> {
+        <span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="self">self</span>.<span class="ident">to_mut_ptr</span>()
     }
 
     <span class="doccomment">/// converts the Address to a pointer-sized integer</span>

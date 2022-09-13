@@ -524,7 +524,6 @@
 <span id="522">522</span>
 <span id="523">523</span>
 <span id="524">524</span>
-<span id="525">525</span>
 </pre><pre class="rust"><code><span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
 <span class="kw">mod</span> <span class="ident">tests</span> {
     <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -761,14 +760,12 @@
                         )
                         .<span class="ident">is_ok</span>());
 
-                    <span class="ident">ensure_metadata_is_mapped</span>(<span class="kw-2">&amp;</span><span class="ident">gspec</span>, <span class="ident">vm_layout_constants::HEAP_START</span>);
-                    <span class="ident">ensure_metadata_is_mapped</span>(<span class="kw-2">&amp;</span><span class="ident">lspec</span>, <span class="ident">vm_layout_constants::HEAP_START</span>);
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">gspec</span>,
+                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">vm_layout_constants::HEAP_START</span>);
+                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">vm_layout_constants::HEAP_START</span>);
+                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">constants::BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>,
                     );
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">lspec</span>,
+                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">constants::BYTES_IN_PAGE</span> <span class="op">-</span> <span class="number">1</span>,
                     );
 
@@ -799,21 +796,17 @@
                         )
                         .<span class="ident">is_ok</span>());
 
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">gspec</span>,
+                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
                     );
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">lspec</span>,
+                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span>,
                     );
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">gspec</span>,
+                    <span class="ident">gspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">2</span>
                             <span class="op">-</span> <span class="number">8</span>,
                     );
-                    <span class="ident">ensure_metadata_is_mapped</span>(
-                        <span class="kw-2">&amp;</span><span class="ident">lspec</span>,
+                    <span class="ident">lspec</span>.<span class="ident">assert_metadata_mapped</span>(
                         <span class="ident">vm_layout_constants::HEAP_START</span> <span class="op">+</span> <span class="ident">vm_layout_constants::BYTES_IN_CHUNK</span> <span class="op">*</span> <span class="number">2</span>
                             <span class="op">-</span> <span class="number">16</span>,
                     );
@@ -867,30 +860,32 @@
                         .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
                         .<span class="ident">is_ok</span>());
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
+                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
+                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
                     <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span>
-                        <span class="ident">fetch_sub_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
+                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">three</span>, <span class="number">3</span>);
 
                     <span class="kw">let</span> <span class="ident">another_five</span> <span class="op">=</span>
-                        <span class="ident">fetch_sub_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
+                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">another_five</span>, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">three</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">three</span>, <span class="number">3</span>);
 
                     <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
@@ -933,17 +928,18 @@
                         .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
                         .<span class="ident">is_ok</span>());
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
+                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">2</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">two</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">two</span>, <span class="number">2</span>);
 
                     <span class="kw">let</span> <span class="ident">another_two</span> <span class="op">=</span>
-                        <span class="ident">fetch_sub_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_sub_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">another_two</span>, <span class="number">2</span>);
 
-                    <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">one</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">one</span>, <span class="number">1</span>);
 
                     <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
@@ -1013,30 +1009,32 @@
                         .<span class="ident">try_map_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>,)
                         .<span class="ident">is_ok</span>());
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
+                        <span class="ident">metadata_1_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span> <span class="ident">fetch_add_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">zero</span> <span class="op">=</span>
+                        <span class="ident">metadata_2_spec</span>.<span class="ident">fetch_add_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="number">5</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">zero</span>, <span class="number">0</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
 
-                    <span class="ident">bzero_metadata</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
+                    <span class="ident">metadata_2_spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">5</span>);
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
 
-                    <span class="ident">bzero_metadata</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
+                    <span class="ident">metadata_1_spec</span>.<span class="ident">bzero_metadata</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);
 
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_1_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_1_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u16</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
-                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">metadata_2_spec</span>, <span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
+                    <span class="kw">let</span> <span class="ident">five</span> <span class="op">=</span> <span class="ident">metadata_2_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">data_addr</span>, <span class="ident">Ordering::SeqCst</span>);
                     <span class="macro">assert_eq!</span>(<span class="ident">five</span>, <span class="number">0</span>);
 
                     <span class="ident">metadata</span>.<span class="ident">ensure_unmap_metadata_space</span>(<span class="ident">data_addr</span>, <span class="ident">constants::BYTES_IN_PAGE</span>);

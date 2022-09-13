@@ -268,34 +268,12 @@
 <span id="266">266</span>
 <span id="267">267</span>
 <span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
-<span id="287">287</span>
-<span id="288">288</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::load_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::store_metadata</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
@@ -457,23 +435,22 @@
     <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">addr</span>) <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">addr</span>)
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_marked</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
-        <span class="ident">object</span>,
-        <span class="prelude-val">None</span>,
-        <span class="ident">ordering</span>,
-    ) <span class="op">==</span> <span class="number">1</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_marked</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>, <span class="ident">ordering</span>) <span class="op">==</span> <span class="number">1</span>
+}
+
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_marked_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_page_marked</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">side_metadata::load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>, <span class="ident">page_addr</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
+    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_page_marked_unsafe</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">side_metadata::load</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>, <span class="ident">page_addr</span>) <span class="op">==</span> <span class="number">1</span>
+    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_chunk_mapped</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
@@ -490,25 +467,19 @@
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_chunk_marked</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">side_metadata::load_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>, <span class="ident">chunk_start</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
+    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">is_chunk_marked_unsafe</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">side_metadata::load</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>, <span class="ident">chunk_start</span>) <span class="op">==</span> <span class="number">1</span>
+    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_alloc_bit</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
     <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">object</span>);
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>) {
-    <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
-        <span class="ident">object</span>,
-        <span class="number">1</span>,
-        <span class="prelude-val">None</span>,
-        <span class="ident">ordering</span>,
-    );
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) {
+    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">1</span>, <span class="prelude-val">None</span>, <span class="ident">ordering</span>);
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
@@ -517,28 +488,23 @@
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_page_mark</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>, <span class="ident">page_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_chunk_mark</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store_atomic</span>(
-        <span class="kw-2">&amp;</span><span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>,
-        <span class="ident">chunk_start</span>,
-        <span class="number">1</span>,
-        <span class="ident">Ordering::SeqCst</span>,
-    );
+    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_offset_malloc</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="kw">unsafe</span> { <span class="ident">side_metadata::load</span>(<span class="kw-2">&amp;</span><span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>, <span class="ident">address</span>) <span class="op">==</span> <span class="number">1</span> }
+    <span class="kw">unsafe</span> { <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>) <span class="op">==</span> <span class="number">1</span> }
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_offset_malloc_bit</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store_atomic</span>(<span class="kw-2">&amp;</span><span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>, <span class="ident">address</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
+    <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_offset_malloc_bit_unsafe</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store</span>(<span class="kw-2">&amp;</span><span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>, <span class="ident">address</span>, <span class="number">0</span>);
+    <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">0</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
@@ -546,22 +512,16 @@
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>) {
-    <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
-        <span class="ident">object</span>,
-        <span class="number">0</span>,
-        <span class="prelude-val">None</span>,
-        <span class="ident">ordering</span>,
-    );
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">0</span>, <span class="prelude-val">None</span>);
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>, <span class="ident">page_addr</span>, <span class="number">0</span>);
+    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">0</span>)
 }
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_chunk_mark_unsafe</span>(<span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-    <span class="ident">side_metadata::store</span>(<span class="kw-2">&amp;</span><span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>, <span class="ident">chunk_start</span>, <span class="number">0</span>);
+    <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="number">0</span>)
 }
 
 <span class="doccomment">/// Load u128 bits of side metadata</span>
@@ -570,9 +530,9 @@
 <span class="doccomment">/// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load128</span>(<span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">SideMetadataSpec</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">u128</span> {
     <span class="kw">let</span> <span class="ident">meta_addr</span> <span class="op">=</span> <span class="ident">side_metadata::address_to_meta_address</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    <span class="kw">if</span> <span class="macro">cfg!</span>(<span class="ident">debug_assertions</span>) {
-        <span class="ident">side_metadata::ensure_metadata_is_mapped</span>(<span class="ident">metadata_spec</span>, <span class="ident">data_addr</span>);
-    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
+    <span class="ident">metadata_spec</span>.<span class="ident">assert_metadata_mapped</span>(<span class="ident">data_addr</span>);
 
     <span class="ident">meta_addr</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u128</span><span class="op">&gt;</span>() <span class="kw">as</span> <span class="ident">u128</span>
 }

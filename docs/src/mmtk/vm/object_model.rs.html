@@ -375,14 +375,140 @@
 <span id="373">373</span>
 <span id="374">374</span>
 <span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
+<span id="435">435</span>
+<span id="436">436</span>
+<span id="437">437</span>
+<span id="438">438</span>
+<span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
+<span id="442">442</span>
+<span id="443">443</span>
+<span id="444">444</span>
+<span id="445">445</span>
+<span id="446">446</span>
+<span id="447">447</span>
+<span id="448">448</span>
+<span id="449">449</span>
+<span id="450">450</span>
+<span id="451">451</span>
+<span id="452">452</span>
+<span id="453">453</span>
+<span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
+<span id="499">499</span>
+<span id="500">500</span>
+<span id="501">501</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::header_metadata::HeaderMetadataSpec</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::MetadataValue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
-
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// VM-specific methods for object model.</span>
 <span class="doccomment">///</span>
@@ -396,8 +522,8 @@
 <span class="doccomment">///      will use side tables to store the metadata. The following section Side Specs Layout will discuss how to correctly create</span>
 <span class="doccomment">///      side metadata specs.</span>
 <span class="doccomment">/// 2. In header metadata access: A binding</span>
-<span class="doccomment">///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use</span>
-<span class="doccomment">///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their</span>
+<span class="doccomment">///    need to further define the functions with suffix _metadata about how to access the bits in the header. We provide default implementations</span>
+<span class="doccomment">///    for those methods, assuming the bits in the spec are always available to MMTk. A binding could implement their</span>
 <span class="doccomment">///    own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).</span>
 <span class="doccomment">/// 3. VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs</span>
 <span class="doccomment">///    some object information for GC. A binding needs to implement them correctly.</span>
@@ -461,101 +587,227 @@
     <span class="doccomment">/// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_LOS_MARK_NURSERY_SPEC</span>: <span class="ident">VMLocalLOSMarkNurserySpec</span>;
 
-    <span class="doccomment">/// A function to load the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// A function to non-atomically load the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// Returns the metadata value.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Arguments:</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
     <span class="doccomment">/// * `object`: is a reference to the target object.</span>
     <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
-    <span class="doccomment">/// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">load_metadata</span>(
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// This is a non-atomic load, thus not thread-safe.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-        <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">usize</span>;
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">mask</span>)
+    }
 
-    <span class="doccomment">/// A function to store a value to the specified per-object metadata.</span>
+    <span class="doccomment">/// A function to atomically load the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// Returns the metadata value.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Arguments:</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">/// * `atomic_ordering`: is the atomic ordering for the load operation.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">load_metadata_atomic</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">mask</span>, <span class="ident">ordering</span>)
+    }
+
+    <span class="doccomment">/// A function to non-atomically store a value to the specified per-object metadata.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
     <span class="doccomment">/// * `object`: is a reference to the target object.</span>
     <span class="doccomment">/// * `val`: is the new metadata value to be stored.</span>
     <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
-    <span class="doccomment">/// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.</span>
     <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">store_metadata</span>(
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// This is a non-atomic store, thus not thread-safe.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">usize</span>,
-        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
-        <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
-    );
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+    ) {
+        <span class="ident">metadata_spec</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">mask</span>)
+    }
 
-    <span class="doccomment">/// A function to atomically compare-and-exchange the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// A function to atomically store a value to the specified per-object metadata.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Arguments:</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the new metadata value to be stored.</span>
+    <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
+    <span class="doccomment">/// * `atomic_ordering`: is the optional atomic ordering for the store operation.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">store_metadata_atomic</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
+        <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
+    ) {
+        <span class="ident">metadata_spec</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">mask</span>, <span class="ident">ordering</span>)
+    }
+
+    <span class="doccomment">/// A function to atomically compare-and-exchange the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// Returns `true` if the operation is successful, and `false` otherwise.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
     <span class="doccomment">/// * `object`: is a reference to the target object.</span>
     <span class="doccomment">/// * `old_val`: is the expected current value of the metadata.</span>
     <span class="doccomment">/// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.</span>
     <span class="doccomment">/// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.</span>
     <span class="doccomment">/// * `success_order`: is the atomic ordering used if the operation is successful.</span>
     <span class="doccomment">/// * `failure_order`: is the atomic ordering used if the operation fails.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns `true` if the operation is successful, and `false` otherwise.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">compare_exchange_metadata</span>(
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">compare_exchange_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">old_val</span>: <span class="ident">usize</span>,
-        <span class="ident">new_val</span>: <span class="ident">usize</span>,
-        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>,
+        <span class="ident">old_val</span>: <span class="ident">T</span>,
+        <span class="ident">new_val</span>: <span class="ident">T</span>,
+        <span class="ident">mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">success_order</span>: <span class="ident">Ordering</span>,
         <span class="ident">failure_order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">bool</span>;
+    ) -&gt; <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">compare_exchange</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(
+            <span class="ident">object</span>,
+            <span class="ident">old_val</span>,
+            <span class="ident">new_val</span>,
+            <span class="ident">mask</span>,
+            <span class="ident">success_order</span>,
+            <span class="ident">failure_order</span>,
+        )
+    }
 
     <span class="doccomment">/// A function to atomically perform an add operation on the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// This is a wrapping add.</span>
+    <span class="doccomment">/// # Returns the old metadata value.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Arguments:</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
     <span class="doccomment">/// * `object`: is a reference to the target object.</span>
     <span class="doccomment">/// * `val`: is the value to be added to the current value of the metadata.</span>
     <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns the old metadata value as a word.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">fetch_add_metadata</span>(
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">fetch_add_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">usize</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
         <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">usize</span>;
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">fetch_add</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    }
 
     <span class="doccomment">/// A function to atomically perform a subtract operation on the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// This is a wrapping sub.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// # Arguments:</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
     <span class="doccomment">/// * `object`: is a reference to the target object.</span>
     <span class="doccomment">/// * `val`: is the value to be subtracted from the current value of the metadata.</span>
     <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// # Returns the old metadata value as a word.</span>
-    <span class="doccomment">///</span>
-    <span class="kw">fn</span> <span class="ident">fetch_sub_metadata</span>(
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">fetch_sub_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">usize</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
         <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">usize</span>;
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">fetch_sub</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    }
+
+    <span class="doccomment">/// A function to atomically perform a bit-and operation on the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-and with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">fetch_and_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">fetch_and</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    }
+
+    <span class="doccomment">/// A function to atomically perform a bit-or operation on the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// Returns the old metadata value.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-or with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">fetch_or_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+        <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">val</span>: <span class="ident">T</span>,
+        <span class="ident">order</span>: <span class="ident">Ordering</span>,
+    ) -&gt; <span class="ident">T</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">fetch_or</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">order</span>)
+    }
+
+    <span class="doccomment">/// A function to atomically perform an update operation on the specified per-object metadata&#39;s content.</span>
+    <span class="doccomment">/// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.</span>
+    <span class="doccomment">/// The semantics of this method are the same as the `fetch_update()` on Rust atomic types.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Arguments:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// * `metadata_spec`: is the header metadata spec that tries to perform the operation.</span>
+    <span class="doccomment">/// * `object`: is a reference to the target object.</span>
+    <span class="doccomment">/// * `val`: is the value to bit-and with the current value of the metadata.</span>
+    <span class="doccomment">/// * `order`: is the atomic ordering of the fetch-and-add operation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Returns the old metadata value.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">fetch_update_metadata</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span>, <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">T</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Copy</span><span class="op">&gt;</span>(
+        <span class="ident">metadata_spec</span>: <span class="kw-2">&amp;</span><span class="ident">HeaderMetadataSpec</span>,
+        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
+        <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
+        <span class="ident">f</span>: <span class="ident">F</span>,
+    ) -&gt; <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">metadata_spec</span>.<span class="ident">fetch_update</span>(<span class="ident">object</span>, <span class="ident">set_order</span>, <span class="ident">fetch_order</span>, <span class="ident">f</span>)
+    }
 
     <span class="doccomment">/// Copy an object and return the address of the new object. Usually in the implementation of this method,</span>
     <span class="doccomment">/// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)</span>

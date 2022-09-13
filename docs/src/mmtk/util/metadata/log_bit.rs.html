@@ -11,9 +11,7 @@
 <span id="9"> 9</span>
 <span id="10">10</span>
 <span id="11">11</span>
-<span id="12">12</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMGlobalLogBitSpec</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
@@ -21,7 +19,7 @@
 <span class="kw">impl</span> <span class="ident">VMGlobalLogBitSpec</span> {
     <span class="doccomment">/// Mark the log bit as unlogged (1 means unlogged)</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_as_unlogged</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) {
-        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">object</span>, <span class="number">1</span>, <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(<span class="ident">order</span>))
+        <span class="self">self</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">1</span>, <span class="prelude-val">None</span>, <span class="ident">order</span>)
     }
 }
 </code></pre></div>

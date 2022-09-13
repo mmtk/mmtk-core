@@ -221,25 +221,18 @@
 <span id="219">219</span>
 <span id="220">220</span>
 <span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{
-    <span class="ident">compare_exchange_metadata</span>, <span class="ident">load_metadata</span>, <span class="ident">store_metadata</span>, <span class="ident">MetadataSpec</span>,
-};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::MetadataSpec</span>;
 <span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
-<span class="kw">const</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b00</span>;
-<span class="kw">const</span> <span class="ident">BEING_FORWARDED</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b10</span>;
-<span class="kw">const</span> <span class="ident">FORWARDED</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b11</span>;
-<span class="kw">const</span> <span class="ident">FORWARDING_MASK</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0b11</span>;
+<span class="kw">const</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b00</span>;
+<span class="kw">const</span> <span class="ident">BEING_FORWARDED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b10</span>;
+<span class="kw">const</span> <span class="ident">FORWARDED</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b11</span>;
+<span class="kw">const</span> <span class="ident">FORWARDING_MASK</span>: <span class="ident">u8</span> <span class="op">=</span> <span class="number">0b11</span>;
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">const</span> <span class="ident">FORWARDING_BITS</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">2</span>;
 
@@ -251,19 +244,20 @@
 
 <span class="doccomment">/// Attempt to become the worker thread who will forward the object.</span>
 <span class="doccomment">/// The successful worker will set the object forwarding bits to BEING_FORWARDED, preventing other workers from forwarding the same object.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attempt_to_forward</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">attempt_to_forward</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">u8</span> {
     <span class="kw">loop</span> {
         <span class="kw">let</span> <span class="ident">old_value</span> <span class="op">=</span> <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
         <span class="kw">if</span> <span class="ident">old_value</span> <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
-            <span class="op">|</span><span class="op">|</span> <span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-                <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
-                <span class="ident">object</span>,
-                <span class="ident">old_value</span>,
-                <span class="ident">BEING_FORWARDED</span>,
-                <span class="prelude-val">None</span>,
-                <span class="ident">Ordering::SeqCst</span>,
-                <span class="ident">Ordering::Relaxed</span>,
-            )
+            <span class="op">|</span><span class="op">|</span> <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>
+                .<span class="ident">compare_exchange_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
+                    <span class="ident">object</span>,
+                    <span class="ident">old_value</span>,
+                    <span class="ident">BEING_FORWARDED</span>,
+                    <span class="prelude-val">None</span>,
+                    <span class="ident">Ordering::SeqCst</span>,
+                    <span class="ident">Ordering::Relaxed</span>,
+                )
+                .<span class="ident">is_ok</span>()
         {
             <span class="kw">return</span> <span class="ident">old_value</span>;
         }
@@ -281,7 +275,7 @@
 <span class="doccomment">///</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">spin_and_get_forwarded_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-    <span class="ident">forwarding_bits</span>: <span class="ident">usize</span>,
+    <span class="ident">forwarding_bits</span>: <span class="ident">u8</span>,
 ) -&gt; <span class="ident">ObjectReference</span> {
     <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">forwarding_bits</span> <span class="op">=</span> <span class="ident">forwarding_bits</span>;
     <span class="kw">while</span> <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">BEING_FORWARDED</span> {
@@ -313,21 +307,19 @@
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
     <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">new_object</span>);
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">shift</span>) <span class="op">=</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>() {
-        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
+        <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
-            <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>() <span class="op">|</span> (<span class="ident">FORWARDED</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>),
+            <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>() <span class="op">|</span> ((<span class="ident">FORWARDED</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>),
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::SeqCst</span>,
         )
     } <span class="kw">else</span> {
         <span class="ident">write_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">new_object</span>);
-        <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
+        <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
-            <span class="ident">FORWARDED</span>,
+            <span class="ident">FORWARDED</span> <span class="kw">as</span> <span class="ident">u8</span>,
             <span class="prelude-val">None</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+            <span class="ident">Ordering::SeqCst</span>,
         );
     }
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -337,12 +329,11 @@
 
 <span class="doccomment">/// Return the forwarding bits for a given `ObjectReference`.</span>
 <span class="attribute">#[<span class="ident">inline</span>]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_forwarding_status</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">usize</span> {
-    <span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_forwarding_status</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">u8</span> {
+    <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
         <span class="ident">object</span>,
         <span class="prelude-val">None</span>,
-        <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        <span class="ident">Ordering::SeqCst</span>,
     )
 }
 
@@ -358,23 +349,22 @@
     <span class="ident">get_forwarding_status</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_forwarded_or_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">forwarding_bits</span> <span class="op">!</span><span class="op">=</span> <span class="ident">FORWARDING_NOT_TRIGGERED_YET</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">usize</span>) -&gt; <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">state_is_being_forwarded</span>(<span class="ident">forwarding_bits</span>: <span class="ident">u8</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">forwarding_bits</span> <span class="op">==</span> <span class="ident">BEING_FORWARDED</span>
 }
 
 <span class="doccomment">/// Zero the forwarding bits of an object.</span>
 <span class="doccomment">/// This function is used on new objects.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">clear_forwarding_bits</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
+    <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(
         <span class="ident">object</span>,
         <span class="number">0</span>,
         <span class="prelude-val">None</span>,
-        <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        <span class="ident">Ordering::SeqCst</span>,
     )
 }
 
@@ -388,12 +378,13 @@
     );
 
     <span class="kw">unsafe</span> {
-        <span class="ident">Address::from_usize</span>(<span class="ident">load_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-            <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
-            <span class="ident">object</span>,
-            <span class="prelude-val">Some</span>(<span class="ident">FORWARDING_POINTER_MASK</span>),
-            <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
-        ))
+        <span class="ident">Address::from_usize</span>(
+            <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
+                <span class="ident">object</span>,
+                <span class="prelude-val">Some</span>(<span class="ident">FORWARDING_POINTER_MASK</span>),
+                <span class="ident">Ordering::SeqCst</span>,
+            ),
+        )
         .<span class="ident">to_object_reference</span>()
     }
 }
@@ -412,12 +403,11 @@
     );
 
     <span class="macro">trace!</span>(<span class="string">&quot;GCForwardingWord::write({:#?}, {:x})\n&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
-    <span class="ident">store_metadata</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
+    <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
         <span class="ident">object</span>,
         <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>(),
         <span class="prelude-val">Some</span>(<span class="ident">FORWARDING_POINTER_MASK</span>),
-        <span class="prelude-val">Some</span>(<span class="ident">Ordering::SeqCst</span>),
+        <span class="ident">Ordering::SeqCst</span>,
     )
 }
 
