@@ -297,12 +297,16 @@ impl MetadataSpec {
     /// * `f`: the update function. The function may be called multiple times.
     ///
     #[inline(always)]
-    pub fn fetch_update_metadata<VM: VMBinding, T: MetadataValue>(
+    pub fn fetch_update_metadata<
+        VM: VMBinding,
+        T: MetadataValue,
+        F: FnMut(T) -> Option<T> + Copy,
+    >(
         &self,
         object: ObjectReference,
         set_order: Ordering,
         fetch_order: Ordering,
-        f: impl FnMut(T) -> Option<T> + Copy,
+        f: F,
     ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {

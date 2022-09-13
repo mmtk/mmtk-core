@@ -296,12 +296,12 @@ pub trait ObjectModel<VM: VMBinding> {
     ///
     /// # Returns the old metadata value.
     #[inline(always)]
-    fn fetch_update_metadata<T: MetadataValue>(
+    fn fetch_update_metadata<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
         set_order: Ordering,
         fetch_order: Ordering,
-        f: impl FnMut(T) -> Option<T> + Copy,
+        f: F,
     ) -> std::result::Result<T, T> {
         metadata_spec.fetch_update(object, set_order, fetch_order, f)
     }
