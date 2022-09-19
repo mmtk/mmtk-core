@@ -128,3 +128,8 @@ malloc_hoard = ["hoard-sys"]
 
 # If there are more groups, they should be inserted above this line
 # Group:end
+
+[target.'cfg(target_os = "macos")'.dependencies.mach2]
+version = "0.4"
+[target.'cfg(target_os = "macos")'.dependencies.libproc]
+version = "0.12"

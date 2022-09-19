@@ -39,13 +39,20 @@ pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
     ret
 }
 
+#[cfg(target_os = "linux")]
+// MAP_FIXED_NOREPLACE returns EEXIST if already mapped
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+#[cfg(target_os = "macos")]
+// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE. We are at the risk of overwriting pre-existing mappings.
+const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
+
 /// Demand-zero mmap (no replace):
 /// This function mmaps the memory and guarantees to zero all mapped memory.
 /// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.
 #[allow(clippy::let_and_return)] // Zeroing is not neceesary for some OS/s
 pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
     let prot = PROT_READ | PROT_WRITE | PROT_EXEC;
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
+    let flags = MMAP_FLAGS;
     let ret = mmap_fixed(start, size, prot, flags);
     // We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)
     #[cfg(not(target_os = "linux"))]
@@ -61,8 +68,7 @@ pub fn dzmmap_noreplace(start: Address, size: usize) -> Result<()> {
 /// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().
 pub fn mmap_noreserve(start: Address, size: usize) -> Result<()> {
     let prot = PROT_NONE;
-    let flags =
-        libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE | libc::MAP_NORESERVE;
+    let flags = MMAP_FLAGS | libc::MAP_NORESERVE;
     mmap_fixed(start, size, prot, flags)
 }
 
@@ -120,19 +126,65 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 // Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
 // Be very careful about using this function.
 pub fn panic_if_unmapped(start: Address, size: usize) {
-    let prot = PROT_READ | PROT_WRITE;
-    // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
-    let flags = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
-    match mmap_fixed(start, size, prot, flags) {
-        Ok(_) => panic!("{} of size {} is not mapped", start, size),
-        Err(e) => {
-            assert!(
-                e.kind() == std::io::ErrorKind::AlreadyExists,
-                "Failed to check mapped: {:?}",
-                e
-            );
+    #[cfg(target_os = "linux")]
+    {
+        let prot = PROT_READ | PROT_WRITE;
+        let flags = MMAP_FLAGS;
+        match mmap_fixed(start, size, prot, flags) {
+            Ok(_) => panic!("{} of size {} is not mapped", start, size),
+            Err(e) => {
+                assert!(
+                    e.kind() == std::io::ErrorKind::AlreadyExists,
+                    "Failed to check mapped: {:?}",
+                    e
+                );
+            }
         }
     }
+
+    // #[cfg(target_os = "macos")]
+    // {
+    //     use mach2::vm_region::*;
+    //     use mach2::port::mach_port_name_t;
+    //     use mach2::mach_types::vm_task_entry_t;
+    //     use libc::*;
+    //     use libproc::libproc::proc_pid::regionfilename;
+    //     use std::mem;
+
+    //     let mut count = mem::size_of::<vm_region_basic_info_data_64_t>() as mach_msg_type_number_t;
+    //     let mut object_name: mach_port_t = 0;
+    //     // we need to create new `size` and `info` structs for the function we call to read the data
+    //     // into
+    //     let mut size = unsafe { mem::zeroed::<mach_vm_size_t>() };
+    //     let mut info = unsafe { mem::zeroed::<vm_region_basic_info_data_t>() };
+    //     let result = unsafe {
+    //         // Call the underlying Mach function
+    //         mach2::vm::mach_vm_region(
+    //             target_task as vm_task_entry_t,
+    //             &mut address,
+    //             &mut size,
+    //             VM_REGION_BASIC_INFO,
+    //             &mut info as *mut vm_region_basic_info_data_t as vm_region_info_t,
+    //             &mut count,
+    //             &mut object_name,
+    //         )
+    //     };
+    //     if result != KERN_SUCCESS {
+    //         panic!("Unable to get mach_vm_region")
+    //     }
+    //     // this uses 
+    //     // let filename = match regionfilename(41000, address) {
+    //     //     Ok(x) => Some(x),
+    //     //     _ => None,
+    //     // };
+    //     // Some(Region {
+    //     //     size: size,
+    //     //     info: info,
+    //     //     address: address,
+    //     //     count: count,
+    //     //     filename: filename,
+    //     // })
+    // }
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
@@ -218,6 +270,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_mmap_noreplace() {
         serial_test(|| {
@@ -255,6 +308,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped() {
@@ -286,6 +340,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped_next_to_mapped() {

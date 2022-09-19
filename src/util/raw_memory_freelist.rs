@@ -258,7 +258,10 @@ mod tests {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
+        #[cfg(target_os = "linux")]
         let start = unsafe { Address::from_usize(0x8000_0000) };
+        #[cfg(target_os = "macos")]
+        let start = unsafe { Address::from_usize(0x2400_0000_0000) };
         let extent = BYTES_IN_PAGE;
         let pages_per_block = RawMemoryFreeList::default_block_size(list_size as _, 1);
         assert_eq!(pages_per_block, 1);
