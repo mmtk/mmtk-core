@@ -4,7 +4,7 @@ use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
 use crate::vm::*;
 use spin::{Mutex, MutexGuard};
@@ -84,7 +84,10 @@ impl From<Block> for Address {
 }
 
 impl Region for Block {
+    #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
+    #[cfg(feature = "immix_smaller_block")]
+    const LOG_BYTES: usize = 13;
 }
 
 impl Block {
@@ -122,16 +125,15 @@ impl Block {
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        let byte =
-            side_metadata::load_atomic(&Self::MARK_TABLE, self.start(), Ordering::SeqCst) as u8;
+        let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         byte.into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        let state = u8::from(state) as usize;
-        side_metadata::store_atomic(&Self::MARK_TABLE, self.start(), state, Ordering::SeqCst);
+        let state = u8::from(state);
+        Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
     // Defrag byte
@@ -141,9 +143,7 @@ impl Block {
     /// Test if the block is marked for defragmentation.
     #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
-        let byte =
-            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
-                as u8;
+        let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
@@ -152,31 +152,19 @@ impl Block {
     #[inline(always)]
     pub fn set_as_defrag_source(&self, defrag: bool) {
         let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
-        side_metadata::store_atomic(
-            &Self::DEFRAG_STATE_TABLE,
-            self.start(),
-            byte as usize,
-            Ordering::SeqCst,
-        );
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), byte, Ordering::SeqCst);
     }
 
     /// Record the number of holes in the block.
     #[inline(always)]
     pub fn set_holes(&self, holes: usize) {
-        side_metadata::store_atomic(
-            &Self::DEFRAG_STATE_TABLE,
-            self.start(),
-            holes,
-            Ordering::SeqCst,
-        );
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), holes as u8, Ordering::SeqCst);
     }
 
     /// Get the number of holes.
     #[inline(always)]
     pub fn get_holes(&self) -> usize {
-        let byte =
-            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
-                as u8;
+        let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
         byte as usize
     }
@@ -189,7 +177,7 @@ impl Block {
         } else {
             BlockState::Unmarked
         });
-        side_metadata::store_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), 0, Ordering::SeqCst);
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), 0, Ordering::SeqCst);
     }
 
     /// Deinitalize a block before releasing.
