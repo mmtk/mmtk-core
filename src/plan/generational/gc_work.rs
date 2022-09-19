@@ -3,7 +3,6 @@ use atomic::Ordering;
 use crate::plan::generational::global::Gen;
 use crate::policy::space::Space;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker};
-use crate::util::metadata::store_metadata;
 use crate::util::ObjectReference;
 use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::*;
@@ -88,12 +87,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Flip the per-object unlogged bits to "unlogged" state.
         for obj in &self.modbuf {
-            store_metadata::<E::VM>(
-                &<E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC,
+            <E::VM as VMBinding>::VMObjectModel::GLOBAL_LOG_BIT_SPEC.store_atomic::<E::VM, u8>(
                 *obj,
                 1,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
         }
         // scan modbuf only if the current GC is a nursery GC

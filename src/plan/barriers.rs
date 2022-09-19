@@ -1,6 +1,5 @@
 //! Read/Write barrier implementations.
 
-use crate::util::metadata::{compare_exchange_metadata, load_metadata};
 use crate::vm::edge_shape::{Edge, MemorySlice};
 use crate::vm::ObjectModel;
 use crate::{
@@ -153,7 +152,7 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     /// Returns true if the object is not logged previously.
     #[inline(always)]
     fn object_is_unlogged(&self, object: ObjectReference) -> bool {
-        load_metadata::<S::VM>(&S::UNLOG_BIT_SPEC, object, None, None) != 0
+        unsafe { S::UNLOG_BIT_SPEC.load::<S::VM, u8>(object, None) != 0 }
     }
 
     /// Attepmt to atomically log an object.
@@ -162,19 +161,21 @@ impl<S: BarrierSemantics> ObjectBarrier<S> {
     fn log_object(&self, object: ObjectReference) -> bool {
         loop {
             let old_value =
-                load_metadata::<S::VM>(&S::UNLOG_BIT_SPEC, object, None, Some(Ordering::SeqCst));
+                S::UNLOG_BIT_SPEC.load_atomic::<S::VM, u8>(object, None, Ordering::SeqCst);
             if old_value == 0 {
                 return false;
             }
-            if compare_exchange_metadata::<S::VM>(
-                &S::UNLOG_BIT_SPEC,
-                object,
-                1,
-                0,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if S::UNLOG_BIT_SPEC
+                .compare_exchange_metadata::<S::VM, u8>(
+                    object,
+                    1,
+                    0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 return true;
             }
         }
