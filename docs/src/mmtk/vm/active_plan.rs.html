@@ -191,7 +191,7 @@
     <span class="doccomment">/// * `queue`: The object queue. If an object is encountered for the first time in this GC, we expect the implementation to call `queue.enqueue()`</span>
     <span class="doccomment">///            for the object. If the object is moved during the tracing, the new object reference (after copying) should be enqueued instead.</span>
     <span class="doccomment">/// * `object`: The object to trace.</span>
-    <span class="doccomment">/// * `worker`: The GC worker that is doing this tracing. This is used to copy object (see [vm::ObjectModel::copy])</span>
+    <span class="doccomment">/// * `worker`: The GC worker that is doing this tracing. This is used to copy object (see [`crate::vm::ObjectModel::copy`])</span>
     <span class="kw">fn</span> <span class="ident">vm_trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
         <span class="ident">_queue</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Q</span>,
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,

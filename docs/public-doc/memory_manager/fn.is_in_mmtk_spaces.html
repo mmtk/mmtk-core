@@ -21,7 +21,7 @@ primordial objects, or if the VM has its own allocator or uses any third-party a
 if the VM allows an object reference to point to native objects such as C++ objects, this
 function can distinguish between MMTk-allocated objects and other objects.</p>
 <p>Note: This function has special behaviors if the VM space (enabled by the <code>vm_space</code> feature)
-is present.  See [<code>crate::plan::global::BasePlan::vm_space</code>].</p>
+is present.  See <code>crate::plan::global::BasePlan::vm_space</code>.</p>
 <p>Arguments:</p>
 <ul>
 <li><code>object</code>: The object reference to query.</li>

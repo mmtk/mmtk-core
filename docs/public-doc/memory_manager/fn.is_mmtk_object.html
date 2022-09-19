@@ -40,7 +40,7 @@ a stack, filter out zeros, misaligned words, obviously out-of-range words (such 
 greater than <code>0x0000_7fff_ffff_ffff</code> on Linux on x86_64), and use this function to deside if the
 word is really a reference.</p>
 <p>Note: This function has special behaviors if the VM space (enabled by the <code>vm_space</code> feature)
-is present.  See [<code>crate::plan::global::BasePlan::vm_space</code>].</p>
+is present.  See <code>crate::plan::global::BasePlan::vm_space</code>.</p>
 <p>Argument:</p>
 <ul>
 <li><code>addr</code>: An arbitrary address.</li>
