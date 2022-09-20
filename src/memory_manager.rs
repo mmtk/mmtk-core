@@ -601,7 +601,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// word is really a reference.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Argument:
 /// * `addr`: An arbitrary address.
@@ -634,7 +634,7 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// function can distinguish between MMTk-allocated objects and other objects.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
