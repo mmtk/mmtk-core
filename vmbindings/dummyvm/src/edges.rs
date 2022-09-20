@@ -1,7 +1,8 @@
 use atomic::Atomic;
+use mmtk::util::constants::LOG_BYTES_IN_ADDRESS;
 use mmtk::{
     util::{Address, ObjectReference},
-    vm::edge_shape::{Edge, SimpleEdge},
+    vm::edge_shape::{Edge, MemorySlice, SimpleEdge},
 };
 
 /// If a VM supports multiple kinds of edges, we can use tagged union to represent all of them.
@@ -34,6 +35,69 @@ impl Edge for DummyVMEdge {
             DummyVMEdge::Compressed(e) => e.store(object),
             DummyVMEdge::Offset(e) => e.store(object),
             DummyVMEdge::Tagged(e) => e.store(object),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DummyVMMemorySlice(*mut [ObjectReference]);
+
+unsafe impl Send for DummyVMMemorySlice {}
+
+impl MemorySlice for DummyVMMemorySlice {
+    type Edge = DummyVMEdge;
+    type EdgeIterator = DummyVMMemorySliceIterator;
+
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        DummyVMMemorySliceIterator {
+            cursor: unsafe { (*self.0).as_mut_ptr_range().start },
+            limit: unsafe { (*self.0).as_mut_ptr_range().end },
+        }
+    }
+
+    fn start(&self) -> Address {
+        Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
+    }
+
+    fn bytes(&self) -> usize {
+        unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+    }
+
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        debug_assert_eq!(
+            src.bytes() & ((1 << LOG_BYTES_IN_ADDRESS) - 1),
+            0,
+            "bytes are not a multiple of words"
+        );
+        // Raw memory copy
+        unsafe {
+            let words = tgt.bytes() >> LOG_BYTES_IN_ADDRESS;
+            let src = src.start().to_ptr::<usize>();
+            let tgt = tgt.start().to_mut_ptr::<usize>();
+            std::ptr::copy(src, tgt, words)
+        }
+    }
+}
+
+pub struct DummyVMMemorySliceIterator {
+    cursor: *mut ObjectReference,
+    limit: *mut ObjectReference,
+}
+
+impl Iterator for DummyVMMemorySliceIterator {
+    type Item = DummyVMEdge;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let edge = self.cursor;
+            self.cursor = unsafe { self.cursor.add(1) };
+            Some(DummyVMEdge::Simple(SimpleEdge::from_address(
+                Address::from_ptr(edge),
+            )))
         }
     }
 }
