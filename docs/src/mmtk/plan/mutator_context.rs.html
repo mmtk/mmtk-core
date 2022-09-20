@@ -298,6 +298,21 @@
 <span id="296">296</span>
 <span id="297">297</span>
 <span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
+<span id="304">304</span>
+<span id="305">305</span>
+<span id="306">306</span>
+<span id="307">307</span>
+<span id="308">308</span>
+<span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::Barrier</span>;
@@ -357,7 +372,7 @@
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="ident">allocators</span>: <span class="ident">Allocators</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="kw">pub</span> <span class="ident">barrier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">barrier</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// The mutator thread that is bound with this Mutator struct.</span>
     <span class="kw">pub</span> <span class="ident">mutator_tls</span>: <span class="ident">VMMutatorThread</span>,
     <span class="kw">pub</span> <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span>,
@@ -406,7 +421,16 @@
         <span class="self">self</span>.<span class="ident">mutator_tls</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span> {
+    <span class="doccomment">/// Used by specialized barrier slow-path calls to avoid dynamic dispatches.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">barrier_impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">B</span> {
+        <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">barrier</span>().<span class="ident">is</span>::<span class="op">&lt;</span><span class="ident">B</span><span class="op">&gt;</span>());
+        <span class="kw">let</span> (<span class="ident">payload</span>, <span class="ident">_vptr</span>) <span class="op">=</span> <span class="ident">std::mem::transmute</span>::<span class="op">&lt;</span><span class="kw">_</span>, (<span class="kw-2">*mut</span> <span class="ident">B</span>, <span class="kw-2">*mut</span> ())<span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">barrier</span>());
+        <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="ident">payload</span>
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">barrier</span>
     }
 }
@@ -434,7 +458,13 @@
         <span class="self">self</span>.<span class="ident">flush_remembered_sets</span>();
     }
     <span class="kw">fn</span> <span class="ident">get_tls</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">VMMutatorThread</span>;
-    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span>;
+    <span class="doccomment">/// Get active barrier trait object</span>
+    <span class="kw">fn</span> <span class="ident">barrier</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="kw">dyn</span> <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+    <span class="doccomment">/// Force cast the barrier trait object to a concrete implementation.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">/// The safety of this function is ensured by a down-cast check.</span>
+    <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">barrier_impl</span><span class="op">&lt;</span><span class="ident">B</span>: <span class="ident">Barrier</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut</span> <span class="ident">B</span>;
 }
 
 <span class="doccomment">/// This is used for plans to indicate the number of allocators reserved for the plan.</span>

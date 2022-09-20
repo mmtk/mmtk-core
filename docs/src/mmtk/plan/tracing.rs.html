@@ -111,10 +111,14 @@
 <span id="109">109</span>
 <span id="110">110</span>
 <span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module contains code useful for tracing,</span>
 <span class="doccomment">//! i.e. visiting the reachable objects by traversing all or part of an object graph.</span>
-
-<span class="kw">use</span> <span class="ident">std::mem</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::gc_work</span>::{<span class="ident">EdgeOf</span>, <span class="ident">ProcessEdgesWork</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">GCWorker</span>, <span class="ident">WorkBucketStage</span>};
@@ -127,91 +131,99 @@
     <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>);
 }
 
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">VectorObjectQueue</span> <span class="op">=</span> <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>;
+
 <span class="doccomment">/// An implementation of `ObjectQueue` using a `Vec`.</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VectorObjectQueue</span> {
+<span class="doccomment">///</span>
+<span class="doccomment">/// This can also be used as a buffer. For example, the mark stack or the write barrier mod-buffer.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Enqueued nodes.</span>
-    <span class="ident">nodes</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
+    <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">VectorObjectQueue</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="doccomment">/// Reserve a capacity of this on first enqueue to avoid frequent resizing.</span>
     <span class="kw">const</span> <span class="ident">CAPACITY</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4096</span>;
 
     <span class="doccomment">/// Create an empty `VectorObjectQueue`.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>() -&gt; <span class="self">Self</span> {
-        <span class="self">Self</span> { <span class="ident">nodes</span>: <span class="ident">Vec::new</span>() }
+        <span class="self">Self</span> { <span class="ident">buffer</span>: <span class="ident">Vec::new</span>() }
     }
 
     <span class="doccomment">/// Return `true` if the queue is empty.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
-        <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">is_empty</span>()
+        <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">is_empty</span>()
     }
 
     <span class="doccomment">/// Return the contents of the underlying vector.  It will empty the queue.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-        <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">nodes</span>)
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">buffer</span>)
     }
 
     <span class="doccomment">/// Consume this `VectorObjectQueue` and return its underlying vector.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_vec</span>(<span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">nodes</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">into_vec</span>(<span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">buffer</span>
+    }
+
+    <span class="doccomment">/// Check if the buffer size reaches `CAPACITY`.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_full</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident"><span class="self">Self</span>::CAPACITY</span>
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">v</span>: <span class="ident">T</span>) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">is_empty</span>() {
+            <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">reserve</span>(<span class="ident"><span class="self">Self</span>::CAPACITY</span>);
+        }
+        <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">push</span>(<span class="ident">v</span>);
     }
 }
 
-<span class="kw">impl</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">VectorObjectQueue</span> {
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="ident">Default</span> <span class="kw">for</span> <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">default</span>() -&gt; <span class="self">Self</span> {
         <span class="ident"><span class="self">Self</span>::new</span>()
     }
 }
 
-<span class="kw">impl</span> <span class="ident">ObjectQueue</span> <span class="kw">for</span> <span class="ident">VectorObjectQueue</span> {
+<span class="kw">impl</span> <span class="ident">ObjectQueue</span> <span class="kw">for</span> <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">is_empty</span>() {
-            <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">reserve</span>(<span class="ident"><span class="self">Self</span>::CAPACITY</span>);
-        }
-        <span class="self">self</span>.<span class="ident">nodes</span>.<span class="ident">push</span>(<span class="ident">object</span>);
+    <span class="kw">fn</span> <span class="ident">enqueue</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">v</span>: <span class="ident">ObjectReference</span>) {
+        <span class="self">self</span>.<span class="ident">push</span>(<span class="ident">v</span>);
     }
 }
 
 <span class="doccomment">/// A transitive closure visitor to collect all the edges of an object.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> {
-    <span class="ident">buffer</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">buffer</span>: <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="kw-2">mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
-            <span class="ident">buffer</span>: <span class="macro">vec!</span>[],
+            <span class="ident">buffer</span>: <span class="ident">VectorQueue::new</span>(),
             <span class="ident">worker</span>,
         }
     }
 
     <span class="kw">fn</span> <span class="ident">flush</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_edges</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-        <span class="ident">mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="ident">new_edges</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">buffer</span>);
-        <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">add_work</span>(
-            <span class="ident">WorkBucketStage::Closure</span>,
-            <span class="ident">E::new</span>(<span class="ident">new_edges</span>, <span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">mmtk</span>),
-        );
+        <span class="kw">let</span> <span class="ident">buf</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">take</span>();
+        <span class="kw">if</span> <span class="op">!</span><span class="ident">buf</span>.<span class="ident">is_empty</span>() {
+            <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">add_work</span>(
+                <span class="ident">WorkBucketStage::Closure</span>,
+                <span class="ident">E::new</span>(<span class="ident">buf</span>, <span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">mmtk</span>),
+            );
+        }
     }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span> <span class="ident">EdgeVisitor</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">ObjectsClosure</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="ident">E</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">visit_edge</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">slot</span>: <span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">is_empty</span>() {
-            <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">reserve</span>(<span class="ident">E::CAPACITY</span>);
-        }
         <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">push</span>(<span class="ident">slot</span>);
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">len</span>() <span class="op">&gt;</span><span class="op">=</span> <span class="ident">E::CAPACITY</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_edges</span> <span class="op">=</span> <span class="ident">Vec::new</span>();
-            <span class="ident">mem::swap</span>(<span class="kw-2">&amp;mut</span> <span class="ident">new_edges</span>, <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">buffer</span>);
-            <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">add_work</span>(
-                <span class="ident">WorkBucketStage::Closure</span>,
-                <span class="ident">E::new</span>(<span class="ident">new_edges</span>, <span class="bool-val">false</span>, <span class="self">self</span>.<span class="ident">worker</span>.<span class="ident">mmtk</span>),
-            );
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">buffer</span>.<span class="ident">is_full</span>() {
+            <span class="self">self</span>.<span class="ident">flush</span>();
         }
     }
 }

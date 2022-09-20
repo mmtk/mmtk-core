@@ -58,8 +58,6 @@
 <span id="56">56</span>
 <span id="57">57</span>
 <span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
 </pre><pre class="rust"><code><span class="doccomment">//! GC algorithms from the MMTk suite.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides various GC plans, each of which implements a GC algorithm.</span>
@@ -76,9 +74,7 @@
 <span class="doccomment">//! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).</span>
 
 <span class="kw">mod</span> <span class="ident">barriers</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">barriers::Barrier</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">barriers::BarrierSelector</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">barriers::BarrierWriteTarget</span>;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">gc_requester</span>;
 
@@ -100,7 +96,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">plan_constraints::DEFAULT_PLAN_CONSTRAINTS</span>;
 
 <span class="kw">mod</span> <span class="ident">tracing</span>;
-<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracing</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">ObjectsClosure</span>, <span class="ident">VectorObjectQueue</span>};
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">tracing</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">ObjectsClosure</span>, <span class="ident">VectorObjectQueue</span>, <span class="ident">VectorQueue</span>};
 
 <span class="kw">mod</span> <span class="ident">generational</span>;
 <span class="kw">mod</span> <span class="ident">immix</span>;
