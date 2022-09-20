@@ -48,6 +48,8 @@ where
 
     /// The type of edges in this VM.
     type VMEdge: edge_shape::Edge;
+    /// The type of heap memory slice in this VM.
+    type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
@@ -55,7 +57,7 @@ where
     const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
-    /// Allowed maximum alignment as shift by min alignment.    
+    /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 
     /// Allowed maximum alignment in bytes.
