@@ -71,10 +71,6 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
-<span id="72">72</span>
-<span id="73">73</span>
-<span id="74">74</span>
-<span id="75">75</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
@@ -134,10 +130,6 @@
     <span class="kw">const</span> <span class="ident">LOG_MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
     <span class="doccomment">/// Allowed minimal alignment in bytes.</span>
     <span class="kw">const</span> <span class="ident">MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_MIN_ALIGNMENT</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86&quot;</span>)]</span>
-    <span class="doccomment">/// Allowed maximum alignment as shift by min alignment.</span>
-    <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT_SHIFT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">+</span> <span class="ident">LOG_BYTES_IN_LONG</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_arch</span> <span class="op">=</span> <span class="string">&quot;x86_64&quot;</span>)]</span>
     <span class="doccomment">/// Allowed maximum alignment as shift by min alignment.</span>
     <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT_SHIFT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_LONG</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
 
