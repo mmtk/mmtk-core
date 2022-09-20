@@ -13,7 +13,7 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::{extract_side_metadata, side_metadata, MetadataSpec};
+use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
@@ -94,8 +94,8 @@ impl<VM: VMBinding> Space<VM> for CopySpace<VM> {
         &self.common
     }
 
-    fn init(&mut self, _vm_map: &'static VMMap) {
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
 
     fn release_multiple_pages(&mut self, _start: Address) {
@@ -182,11 +182,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         if let MetadataSpec::OnSide(side_forwarding_status_table) =
             *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
         {
-            side_metadata::bzero_metadata(
-                &side_forwarding_status_table,
-                self.common.start,
-                self.pr.cursor() - self.common.start,
-            );
+            side_forwarding_status_table
+                .bzero_metadata(self.common.start, self.pr.cursor() - self.common.start);
         }
     }
 
@@ -204,10 +201,13 @@ impl<VM: VMBinding> CopySpace<VM> {
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
-            crate::util::alloc_bit::bzero_alloc_bit(
-                self.common.start,
-                current_chunk + BYTES_IN_CHUNK - self.common.start,
-            );
+            // If we have allocated something into this space, we need to clear its alloc bit.
+            if current_chunk != self.common.start {
+                crate::util::alloc_bit::bzero_alloc_bit(
+                    self.common.start,
+                    current_chunk + BYTES_IN_CHUNK - self.common.start,
+                );
+            }
         } else {
             unimplemented!();
         }

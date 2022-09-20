@@ -14,11 +14,10 @@ use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
-use crate::util::options::UnsafeOptionsWrapper;
+use crate::util::options::Options;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
@@ -79,18 +78,14 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     }
     // ANCHOR_END: create_copy_config
 
-    // Modify
-    // ANCHOR: gc_init
-    fn gc_init(
-        &mut self,
-        heap_size: usize,
-        vm_map: &'static VMMap,
-    ) {
-        self.common.gc_init(heap_size, vm_map);
-        self.copyspace0.init(&vm_map);
-        self.copyspace1.init(&vm_map);
+    // ANCHOR: get_spaces
+    fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>> {
+        let mut ret = self.common.get_spaces();
+        ret.push(&self.copyspace0);
+        ret.push(&self.copyspace1);
+        ret
     }
-    // ANCHOR_END: gc_init
+    // ANCHOR_EN: get_spaces
 
     // Modify
     // ANCHOR: schedule_collection
@@ -102,8 +97,8 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
     // ANCHOR_END: schedule_collection
 
     // ANCHOR: collection_required()
-    fn collection_required(&self, space_full: bool, space: &dyn Space<Self::VM>) -> bool {
-        self.base().collection_required(self, space_full, space)
+    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
+        self.base().collection_required(self, space_full)
     }
     // ANCHOR_END: collection_required()
 
@@ -179,10 +174,10 @@ impl<VM: VMBinding> MyGC<VM> {
     fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
-        options: Arc<UnsafeOptionsWrapper>,
+        options: Arc<Options>,
     ) -> Self {
         // Modify
-        let mut heap = HeapMeta::new(HEAP_START, HEAP_END);
+        let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
 
         let res = MyGC {

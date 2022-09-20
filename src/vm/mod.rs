@@ -19,6 +19,7 @@ use crate::util::constants::*;
 
 mod active_plan;
 mod collection;
+pub mod edge_shape;
 mod object_model;
 mod reference_glue;
 mod scanning;
@@ -30,6 +31,8 @@ pub use self::object_model::ObjectModel;
 pub use self::reference_glue::Finalizable;
 pub use self::reference_glue::ReferenceGlue;
 pub use self::scanning::EdgeVisitor;
+pub use self::scanning::ObjectTracer;
+pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
@@ -43,6 +46,11 @@ where
     type VMActivePlan: ActivePlan<Self>;
     type VMReferenceGlue: ReferenceGlue<Self>;
 
+    /// The type of edges in this VM.
+    type VMEdge: edge_shape::Edge;
+    /// The type of heap memory slice in this VM.
+    type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
+
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
     /// Allowed minimal alignment.
@@ -50,10 +58,10 @@ where
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
     #[cfg(target_arch = "x86")]
-    /// Allowed maximum alignment as shift by min alignment.    
+    /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
     #[cfg(target_arch = "x86_64")]
-    /// Allowed maximum alignment as shift by min alignment.    
+    /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 
     /// Allowed maximum alignment in bytes.

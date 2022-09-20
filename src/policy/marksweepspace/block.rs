@@ -1,29 +1,38 @@
 // adapted from Immix
 
-use std::iter::Step;
-
 use atomic::Ordering;
 
-use crate::{util::{Address, metadata::{side_metadata::{SideMetadataSpec, self}, load_metadata, MetadataSpec, store_metadata}, alloc::free_list_allocator::BlockList, VMThread, OpaquePointer}, vm::VMBinding};
+use crate::{util::{Address, metadata::{side_metadata::{SideMetadataSpec, self}, MetadataSpec}, alloc::free_list_allocator::BlockList, VMThread, OpaquePointer}, vm::VMBinding};
 
 use super::{MarkSweepSpace, chunk::Chunk};
-
+use crate::util::linear_scan::{Region, RegionIterator};
 
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Block(Address);
 
-impl Block {
-
-    pub const LOG_BYTES: usize = 16;
-
-    pub const BYTES: usize = 1 << Block::LOG_BYTES;
-
-    /// Align the address to a block boundary.
-    pub const fn align(address: Address) -> Address {
-        address.align_down(Block::BYTES)
+impl From<Address> for Block {
+    #[inline(always)]
+    fn from(address: Address) -> Block {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
     }
+}
+
+impl From<Block> for Address {
+    #[inline(always)]
+    fn from(block: Block) -> Address {
+        block.0
+    }
+}
+
+impl Region for Block {
+    const LOG_BYTES: usize = 16;
+}
+
+impl Block {
+    pub const ZERO_BLOCK: Self = Self(Address::ZERO);
 
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec = 
@@ -56,25 +65,12 @@ impl Block {
 
     #[inline]
     pub fn load_free_list<VM: VMBinding>(&self) -> Address {
-        unsafe {
-            Address::from_usize(load_metadata::<VM>(
-                &MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
-                self.0.to_object_reference(),
-                None,
-                None,
-            ))
-        }
+        unsafe { Address::from_usize(Block::FREE_LIST_TABLE.load::<usize>(self.0)) }
     }
 
     #[inline]
     pub fn store_free_list<VM: VMBinding>(&self, free_list: Address) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
-            unsafe { self.0.to_object_reference() },
-            free_list.as_usize(),
-            None,
-            None,
-        );
+        unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.0, free_list.as_usize()) }
     }
 
     // #[inline]
@@ -143,110 +139,57 @@ impl Block {
 
     pub fn load_prev_block<VM: VMBinding>(&self) -> Block {
         debug_assert!(!self.0.is_zero());
-        let prev = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
-            unsafe { self.0.to_object_reference() },
-            None,
-            None,
-        );
-        Block::from(unsafe { Address::from_usize(prev) })
+        let prev = unsafe { Address::from_usize(Block::PREV_BLOCK_TABLE.load::<usize>(self.0)) };
+        Block::from(prev)
     }
 
     pub fn load_next_block<VM: VMBinding>(&self) -> Block {
         debug_assert!(!self.is_zero());
-        let next = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-            unsafe { self.0.to_object_reference() },
-            None,
-            None,
-        );
-        Block::from(unsafe { Address::from_usize(next) })
+        let next = unsafe { Address::from_usize(Block::NEXT_BLOCK_TABLE.load::<usize>(self.0)) };
+        Block::from(next)
     }
 
     pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
         debug_assert!(!self.0.is_zero());
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
-            unsafe { self.0.to_object_reference() },
-            next.start().as_usize(),
-            None,
-            None,
-        );
+        unsafe { Block::NEXT_BLOCK_TABLE.store::<usize>(self.0, next.start().as_usize()); }
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
         debug_assert!(!self.0.is_zero());
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
-            unsafe { self.0.to_object_reference() },
-            prev.start().as_usize(),
-            None,
-            None,
-        );
+        unsafe { Block::PREV_BLOCK_TABLE.store::<usize>(self.0, prev.start().as_usize()); }
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
         debug_assert!(!self.0.is_zero());
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
-            unsafe { self.0.to_object_reference() },
-            unsafe { std::mem::transmute::<&BlockList, usize>(block_list) },
-            None,
-            None,
-        );
+        let block_list_usize: usize = unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
+        unsafe { Block::BLOCK_LIST_TABLE.store::<usize>(self.0, block_list_usize); }
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
         debug_assert!(!self.0.is_zero());
-        let block_list = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
-            unsafe { self.0.to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        );
+        let block_list = unsafe {
+            Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst)
+        };
         unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
     }
 
     pub fn load_block_cell_size<VM: VMBinding>(&self) -> usize {
-        load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::SIZE_TABLE),
-            unsafe { self.0.to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        )
+        // FIXME: cannot cast u64 to usize
+        Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst) as usize
     }
     
     pub fn store_block_cell_size<VM: VMBinding>(&self, size: usize) {
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::SIZE_TABLE),
-            unsafe { self.0.to_object_reference() },
-            size,
-            None,
-            None,
-        );
+        unsafe { Block::SIZE_TABLE.store::<usize>(self.0, size) }
     }
-
     
     pub fn store_tls<VM: VMBinding>(&self, tls: VMThread) {
         let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
-        store_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::TLS_TABLE),
-            unsafe { self.start().to_object_reference() },
-            tls,
-            None,
-            None,
-        );
+        unsafe { Block::TLS_TABLE.store(self.start(), tls) }
     }
-
     
-    pub fn load_tls<VM: VMBinding>(&self) -> OpaquePointer {
-        let tls = load_metadata::<VM>(
-            &MetadataSpec::OnSide(Block::TLS_TABLE),
-            unsafe { self.start().to_object_reference() },
-            None,
-            Some(Ordering::SeqCst),
-        );
-        unsafe { std::mem::transmute::<usize, OpaquePointer>(tls) }
+    pub fn load_tls<VM: VMBinding>(&self) -> VMThread {
+        let tls = Block::TLS_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst);
+        VMThread(OpaquePointer::from_address(unsafe { Address::from_usize(tls) }))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -266,16 +209,15 @@ impl Block {
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        let byte =
-            side_metadata::load_atomic(&Self::MARK_TABLE, self.start(), Ordering::SeqCst) as u8;
+        let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         byte.into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        let state = u8::from(state) as usize;
-        side_metadata::store_atomic(&Self::MARK_TABLE, self.start(), state, Ordering::SeqCst);
+        let state = u8::from(state);
+        Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
     /// Sweep this block.
@@ -325,53 +267,8 @@ impl Block {
     pub fn deinit(&self) {
         self.set_state(BlockState::Unallocated);
     }
-
-    /// Get the block from a given address.
-    /// The address must be block-aligned.
-    #[inline(always)]
-    pub const fn from(address: Address) -> Self {
-        // debug_assert!(address.is_aligned_to(BYTES_IN_BLOCK));
-        Self(address)
-    }
 }
 
-impl Step for Block {
-    /// Get the number of blocks between the given two blocks.
-    #[inline(always)]
-    #[allow(clippy::assertions_on_constants)]
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-        if start > end {
-            return None;
-        }
-        Some((end.start() - start.start()) >> Block::LOG_BYTES)
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward(start: Self, count: usize) -> Self {
-        Self::from(start.start() + (count << Block::LOG_BYTES))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() > usize::MAX - (count << Block::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::forward(start, count))
-    }
-    /// result = block_address + count * block_size
-    #[inline(always)]
-    fn backward(start: Self, count: usize) -> Self {
-        Self::from(start.start() - (count << Block::LOG_BYTES))
-    }
-    /// result = block_address - count * block_size
-    #[inline(always)]
-    fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.start().as_usize() < (count << Block::LOG_BYTES) {
-            return None;
-        }
-        Some(Self::backward(start, count))
-    }
-}
 /// The block allocation state.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BlockState {

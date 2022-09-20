@@ -16,9 +16,11 @@ extern "C" {
 #endif
 
 typedef void* MMTk_Mutator;
+typedef void* MMTk_Builder;
+typedef void* MMTk;
 
 // Initialize an MMTk instance
-extern void mmtk_gc_init(size_t heap_size);
+extern MMTk mmtk_init(MMTk_Builder builder);
 
 // Request MMTk to create a new mutator for the given `tls` thread
 extern MMTk_Mutator mmtk_bind_mutator(void* tls);
@@ -74,10 +76,10 @@ extern void mmtk_modify_check(void* ref);
 extern bool mmtk_will_never_move(void* object);
 
 // Process an MMTk option. Return true if option was processed successfully
-extern bool mmtk_process(char* name, char* value);
+extern bool mmtk_process(MMTk_Builder builder, char* name, char* value);
 
 // Process MMTk options. Return true if all options were processed successfully
-extern bool mmtk_process_bulk(char* options);
+extern bool mmtk_process_bulk(MMTk_Builder builder, char* options);
 
 // Sanity only. Scan heap for discrepancies and errors
 extern void mmtk_scan_region();

@@ -74,7 +74,7 @@ pub fn create_ms_mutator<VM: VMBinding>(
     let ms = plan.downcast_ref::<MarkSweep<VM>>().unwrap();
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box {
+        space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
             #[cfg(feature="malloc")]
             vec.push((AllocatorSelector::Malloc(0), ms.ms_space()));
@@ -85,14 +85,14 @@ pub fn create_ms_mutator<VM: VMBinding>(
             #[cfg(not(feature="malloc"))]
             vec.push((AllocatorSelector::LargeObject(0), ms.common().get_los()));
             vec
-        },
+        }),
         prepare_func: &ms_mutator_prepare,
         release_func: &ms_mutator_release,
     };
 
     Mutator {
         allocators: Allocators::<VM>::new(mutator_tls, plan, &config.space_mapping),
-        barrier: box NoBarrier,
+        barrier: Box::new(NoBarrier),
         mutator_tls,
         config,
         plan,

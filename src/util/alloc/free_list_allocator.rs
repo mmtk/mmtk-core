@@ -10,6 +10,7 @@ use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 use crate::Plan;
+use crate::util::linear_scan::Region;
 
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
@@ -19,7 +20,7 @@ const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 pub const MI_BIN_FULL: usize = MAX_BIN + 1;
 pub const BYTES_IN_BLOCK_WSIZE: usize = Block::BYTES / MI_INTPTR_SIZE;
 pub const MAX_BIN: usize = 48;
-const ZERO_BLOCK: Block = Block::from(unsafe { Address::zero() });
+const ZERO_BLOCK: Block = Block::ZERO_BLOCK;
 pub type BlockLists = [BlockList; MAX_BIN + 1];
 
 pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
@@ -563,7 +564,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         while cell + cell_size <= block.start() + Block::BYTES {
             if !is_marked::<VM>(
                 unsafe { cell.to_object_reference() },
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             ) {
                 unsafe { cell.store::<Address>(last); }
                 last = cell;

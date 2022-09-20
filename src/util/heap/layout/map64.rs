@@ -152,6 +152,14 @@ impl Map for Map64 {
         unreachable!()
     }
 
+    fn get_available_discontiguous_chunks(&self) -> usize {
+        panic!("We don't use discontiguous chunks for 64-bit!");
+    }
+
+    fn get_chunk_consumer_count(&self) -> usize {
+        panic!("We don't use discontiguous chunks for 64-bit!");
+    }
+
     fn free_all_chunks(&self, _any_chunk: Address) {
         unreachable!()
     }
@@ -161,7 +169,7 @@ impl Map for Map64 {
     }
 
     fn boot(&self) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {
@@ -174,7 +182,7 @@ impl Map for Map64 {
     }
 
     fn finalize_static_space_map(&self, _from: Address, _to: Address) {
-        // This is only called during boot process by a single thread calling gc_init().
+        // This is only called during boot process by a single thread.
         // It is fine to get a mutable reference.
         let self_mut: &mut Self = unsafe { self.mut_self() };
         for pr in 0..MAX_SPACES {

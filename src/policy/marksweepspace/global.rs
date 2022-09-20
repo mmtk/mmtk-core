@@ -7,7 +7,7 @@ use atomic::Ordering;
 use crate::{policy::{marksweepspace::{block::{Block, BlockState}, chunk::Chunk, metadata::{is_marked, set_mark_bit}}, space::{SpaceOptions, GCWorkerMutRef}}, scheduler::{GCWorkScheduler, WorkBucketStage, GCWorker}, util::{ ObjectReference, alloc_bit::{ALLOC_SIDE_METADATA_SPEC, bzero_alloc_bit, is_alloced}, heap::{
             layout::heap_layout::{Mmapper, VMMap},
             FreeListPageResource, HeapMeta, VMRequest,
-        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}, store_metadata}, alloc::free_list_allocator::mi_bin, copy::CopySemantics}, vm::VMBinding};
+        }, metadata::{self, MetadataSpec, side_metadata::{self, SideMetadataContext, SideMetadataSpec}}, alloc::free_list_allocator::mi_bin, copy::CopySemantics}, vm::VMBinding};
 
 use super::{super::space::{CommonSpace, Space, SFT}, chunk::{ChunkMap, ChunkState}};
 use crate::vm::ObjectModel;
@@ -18,6 +18,7 @@ use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
+use crate::util::linear_scan::Region;
 
 pub enum BlockAcquireResult {
     Fresh(Block),
@@ -82,8 +83,8 @@ impl<VM: VMBinding> Space<VM> for MarkSweepSpace<VM> {
         &self.pr
     }
 
-    fn init(&mut self, vm_map: &'static crate::util::heap::layout::heap_layout::VMMap) {
-        self.common().init(self.as_space());
+    fn initialize_sft(&self) {
+        self.common().initialize_sft(self.as_sft())
     }
 
     fn common(&self) -> &CommonSpace<VM> {
@@ -113,8 +114,8 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
         );
-        if !is_marked::<VM>(object, Some(Ordering::SeqCst)) {
-            set_mark_bit::<VM>(object, Some(Ordering::SeqCst));
+        if !is_marked::<VM>(object, Ordering::SeqCst) {
+            set_mark_bit::<VM>(object, Ordering::SeqCst);
             let block = Block::from(Block::align(address));
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
@@ -209,7 +210,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         use crate::vm::*;
         for chunk in self.chunk_map.all_chunks() {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                side_metadata::bzero_metadata(&side, chunk.start(), Chunk::BYTES);
+                side.bzero_metadata(chunk.start(), Chunk::BYTES);
             }
         }
     }
@@ -270,14 +271,17 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn block_clear_metadata(&self, block: Block) {
+        let clear_metadata = |spec: &SideMetadataSpec| {
+            match spec.log_num_of_bits {
+                0..=3 => spec.store_atomic::<u8>(block.start(), 0, Ordering::SeqCst),
+                4 => spec.store_atomic::<u16>(block.start(), 0, Ordering::SeqCst),
+                5 => spec.store_atomic::<u32>(block.start(), 0, Ordering::SeqCst),
+                6 => spec.store_atomic::<u64>(block.start(), 0, Ordering::SeqCst),
+                _ => unreachable!()
+            }
+        };
         for metadata_spec in &self.common.metadata.local {
-            store_metadata::<VM>(
-                &MetadataSpec::OnSide(*metadata_spec),
-                unsafe { block.start().to_object_reference() },
-                0,
-                None,
-                Some(Ordering::SeqCst),
-            )
+            clear_metadata(metadata_spec);
         }
         bzero_alloc_bit(block.start(), Block::BYTES);
     }

@@ -1,0 +1,31 @@
+name: Public API Check
+
+on:
+  pull_request:
+    branches:
+      - master
+
+# The workflow may fail if we change the public API in a pull request.
+# We allow fail on this action. But we should manually check if the changes are reasonable when we see a failed action.
+# It would be good if the workflow returns a neutral status when we find API changes. But it is currently not
+# possible with Github actions.
+jobs:
+  check-public-api-changes:
+    runs-on: ubuntu-latest
+    steps:
+      # Full git history needed
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # Install nightly
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          profile: minimal
+
+      # Install cargo-public-api
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api
+      - name: API Diff
+        run: cargo public-api --diff-git-checkouts ${GITHUB_BASE_REF} ${{ github.event.pull_request.head.sha }} --deny=all

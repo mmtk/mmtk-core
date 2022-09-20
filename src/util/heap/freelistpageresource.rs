@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Mutex, MutexGuard};
 
 use super::layout::map::Map;
+use super::layout::vm_layout_constants::{PAGES_IN_CHUNK, PAGES_IN_SPACE64};
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
 use crate::util::address::Address;
@@ -73,6 +74,22 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
     }
     fn common_mut(&mut self) -> &mut CommonPageResource {
         &mut self.common
+    }
+
+    fn get_available_physical_pages(&self) -> usize {
+        let mut rtn = self.sync.lock().unwrap().pages_currently_on_freelist;
+        if !self.common.contiguous {
+            let chunks: usize = self
+                .common
+                .vm_map
+                .get_available_discontiguous_chunks()
+                .saturating_sub(self.common.vm_map.get_chunk_consumer_count());
+            rtn += chunks * (PAGES_IN_CHUNK - self.meta_data_pages_per_region);
+        } else if self.common.growable && cfg!(target_pointer_width = "64") {
+            rtn = PAGES_IN_SPACE64 - self.reserved_pages();
+        }
+
+        rtn
     }
 
     fn alloc_pages(

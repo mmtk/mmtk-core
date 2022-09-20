@@ -1,3 +1,61 @@
+0.14.0 (2022-08-08)
+===
+
+API
+---
+* `ProcessEdgesWork` is no longer exposed in the `Scanning` trait. Instead, `RootsWorkFactory` is introduced
+  for the bindings to create more work packets.
+* `Collection::stop_all_mutators()` now provides a callback `mutator_visitor`. The implementation is required
+  to call `mutator_visitor` for each mutator once it is stopped. This requirement was implicit prior to this change.
+* Now MMTk creation is done in the builder pattern:
+  * `MMTKBuilder` is introduced. Command line argument processing API (`process()` and `process_bulk()`) now
+    takes `&MMTKBuilder` as an argument instead of `&MMTK`.
+  * `gc_init()` is renamed to `mmtk_init()`. `mmtk_init()` now takes `&MMTKBuilder` as an argument,
+    and returns an MMTk instance `Box<MMTK>`.
+  * `heap_size` (which used to be an argument for `gc_init()`) is now an MMTk option.
+  * All the options now can be set through the command line argument processing API.
+* Node enqueuing is supported:
+  * Add `Scanning::support_edge_enqueuing()`. A binding may return `false` if they cannot do edge scanning for certain objects.
+  * For objects that cannot be enqueued as edges, `Scanning::scan_object_and_trace_edges()` will be called.
+
+
+Scheduler
+---
+* Fixed a bug that may cause deadlock when GC workers are parked and the coordinator is still executing work.
+
+Misc
+---
+* `Plan::gc_init()` and `Space::init()` are removed. Initialization is now properly done in the respective constructors.
+
+
+0.13.0 (2022-06-27)
+===
+
+Allocators
+---
+* Fixed a bug that in GC stress testing, the allocator slowpath may double count the allocated bytes.
+* Fixed a bug that in GC stress testing, the Immix allocator may miss the updates to the allocated bytes in some cases.
+
+Scheduler
+---
+* Added work stealing mechanisms to the scheduler: a GC worker may steal work packets from other workers.
+* Fixed a bug that work buckets may be incorrectly opened when there is still work left in workers' local bucket.
+
+API
+---
+* Added an associate type `Finalizable` to `ReferenceGlue`, with which, a binding can define their own finalizer type.
+* Added a set of malloc APIs that allows a binding to do malloc using MMTk.
+* Added `vm_trace_object()` to `ActivePlan`. When tracing an object that is not in any of MMTk spaces, MMTk will call this method
+  and allow bindings to handle the object.
+
+Misc
+---
+* `trait TransitiveClosure` is split into two different traits: `EdgeVisitor` and `ObjectQueue`, and `TransitiveClosure` is now removed.
+* Fixed a bug that the work packet statistics were not collected correctly if different work packets used the same display name.
+* Fixed a bug that the work packet statistics and the phase statistics use different time units. Now they both use milliseconds.
+* Fixed a bug that `acquire_lock` was used to lock a larger scope than what was necessary, which caused bad performance when we have many
+  allocation threads (e.g. more than 24 threads).
+
 0.12.0 (2022-05-13)
 ===
 

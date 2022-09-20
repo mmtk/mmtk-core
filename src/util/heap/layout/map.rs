@@ -32,6 +32,14 @@ pub trait Map: Sized {
 
     fn get_contiguous_region_size(&self, start: Address) -> usize;
 
+    /// Return the total number of chunks available (unassigned) within the range of virtual memory
+    /// apportioned to discontiguous spaces.
+    fn get_available_discontiguous_chunks(&self) -> usize;
+
+    /// Return the total number of clients contending for chunks. This is useful when establishing
+    /// conservative bounds on the number of remaining chunks.
+    fn get_chunk_consumer_count(&self) -> usize;
+
     fn free_all_chunks(&self, any_chunk: Address);
 
     fn free_contiguous_chunks(&self, start: Address) -> usize;

@@ -1,16 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(integer_atomics)]
-#![feature(is_sorted)]
-#![feature(drain_filter)]
-#![feature(nll)]
-#![feature(box_syntax)]
-#![feature(get_mut_unchecked)]
-#![feature(arbitrary_self_types)]
-#![feature(associated_type_defaults)]
-#![feature(specialization)]
-#![feature(trait_alias)]
-#![feature(step_trait)]
-#![feature(adt_const_params)]
 // TODO: We should fix missing docs for public items and turn this on (Issue #309).
 // #![deny(missing_docs)]
 
@@ -58,12 +45,13 @@ extern crate num_cpus;
 extern crate downcast_rs;
 
 mod mmtk;
+pub use mmtk::MMTKBuilder;
 pub(crate) use mmtk::MMAPPER;
 pub use mmtk::MMTK;
-pub(crate) use mmtk::VM_MAP;
 
 mod policy;
 
+pub mod build_info;
 pub mod memory_manager;
 pub mod plan;
 pub mod scheduler;

@@ -46,10 +46,10 @@ pub fn create_nogc_mutator<VM: VMBinding>(
 ) -> Mutator<VM> {
     let config = MutatorConfig {
         allocator_mapping: &*ALLOCATOR_MAPPING,
-        space_mapping: box vec![(
+        space_mapping: Box::new(vec![(
             AllocatorSelector::FreeList(0),
             &plan.downcast_ref::<NoGC<VM>>().unwrap().nogc_space,
-        ),],
+        )]),
         prepare_func: &nogc_mutator_noop,
         release_func: &nogc_mutator_noop,
     };

@@ -2,6 +2,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use libc::c_char;
+use std::sync::atomic::Ordering;
 use std::ffi::CStr;
 use mmtk::memory_manager;
 use mmtk::AllocationSemantics;
@@ -9,17 +10,23 @@ use mmtk::util::{ObjectReference, Address};
 use mmtk::util::opaque_pointer::*;
 use mmtk::scheduler::{GCController, GCWorker};
 use mmtk::Mutator;
-use mmtk::MMTK;
 use crate::DummyVM;
 use crate::SINGLETON;
+use crate::BUILDER;
 
 #[no_mangle]
-pub extern "C" fn mmtk_gc_init(heap_size: usize) {
-    // # Safety
-    // Casting `SINGLETON` as mutable is safe because `gc_init` will only be executed once by a single thread during startup.
-    #[allow(clippy::cast_ref_to_mut)]
-    let singleton_mut = unsafe { &mut *(&*SINGLETON as *const MMTK<DummyVM> as *mut MMTK<DummyVM>) };
-    memory_manager::gc_init(singleton_mut, heap_size)
+pub extern "C" fn mmtk_init(heap_size: usize) {
+    // set heap size first
+    {
+        let mut builder = BUILDER.lock().unwrap();
+        let success = builder.options.heap_size.set(heap_size);
+        assert!(success, "Failed to set heap size to {}", heap_size);
+    }
+
+    // Make sure MMTk has not yet been initialized
+    assert!(!crate::MMTK_INITIALIZED.load(Ordering::SeqCst));
+    // Initialize MMTk here
+    lazy_static::initialize(&SINGLETON);
 }
 
 #[no_mangle]
@@ -155,7 +162,8 @@ pub extern "C" fn mmtk_harness_end() {
 pub extern "C" fn mmtk_process(name: *const c_char, value: *const c_char) -> bool {
     let name_str: &CStr = unsafe { CStr::from_ptr(name) };
     let value_str: &CStr = unsafe { CStr::from_ptr(value) };
-    memory_manager::process(&SINGLETON, name_str.to_str().unwrap(), value_str.to_str().unwrap())
+    let mut builder = BUILDER.lock().unwrap();
+    memory_manager::process(&mut builder, name_str.to_str().unwrap(), value_str.to_str().unwrap())
 }
 
 #[no_mangle]
@@ -166,4 +174,44 @@ pub extern "C" fn mmtk_starting_heap_address() -> Address {
 #[no_mangle]
 pub extern "C" fn mmtk_last_heap_address() -> Address {
     memory_manager::last_heap_address()
+}
+
+#[no_mangle]
+#[cfg(feature = "malloc_counted_size")]
+pub extern "C" fn mmtk_counted_malloc(size: usize) -> Address {
+    memory_manager::counted_malloc::<DummyVM>(&SINGLETON, size)
+}
+#[no_mangle]
+pub extern "C" fn mmtk_malloc(size: usize) -> Address {
+    memory_manager::malloc(size)
+}
+
+#[no_mangle]
+#[cfg(feature = "malloc_counted_size")]
+pub extern "C" fn mmtk_counted_calloc(num: usize, size: usize) -> Address {
+    memory_manager::counted_calloc::<DummyVM>(&SINGLETON, num, size)
+}
+#[no_mangle]
+pub extern "C" fn mmtk_calloc(num: usize, size: usize) -> Address {
+    memory_manager::calloc(num, size)
+}
+
+#[no_mangle]
+#[cfg(feature = "malloc_counted_size")]
+pub extern "C" fn mmtk_realloc_with_old_size(addr: Address, size: usize, old_size: usize) -> Address {
+    memory_manager::realloc_with_old_size::<DummyVM>(&SINGLETON, addr, size, old_size)
+}
+#[no_mangle]
+pub extern "C" fn mmtk_realloc(addr: Address, size: usize) -> Address {
+    memory_manager::realloc(addr, size)
+}
+
+#[no_mangle]
+#[cfg(feature = "malloc_counted_size")]
+pub extern "C" fn mmtk_free_with_size(addr: Address, old_size: usize) {
+    memory_manager::free_with_size::<DummyVM>(&SINGLETON, addr, old_size)
+}
+#[no_mangle]
+pub extern "C" fn mmtk_free(addr: Address) {
+    memory_manager::free(addr)
 }

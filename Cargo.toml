@@ -1,8 +1,8 @@
 [package]
 name = "mmtk"
-version = "0.12.0"
+version = "0.14.0"
 authors = ["The MMTk Developers <>"]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "MMTk is a framework for the design and implementation of high-performance and portable memory managers."
 homepage = "https://www.mmtk.io"
@@ -11,6 +11,7 @@ readme = "README.md"
 categories = ["memory-management"]
 keywords = ["gc", "garbage", "collection", "garbage-collection", "allocation"]
 rust-version = "1.57.0"
+build = "build.rs"
 
 [lib]
 name = "mmtk"
@@ -19,12 +20,12 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.12.0", path = "macros/" }
+mmtk-macros = { version = "0.14.0", path = "macros/" }
 
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
 mimalloc-sys = { version = "0.1.6", optional = true }
-hoard-sys = { version = "0.1.1", optional = true }
+hoard-sys = { version = "0.1.2", optional = true }
 lazy_static = "1.1"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam = "0.8.1"
@@ -33,6 +34,7 @@ enum-map = "=2.1"
 downcast-rs = "1.1.1"
 atomic-traits = "0.2.0"
 atomic = "0.4.6"
+num-traits = "0.2"
 spin = "0.5.2"
 env_logger = "0.8.2"
 pfm = { version = "0.1.0-beta.1", optional = true }
@@ -42,6 +44,10 @@ strum_macros = "0.24"
 
 [dev-dependencies]
 rand = "0.7.3"
+paste = "1.0.8"
+
+[build-dependencies]
+built = { version = "0.5.1", features = ["git2"] }
 
 [profile.release]
 debug = true
@@ -63,9 +69,18 @@ perf_counter = ["pfm"]
 # Do not modify the following line - ci-common.sh matches it
 # -- Non mutually exclusive features --
 
-# spaces
+# spaces with different semantics
+
+# A VM-allocated/managed space. A binding could use this for their boot image, metadata space, etc.
+# FIXME: This is not properly implemented yet (it is only working for JikesRVM): https://github.com/mmtk/mmtk-core/issues/415
+# If a binding would need to trace/scan objects that is allocated and managed by the VM, `ActivePlan::vm_trace_object()` is an alternative.
 vm_space = []
+
+# A readonly space.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and do not guarantee read-only semantics.
 ro_space = []
+# A code space with execution permission.
+# TODO: This is not properly implemented yet. We currently use an immortal space instead, and all our spaces have execution permission at the moment.
 code_space  = []
 
 # metadata
@@ -73,6 +88,13 @@ global_alloc_bit = []
 
 # conservative garbage collection support
 is_mmtk_object = ["global_alloc_bit"]
+
+# The following two features are useful for using Immix for VMs that do not support moving GC.
+
+# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
+immix_no_defrag = []
+# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+immix_smaller_block = []
 
 # Run sanity GC
 sanity = []
@@ -88,6 +110,15 @@ single_worker = []
 
 # To run expensive comprehensive runtime checks, such as checking duplicate edges
 extreme_assertions = []
+
+# Enable multiple spaces for NoGC, each allocator maps to an individual ImmortalSpace.
+nogc_multi_space = []
+
+# To collect statistics for each GC work packet. Enabling this may introduce a small overhead (several percentage slowdown on benchmark time).
+work_packet_stats = []
+
+# Count the malloc'd memory into the heap size
+malloc_counted_size = []
 
 # Do not modify the following line - ci-common.sh matches it
 # -- Mutally exclusive features --
