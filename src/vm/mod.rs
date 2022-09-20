@@ -57,10 +57,6 @@ where
     const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
-    #[cfg(target_arch = "x86")]
-    /// Allowed maximum alignment as shift by min alignment.
-    const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-    #[cfg(target_arch = "x86_64")]
     /// Allowed maximum alignment as shift by min alignment.
     const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
 
