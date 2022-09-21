@@ -1,8 +1,6 @@
 use mmtk::util::copy::{CopySemantics, GCWorkerCopyContext};
-use mmtk::util::metadata::header_metadata::HeaderMetadataSpec;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::vm::*;
-use std::sync::atomic::Ordering;
 use crate::DummyVM;
 
 pub struct VMObjectModel {}
@@ -17,56 +15,6 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec = VMLocalForwardingBitsSpec::in_header(0);
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = VMLocalLOSMarkNurserySpec::in_header(0);
-
-    fn load_metadata(
-        _metadata_spec: &HeaderMetadataSpec,
-        _object: ObjectReference,
-        _mask: Option<usize>,
-        _atomic_ordering: Option<Ordering>,
-    ) -> usize {
-        // Do nothing at this moment.
-        0
-    }
-
-    fn store_metadata(
-        _metadata_spec: &HeaderMetadataSpec,
-        _object: ObjectReference,
-        _val: usize,
-        _mask: Option<usize>,
-        _atomic_ordering: Option<Ordering>,
-    ) {
-        // Do nothing at this moment.
-    }
-
-    fn compare_exchange_metadata(
-        _metadata_spec: &HeaderMetadataSpec,
-        _object: ObjectReference,
-        _old_val: usize,
-        _new_val: usize,
-        _mask: Option<usize>,
-        _success_order: Ordering,
-        _failure_order: Ordering,
-    ) -> bool {
-        unimplemented!()
-    }
-
-    fn fetch_add_metadata(
-        _metadata_spec: &HeaderMetadataSpec,
-        _object: ObjectReference,
-        _val: usize,
-        _order: Ordering,
-    ) -> usize {
-        unimplemented!()
-    }
-
-    fn fetch_sub_metadata(
-        _metadata_spec: &HeaderMetadataSpec,
-        _object: ObjectReference,
-        _val: usize,
-        _order: Ordering,
-    ) -> usize {
-        unimplemented!()
-    }
 
     fn copy(
         _from: ObjectReference,

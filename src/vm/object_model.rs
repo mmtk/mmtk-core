@@ -1,11 +1,11 @@
 use atomic::Ordering;
 
 use self::specs::*;
+use crate::util::copy::*;
 use crate::util::metadata::header_metadata::HeaderMetadataSpec;
+use crate::util::metadata::MetadataValue;
 use crate::util::{Address, ObjectReference};
 use crate::vm::VMBinding;
-
-use crate::util::copy::*;
 
 /// VM-specific methods for object model.
 ///
@@ -19,8 +19,8 @@ use crate::util::copy::*;
 ///      will use side tables to store the metadata. The following section Side Specs Layout will discuss how to correctly create
 ///      side metadata specs.
 /// 2. In header metadata access: A binding
-///    need to further define the functions with suffix _metadata about how to access the bits in the header. A binding may use
-///    functions in the [`header_metadata`] module if the bits are always available to MMTk, or they could implement their
+///    need to further define the functions with suffix _metadata about how to access the bits in the header. We provide default implementations
+///    for those methods, assuming the bits in the spec are always available to MMTk. A binding could implement their
 ///    own routines to access the bits if VM specific treatment is needed (e.g. some bits are not always available to MMTk).
 /// 3. VM-specific object info needed by MMTk: MMTk does not know object info as it is VM specific. However, MMTk needs
 ///    some object information for GC. A binding needs to implement them correctly.
@@ -84,101 +84,227 @@ pub trait ObjectModel<VM: VMBinding> {
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
-    /// A function to load the specified per-object metadata's content.
+    /// A function to non-atomically load the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// Returns the metadata value.
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
     /// * `object`: is a reference to the target object.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    /// * `atomic_ordering`: is an optional atomic ordering for the load operation. An input value of `None` means the load operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic load operation will use the `Ordering::X`.
     ///
-    /// # Returns the metadata value as a word. If the metadata size is less than a word, the effective value is stored in the low-order bits of the word.
-    ///
-    fn load_metadata(
+    /// # Safety
+    /// This is a non-atomic load, thus not thread-safe.
+    #[inline(always)]
+    unsafe fn load_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        mask: Option<usize>,
-        atomic_ordering: Option<Ordering>,
-    ) -> usize;
+        mask: Option<T>,
+    ) -> T {
+        metadata_spec.load::<T>(object, mask)
+    }
 
-    /// A function to store a value to the specified per-object metadata.
+    /// A function to atomically load the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// Returns the metadata value.
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
+    /// * `object`: is a reference to the target object.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is the atomic ordering for the load operation.
+    #[inline(always)]
+    fn load_metadata_atomic<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) -> T {
+        metadata_spec.load_atomic::<T>(object, mask, ordering)
+    }
+
+    /// A function to non-atomically store a value to the specified per-object metadata.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the new metadata value to be stored.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
-    /// * `atomic_ordering`: is an optional atomic ordering for the store operation. An input value of `None` means the store operation is not atomic, and an input value of `Some(Ordering::X)` means the atomic store operation will use the `Ordering::X`.
     ///
-    fn store_metadata(
+    /// # Safety
+    /// This is a non-atomic store, thus not thread-safe.
+    #[inline(always)]
+    unsafe fn store_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
-        mask: Option<usize>,
-        atomic_ordering: Option<Ordering>,
-    );
+        val: T,
+        mask: Option<T>,
+    ) {
+        metadata_spec.store::<T>(object, val, mask)
+    }
 
-    /// A function to atomically compare-and-exchange the specified per-object metadata's content.
+    /// A function to atomically store a value to the specified per-object metadata.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the new metadata value to be stored.
+    /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
+    /// * `atomic_ordering`: is the optional atomic ordering for the store operation.
+    #[inline(always)]
+    fn store_metadata_atomic<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        mask: Option<T>,
+        ordering: Ordering,
+    ) {
+        metadata_spec.store_atomic::<T>(object, val, mask, ordering)
+    }
+
+    /// A function to atomically compare-and-exchange the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// Returns `true` if the operation is successful, and `false` otherwise.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
     /// * `object`: is a reference to the target object.
     /// * `old_val`: is the expected current value of the metadata.
     /// * `new_val`: is the new metadata value to be stored if the compare-and-exchange operation is successful.
     /// * `mask`: is an optional mask value for the metadata. This value is used in cases like the forwarding pointer metadata, where some of the bits are reused by other metadata such as the forwarding bits.
     /// * `success_order`: is the atomic ordering used if the operation is successful.
     /// * `failure_order`: is the atomic ordering used if the operation fails.
-    ///
-    /// # Returns `true` if the operation is successful, and `false` otherwise.
-    ///
-    fn compare_exchange_metadata(
+    #[inline(always)]
+    fn compare_exchange_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        old_val: usize,
-        new_val: usize,
-        mask: Option<usize>,
+        old_val: T,
+        new_val: T,
+        mask: Option<T>,
         success_order: Ordering,
         failure_order: Ordering,
-    ) -> bool;
+    ) -> std::result::Result<T, T> {
+        metadata_spec.compare_exchange::<T>(
+            object,
+            old_val,
+            new_val,
+            mask,
+            success_order,
+            failure_order,
+        )
+    }
 
     /// A function to atomically perform an add operation on the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// This is a wrapping add.
+    /// # Returns the old metadata value.
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be added to the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value as a word.
-    ///
-    fn fetch_add_metadata(
+    #[inline(always)]
+    fn fetch_add_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
+        val: T,
         order: Ordering,
-    ) -> usize;
+    ) -> T {
+        metadata_spec.fetch_add::<T>(object, val, order)
+    }
 
     /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// This is a wrapping sub.
+    /// Returns the old metadata value.
     ///
     /// # Arguments:
     ///
-    /// * `metadata_spec`: is one of the const `MetadataSpec` instances from the ObjectModel trait, for the target metadata. Whether the metadata is in-header or on-side is a VM-specific choice.
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
     /// * `object`: is a reference to the target object.
     /// * `val`: is the value to be subtracted from the current value of the metadata.
     /// * `order`: is the atomic ordering of the fetch-and-add operation.
-    ///
-    /// # Returns the old metadata value as a word.
-    ///
-    fn fetch_sub_metadata(
+    #[inline(always)]
+    fn fetch_sub_metadata<T: MetadataValue>(
         metadata_spec: &HeaderMetadataSpec,
         object: ObjectReference,
-        val: usize,
+        val: T,
         order: Ordering,
-    ) -> usize;
+    ) -> T {
+        metadata_spec.fetch_sub::<T>(object, val, order)
+    }
+
+    /// A function to atomically perform a bit-and operation on the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// Returns the old metadata value.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the value to bit-and with the current value of the metadata.
+    /// * `order`: is the atomic ordering of the fetch-and-add operation.
+    #[inline(always)]
+    fn fetch_and_metadata<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        metadata_spec.fetch_and::<T>(object, val, order)
+    }
+
+    /// A function to atomically perform a bit-or operation on the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// Returns the old metadata value.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the value to bit-or with the current value of the metadata.
+    /// * `order`: is the atomic ordering of the fetch-and-add operation.
+    #[inline(always)]
+    fn fetch_or_metadata<T: MetadataValue>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        val: T,
+        order: Ordering,
+    ) -> T {
+        metadata_spec.fetch_or::<T>(object, val, order)
+    }
+
+    /// A function to atomically perform an update operation on the specified per-object metadata's content.
+    /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
+    /// The semantics of this method are the same as the `fetch_update()` on Rust atomic types.
+    ///
+    /// # Arguments:
+    ///
+    /// * `metadata_spec`: is the header metadata spec that tries to perform the operation.
+    /// * `object`: is a reference to the target object.
+    /// * `val`: is the value to bit-and with the current value of the metadata.
+    /// * `order`: is the atomic ordering of the fetch-and-add operation.
+    ///
+    /// # Returns the old metadata value.
+    #[inline(always)]
+    fn fetch_update_metadata<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
+        metadata_spec: &HeaderMetadataSpec,
+        object: ObjectReference,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        f: F,
+    ) -> std::result::Result<T, T> {
+        metadata_spec.fetch_update(object, set_order, fetch_order, f)
+    }
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
     /// `alloc_copy()` and `post_copy()` from [`GCWorkerCopyContext`](util/copy/struct.GCWorkerCopyContext.html)

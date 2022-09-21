@@ -14,7 +14,6 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
-use crate::plan::BarrierWriteTarget;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -24,6 +23,7 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::edge_shape::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
@@ -160,18 +160,159 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, bytes, semantics);
 }
 
-/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
-/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
+/// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
 ///
-/// TODO: We plan to replace this API with a subsuming barrier API.
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
 #[inline(always)]
-pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
-    mutator.barrier().post_write_barrier(target)
+pub fn object_reference_write<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator.barrier().object_reference_write(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *pre* write barrier, which we expect a binding to call
+/// *before* it modifies an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_pre<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_pre(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
+/// *after* it modifies an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_post<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_post(src, slot, target);
+}
+
+/// The *subsuming* memory region copy barrier by MMTk.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy(src, dst);
+}
+
+/// The *generic* memory region copy *pre* barrier by MMTk, which we expect a binding to call
+/// *before* it performs memory copy.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy_pre<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_pre(src, dst);
+}
+
+/// The *generic* memory region copy *post* barrier by MMTk, which we expect a binding to call
+/// *after* it performs memory copy.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy_post<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_post(src, dst);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
@@ -460,7 +601,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// word is really a reference.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Argument:
 /// * `addr`: An arbitrary address.
@@ -500,7 +641,7 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// function can distinguish between MMTk-allocated objects and other objects.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Arguments:
 /// * `object`: The object reference to query.

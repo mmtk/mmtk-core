@@ -246,9 +246,9 @@ mod dense_chunk_map {
 
     impl<'a> SFTMap for SFTDenseChunkMap<'a> {
         fn has_sft_entry(&self, addr: Address) -> bool {
-            if is_metadata_mapped(&SFT_DENSE_CHUNK_MAP_INDEX, addr) {
+            if SFT_DENSE_CHUNK_MAP_INDEX.is_mapped(addr) {
                 let index = Self::addr_to_index(addr);
-                index < self.sft.len()
+                index < self.sft.len() as u8
             } else {
                 // We haven't mapped side metadata for the chunk, so we do not have an SFT entry for the address.
                 false
@@ -260,7 +260,7 @@ mod dense_chunk_map {
         }
 
         fn get(&self, address: Address) -> &dyn SFT {
-            self.sft[Self::addr_to_index(address)]
+            self.sft[Self::addr_to_index(address) as usize]
         }
 
         fn eager_initialize(
@@ -285,14 +285,14 @@ mod dense_chunk_map {
 
             // Check if we have an entry in self.sft for the space. If so, get the index.
             // If not, push the space pointer to the table and add an entry to the hahs map.
-            let index: usize = *mut_self
+            let index: u8 = *mut_self
                 .index_map
                 .entry(space.name().to_string())
                 .or_insert_with(|| {
                     let count = mut_self.sft.len();
                     mut_self.sft.push(space);
                     count
-                });
+                }) as u8;
 
             // Iterate through the chunks and record the space index in the side metadata.
             let first_chunk = conversions::chunk_align_down(start);
@@ -307,15 +307,14 @@ mod dense_chunk_map {
             );
             while chunk < last_chunk {
                 trace!("Update {} to index {}", chunk, index);
-                store_atomic(&SFT_DENSE_CHUNK_MAP_INDEX, chunk, index, Ordering::SeqCst);
+                SFT_DENSE_CHUNK_MAP_INDEX.store_atomic::<u8>(chunk, index, Ordering::SeqCst);
                 chunk += BYTES_IN_CHUNK;
             }
             debug!("update done");
         }
 
         fn clear(&self, address: Address) {
-            store_atomic(
-                &SFT_DENSE_CHUNK_MAP_INDEX,
+            SFT_DENSE_CHUNK_MAP_INDEX.store_atomic::<u8>(
                 address,
                 Self::EMPTY_SFT_INDEX,
                 Ordering::SeqCst,
@@ -325,7 +324,7 @@ mod dense_chunk_map {
 
     impl<'a> SFTDenseChunkMap<'a> {
         /// Empty space is at index 0
-        const EMPTY_SFT_INDEX: usize = 0;
+        const EMPTY_SFT_INDEX: u8 = 0;
 
         pub fn new() -> Self {
             Self {
@@ -345,8 +344,8 @@ mod dense_chunk_map {
         }
 
         #[inline(always)]
-        pub fn addr_to_index(addr: Address) -> usize {
-            load_atomic(&SFT_DENSE_CHUNK_MAP_INDEX, addr, Ordering::Relaxed)
+        pub fn addr_to_index(addr: Address) -> u8 {
+            SFT_DENSE_CHUNK_MAP_INDEX.load_atomic::<u8>(addr, Ordering::Relaxed)
         }
     }
 }

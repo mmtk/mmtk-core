@@ -19,6 +19,7 @@ use super::mutator_context::ReservedAllocators;
 
 // Generational plans:
 
+pub mod barrier;
 /// Generational copying (GenCopy)
 pub mod copying;
 /// Generational immix (GenImmix)

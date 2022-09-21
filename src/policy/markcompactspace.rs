@@ -9,9 +9,8 @@ use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
-use crate::util::metadata::load_metadata;
+use crate::util::metadata::extract_side_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::{compare_exchange_metadata, extract_side_metadata};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
@@ -24,7 +23,7 @@ pub struct MarkCompactSpace<VM: VMBinding> {
     pr: MonotonePageResource<VM>,
 }
 
-const GC_MARK_BIT_MASK: usize = 1;
+const GC_MARK_BIT_MASK: u8 = 1;
 
 /// For each MarkCompact object, we need one extra word for storing forwarding pointer (Lisp-2 implementation).
 /// Note that considering the object alignment, we may end up allocating/reserving more than one word per object.
@@ -263,25 +262,26 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit != 0 {
                 return false;
             }
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                object,
-                old_value,
-                1,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    1,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
@@ -290,26 +290,27 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
 
     pub fn test_and_clear_mark(object: ObjectReference) -> bool {
         loop {
-            let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & GC_MARK_BIT_MASK;
             if mark_bit == 0 {
                 return false;
             }
 
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                object,
-                old_value,
-                0,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    0,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
@@ -317,11 +318,10 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     }
 
     pub fn is_marked(object: ObjectReference) -> bool {
-        let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let mark_bit = old_value & GC_MARK_BIT_MASK;
         mark_bit != 0

@@ -220,7 +220,9 @@
 
 mod global;
 pub mod header_metadata;
+mod metadata_val_traits;
 pub mod side_metadata;
+pub use metadata_val_traits::*;
 
 pub(crate) mod log_bit;
 
