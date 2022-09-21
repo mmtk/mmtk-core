@@ -139,7 +139,7 @@ impl SideMetadataSpec {
 
     /// Check with the mmapper to see if side metadata is mapped for the spec for the data address.
     #[inline]
-    pub fn is_mapped(&self, data_addr: Address) -> bool {
+    pub(crate) fn is_mapped(&self, data_addr: Address) -> bool {
         use crate::util::heap::layout::Mmapper;
         use crate::MMAPPER;
         let meta_addr = address_to_meta_address(self, data_addr);
@@ -701,7 +701,6 @@ impl std::hash::Hash for SideMetadataOffset {
 
 /// This struct stores all the side metadata specs for a policy. Generally a policy needs to know its own
 /// side metadata spec as well as the plan's specs.
-#[derive(Debug)]
 pub struct SideMetadataContext {
     // For plans
     pub global: Vec<SideMetadataSpec>,

@@ -460,6 +460,8 @@ mod truncate_tests {
     }
 }
 
+// When storing a value for a data address, we align the data address to the region start.
+// So when accessing any data address in the region, we will use the same data address to fetch the metadata value.
 fn align_to_region_start(spec: &SideMetadataSpec, data_addr: Address) -> Address {
     data_addr.align_down(1 << spec.log_bytes_in_region)
 }
