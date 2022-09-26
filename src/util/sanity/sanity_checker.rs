@@ -181,19 +181,7 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
         let mut sanity_checker = self.mmtk().sanity_checker.lock().unwrap();
         if !sanity_checker.refs.contains(&object) {
             // FIXME steveb consider VM-specific integrity check on reference.
-            if !object.is_sane() {
-                panic!("Invalid reference {:?}", object);
-            }
-            
-            assert!(object.to_address().as_usize() > 0x40000000000 || crate::policy::marksweepspace::metadata::is_marked::<VM>(object, Some(Ordering::SeqCst)), "{}", object);
-            
-                
-
-            // assert!(object.to_address().as_usize() == 0x40000000000 || crate::util::alloc_bit::is_alloced(object), 
-            // "Address {} was found to be alive by the danity checker but has no alloc bit", object.to_address()
-            
-        // );
-
+            assert!(object.is_sane(), "Invalid reference {:?}", object);
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it
             self.nodes.enqueue(object);

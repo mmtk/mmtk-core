@@ -44,7 +44,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
-        true
+        is_marked::<VM>(object, Ordering::SeqCst)
     }
 
     fn is_movable(&self) -> bool {
@@ -56,8 +56,10 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
         true
     }
 
-    fn initialize_object_metadata(&self, object: crate::util::ObjectReference, alloc: bool) {
+    fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
         // do nothing
+        #[cfg(feature = "global_alloc_bit")]
+        crate::util::alloc_bit::set_alloc_bit(_object);
     }
 
     fn sft_trace_object(
@@ -144,6 +146,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         heap: &mut HeapMeta,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
+        // FIXME: alloc bit should be optional
         let alloc_bits = &mut metadata::extract_side_metadata(&[
             MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC),
         ]);
@@ -203,7 +206,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             abandoned_consumed: Mutex::from(BLOCK_LISTS_EMPTY),
         }
     }
-        
 
     pub fn zero_mark_bits(&self) {
         // todo: concurrent zeroing
@@ -211,6 +213,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         for chunk in self.chunk_map.all_chunks() {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side.bzero_metadata(chunk.start(), Chunk::BYTES);
+            } else {
+                unimplemented!();
             }
         }
     }

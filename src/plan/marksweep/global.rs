@@ -128,7 +128,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     #[cfg(not(feature="malloc"))]
-    fn destroy_mutator(&self, mutator: &mut Mutator<VM>) {
+    fn destroy_mutator(&self, mut mutator: Box<Mutator<VM>>) {
         unsafe { 
             mutator.allocators.free_list[0].assume_init_mut().abandon_blocks();
         }
