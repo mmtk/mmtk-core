@@ -2,11 +2,16 @@
 
 use atomic::Ordering;
 
-use crate::{util::{Address, metadata::{side_metadata::{SideMetadataSpec, self}, MetadataSpec}, alloc::free_list_allocator::BlockList, VMThread, OpaquePointer}, vm::VMBinding};
+use crate::{
+    util::{
+        alloc::free_list_allocator::BlockList, metadata::side_metadata::SideMetadataSpec, Address,
+        OpaquePointer, VMThread,
+    },
+    vm::VMBinding,
+};
 
-use super::{MarkSweepSpace, chunk::Chunk};
-use crate::util::linear_scan::{Region, RegionIterator};
-
+use super::{chunk::Chunk, MarkSweepSpace};
+use crate::util::linear_scan::Region;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
@@ -35,32 +40,32 @@ impl Block {
     pub const ZERO_BLOCK: Self = Self(Address::ZERO);
 
     /// Block mark table (side)
-    pub const MARK_TABLE: SideMetadataSpec = 
+    pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK;
 
     pub const NEXT_BLOCK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_NEXT;
 
-    pub const PREV_BLOCK_TABLE: SideMetadataSpec = 
+    pub const PREV_BLOCK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_PREV;
 
-    pub const FREE_LIST_TABLE: SideMetadataSpec = 
+    pub const FREE_LIST_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_FREE;
-    
+
     // needed for non GC context
-    // pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec = 
+    // pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec =
     //     crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
-    // pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec = 
+    // pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec =
     //     crate::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
 
-    pub const SIZE_TABLE: SideMetadataSpec = 
+    pub const SIZE_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE;
 
-    pub const BLOCK_LIST_TABLE: SideMetadataSpec = 
+    pub const BLOCK_LIST_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_LIST;
 
-    pub const TLS_TABLE: SideMetadataSpec = 
+    pub const TLS_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
     #[inline]
@@ -151,25 +156,30 @@ impl Block {
 
     pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
         debug_assert!(!self.0.is_zero());
-        unsafe { Block::NEXT_BLOCK_TABLE.store::<usize>(self.0, next.start().as_usize()); }
+        unsafe {
+            Block::NEXT_BLOCK_TABLE.store::<usize>(self.0, next.start().as_usize());
+        }
     }
 
     pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
         debug_assert!(!self.0.is_zero());
-        unsafe { Block::PREV_BLOCK_TABLE.store::<usize>(self.0, prev.start().as_usize()); }
+        unsafe {
+            Block::PREV_BLOCK_TABLE.store::<usize>(self.0, prev.start().as_usize());
+        }
     }
 
     pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
         debug_assert!(!self.0.is_zero());
-        let block_list_usize: usize = unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
-        unsafe { Block::BLOCK_LIST_TABLE.store::<usize>(self.0, block_list_usize); }
+        let block_list_usize: usize =
+            unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
+        unsafe {
+            Block::BLOCK_LIST_TABLE.store::<usize>(self.0, block_list_usize);
+        }
     }
 
     pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
         debug_assert!(!self.0.is_zero());
-        let block_list = unsafe {
-            Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst)
-        };
+        let block_list = Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst);
         unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
     }
 
@@ -177,19 +187,21 @@ impl Block {
         // FIXME: cannot cast u64 to usize
         Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst) as usize
     }
-    
+
     pub fn store_block_cell_size<VM: VMBinding>(&self, size: usize) {
         unsafe { Block::SIZE_TABLE.store::<usize>(self.0, size) }
     }
-    
+
     pub fn store_tls<VM: VMBinding>(&self, tls: VMThread) {
         let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
         unsafe { Block::TLS_TABLE.store(self.start(), tls) }
     }
-    
+
     pub fn load_tls<VM: VMBinding>(&self) -> VMThread {
         let tls = Block::TLS_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst);
-        VMThread(OpaquePointer::from_address(unsafe { Address::from_usize(tls) }))
+        VMThread(OpaquePointer::from_address(unsafe {
+            Address::from_usize(tls)
+        }))
     }
 
     pub fn is_zero(&self) -> bool {
@@ -232,7 +244,7 @@ impl Block {
                         let list = self.load_block_list::<VM>();
                         (*list).lock();
                         if list == self.load_block_list::<VM>() {
-                            break list
+                            break list;
                         }
                         (*list).unlock();
                     };
@@ -246,10 +258,9 @@ impl Block {
                 // The block is live.
                 false
             }
-            _ => unreachable!(),
         }
     }
- 
+
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
@@ -259,7 +270,7 @@ impl Block {
     /// Initialize a clean block after acquired from page-resource.
     #[inline]
     pub fn init(&self) {
-        self.set_state( BlockState::Unmarked);
+        self.set_state(BlockState::Unmarked);
     }
 
     /// Deinitalize a block before releasing.
@@ -296,7 +307,7 @@ impl From<u8> for BlockState {
             Self::MARK_UNALLOCATED => BlockState::Unallocated,
             Self::MARK_UNMARKED => BlockState::Unmarked,
             Self::MARK_MARKED => BlockState::Marked,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }

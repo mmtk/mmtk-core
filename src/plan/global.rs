@@ -49,7 +49,8 @@ pub fn create_mutator<VM: VMBinding>(
             crate::plan::generational::immix::mutator::create_genimmix_mutator(tls, mmtk)
         }
         PlanSelector::MarkSweep => {
-            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan) // FIXME: this very large struct is stack allocated which may cause an undetected stack overflow problem on JikesRVM
+            crate::plan::marksweep::mutator::create_ms_mutator(tls, &*mmtk.plan)
+            // FIXME: this very large struct is stack allocated which may cause an undetected stack overflow problem on JikesRVM
         }
         PlanSelector::Immix => crate::plan::immix::mutator::create_immix_mutator(tls, &*mmtk.plan),
         PlanSelector::PageProtect => {

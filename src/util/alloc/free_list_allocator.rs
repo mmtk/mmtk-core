@@ -1,16 +1,16 @@
 // This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
-use std::sync::atomic::AtomicBool;
-use atomic::Ordering;
 use crate::policy::marksweepspace::block::Block;
 use crate::policy::marksweepspace::metadata::is_marked;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::util::alloc::Allocator;
+use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 use crate::Plan;
-use crate::util::linear_scan::Region;
+use atomic::Ordering;
+use std::sync::atomic::AtomicBool;
 
 const MI_INTPTR_SHIFT: usize = 3;
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
@@ -23,9 +23,13 @@ pub const MAX_BIN: usize = 48;
 const ZERO_BLOCK: Block = Block::ZERO_BLOCK;
 pub type BlockLists = [BlockList; MAX_BIN + 1];
 
+// FIXME: Due to https://rust-lang.github.io/rust-clippy/master/index.html#declare_interior_mutable_const, this should be static.
+// If this is a const, each time it is referenced, a new copy of this constant will be used. Do we actually want one copy or multiple copies?
+// Need to double check on this
+#[allow(clippy::declare_interior_mutable_const)]
 pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
-    BlockList::new(1 * MI_INTPTR_SIZE),
-    BlockList::new(1 * MI_INTPTR_SIZE),
+    BlockList::new(MI_INTPTR_SIZE),
+    BlockList::new(MI_INTPTR_SIZE),
     BlockList::new(2 * MI_INTPTR_SIZE),
     BlockList::new(3 * MI_INTPTR_SIZE),
     BlockList::new(4 * MI_INTPTR_SIZE),
@@ -83,8 +87,8 @@ pub struct FreeListAllocator<VM: VMBinding> {
     plan: &'static dyn Plan<VM = VM>,
     pub available_blocks: BlockLists, // blocks with free space (no stress GC)
     pub available_blocks_stress: BlockLists, // blocks with free space (with stress GC)
-    pub unswept_blocks: BlockLists, // blocks that are marked, not swept
-    pub consumed_blocks: BlockLists, // full blocks
+    pub unswept_blocks: BlockLists,   // blocks that are marked, not swept
+    pub consumed_blocks: BlockLists,  // full blocks
 }
 
 // List of blocks owned by the allocator
@@ -116,6 +120,7 @@ impl BlockList {
     pub fn remove<VM: VMBinding>(&mut self, block: Block) {
         let prev = block.load_prev_block::<VM>();
         let next = block.load_next_block::<VM>();
+        #[allow(clippy::collapsible_else_if)]
         if prev.is_zero() {
             if next.is_zero() {
                 self.first = ZERO_BLOCK;
@@ -173,17 +178,27 @@ impl BlockList {
         }
         block.store_block_list::<VM>(self);
     }
-    
+
     // Append one block list to another
     // The second block list left empty
     pub fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
         if !list.is_empty() {
-            debug_assert!(list.first.load_prev_block::<VM>().is_zero(), "{} -> {}", list.first.load_prev_block::<VM>().start(), list.first.start());
+            debug_assert!(
+                list.first.load_prev_block::<VM>().is_zero(),
+                "{} -> {}",
+                list.first.load_prev_block::<VM>().start(),
+                list.first.start()
+            );
             if self.is_empty() {
                 self.first = list.first;
                 self.last = list.last;
             } else {
-                debug_assert!(self.first.load_prev_block::<VM>().is_zero(), "{} -> {}", self.first.load_prev_block::<VM>().start(), self.first.start());
+                debug_assert!(
+                    self.first.load_prev_block::<VM>().is_zero(),
+                    "{} -> {}",
+                    self.first.load_prev_block::<VM>().start(),
+                    self.first.start()
+                );
                 self.last.store_next_block::<VM>(list.first);
                 list.first.store_prev_block::<VM>(self.last);
                 self.last = list.last;
@@ -205,10 +220,18 @@ impl BlockList {
 
     // Lock list
     pub fn lock(&mut self) {
-        debug_assert!(self.size <= MI_LARGE_OBJ_SIZE_MAX, "{:?} {}", self as *mut _, self.size);
+        debug_assert!(
+            self.size <= MI_LARGE_OBJ_SIZE_MAX,
+            "{:?} {}",
+            self as *mut _,
+            self.size
+        );
         let mut success = false;
         while !success {
-            success = self.lock.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok();
+            success = self
+                .lock
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok();
         }
     }
 
@@ -252,15 +275,13 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         }
     }
 
-
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         let block = self.find_free_block(size);
         if block.is_zero() {
-            return unsafe {Address::zero()};
+            return unsafe { Address::zero() };
         }
-    
-        self.block_alloc(block, size, align, offset)
 
+        self.block_alloc(block, size, align, offset)
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -272,7 +293,14 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     }
 
     #[cfg(not(feature = "eager_sweeping"))]
-    fn alloc_slow_once_precise_stress(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
+    #[allow(unused_variables)] // FIXME: align/offset need to be respected
+    fn alloc_slow_once_precise_stress(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
         trace!("allow slow precise stress s={}", size);
         let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty());
@@ -282,7 +310,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let available = self.available_blocks_stress.get_mut(bin as usize).unwrap();
         if !available.is_empty() {
             let mut block = available.first;
-    
+
             while !block.is_zero() {
                 let free_list = block.load_free_list::<VM>();
                 if !free_list.is_zero() {
@@ -290,19 +318,21 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                     let next_cell = unsafe { free_list.load::<Address>() };
                     block.store_free_list::<VM>(next_cell);
                     debug_assert!(block.load_free_list::<VM>() == next_cell);
-    
+
                     return free_list;
                 }
                 available.pop::<VM>();
-                self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
-    
+                self.consumed_blocks
+                    .get_mut(bin as usize)
+                    .unwrap()
+                    .push::<VM>(block);
+
                 block = available.first;
-    
             }
         }
         let block = self.acquire_block_for_size(size, true);
         if block.is_zero() {
-            return unsafe {Address::zero()};
+            return unsafe { Address::zero() };
         }
 
         let free_list = block.load_free_list::<VM>();
@@ -314,7 +344,14 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         free_list
     }
     #[cfg(feature = "eager_sweeping")]
-    fn alloc_slow_once_precise_stress(&mut self, size: usize, align: usize, offset: isize, need_poll: bool) -> Address {
+    #[allow(unused_variables)] // FIXME: align/offset need to be respected
+    fn alloc_slow_once_precise_stress(
+        &mut self,
+        size: usize,
+        align: usize,
+        offset: isize,
+        need_poll: bool,
+    ) -> Address {
         let bin = mi_bin(size) as usize;
         let consumed = self.consumed_blocks.get_mut(bin).unwrap();
         let available = self.available_blocks.get_mut(bin).unwrap();
@@ -324,7 +361,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 }
 
 impl<VM: VMBinding> FreeListAllocator<VM> {
-
     // New free list allcoator
     pub fn new(
         tls: VMThread,
@@ -343,9 +379,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     // Find a free cell within a given block
-    pub fn block_alloc(&mut self, block: Block, size: usize, align: usize, offset: isize) -> Address {
+    pub fn block_alloc(
+        &mut self,
+        block: Block,
+        size: usize,
+        align: usize,
+        offset: isize,
+    ) -> Address {
         if block.is_zero() {
-            return unsafe { Address::zero() }
+            return unsafe { Address::zero() };
         }
         let cell = block.load_free_list::<VM>();
         if cell.is_zero() {
@@ -372,16 +414,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 return block;
             }
             available_blocks.pop::<VM>();
-            self.consumed_blocks.get_mut(bin as usize).unwrap().push::<VM>(block);
+            self.consumed_blocks
+                .get_mut(bin as usize)
+                .unwrap()
+                .push::<VM>(block);
 
             block = available_blocks.first;
         }
-        
+
         self.acquire_block_for_size(size, false)
     }
 
-    // These functions are not necessary in a GC context. 
-
+    // These functions are not necessary in a GC context.
 
     // pub fn block_thread_free_collect(&self, block: Address) {
     //     let free_list = block.load_free_list();
@@ -443,10 +487,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     //     debug_assert!(block.load_local_free_list::<VM>().is_zero());
     // }
 
-
-
     pub fn acquire_block_for_size(&mut self, size: usize, stress_test: bool) -> Block {
-
         let bin = mi_bin(size) as usize;
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
@@ -456,15 +497,21 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let block = self.unswept_blocks.get_mut(bin).unwrap().pop::<VM>();
             if block.is_zero() {
                 // no more blocks to sweep
-                break
+                break;
             }
             self.sweep_block(block);
             if block.has_free_cells::<VM>() {
                 // recyclable block
                 if stress_test {
-                    self.available_blocks_stress.get_mut(bin).unwrap().push::<VM>(block);
+                    self.available_blocks_stress
+                        .get_mut(bin)
+                        .unwrap()
+                        .push::<VM>(block);
                 } else {
-                    self.available_blocks.get_mut(bin).unwrap().push::<VM>(block);
+                    self.available_blocks
+                        .get_mut(bin)
+                        .unwrap()
+                        .push::<VM>(block);
                 }
                 return block;
             } else {
@@ -493,7 +540,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     self.init_block(block, self.available_blocks[bin].size);
 
                     return block;
-                },
+                }
 
                 crate::policy::marksweepspace::BlockAcquireResult::AbandonedAvailable(block) => {
                     block.store_tls::<VM>(self.tls);
@@ -503,12 +550,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         } else {
                             self.available_blocks[bin].push::<VM>(block);
                         }
-                        return block
+                        return block;
                     } else {
                         self.consumed_blocks[bin].push::<VM>(block);
                     }
-
-                },
+                }
 
                 crate::policy::marksweepspace::BlockAcquireResult::AbandonedUnswept(block) => {
                     block.store_tls::<VM>(self.tls);
@@ -519,17 +565,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         } else {
                             self.available_blocks[bin].push::<VM>(block);
                         }
-                        return block
+                        return block;
                     } else {
                         self.consumed_blocks[bin].push::<VM>(block);
                     }
-                },
+                }
             }
-        };
+        }
     }
 
     pub fn init_block(&self, block: Block, cell_size: usize) {
-
         self.space.record_new_block(block);
 
         // construct free list
@@ -542,19 +587,18 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 new_cell.store::<Address>(old_cell);
             }
             old_cell = new_cell;
-            new_cell = new_cell + cell_size;
+            new_cell += cell_size;
             if new_cell + cell_size > block_end {
                 break old_cell;
             };
         };
-        
+
         block.store_free_list::<VM>(final_cell);
         // block.store_local_free_list::<VM>(unsafe { Address::zero() });
         // block.store_thread_free_list::<VM>(unsafe { Address::zero() });
         block.store_block_cell_size::<VM>(cell_size);
 
         self.store_block_tls(block);
-        
     }
 
     pub fn sweep_block(&self, block: Block) {
@@ -562,11 +606,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut cell = block.start();
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= block.start() + Block::BYTES {
-            if !is_marked::<VM>(
-                unsafe { cell.to_object_reference() },
-                Ordering::SeqCst,
-            ) {
-                unsafe { cell.store::<Address>(last); }
+            if !is_marked::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst) {
+                unsafe {
+                    cell.store::<Address>(last);
+                }
                 last = cell;
             }
             cell += cell_size;
@@ -577,23 +620,23 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     // alloc bit required for non GC context
     // pub fn sweep_block(&self, block: Block) {
-        // let cell_size = block.load_block_cell_size::<VM>();
-        // debug_assert!(cell_size != 0);
-        // let mut cell = block.start();
-        // while cell < block.start() + Block::BYTES {
-        //     let alloced = is_alloced(unsafe { cell.to_object_reference() });
-        //     if alloced {
-        //         let marked = is_marked::<VM>(
-        //             unsafe { cell.to_object_reference() },
-        //             Some(Ordering::SeqCst),
-        //         );
-        //         if !marked {
-        //             self.free(cell);
-        //         }
-        //     }
-        //     cell += cell_size;
-        // }
-        // self.block_free_collect(block);
+    // let cell_size = block.load_block_cell_size::<VM>();
+    // debug_assert!(cell_size != 0);
+    // let mut cell = block.start();
+    // while cell < block.start() + Block::BYTES {
+    //     let alloced = is_alloced(unsafe { cell.to_object_reference() });
+    //     if alloced {
+    //         let marked = is_marked::<VM>(
+    //             unsafe { cell.to_object_reference() },
+    //             Some(Ordering::SeqCst),
+    //         );
+    //         if !marked {
+    //             self.free(cell);
+    //         }
+    //     }
+    //     cell += cell_size;
+    // }
+    // self.block_free_collect(block);
     // }
 
     // pub fn free(&self, addr: Address) {
@@ -678,7 +721,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 block = block.load_next_block::<VM>();
             }
 
-            self.available_blocks.get_mut(bin).unwrap().append::<VM>(self.consumed_blocks.get_mut(bin).unwrap());
+            self.available_blocks
+                .get_mut(bin)
+                .unwrap()
+                .append::<VM>(self.consumed_blocks.get_mut(bin).unwrap());
             bin += 1;
         }
     }
@@ -699,7 +745,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if !available.is_empty() {
                 abandoned[i].append::<VM>(available);
             }
-            
+
             let available_stress = self.available_blocks_stress.get_mut(i).unwrap();
             if !available_stress.is_empty() {
                 abandoned[i].append::<VM>(available_stress);
@@ -714,7 +760,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if !unswept.is_empty() {
                 abandoned_unswept[i].append::<VM>(unswept);
             }
-            i = i + 1;
+            i += 1;
         }
     }
 }

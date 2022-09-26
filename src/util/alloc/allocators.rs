@@ -14,7 +14,6 @@ use crate::vm::VMBinding;
 use super::FreeListAllocator;
 use super::MarkCompactAllocator;
 
-
 pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
@@ -49,9 +48,7 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
-            AllocatorSelector::FreeList(index) => {
-                self.free_list[index as usize].assume_init_ref()
-            }
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_ref(),
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_ref()
             }
@@ -74,9 +71,7 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
-            AllocatorSelector::FreeList(index) => {
-                self.free_list[index as usize].assume_init_mut()
-            }
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_mut()
             }

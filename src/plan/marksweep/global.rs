@@ -1,52 +1,53 @@
-use crate::Mutator;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
-#[cfg(feature="malloc")]
+#[cfg(feature = "malloc")]
 use crate::plan::marksweep::gc_work::MSSweepChunks;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
+use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::plan::{AllocationSemantics};
-use crate::policy::space::{Space};
-#[cfg(not(feature="malloc"))]
-use crate::policy::marksweepspace::block::Block;
-#[cfg(not(feature="malloc"))]
-use crate::policy::marksweepspace::MarkSweepSpace;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
-#[cfg(feature="malloc")]
+#[cfg(feature = "malloc")]
 use crate::policy::mallocspace::MallocSpace;
+#[cfg(not(feature = "malloc"))]
+use crate::policy::marksweepspace::block::Block;
+#[cfg(not(feature = "malloc"))]
+use crate::policy::marksweepspace::MarkSweepSpace;
+use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
-#[cfg(feature="malloc")]
+#[cfg(feature = "malloc")]
 use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(feature="malloc")]
+#[cfg(not(feature = "global_alloc_bit"))]
+use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+#[cfg(feature = "malloc")]
 use crate::util::constants::MAX_INT;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
+#[cfg(not(feature = "malloc"))]
+use crate::util::linear_scan::Region;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
+#[cfg(not(feature = "malloc"))]
+use crate::Mutator;
 use enum_map::EnumMap;
-use std::sync::Arc;
 use mmtk_macros::PlanTraceObject;
-use crate::util::linear_scan::Region;
-
+use std::sync::Arc;
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
     #[fallback_trace]
     common: CommonPlan<VM>,
-    #[cfg(feature="malloc")]
+    #[cfg(feature = "malloc")]
     #[trace]
     ms: MallocSpace<VM>,
-    #[cfg(not(feature="malloc"))]
+    #[cfg(not(feature = "malloc"))]
     #[trace]
     ms: MarkSweepSpace<VM>,
 }
@@ -56,15 +57,16 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    #[cfg(feature="malloc")]
+    #[cfg(feature = "malloc")]
     max_non_los_default_alloc_bytes: MAX_INT,
-    #[cfg(feature="malloc")]
+    #[cfg(feature = "malloc")]
     max_non_los_copy_bytes: MAX_INT,
-    #[cfg(not(feature="malloc"))]
+    #[cfg(not(feature = "malloc"))]
     max_non_los_default_alloc_bytes: Block::BYTES,
-    #[cfg(not(feature="malloc"))]
+    #[cfg(not(feature = "malloc"))]
     max_non_los_copy_bytes: Block::BYTES,
-    needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING || crate::util::constants::LAZY_SWEEP,
+    needs_linear_scan: crate::util::constants::SUPPORT_CARD_SCANNING
+        || crate::util::constants::LAZY_SWEEP,
     needs_concurrent_workers: false,
     generate_gc_trace: false,
     may_trace_duplicate_edges: true,
@@ -86,7 +88,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
-        #[cfg(feature="malloc")]
+        #[cfg(feature = "malloc")]
         scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 
@@ -96,12 +98,12 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        #[cfg(not(feature="malloc"))]
+        #[cfg(not(feature = "malloc"))]
         self.ms.reset();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        #[cfg(not(any(feature="malloc", feature="eager_sweeping")))]
+        #[cfg(not(any(feature = "malloc", feature = "eager_sweeping")))]
         self.ms.block_level_sweep();
         self.common.release(tls, true);
     }
@@ -109,7 +111,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool {
         self.base().collection_required(self, space_full)
     }
-
 
     fn get_used_pages(&self) -> usize {
         self.common.get_used_pages() + self.ms.reserved_pages()
@@ -127,29 +128,36 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         &MS_CONSTRAINTS
     }
 
-    #[cfg(not(feature="malloc"))]
+    #[cfg(not(feature = "malloc"))]
     fn destroy_mutator(&self, mut mutator: Box<Mutator<VM>>) {
-        unsafe { 
-            mutator.allocators.free_list[0].assume_init_mut().abandon_blocks();
+        unsafe {
+            mutator.allocators.free_list[0]
+                .assume_init_mut()
+                .abandon_blocks();
         }
     }
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>, scheduler: Arc<GCWorkScheduler<VM>>) -> Self {
+    #[allow(unused_variables)] // scheduler only used by marksweepspace
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<Options>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
+    ) -> Self {
+        #[allow(unused_mut)]
         let mut heap = HeapMeta::new(&options);
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs =
-            SideMetadataContext::new_global_specs(&[]);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         // if global_alloc_bit is NOT enabled,
         // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
         #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[
-            ALLOC_SIDE_METADATA_SPEC,
-        ]);
-        
+        let global_metadata_specs =
+            SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
+
         #[cfg(not(feature = "malloc"))]
         let res = {
             let ms = MarkSweepSpace::new(
@@ -163,7 +171,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
                 scheduler,
             );
 
-            let common =             CommonPlan::new(
+            let common = CommonPlan::new(
                 vm_map,
                 mmapper,
                 options,
@@ -172,10 +180,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
                 global_metadata_specs,
             );
 
-            MarkSweep {
-                common,
-                ms,
-            }
+            MarkSweep { common, ms }
         };
 
         #[cfg(feature = "malloc")]
@@ -199,19 +204,13 @@ impl<VM: VMBinding> MarkSweep<VM> {
         res
     }
 
-    #[cfg(feature="malloc")]
+    #[cfg(feature = "malloc")]
     pub fn ms_space(&self) -> &MallocSpace<VM> {
         &self.ms
     }
 
-    #[cfg(not(feature="malloc"))]
+    #[cfg(not(feature = "malloc"))]
     pub fn ms_space(&self) -> &MarkSweepSpace<VM> {
         &self.ms
-    }
-
-    /// Verify side metadata specs used in the spaces in Gen.
-    pub fn verify_side_metadata_sanity(&self, sanity: &mut SideMetadataSanity) {
-        self.ms.verify_side_metadata_sanity(sanity);
-        self.common.verify_side_metadata_sanity(sanity);
     }
 }

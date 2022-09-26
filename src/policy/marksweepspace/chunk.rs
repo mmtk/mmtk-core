@@ -2,7 +2,8 @@
 
 use super::block::{Block, BlockState};
 use super::MarkSweepSpace;
-use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
+use crate::util::linear_scan::{Region, RegionIterator};
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::{
     scheduler::*,
     util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
@@ -10,8 +11,7 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
-use std::{ops::Range};
-use crate::util::linear_scan::{Region, RegionIterator};
+use std::ops::Range;
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(C)]
@@ -90,8 +90,13 @@ pub struct ChunkMap {
     chunk_range: Mutex<Range<Chunk>>,
 }
 
-impl ChunkMap {
+impl Default for ChunkMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
+impl ChunkMap {
     pub const ALLOC_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_CHUNK_MARK;
 
@@ -140,8 +145,8 @@ impl ChunkMap {
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
-     /// Helper function to create per-chunk processing work packets.
-     pub fn generate_tasks<VM: VMBinding>(
+    /// Helper function to create per-chunk processing work packets.
+    pub fn generate_tasks<VM: VMBinding>(
         &self,
         func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
     ) -> Vec<Box<dyn GCWork<VM>>> {

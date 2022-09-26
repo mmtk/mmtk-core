@@ -39,6 +39,4 @@ pub use markcompact_allocator::MarkCompactAllocator;
 /// Embedded metadata pages
 pub(crate) mod embedded_meta_data;
 
-
 pub use crate::policy::mallocspace::metadata::is_alloced_by_malloc;
-

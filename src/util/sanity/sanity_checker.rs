@@ -1,5 +1,4 @@
 use crate::plan::Plan;
-use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::scheduler::gc_work::*;
 use crate::util::ObjectReference;
 use crate::vm::edge_shape::Edge;
