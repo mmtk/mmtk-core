@@ -211,7 +211,7 @@ mod space_map {
         }
     }
 
-    #[cfg(tests)]
+    #[cfg(test)]
     mod tests {
         use super::*;
         use crate::util::heap::layout::heap_parameters::MAX_SPACES;
