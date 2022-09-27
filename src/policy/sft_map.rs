@@ -215,9 +215,7 @@ mod space_map {
     mod tests {
         use super::*;
         use crate::util::heap::layout::heap_parameters::MAX_SPACES;
-        use crate::util::heap::layout::vm_layout_constants::{
-            HEAP_END, HEAP_START, LOG_SPACE_EXTENT, MAX_SPACE_EXTENT,
-        };
+        use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
 
         // If the test `test_address_arithmetic()` fails, it is possible due to change of our heap range, max space extent, or max number of spaces.
         // We need to update the code and the constants for the address arithemtic.

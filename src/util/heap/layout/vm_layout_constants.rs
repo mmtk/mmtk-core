@@ -66,10 +66,10 @@ pub const HEAP_END: Address = HEAP_START.add(1 << (LOG_MAX_SPACES + LOG_SPACE_EX
 
 #[cfg(test)]
 mod test_heap_range {
-    use super::*;
     #[cfg(target_pointer_width = "64")]
     #[test]
     fn test_heap_end() {
+        use super::*;
         // Just to ensure we know if the heap end is changed
         assert_eq!(
             HEAP_END,
