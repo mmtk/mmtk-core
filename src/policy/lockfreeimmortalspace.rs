@@ -90,7 +90,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self) {
-        SFT_MAP.update(self.as_sft(), self.start, self.extent);
+        unsafe { SFT_MAP.update(self.as_sft(), self.start, self.extent) };
     }
 
     fn reserved_pages(&self) -> usize {

@@ -253,7 +253,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
-                crate::mmtk::SFT_MAP.update(self, address, actual_size);
+                assert!(crate::mmtk::SFT_MAP.has_sft_entry(address)); // make sure the address is okay with our SFT map
+                unsafe { crate::mmtk::SFT_MAP.update(self, address, actual_size) };
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -398,7 +399,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // Since the chunk mark metadata is a byte, we don't need synchronization
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
-        crate::mmtk::SFT_MAP.clear(chunk_start);
+        unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
     }
 
     /// Sweep an object if it is dead, and unset page marks for empty pages before this object.

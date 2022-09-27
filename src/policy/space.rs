@@ -134,7 +134,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                     {
                         // --- Assert the start of the allocated region ---
                         // The start address SFT should be correct.
-                        debug_assert_eq!(SFT_MAP.get(res.start).name(), self.get_name());
+                        debug_assert_eq!(SFT_MAP.get_checked(res.start).name(), self.get_name());
                         // The start address is in our space.
                         debug_assert!(self.address_in_space(res.start));
                         // The descriptor should be correct.
@@ -146,7 +146,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         // --- Assert the last byte in the allocated region ---
                         let last_byte = res.start + bytes - 1;
                         // The SFT for the last byte in the allocated memory should be correct.
-                        debug_assert_eq!(SFT_MAP.get(last_byte).name(), self.get_name());
+                        debug_assert_eq!(SFT_MAP.get_checked(last_byte).name(), self.get_name());
                         // The last byte in the allocated memory should be in this space.
                         debug_assert!(self.address_in_space(last_byte));
                         // The descriptor for the last byte should be correct.
@@ -212,27 +212,27 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         #[cfg(debug_assertions)]
         if !new_chunk {
             debug_assert!(
-                SFT_MAP.get(start).name() != EMPTY_SFT_NAME,
+                SFT_MAP.get_checked(start).name() != EMPTY_SFT_NAME,
                 "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
                 start,
                 bytes,
                 new_chunk,
                 start,
-                SFT_MAP.get(start).name()
+                SFT_MAP.get_checked(start).name()
             );
             debug_assert!(
-                SFT_MAP.get(start + bytes - 1).name() != EMPTY_SFT_NAME,
+                SFT_MAP.get_checked(start + bytes - 1).name() != EMPTY_SFT_NAME,
                 "In grow_space(start = {}, bytes = {}, new_chunk = {}), we have empty SFT entries (chunk for {} = {})",
                 start,
                 bytes,
                 new_chunk,
                 start + bytes - 1,
-                SFT_MAP.get(start + bytes - 1).name()
+                SFT_MAP.get_checked(start + bytes - 1).name()
             );
         }
 
         if new_chunk {
-            SFT_MAP.update(self.as_sft(), start, bytes);
+            unsafe { SFT_MAP.update(self.as_sft(), start, bytes) };
         }
     }
 
@@ -509,7 +509,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
             // * fix page resource, so it propelry returns new_chunk
             // * change grow_space() so it sets SFT no matter what the new_chunks value is.
             // FIXME: eagerly initializing SFT is not a good idea.
-            SFT_MAP.eager_initialize(sft, self.start, self.extent);
+            unsafe { SFT_MAP.eager_initialize(sft, self.start, self.extent) };
         }
     }
 
