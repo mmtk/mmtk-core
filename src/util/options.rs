@@ -257,8 +257,9 @@ macro_rules! options {
 
 impl CpuSet {
     /// Returns a CpuSet or String containing error. Expects the list of cores to be formatted as
-    /// numbers separated by commas, including ranges. For example: 0,5,8-11 specifies that the
-    /// cores 0, 5, 8, 9, 10, 11 should be used for pinning threads.
+    /// numbers separated by commas, including ranges. There should be no spaces between the cores
+    /// in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11 should be used
+    /// for pinning threads.
     fn parse_cpulist(cpulist: &str) -> Result<CpuSet, String> {
         let mut cpuset = CpuSet::new();
 
@@ -471,8 +472,10 @@ options! {
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
     // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS scheduler. XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [always_valid] = AffinityKind::OsDefault,
-    // List of cores. The core ids should match the ones reported by /proc/cpuinfo. Core ids are separated by commas and may include ranges.
-    // For example: 0,5,8-11. XXX: This option is currently only supported on Linux.
+    // List of cores. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    // separated by commas and may include ranges.  There should be no spaces in the core list. For
+    // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    // XXX: This option is currently only supported on Linux.
     cpu_list:               CpuSet               [env_var: true, command_line: true] [always_valid] = CpuSet::new()
 }
 

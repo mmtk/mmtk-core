@@ -4,11 +4,12 @@ use libc::{cpu_set_t, sched_setaffinity, CPU_SET, CPU_ZERO};
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicU16, Ordering};
 
-// We use an index variable for the RoundRobin affinity as if directly use the thread id, we can
-// get cases where the GC Controller thread gets assigned the same core as another worker. For
-// example, with the core list "0,1,2" and 2 GC threads, thread 0 and 1 are assigned cores 0 and 1
-// respectively, but the GC Controller thread (with thread id usize::MAX) is assigned core 0 as
-// well even though there is a spare core.
+// We use an index variable for the RoundRobin affinity as if we directly use the
+// thread id % size(core list) for assiging thread affinities, we can get cases where the GC
+// Controller thread gets assigned the same core as another worker. For example, with the core list
+// "0,1,2" and 2 GC threads, thread 0 and 1 are assigned cores 0 and 1 respectively, but the GC
+// Controller thread (with thread id usize::MAX) is assigned core 0 as well even though there is a
+// spare core (core 2).
 static CPU_SET_IDX: AtomicU16 = AtomicU16::new(0);
 
 /// Represents the ID of a logical CPU on a system.
