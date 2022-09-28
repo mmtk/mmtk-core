@@ -277,7 +277,9 @@ impl CpuSet {
                     let end = range[1].parse::<u16>().unwrap();
 
                     if start >= end {
-                        return Err("Starting core id in range should be less than the end".to_string());
+                        return Err(
+                            "Starting core id in range should be less than the end".to_string()
+                        );
                     }
 
                     for cpu in start..=end {
@@ -309,7 +311,6 @@ pub enum AffinityKind {
     Fixed,
     RoundRobin,
 }
-
 
 #[derive(Copy, Clone, EnumString, Debug)]
 /// Different nursery types.

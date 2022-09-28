@@ -48,7 +48,8 @@ impl<VM: VMBinding> GCController<VM> {
     }
 
     pub fn run(&mut self, tls: VMWorkerThread) {
-        self.scheduler.resolve_affinity(self.coordinator_worker.ordinal);
+        self.scheduler
+            .resolve_affinity(self.coordinator_worker.ordinal);
         // Initialize the GC worker for coordinator. We are not using the run() method from
         // GCWorker so we manually initialize the worker here.
         self.coordinator_worker.tls = tls;

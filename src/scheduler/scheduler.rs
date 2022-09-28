@@ -1,7 +1,7 @@
 use super::affinity::CpuSet;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, WorkerGroup, ThreadId};
+use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;

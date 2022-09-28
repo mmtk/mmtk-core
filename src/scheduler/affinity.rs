@@ -1,15 +1,13 @@
 use super::worker::ThreadId;
 use crate::util::options::AffinityKind;
+use libc::{cpu_set_t, sched_setaffinity, CPU_SET, CPU_ZERO};
 use std::mem::MaybeUninit;
-use libc::{sched_setaffinity, cpu_set_t, CPU_ZERO, CPU_SET};
 
 pub type CoreId = u16;
 
 #[cfg(target_os = "linux")]
 fn get_total_num_cpus() -> u16 {
-    unsafe {
-        libc::sysconf(libc::_SC_NPROCESSORS_ONLN) as u16
-    }
+    unsafe { libc::sysconf(libc::_SC_NPROCESSORS_ONLN) as u16 }
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -33,7 +31,10 @@ impl CpuSet {
 
     pub fn add(&mut self, cpu: CoreId) {
         if cpu > self.num_cpu {
-            panic!("Core id {} greater than maximum number of cores on system", cpu);
+            panic!(
+                "Core id {} greater than maximum number of cores on system",
+                cpu
+            );
         }
 
         self.set.push(cpu);
@@ -43,7 +44,7 @@ impl CpuSet {
 
     pub fn resolve_affinity(&self, thread: ThreadId, affinity: AffinityKind) {
         match affinity {
-            AffinityKind::OsDefault => {},
+            AffinityKind::OsDefault => {}
             AffinityKind::Fixed => {
                 if self.set.is_empty() {
                     panic!("Need to provide a list of cores if not using OsDefault affinity");
@@ -52,7 +53,7 @@ impl CpuSet {
                 let cpu = self.set[0];
                 info!("Set affinity for thread {} to core {}", thread, cpu);
                 bind_current_thread_to_core(cpu);
-            },
+            }
             AffinityKind::RoundRobin => {
                 if self.set.is_empty() {
                     panic!("Need to provide a list of cores if not using OsDefault affinity");
@@ -61,7 +62,7 @@ impl CpuSet {
                 let cpu = self.set[thread % self.set.len()];
                 info!("Set affinity for thread {} to core {}", thread, cpu);
                 bind_current_thread_to_core(cpu);
-            },
+            }
         }
     }
 }
