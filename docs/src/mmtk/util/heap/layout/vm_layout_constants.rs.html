@@ -151,6 +151,19 @@
 <span id="149">149</span>
 <span id="150">150</span>
 <span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::heap_parameters</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -215,8 +228,21 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0xb000_0000</span>) });
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span>
-    <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_2000_0000_0000usize</span>) });
+<span class="kw">pub</span> <span class="kw">const</span> <span class="ident">HEAP_END</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="ident">HEAP_START</span>.<span class="ident">add</span>(<span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> (<span class="ident">LOG_MAX_SPACES</span> <span class="op">+</span> <span class="ident">LOG_SPACE_EXTENT</span>));
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">test_heap_range</span> {
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">test</span>]</span>
+    <span class="kw">fn</span> <span class="ident">test_heap_end</span>() {
+        <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+        <span class="comment">// Just to ensure we know if the heap end is changed</span>
+        <span class="macro">assert_eq!</span>(
+            <span class="ident">HEAP_END</span>,
+            <span class="ident">chunk_align_up</span>(<span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="number">0x0000_2200_0000_0000usize</span>) })
+        )
+    }
+}
 
 <span class="doccomment">/// vm-sapce size (currently only used by jikesrvm)</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;32&quot;</span>)]</span>

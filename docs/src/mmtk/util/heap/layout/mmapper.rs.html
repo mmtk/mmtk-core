@@ -141,6 +141,13 @@
 <span id="139">139</span>
 <span id="140">140</span>
 <span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::memory</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -256,7 +263,14 @@
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) {
             <span class="ident">MapState::Unmapped</span> =&gt; <span class="ident">mmap_noreserve</span>(<span class="ident">mmap_start</span>, <span class="ident">MMAP_CHUNK_BYTES</span>),
             <span class="ident">MapState::Quarantined</span> =&gt; <span class="prelude-val">Ok</span>(()),
-            <span class="ident">MapState::Mapped</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Cannot quarantine mapped memory&quot;</span>),
+            <span class="ident">MapState::Mapped</span> =&gt; {
+                <span class="comment">// If a chunk is mapped by us and we try to quanrantine it, we simply don&#39;t do anything.</span>
+                <span class="comment">// We allow this as it is possible to have a situation like this:</span>
+                <span class="comment">// we have global side metdata S, and space A and B. We quanrantine memory X for S for A, then map</span>
+                <span class="comment">// X for A, and then we quanrantine memory Y for S for B. It is possible that X and Y is the same chunk,</span>
+                <span class="comment">// so the chunk is already mapped for A, and we try quanrantine it for B. We simply allow this transition.</span>
+                <span class="kw">return</span> <span class="prelude-val">Ok</span>(());
+            }
             <span class="ident">MapState::Protected</span> =&gt; <span class="macro">panic!</span>(<span class="string">&quot;Cannot quarantine protected memory&quot;</span>),
         };
         <span class="kw">if</span> <span class="ident">res</span>.<span class="ident">is_ok</span>() {

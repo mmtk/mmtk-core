@@ -843,6 +843,10 @@
 <span id="841">841</span>
 <span id="842">842</span>
 <span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -1452,7 +1456,9 @@
 <span class="doccomment">/// * `addr`: An arbitrary address.</span>
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident"><span class="kw">crate</span>::util::is_mmtk_object::is_mmtk_object</span>(<span class="ident">addr</span>)
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
+    <span class="ident">SFT_MAP</span>.<span class="ident">get_checked</span>(<span class="ident">addr</span>).<span class="ident">is_mmtk_object</span>(<span class="ident">addr</span>)
 }
 
 <span class="doccomment">/// Return true if the `object` lies in a region of memory where</span>
@@ -1484,7 +1490,9 @@
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_mmtk_spaces</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">object</span>.<span class="ident">is_in_any_space</span>()
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
+    <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
+    <span class="ident">SFT_MAP</span>.<span class="ident">get_checked</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()).<span class="ident">is_in_space</span>(<span class="ident">object</span>)
 }
 
 <span class="doccomment">/// Is the address in the mapped memory? The runtime can use this function to check</span>

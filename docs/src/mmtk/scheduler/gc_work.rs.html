@@ -898,6 +898,7 @@
 <span id="896">896</span>
 <span id="897">897</span>
 <span id="898">898</span>
+<span id="899">899</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -1415,7 +1416,8 @@
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
 
         <span class="kw">if</span> <span class="ident">object</span>.<span class="ident">is_null</span>() {
             <span class="kw">return</span> <span class="ident">object</span>;
@@ -1429,7 +1431,7 @@
         <span class="kw">let</span> <span class="ident">worker</span> <span class="op">=</span> <span class="ident">GCWorkerMutRef::new</span>(<span class="self">self</span>.<span class="ident">worker</span>());
 
         <span class="comment">// Invoke trace object on sft</span>
-        <span class="kw">let</span> <span class="ident">sft</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">get</span>(<span class="ident">object</span>.<span class="ident">to_address</span>());
+        <span class="kw">let</span> <span class="ident">sft</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">get_unchecked</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()) };
         <span class="ident">sft</span>.<span class="ident">sft_trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">nodes</span>, <span class="ident">object</span>, <span class="ident">worker</span>)
     }
 

@@ -644,11 +644,15 @@
 <span id="642">642</span>
 <span id="643">643</span>
 <span id="644">644</span>
+<span id="645">645</span>
+<span id="646">646</span>
+<span id="647">647</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::BYTES_IN_PAGE</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::malloc_ms_util</span>::<span class="kw-2">*</span>;
@@ -668,7 +672,6 @@
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicU32</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 <span class="comment">// only used for debugging</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
 <span class="kw">use</span> <span class="ident">std::collections::HashMap</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -895,10 +898,12 @@
 
             <span class="comment">// If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped</span>(<span class="ident">address</span>, <span class="ident">actual_size</span>) {
+                <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
                 <span class="comment">// Map the metadata space for the associated chunk</span>
                 <span class="self">self</span>.<span class="ident">map_metadata_and_update_bound</span>(<span class="ident">address</span>, <span class="ident">actual_size</span>);
                 <span class="comment">// Update SFT</span>
-                <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>, <span class="ident">address</span>, <span class="ident">actual_size</span>);
+                <span class="macro">assert!</span>(<span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">has_sft_entry</span>(<span class="ident">address</span>)); <span class="comment">// make sure the address is okay with our SFT map</span>
+                <span class="kw">unsafe</span> { <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">update</span>(<span class="self">self</span>, <span class="ident">address</span>, <span class="ident">actual_size</span>) };
             }
             <span class="self">self</span>.<span class="ident">active_bytes</span>.<span class="ident">fetch_add</span>(<span class="ident">actual_size</span>, <span class="ident">Ordering::SeqCst</span>);
 
@@ -1039,10 +1044,11 @@
 
     <span class="doccomment">/// Clean up for an empty chunk</span>
     <span class="kw">fn</span> <span class="ident">clean_up_empty_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
         <span class="comment">// Since the chunk mark metadata is a byte, we don&#39;t need synchronization</span>
         <span class="kw">unsafe</span> { <span class="ident">unset_chunk_mark_unsafe</span>(<span class="ident">chunk_start</span>) };
         <span class="comment">// Clear the SFT entry</span>
-        <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">clear</span>(<span class="ident">chunk_start</span>);
+        <span class="kw">unsafe</span> { <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">clear</span>(<span class="ident">chunk_start</span>) };
     }
 
     <span class="doccomment">/// Sweep an object if it is dead, and unset page marks for empty pages before this object.</span>
