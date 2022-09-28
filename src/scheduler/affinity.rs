@@ -15,7 +15,7 @@ fn get_total_num_cpus() -> u16 {
     unimplemented!()
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct CpuSet {
     set: Vec<CoreId>,
     num_cpu: u16,
@@ -38,7 +38,7 @@ impl CpuSet {
         }
 
         self.set.push(cpu);
-        self.set.sort();
+        self.set.sort_unstable();
         self.set.dedup();
     }
 
