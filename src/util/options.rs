@@ -473,8 +473,15 @@ options! {
     // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS scheduler. XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [always_valid] = AffinityKind::OsDefault,
     // List of cores. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
-    // separated by commas and may include ranges.  There should be no spaces in the core list. For
+    // separated by commas and may include ranges. There should be no spaces in the core list. For
     // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    // Note that in the case the program has only been allocated a certain number of cores using
+    // `taskset`, the core ids in the list should be specified by their perceived index as using
+    // `taskset` will essentially re-label the core ids. For example, running the program with
+    // `MMTK_CPU_LIST="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will be used
+    // to pin threads even though we specified the core ids "0,1,2,3,4".
+    // `MMTK_CPU_LIST="12" taskset -c 6-12 <program>` will not work, on the other hand, as there is
+    // no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
     cpu_list:               CpuSet               [env_var: true, command_line: true] [always_valid] = CpuSet::new()
 }

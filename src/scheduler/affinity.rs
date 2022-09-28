@@ -1,6 +1,6 @@
 use super::worker::ThreadId;
 use crate::util::options::AffinityKind;
-use libc::{cpu_set_t, sched_setaffinity, CPU_SET, CPU_ZERO};
+use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicU16, Ordering};
 
@@ -18,13 +18,18 @@ pub type CoreId = u16;
 // XXX: Maybe in the future we can use a library such as https://github.com/Elzair/core_affinity_rs
 // to have an OS agnostic way of setting thread affinity.
 #[cfg(target_os = "linux")]
-/// Return the total number of (online) cores on a system.
+/// Return the total number of allocated cores to the program.
 fn get_total_num_cpus() -> u16 {
-    unsafe { libc::sysconf(libc::_SC_NPROCESSORS_ONLN) as u16 }
+    unsafe {
+        let mut cs = MaybeUninit::zeroed().assume_init();
+        CPU_ZERO(&mut cs);
+        sched_getaffinity(0, std::mem::size_of::<cpu_set_t>(), &mut cs);
+        CPU_COUNT(&cs) as u16
+    }
 }
 
 #[cfg(not(target_os = "linux"))]
-/// Return the total number of (online) cores on a system.
+/// Return the total number of allocated cores to the program.
 fn get_total_num_cpus() -> u16 {
     unimplemented!()
 }
