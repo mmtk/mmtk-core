@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
+/// Represents the ID of a GC worker thread.
 pub type ThreadId = usize;
 
 /// The part shared between a GCWorker and the scheduler.
@@ -169,7 +170,7 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
-    /// Entry of the worker thread.
+    /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
         self.scheduler.resolve_affinity(self.ordinal);

@@ -256,13 +256,17 @@ macro_rules! options {
 }
 
 impl CpuSet {
+    /// Returns a CpuSet or String containing error. Expects the list of cores to be formatted as
+    /// numbers separated by commas, including ranges. For example: 0,5,8-11 specifies that the
+    /// cores 0, 5, 8, 9, 10, 11 should be used for pinning threads.
     fn parse_cpulist(cpulist: &str) -> Result<CpuSet, String> {
-        if cpulist.is_empty() {
-            return Err("No core specified in list".to_string());
-        }
-
         let mut cpuset = CpuSet::new();
 
+        if cpulist.is_empty() {
+            return Ok(cpuset);
+        }
+
+        // Split on ',' first and then split on '-' if there is a range
         for split in cpulist.split(',') {
             if !split.contains('-') {
                 if !split.is_empty() {
@@ -305,10 +309,19 @@ impl FromStr for CpuSet {
     }
 }
 
-#[derive(Copy, Clone, EnumString, Debug)]
+#[derive(Copy, Clone, EnumString, Debug, PartialEq)]
+/// AffinityKind describes how to set the affinity of GC threads. Note that we currently assume
+/// that each GC thread is equivalent to an OS or hardware thread.
 pub enum AffinityKind {
+    /// Delegate thread affinity to the OS scheduler
     OsDefault,
+    /// Fix a thread affinity of all GC threads to a single core. In case multiple cores are passed
+    /// in the core list, we pick the first specified one. Hence, a core list of "2,4-6" will
+    /// assign the core 2 to all GC threads.
     Fixed,
+    /// Assign thread affinities over a list of cores in a round robin fashion. Note that if number
+    /// of threads > number of cores specified, then multiple threads will be assigned the same
+    /// core.
     RoundRobin,
 }
 
@@ -456,7 +469,10 @@ options! {
     // Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
+    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS scheduler. XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [always_valid] = AffinityKind::OsDefault,
+    // List of cores. The core ids should match the ones reported by /proc/cpuinfo. Core ids are separated by commas and may include ranges.
+    // For example: 0,5,8-11. XXX: This option is currently only supported on Linux.
     cpu_list:               CpuSet               [env_var: true, command_line: true] [always_valid] = CpuSet::new()
 }
 

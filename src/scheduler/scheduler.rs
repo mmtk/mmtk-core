@@ -46,7 +46,9 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
     pub(super) pending_coordinator_packets: AtomicUsize,
+    /// List of cores for assigning thread affinity. Specified by the user.
     cpu_set: CpuSet,
+    /// How to assign the affinity to each GC thread. Specified by the user.
     affinity: AffinityKind,
 }
 
@@ -57,6 +59,12 @@ unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
     pub fn new(num_workers: usize, cpu_set: CpuSet, affinity: AffinityKind) -> Arc<Self> {
+        assert!(
+            affinity == AffinityKind::OsDefault
+                || (affinity != AffinityKind::OsDefault && !cpu_set.is_empty()),
+            "Need to provide a list of cores if not using OsDefault affinity",
+        );
+
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         let worker_group = WorkerGroup::new(num_workers);
 
@@ -157,6 +165,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.worker_group.spawn(mmtk, sender, tls)
     }
 
+    /// Resolve the affinity of a thread.
     pub fn resolve_affinity(&self, thread: ThreadId) {
         self.cpu_set.resolve_affinity(thread, self.affinity);
     }
