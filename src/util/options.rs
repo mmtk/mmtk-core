@@ -1,3 +1,4 @@
+use crate::scheduler::affinity::CpuSet;
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::default::Default;
@@ -254,6 +255,62 @@ macro_rules! options {
     ]
 }
 
+impl CpuSet {
+    fn parse_cpulist(cpulist: &str) -> Result<CpuSet, String> {
+        if cpulist.is_empty() {
+            return Err("No core specified in list".to_string());
+        }
+
+        let mut cpuset = CpuSet::new();
+
+        for split in cpulist.split(',') {
+            if !split.contains('-') {
+                if !split.is_empty() {
+                    cpuset.add(split.parse::<u16>().unwrap());
+                    continue;
+                }
+            } else {
+                // Contains a range
+                let range: Vec<&str> = split.split('-').collect();
+                if range.len() == 2 {
+                    let start = range[0].parse::<u16>().unwrap();
+                    let end = range[1].parse::<u16>().unwrap();
+
+                    if start >= end {
+                        return Err("Starting core id in range should be less than the end".to_string());
+                    }
+
+                    for cpu in start..=end {
+                        cpuset.add(cpu);
+                    }
+
+                    continue;
+                }
+            }
+
+            return Err("Core ids have been incorrectly specified".to_string());
+        }
+
+        Ok(cpuset)
+    }
+}
+
+impl FromStr for CpuSet {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        CpuSet::parse_cpulist(s)
+    }
+}
+
+#[derive(Copy, Clone, EnumString, Debug)]
+pub enum AffinityKind {
+    OsDefault,
+    Fixed,
+    RoundRobin,
+}
+
+
 #[derive(Copy, Clone, EnumString, Debug)]
 /// Different nursery types.
 pub enum NurseryKind {
@@ -397,7 +454,9 @@ options! {
     work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
-    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]}
+    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
+    thread_affinity:        AffinityKind         [env_var: true, command_line: true] [always_valid] = AffinityKind::OsDefault,
+    cpu_list:               CpuSet               [env_var: true, command_line: true] [always_valid] = CpuSet::new()
 }
 
 #[cfg(test)]

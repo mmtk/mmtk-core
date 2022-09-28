@@ -12,6 +12,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
+pub type ThreadId = usize;
+
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
@@ -44,7 +46,7 @@ pub struct GCWorker<VM: VMBinding> {
     pub tls: VMWorkerThread,
     /// The ordinal of the worker, numbered from 0 to the number of workers minus one.
     /// 0 if it is the embedded worker of the GC controller thread.
-    pub ordinal: usize,
+    pub ordinal: ThreadId,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// The copy context, used to implement copying GC.
@@ -82,7 +84,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 impl<VM: VMBinding> GCWorker<VM> {
     pub fn new(
         mmtk: &'static MMTK<VM>,
-        ordinal: usize,
+        ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
@@ -170,6 +172,7 @@ impl<VM: VMBinding> GCWorker<VM> {
     /// Entry of the worker thread.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         loop {
