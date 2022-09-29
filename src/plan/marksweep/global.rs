@@ -19,8 +19,6 @@ use crate::scheduler::GCWorkScheduler;
 #[cfg(feature = "malloc")]
 use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 #[cfg(feature = "malloc")]
 use crate::util::constants::MAX_INT;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -148,23 +146,15 @@ impl<VM: VMBinding> MarkSweep<VM> {
     ) -> Self {
         #[allow(unused_mut)]
         let mut heap = HeapMeta::new(&options);
-        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
-        // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        // if global_alloc_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs =
-            SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 
         #[cfg(not(feature = "malloc"))]
         let res = {
+            let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
             let ms = MarkSweepSpace::new(
                 "MarkSweepSpace",
                 false,
                 VMRequest::discontiguous(),
-                // local_specs.clone(),
+                global_metadata_specs.clone(),
                 vm_map,
                 mmapper,
                 &mut heap,
@@ -184,16 +174,27 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         #[cfg(feature = "malloc")]
-        let res = MarkSweep {
-            ms: MallocSpace::new(global_metadata_specs.clone()),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MS_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+        let res = {
+            // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+            // SideMetadataContext by default, so we don't need to add it here.
+            #[cfg(feature = "global_alloc_bit")]
+            let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+            // if global_alloc_bit is NOT enabled,
+            // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+            #[cfg(not(feature = "global_alloc_bit"))]
+            let global_metadata_specs =
+                SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
+            MarkSweep {
+                ms: MallocSpace::new(global_metadata_specs.clone()),
+                common: CommonPlan::new(
+                    vm_map,
+                    mmapper,
+                    options,
+                    heap,
+                    &MS_CONSTRAINTS,
+                    global_metadata_specs,
+                ),
+            }
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();

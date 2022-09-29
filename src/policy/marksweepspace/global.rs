@@ -9,12 +9,13 @@ use crate::{
             chunk::Chunk,
             metadata::{is_marked, set_mark_bit},
         },
-        space::{GCWorkerMutRef, SpaceOptions},
+        sft::GCWorkerMutRef,
+        space::SpaceOptions,
     },
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         alloc::free_list_allocator::mi_bin,
-        alloc_bit::{bzero_alloc_bit, is_alloced, ALLOC_SIDE_METADATA_SPEC},
+        alloc_bit::{bzero_alloc_bit, is_alloced},
         copy::CopySemantics,
         heap::{
             layout::heap_layout::{Mmapper, VMMap},
@@ -31,11 +32,12 @@ use crate::{
 };
 
 use super::{
-    super::space::{CommonSpace, Space, SFT},
+    super::space::{CommonSpace, Space},
     chunk::{ChunkMap, ChunkState},
 };
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
+use crate::policy::sft::SFT;
 use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
 use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
@@ -144,24 +146,25 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         &self.scheduler
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
         zeroed: bool,
         vmrequest: VMRequest,
-        // local_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
         heap: &mut HeapMeta,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
         // FIXME: alloc bit should be optional
-        let alloc_bits =
-            &mut metadata::extract_side_metadata(&[MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC)]);
+        // let alloc_bits =
+        //     &mut metadata::extract_side_metadata(&[MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC)]);
 
-        let mark_bits =
-            &mut metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
+        // let mark_bits =
+        //     &mut metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
 
-        let mut local_specs = {
+        let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
@@ -177,7 +180,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             ])
         };
 
-        local_specs.append(mark_bits);
+        // local_specs.append(mark_bits);
 
         let common = CommonSpace::new(
             SpaceOptions {
@@ -188,7 +191,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 zeroed,
                 vmrequest,
                 side_metadata_specs: SideMetadataContext {
-                    global: alloc_bits.to_vec(),
+                    global: global_side_metadata_specs,
                     local: local_specs,
                 },
             },
