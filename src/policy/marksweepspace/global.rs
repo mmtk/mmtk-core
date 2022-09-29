@@ -315,6 +315,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         for metadata_spec in &self.common.metadata.local {
             clear_metadata(metadata_spec);
         }
+        #[cfg(feature = "global_alloc_bit")]
         bzero_alloc_bit(block.start(), Block::BYTES);
     }
 
