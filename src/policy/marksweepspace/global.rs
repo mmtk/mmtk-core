@@ -15,7 +15,7 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
     util::{
         alloc::free_list_allocator::mi_bin,
-        alloc_bit::{bzero_alloc_bit, is_alloced},
+        alloc_bit::is_alloced,
         copy::CopySemantics,
         heap::{
             layout::heap_layout::{Mmapper, VMMap},
@@ -316,7 +316,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             clear_metadata(metadata_spec);
         }
         #[cfg(feature = "global_alloc_bit")]
-        bzero_alloc_bit(block.start(), Block::BYTES);
+        crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize) -> BlockAcquireResult {
