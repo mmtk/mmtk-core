@@ -5,9 +5,10 @@ use super::{
     defrag::Defrag,
 };
 use crate::policy::gc_work::TraceKind;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;

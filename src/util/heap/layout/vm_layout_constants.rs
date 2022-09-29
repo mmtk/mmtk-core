@@ -62,8 +62,21 @@ pub const HEAP_START: Address =
 #[cfg(target_pointer_width = "32")]
 pub const HEAP_END: Address = chunk_align_up(unsafe { Address::from_usize(0xb000_0000) });
 #[cfg(target_pointer_width = "64")]
-pub const HEAP_END: Address =
-    chunk_align_up(unsafe { Address::from_usize(0x0000_2000_0000_0000usize) });
+pub const HEAP_END: Address = HEAP_START.add(1 << (LOG_MAX_SPACES + LOG_SPACE_EXTENT));
+
+#[cfg(test)]
+mod test_heap_range {
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn test_heap_end() {
+        use super::*;
+        // Just to ensure we know if the heap end is changed
+        assert_eq!(
+            HEAP_END,
+            chunk_align_up(unsafe { Address::from_usize(0x0000_2200_0000_0000usize) })
+        )
+    }
+}
 
 /// vm-sapce size (currently only used by jikesrvm)
 #[cfg(target_pointer_width = "32")]

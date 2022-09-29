@@ -1,10 +1,12 @@
 use crate::mmtk::SFT_MAP;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
-use crate::policy::space::*;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft_map::SFTMap;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -88,7 +90,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self) {
-        SFT_MAP.update(self.as_sft(), self.start, self.extent);
+        unsafe { SFT_MAP.update(self.as_sft(), self.start, self.extent) };
     }
 
     fn reserved_pages(&self) -> usize {
