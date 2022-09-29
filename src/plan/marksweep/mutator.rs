@@ -8,7 +8,7 @@ use crate::plan::mutator_context::ReservedAllocators;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-#[cfg(not(feature = "malloc"))]
+#[cfg(not(feature = "malloc_mark_sweep"))]
 use crate::util::alloc::FreeListAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
@@ -19,12 +19,12 @@ pub fn ms_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWor
     // Do nothing
 }
 
-#[cfg(feature = "malloc")]
+#[cfg(feature = "malloc_mark_sweep")]
 pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
 }
 
-#[cfg(not(feature = "malloc"))]
+#[cfg(not(feature = "malloc_mark_sweep"))]
 pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // FIXME: rebind?
     let allocator = unsafe {
@@ -48,7 +48,7 @@ const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {
     ..ReservedAllocators::DEFAULT
 };
 
-#[cfg(feature = "malloc")]
+#[cfg(feature = "malloc_mark_sweep")]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
         let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
@@ -57,7 +57,7 @@ lazy_static! {
     };
 }
 
-#[cfg(not(feature = "malloc"))]
+#[cfg(not(feature = "malloc_mark_sweep"))]
 lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
         let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
@@ -77,16 +77,16 @@ pub fn create_ms_mutator<VM: VMBinding>(
         allocator_mapping: &*ALLOCATOR_MAPPING,
         space_mapping: Box::new({
             let mut vec = create_space_mapping(RESERVED_ALLOCATORS, true, plan);
-            #[cfg(feature = "malloc")]
+            #[cfg(feature = "malloc_mark_sweep")]
             vec.push((AllocatorSelector::Malloc(0), ms.ms_space()));
-            #[cfg(not(feature = "malloc"))]
+            #[cfg(not(feature = "malloc_mark_sweep"))]
             vec.push((AllocatorSelector::FreeList(0), ms.ms_space()));
-            #[cfg(not(feature = "malloc"))]
+            #[cfg(not(feature = "malloc_mark_sweep"))]
             vec.push((
                 AllocatorSelector::BumpPointer(0),
                 ms.common().get_immortal(),
             ));
-            #[cfg(not(feature = "malloc"))]
+            #[cfg(not(feature = "malloc_mark_sweep"))]
             vec.push((AllocatorSelector::LargeObject(0), ms.common().get_los()));
             vec
         }),

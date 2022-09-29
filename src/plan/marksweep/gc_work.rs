@@ -48,7 +48,7 @@ use crate::vm::VMBinding;
 //     }
 // }
 
-#[cfg(feature = "malloc")]
+#[cfg(feature = "malloc_mark_sweep")]
 mod malloc_ms_work {
     use super::*;
     use crate::policy::mallocspace::metadata::is_chunk_mapped;
@@ -122,7 +122,7 @@ mod malloc_ms_work {
     }
 }
 
-#[cfg(feature = "malloc")]
+#[cfg(feature = "malloc_mark_sweep")]
 pub use malloc_ms_work::*;
 
 pub struct MSGCWorkContext<VM: VMBinding>(std::marker::PhantomData<VM>);
