@@ -84,8 +84,11 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     Box::new(mmtk)
 }
 
-/// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
-/// store the returned mutator in a thread local storage that can be accessed efficiently.
+/// Request MMTk to create a mutator for the given thread. The ownership
+/// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
+/// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage
+/// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data
+/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -97,11 +100,13 @@ pub fn bind_mutator<VM: VMBinding>(
     crate::plan::create_mutator(tls, mmtk)
 }
 
-/// Reclaim a mutator that is no longer needed.
+/// Report to MMTk that a mutator that is no longer needed. A binding should not attempt
+/// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the
+/// mutator, so a binding should properly reclaim the memory for the mutator after this call.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM>>) {
+pub fn destroy_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
     mutator.plan.destroy_mutator(mutator);
 }
 

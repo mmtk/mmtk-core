@@ -352,7 +352,7 @@ pub trait Plan: 'static + Sync + Downcast {
         );
     }
 
-    fn destroy_mutator(&self, _mutator: Box<Mutator<Self::VM>>) {
+    fn destroy_mutator(&self, _mutator: &mut Mutator<Self::VM>) {
         // most plans do nothing
     }
 }

@@ -36,7 +36,7 @@ pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyV
 
 #[no_mangle]
 pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
-    memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
+    memory_manager::destroy_mutator(unsafe { &mut *mutator })
 }
 
 #[no_mangle]
