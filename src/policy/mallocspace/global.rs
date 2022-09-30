@@ -1,8 +1,9 @@
 use super::metadata::*;
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
-use crate::policy::space::SFT;
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
@@ -22,7 +23,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
-use crate::policy::space::*;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
@@ -249,10 +249,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
             if !is_meta_space_mapped(address, actual_size) {
+                use crate::policy::sft_map::SFTMap;
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
-                crate::mmtk::SFT_MAP.update(self, address, actual_size);
+                assert!(crate::mmtk::SFT_MAP.has_sft_entry(address)); // make sure the address is okay with our SFT map
+                unsafe { crate::mmtk::SFT_MAP.update(self, address, actual_size) };
             }
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
@@ -393,10 +395,11 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     /// Clean up for an empty chunk
     fn clean_up_empty_chunk(&self, chunk_start: Address) {
+        use crate::policy::sft_map::SFTMap;
         // Since the chunk mark metadata is a byte, we don't need synchronization
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
-        crate::mmtk::SFT_MAP.clear(chunk_start);
+        unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
     }
 
     /// Sweep an object if it is dead, and unset page marks for empty pages before this object.

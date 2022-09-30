@@ -415,12 +415,14 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
 #[cfg(feature = "extreme_assertions")]
 pub fn verify_bzero(metadata_spec: &SideMetadataSpec, start: Address, size: usize) {
     let sanity_map = &mut CONTENT_SANITY_MAP.write().unwrap();
+    let start = align_to_region_start(metadata_spec, start);
+    let end = align_to_region_start(metadata_spec, start + size);
     match sanity_map.get_mut(metadata_spec) {
         Some(spec_sanity_map) => {
             // zero entries where the key (data_addr) is in the range (start, start+size)
             for (k, v) in spec_sanity_map.iter_mut() {
                 // If the source address is in the bzero's range
-                if *k >= start && *k < start + size {
+                if *k >= start && *k < end {
                     *v = 0;
                 }
             }
@@ -458,6 +460,12 @@ mod truncate_tests {
     }
 }
 
+// When storing a value for a data address, we align the data address to the region start.
+// So when accessing any data address in the region, we will use the same data address to fetch the metadata value.
+fn align_to_region_start(spec: &SideMetadataSpec, data_addr: Address) -> Address {
+    data_addr.align_down(1 << spec.log_bytes_in_region)
+}
+
 /// Ensures a side metadata load operation returns the correct side metadata content.
 /// Panics if:
 /// 1 - the metadata spec is not valid,
@@ -474,6 +482,7 @@ pub fn verify_load<T: MetadataValue>(
     data_addr: Address,
     actual_val: T,
 ) {
+    let data_addr = align_to_region_start(metadata_spec, data_addr);
     let actual_val: u64 = actual_val.to_u64().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let sanity_map = &mut CONTENT_SANITY_MAP.read().unwrap();
@@ -512,6 +521,7 @@ pub fn verify_store<T: MetadataValue>(
     data_addr: Address,
     metadata: T,
 ) {
+    let data_addr = align_to_region_start(metadata_spec, data_addr);
     let metadata: u64 = metadata.to_u64().unwrap();
     verify_metadata_address_bound(metadata_spec, data_addr);
     let new_val_wrapped = truncate_value::<T>(metadata_spec.log_num_of_bits, metadata);
@@ -543,6 +553,7 @@ pub fn verify_update<T: MetadataValue>(
     old_val: T,
     new_val: T,
 ) {
+    let data_addr = align_to_region_start(metadata_spec, data_addr);
     verify_metadata_address_bound(metadata_spec, data_addr);
 
     // truncate the new_val if metadata's bits is fewer than the type's bits
