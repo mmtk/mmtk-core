@@ -278,7 +278,6 @@ impl AffinityKind {
         let mut cpuset = vec![];
 
         if cpulist.is_empty() {
-            println!("AffinityKind::OsDefault");
             return Ok(AffinityKind::OsDefault);
         }
 

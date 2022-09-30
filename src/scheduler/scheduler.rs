@@ -45,7 +45,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
     pub(super) pending_coordinator_packets: AtomicUsize,
-    /// How to assign the affinity to each GC thread. Specified by the user.
+    /// How to assign the affinity of each GC thread. Specified by the user.
     affinity: AffinityKind,
 }
 
