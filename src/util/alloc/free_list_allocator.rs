@@ -610,7 +610,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             if !is_marked::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst) {
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(cell, 0, Ordering::SeqCst);
+                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
+                    cell,
+                    0,
+                    Ordering::SeqCst,
+                );
                 unsafe {
                     cell.store::<Address>(last);
                 }
