@@ -1,4 +1,3 @@
-use super::affinity::CpuSet;
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
 use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup};
@@ -46,8 +45,6 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
     pub(super) pending_coordinator_packets: AtomicUsize,
-    /// List of cores for assigning thread affinity. Specified by the user.
-    cpu_set: CpuSet,
     /// How to assign the affinity to each GC thread. Specified by the user.
     affinity: AffinityKind,
 }
@@ -58,13 +55,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new(num_workers: usize, cpu_set: CpuSet, affinity: AffinityKind) -> Arc<Self> {
-        assert!(
-            affinity == AffinityKind::OsDefault
-                || (affinity != AffinityKind::OsDefault && !cpu_set.is_empty()),
-            "Need to provide a list of cores if not using OsDefault affinity",
-        );
-
+    pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         let worker_group = WorkerGroup::new(num_workers);
 
@@ -128,7 +119,6 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_monitor,
             closure_end: Mutex::new(None),
             pending_coordinator_packets: AtomicUsize::new(0),
-            cpu_set,
             affinity,
         })
     }
@@ -167,7 +157,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
 
     /// Resolve the affinity of a thread.
     pub fn resolve_affinity(&self, thread: ThreadId) {
-        self.cpu_set.resolve_affinity(thread, self.affinity);
+        self.affinity.resolve_affinity(thread);
     }
 
     /// Schedule all the common work packets

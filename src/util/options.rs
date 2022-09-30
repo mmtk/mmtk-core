@@ -1,4 +1,4 @@
-use crate::scheduler::affinity::CpuSet;
+use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::default::Default;
@@ -255,23 +255,40 @@ macro_rules! options {
     ]
 }
 
-impl CpuSet {
-    /// Returns a CpuSet or String containing error. Expects the list of cores to be formatted as
-    /// numbers separated by commas, including ranges. There should be no spaces between the cores
-    /// in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11 should be used
-    /// for pinning threads.
-    fn parse_cpulist(cpulist: &str) -> Result<CpuSet, String> {
-        let mut cpuset = CpuSet::new();
+#[derive(Clone, Debug, PartialEq)]
+/// AffinityKind describes how to set the affinity of GC threads. Note that we currently assume
+/// that each GC thread is equivalent to an OS or hardware thread.
+pub enum AffinityKind {
+    /// Delegate thread affinity to the OS scheduler
+    OsDefault,
+    /// Assign thread affinities over a list of cores in a round robin fashion. Note that if number
+    /// of threads > number of cores specified, then multiple threads will be assigned the same
+    /// core.
+    // XXX: Maybe using a u128 bitvector with each bit representing a core is more performant?
+    RoundRobin(Vec<CoreId>),
+}
+
+impl AffinityKind {
+    /// Returns an AffinityKind or String containing error. Expects the list of cores to be
+    /// formatted as numbers separated by commas, including ranges. There should be no spaces
+    /// between the cores in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11
+    /// should be used for pinning threads. Performs de-duplication of specified cores. Note that
+    /// the core list is sorted as a side-effect whenever a new core is added to the set.
+    fn parse_cpulist(cpulist: &str) -> Result<AffinityKind, String> {
+        let mut cpuset = vec![];
 
         if cpulist.is_empty() {
-            return Ok(cpuset);
+            println!("AffinityKind::OsDefault");
+            return Ok(AffinityKind::OsDefault);
         }
 
         // Split on ',' first and then split on '-' if there is a range
         for split in cpulist.split(',') {
             if !split.contains('-') {
                 if !split.is_empty() {
-                    cpuset.add(split.parse::<u16>().unwrap());
+                    cpuset.push(split.parse::<u16>().unwrap());
+                    cpuset.sort_unstable();
+                    cpuset.dedup();
                     continue;
                 }
             } else {
@@ -288,7 +305,9 @@ impl CpuSet {
                     }
 
                     for cpu in start..=end {
-                        cpuset.add(cpu);
+                        cpuset.push(cpu);
+                        cpuset.sort_unstable();
+                        cpuset.dedup();
                     }
 
                     continue;
@@ -298,32 +317,33 @@ impl CpuSet {
             return Err("Core ids have been incorrectly specified".to_string());
         }
 
-        Ok(cpuset)
+        Ok(AffinityKind::RoundRobin(cpuset))
+    }
+
+    /// Return true if the affinity is either OsDefault or the cores in the list do not exceed the
+    /// maximum number of cores allocated to the program. Assumes core ids on the system are
+    /// 0-indexed.
+    pub fn validate(&self) -> bool {
+        let num_cpu = get_total_num_cpus();
+
+        if let AffinityKind::RoundRobin(cpuset) = self {
+            for cpu in cpuset {
+                if cpu >= &num_cpu {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 }
 
-impl FromStr for CpuSet {
+impl FromStr for AffinityKind {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        CpuSet::parse_cpulist(s)
+        AffinityKind::parse_cpulist(s)
     }
-}
-
-#[derive(Copy, Clone, EnumString, Debug, PartialEq)]
-/// AffinityKind describes how to set the affinity of GC threads. Note that we currently assume
-/// that each GC thread is equivalent to an OS or hardware thread.
-pub enum AffinityKind {
-    /// Delegate thread affinity to the OS scheduler
-    OsDefault,
-    /// Fix a thread affinity of all GC threads to a single core. In case multiple cores are passed
-    /// in the core list, we pick the first specified one. Hence, a core list of "2,4-6" will
-    /// assign the core 2 to all GC threads.
-    Fixed,
-    /// Assign thread affinities over a list of cores in a round robin fashion. Note that if number
-    /// of threads > number of cores specified, then multiple threads will be assigned the same
-    /// core.
-    RoundRobin,
 }
 
 #[derive(Copy, Clone, EnumString, Debug)]
@@ -470,9 +490,9 @@ options! {
     // Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
     phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
-    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS scheduler. XXX: This option is currently only supported on Linux.
-    thread_affinity:        AffinityKind         [env_var: true, command_line: true] [always_valid] = AffinityKind::OsDefault,
-    // List of cores. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
     // separated by commas and may include ranges. There should be no spaces in the core list. For
     // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
     // Note that in the case the program has only been allocated a certain number of cores using
@@ -483,7 +503,7 @@ options! {
     // `MMTK_CPU_LIST="12" taskset -c 6-12 <program>` will not work, on the other hand, as there is
     // no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
-    cpu_list:               CpuSet               [env_var: true, command_line: true] [always_valid] = CpuSet::new()
+    thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault
 }
 
 #[cfg(test)]
