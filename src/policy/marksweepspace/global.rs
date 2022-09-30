@@ -313,6 +313,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             _ => unreachable!(),
         };
         for metadata_spec in &self.common.metadata.local {
+            // FIXME: is all local metadata based on block?
             clear_metadata(metadata_spec);
         }
         #[cfg(feature = "global_alloc_bit")]
