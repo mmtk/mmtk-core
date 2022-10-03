@@ -285,31 +285,34 @@ impl AffinityKind {
         for split in cpulist.split(',') {
             if !split.contains('-') {
                 if !split.is_empty() {
-                    cpuset.push(split.parse::<u16>().unwrap());
-                    cpuset.sort_unstable();
-                    cpuset.dedup();
-                    continue;
+                    if let Ok(core) = split.parse::<u16>() {
+                        cpuset.push(core);
+                        cpuset.sort_unstable();
+                        cpuset.dedup();
+                        continue;
+                    }
                 }
             } else {
                 // Contains a range
                 let range: Vec<&str> = split.split('-').collect();
                 if range.len() == 2 {
-                    let start = range[0].parse::<u16>().unwrap();
-                    let end = range[1].parse::<u16>().unwrap();
+                    if let Ok(start) = range[0].parse::<u16>() {
+                        if let Ok(end) = range[1].parse::<u16>() {
+                            if start >= end {
+                                return Err(
+                                    "Starting core id in range should be less than the end".to_string()
+                                );
+                            }
 
-                    if start >= end {
-                        return Err(
-                            "Starting core id in range should be less than the end".to_string()
-                        );
+                            for cpu in start..=end {
+                                cpuset.push(cpu);
+                                cpuset.sort_unstable();
+                                cpuset.dedup();
+                            }
+
+                            continue;
+                        }
                     }
-
-                    for cpu in start..=end {
-                        cpuset.push(cpu);
-                        cpuset.sort_unstable();
-                        cpuset.dedup();
-                    }
-
-                    continue;
                 }
             }
 
@@ -670,6 +673,142 @@ mod tests {
                     std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
                 },
             )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_invalid_option() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_THREAD_AFFINITY", "0-");
+
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(
+                        *options.thread_affinity,
+                        AffinityKind::OsDefault
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_single_core() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_THREAD_AFFINITY", "0");
+
+                    let options = Options::default();
+                    assert_eq!(
+                        *options.thread_affinity,
+                        AffinityKind::RoundRobin(vec![0 as u16])
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_generate_core_list() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    let mut vec = vec![0 as u16];
+                    let mut cpu_list = String::new();
+                    let num_cpus = get_total_num_cpus();
+
+                    cpu_list.push('0');
+                    for cpu in 1..num_cpus {
+                        cpu_list.push_str(format!(",{}", cpu).as_str());
+                        vec.push(cpu as u16);
+                    }
+
+                    std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
+                    let options = Options::default();
+                    assert_eq!(
+                        *options.thread_affinity,
+                        AffinityKind::RoundRobin(vec)
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_single_range() {
+        serial_test(|| {
+            let affinity = "0-1".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Ok(AffinityKind::RoundRobin(vec![0 as u16, 1 as u16]))
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_complex_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Ok(AffinityKind::RoundRobin(vec![0 as u16, 1 as u16, 2 as u16, 4 as u16]))
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_space_in_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4, 6".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_bad_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4,".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_range_start_greater_than_end() {
+        serial_test(|| {
+            let affinity = "1-0".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Starting core id in range should be less than the end".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_bad_range_option() {
+        serial_test(|| {
+            let affinity = "0-1-4".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
         })
     }
 

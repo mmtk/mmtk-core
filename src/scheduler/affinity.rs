@@ -1,5 +1,6 @@
 use super::worker::ThreadId;
 use crate::util::options::AffinityKind;
+#[cfg(target_os = "linux")]
 use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
 use std::mem::MaybeUninit;
 
