@@ -296,6 +296,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
     #[cfg(not(feature = "eager_sweeping"))]
     #[allow(unused_variables)]
+    // FIXME: This is not correct.
     fn alloc_slow_once_precise_stress(
         &mut self,
         size: usize,
@@ -308,11 +309,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
             self.acquire_fresh_block(0, 0, true);
         }
 
-        #[cfg(debug_assertions)]
-        {
-            let bin = mi_bin::<VM>(size, align) as usize;
-            debug_assert!(self.available_blocks[bin].is_empty());
-        }
+        debug_assert!(self.available_blocks[mi_bin::<VM>(size, align)].is_empty());
 
         let block = Self::find_free_block_with(
             &mut self.available_blocks_stress,
@@ -403,7 +400,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let bin = mi_bin::<VM>(size, align);
         debug_assert!(bin <= MAX_BIN);
 
-        let available = &mut available_blocks[bin as usize];
+        let available = &mut available_blocks[bin];
         debug_assert!(available.size >= size);
 
         if !available.is_empty() {
@@ -414,13 +411,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     return Some(block);
                 }
                 available.pop();
-                consumed_blocks.get_mut(bin as usize).unwrap().push(block);
+                consumed_blocks.get_mut(bin).unwrap().push(block);
 
                 block = available.first;
             }
         }
 
-        debug_assert!(available_blocks[bin as usize].is_empty());
+        debug_assert!(available_blocks[bin].is_empty());
         None
     }
 
@@ -430,7 +427,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         align: usize,
         stress_test: bool,
     ) -> Block {
-        let bin = mi_bin::<VM>(size, align) as usize;
+        let bin = mi_bin::<VM>(size, align);
         debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
         // attempt to sweep
