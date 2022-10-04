@@ -252,7 +252,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn block_has_no_objects(&self, block: Block) -> bool {
         // for debugging, delete this later
         // assumes block is allocated (has metadata)
-        let size = block.load_block_cell_size::<VM>();
+        let size = block.load_block_cell_size();
         let mut cell = block.start();
         while cell < block.start() + Block::BYTES {
             if is_alloced(unsafe { cell.to_object_reference() }) {
@@ -288,7 +288,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             if !abandoned_consumed[i].is_empty() {
                 abandoned_consumed[i].lock();
                 abandoned_unswept[i].lock();
-                abandoned_unswept[i].append::<VM>(&mut abandoned_consumed[i]);
+                abandoned_unswept[i].append(&mut abandoned_consumed[i]);
                 abandoned_unswept[i].unlock();
                 abandoned_consumed[i].unlock();
             }
@@ -326,7 +326,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         {
             let mut abandoned = self.abandoned_available.lock().unwrap();
             if !abandoned[bin].is_empty() {
-                let block = Block::from(abandoned[bin].pop::<VM>().start());
+                let block = Block::from(abandoned[bin].pop().start());
                 return BlockAcquireResult::AbandonedAvailable(block);
             }
         }
@@ -334,7 +334,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         {
             let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
             if !abandoned_unswept[bin].is_empty() {
-                let block = Block::from(abandoned_unswept[bin].pop::<VM>().start());
+                let block = Block::from(abandoned_unswept[bin].pop().start());
                 return BlockAcquireResult::AbandonedUnswept(block);
             }
         }

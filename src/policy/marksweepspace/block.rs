@@ -69,12 +69,12 @@ impl Block {
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_TLS;
 
     #[inline]
-    pub fn load_free_list<VM: VMBinding>(&self) -> Address {
+    pub fn load_free_list(&self) -> Address {
         unsafe { Address::from_usize(Block::FREE_LIST_TABLE.load::<usize>(self.0)) }
     }
 
     #[inline]
-    pub fn store_free_list<VM: VMBinding>(&self, free_list: Address) {
+    pub fn store_free_list(&self, free_list: Address) {
         unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.0, free_list.as_usize()) }
     }
 
@@ -142,33 +142,33 @@ impl Block {
     //     )
     // }
 
-    pub fn load_prev_block<VM: VMBinding>(&self) -> Block {
+    pub fn load_prev_block(&self) -> Block {
         debug_assert!(!self.0.is_zero());
         let prev = unsafe { Address::from_usize(Block::PREV_BLOCK_TABLE.load::<usize>(self.0)) };
         Block::from(prev)
     }
 
-    pub fn load_next_block<VM: VMBinding>(&self) -> Block {
+    pub fn load_next_block(&self) -> Block {
         debug_assert!(!self.is_zero());
         let next = unsafe { Address::from_usize(Block::NEXT_BLOCK_TABLE.load::<usize>(self.0)) };
         Block::from(next)
     }
 
-    pub fn store_next_block<VM: VMBinding>(&self, next: Block) {
+    pub fn store_next_block(&self, next: Block) {
         debug_assert!(!self.0.is_zero());
         unsafe {
             Block::NEXT_BLOCK_TABLE.store::<usize>(self.0, next.start().as_usize());
         }
     }
 
-    pub fn store_prev_block<VM: VMBinding>(&self, prev: Block) {
+    pub fn store_prev_block(&self, prev: Block) {
         debug_assert!(!self.0.is_zero());
         unsafe {
             Block::PREV_BLOCK_TABLE.store::<usize>(self.0, prev.start().as_usize());
         }
     }
 
-    pub fn store_block_list<VM: VMBinding>(&self, block_list: &BlockList) {
+    pub fn store_block_list(&self, block_list: &BlockList) {
         debug_assert!(!self.0.is_zero());
         let block_list_usize: usize =
             unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
@@ -177,27 +177,27 @@ impl Block {
         }
     }
 
-    pub fn load_block_list<VM: VMBinding>(&self) -> *mut BlockList {
+    pub fn load_block_list(&self) -> *mut BlockList {
         debug_assert!(!self.0.is_zero());
         let block_list = Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst);
         unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
     }
 
-    pub fn load_block_cell_size<VM: VMBinding>(&self) -> usize {
+    pub fn load_block_cell_size(&self) -> usize {
         // FIXME: cannot cast u64 to usize
         Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst) as usize
     }
 
-    pub fn store_block_cell_size<VM: VMBinding>(&self, size: usize) {
+    pub fn store_block_cell_size(&self, size: usize) {
         unsafe { Block::SIZE_TABLE.store::<usize>(self.0, size) }
     }
 
-    pub fn store_tls<VM: VMBinding>(&self, tls: VMThread) {
+    pub fn store_tls(&self, tls: VMThread) {
         let tls = unsafe { std::mem::transmute::<OpaquePointer, usize>(tls.0) };
         unsafe { Block::TLS_TABLE.store(self.start(), tls) }
     }
 
-    pub fn load_tls<VM: VMBinding>(&self) -> VMThread {
+    pub fn load_tls(&self) -> VMThread {
         let tls = Block::TLS_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst);
         VMThread(OpaquePointer::from_address(unsafe {
             Address::from_usize(tls)
@@ -208,9 +208,9 @@ impl Block {
         self.start().is_zero()
     }
 
-    pub fn has_free_cells<VM: VMBinding>(&self) -> bool {
+    pub fn has_free_cells(&self) -> bool {
         debug_assert!(!self.is_zero());
-        !self.load_free_list::<VM>().is_zero()
+        !self.load_free_list().is_zero()
     }
 
     /// Get block start address
@@ -241,14 +241,14 @@ impl Block {
             BlockState::Unmarked => {
                 unsafe {
                     let block_list = loop {
-                        let list = self.load_block_list::<VM>();
+                        let list = self.load_block_list();
                         (*list).lock();
-                        if list == self.load_block_list::<VM>() {
+                        if list == self.load_block_list() {
                             break list;
                         }
                         (*list).unlock();
                     };
-                    (*block_list).remove::<VM>(self);
+                    (*block_list).remove(self);
                     (*block_list).unlock();
                 }
                 space.release_block(self);

@@ -118,76 +118,76 @@ impl BlockList {
     }
 
     // Remove a block from the list
-    pub fn remove<VM: VMBinding>(&mut self, block: Block) {
-        let prev = block.load_prev_block::<VM>();
-        let next = block.load_next_block::<VM>();
+    pub fn remove(&mut self, block: Block) {
+        let prev = block.load_prev_block();
+        let next = block.load_next_block();
         #[allow(clippy::collapsible_else_if)]
         if prev.is_zero() {
             if next.is_zero() {
                 self.first = ZERO_BLOCK;
                 self.last = ZERO_BLOCK;
             } else {
-                next.store_prev_block::<VM>(ZERO_BLOCK);
+                next.store_prev_block(ZERO_BLOCK);
                 self.first = next;
-                next.store_block_list::<VM>(self);
+                next.store_block_list(self);
             }
         } else {
             if next.is_zero() {
-                prev.store_next_block::<VM>(next);
-                prev.store_next_block::<VM>(ZERO_BLOCK);
+                prev.store_next_block(next);
+                prev.store_next_block(ZERO_BLOCK);
                 self.last = prev;
-                prev.store_block_list::<VM>(self);
+                prev.store_block_list(self);
             } else {
-                prev.store_next_block::<VM>(next);
-                next.store_prev_block::<VM>(prev);
+                prev.store_next_block(next);
+                next.store_prev_block(prev);
             }
         }
     }
 
     // Pop the first block in the list
-    pub fn pop<VM: VMBinding>(&mut self) -> Block {
+    pub fn pop(&mut self) -> Block {
         let rtn = self.first;
         if rtn.is_zero() {
             return rtn;
         }
-        let next = rtn.load_next_block::<VM>();
+        let next = rtn.load_next_block();
         if next.is_zero() {
             self.first = ZERO_BLOCK;
             self.last = ZERO_BLOCK;
         } else {
             self.first = next;
-            next.store_prev_block::<VM>(ZERO_BLOCK);
-            self.first.store_block_list::<VM>(self);
+            next.store_prev_block(ZERO_BLOCK);
+            self.first.store_block_list(self);
         }
-        rtn.store_next_block::<VM>(ZERO_BLOCK);
-        rtn.store_prev_block::<VM>(ZERO_BLOCK);
+        rtn.store_next_block(ZERO_BLOCK);
+        rtn.store_prev_block(ZERO_BLOCK);
         rtn
     }
 
     // Push block to the front of the list
-    fn push<VM: VMBinding>(&mut self, block: Block) {
+    fn push(&mut self, block: Block) {
         if self.is_empty() {
-            block.store_next_block::<VM>(ZERO_BLOCK);
-            block.store_prev_block::<VM>(ZERO_BLOCK);
+            block.store_next_block(ZERO_BLOCK);
+            block.store_prev_block(ZERO_BLOCK);
             self.first = block;
             self.last = block;
         } else {
-            block.store_next_block::<VM>(self.first);
-            self.first.store_prev_block::<VM>(block);
-            block.store_prev_block::<VM>(ZERO_BLOCK);
+            block.store_next_block(self.first);
+            self.first.store_prev_block(block);
+            block.store_prev_block(ZERO_BLOCK);
             self.first = block;
         }
-        block.store_block_list::<VM>(self);
+        block.store_block_list(self);
     }
 
     // Append one block list to another
     // The second block list left empty
-    pub fn append<VM: VMBinding>(&mut self, list: &mut BlockList) {
+    pub fn append(&mut self, list: &mut BlockList) {
         if !list.is_empty() {
             debug_assert!(
-                list.first.load_prev_block::<VM>().is_zero(),
+                list.first.load_prev_block().is_zero(),
                 "{} -> {}",
-                list.first.load_prev_block::<VM>().start(),
+                list.first.load_prev_block().start(),
                 list.first.start()
             );
             if self.is_empty() {
@@ -195,19 +195,19 @@ impl BlockList {
                 self.last = list.last;
             } else {
                 debug_assert!(
-                    self.first.load_prev_block::<VM>().is_zero(),
+                    self.first.load_prev_block().is_zero(),
                     "{} -> {}",
-                    self.first.load_prev_block::<VM>().start(),
+                    self.first.load_prev_block().start(),
                     self.first.start()
                 );
-                self.last.store_next_block::<VM>(list.first);
-                list.first.store_prev_block::<VM>(self.last);
+                self.last.store_next_block(list.first);
+                list.first.store_prev_block(self.last);
                 self.last = list.last;
             }
             let mut block = list.first;
             while !block.is_zero() {
-                block.store_block_list::<VM>(self);
-                block = block.load_next_block::<VM>();
+                block.store_block_list(self);
+                block = block.load_next_block();
             }
             list.reset();
         }
@@ -336,7 +336,7 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let bin = mi_bin::<VM>(size, align) as usize;
         let consumed = self.consumed_blocks.get_mut(bin).unwrap();
         let available = self.available_blocks.get_mut(bin).unwrap();
-        consumed.append::<VM>(available);
+        consumed.append(available);
         unsafe { Address::zero() }
     }
 }
@@ -370,12 +370,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         if block.is_zero() {
             return unsafe { Address::zero() };
         }
-        let cell = block.load_free_list::<VM>();
+        let cell = block.load_free_list();
         if cell.is_zero() {
             // return self.alloc_slow(size, align, offset);
             return cell; // return failed allocation
         }
-        block.store_free_list::<VM>(unsafe { cell.load::<Address>() });
+        block.store_free_list(unsafe { cell.load::<Address>() });
         cell
     }
 
@@ -410,14 +410,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let mut block = available.first;
 
             while !block.is_zero() {
-                if block.has_free_cells::<VM>() {
+                if block.has_free_cells() {
                     return Some(block);
                 }
-                available.pop::<VM>();
-                consumed_blocks
-                    .get_mut(bin as usize)
-                    .unwrap()
-                    .push::<VM>(block);
+                available.pop();
+                consumed_blocks.get_mut(bin as usize).unwrap().push(block);
 
                 block = available.first;
             }
@@ -439,29 +436,26 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // attempt to sweep
         #[cfg(not(feature = "eager_sweeping"))]
         loop {
-            let block = self.unswept_blocks.get_mut(bin).unwrap().pop::<VM>();
+            let block = self.unswept_blocks.get_mut(bin).unwrap().pop();
             if block.is_zero() {
                 // no more blocks to sweep
                 break;
             }
             self.sweep_block(block);
-            if block.has_free_cells::<VM>() {
+            if block.has_free_cells() {
                 // recyclable block
                 if stress_test {
                     self.available_blocks_stress
                         .get_mut(bin)
                         .unwrap()
-                        .push::<VM>(block);
+                        .push(block);
                 } else {
-                    self.available_blocks
-                        .get_mut(bin)
-                        .unwrap()
-                        .push::<VM>(block);
+                    self.available_blocks.get_mut(bin).unwrap().push(block);
                 }
                 return block;
             } else {
                 // nothing was freed from this block
-                self.consumed_blocks.get_mut(bin).unwrap().push::<VM>(block);
+                self.consumed_blocks.get_mut(bin).unwrap().push(block);
             }
         }
         self.acquire_fresh_block(size, align, stress_test)
@@ -478,9 +472,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                         return block;
                     }
                     if stress_test {
-                        self.available_blocks_stress[bin].push::<VM>(block);
+                        self.available_blocks_stress[bin].push(block);
                     } else {
-                        self.available_blocks[bin].push::<VM>(block);
+                        self.available_blocks[bin].push(block);
                     }
                     self.init_block(block, self.available_blocks[bin].size);
 
@@ -488,31 +482,31 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 }
 
                 crate::policy::marksweepspace::BlockAcquireResult::AbandonedAvailable(block) => {
-                    block.store_tls::<VM>(self.tls);
-                    if block.has_free_cells::<VM>() {
+                    block.store_tls(self.tls);
+                    if block.has_free_cells() {
                         if stress_test {
-                            self.available_blocks_stress[bin].push::<VM>(block);
+                            self.available_blocks_stress[bin].push(block);
                         } else {
-                            self.available_blocks[bin].push::<VM>(block);
+                            self.available_blocks[bin].push(block);
                         }
                         return block;
                     } else {
-                        self.consumed_blocks[bin].push::<VM>(block);
+                        self.consumed_blocks[bin].push(block);
                     }
                 }
 
                 crate::policy::marksweepspace::BlockAcquireResult::AbandonedUnswept(block) => {
-                    block.store_tls::<VM>(self.tls);
+                    block.store_tls(self.tls);
                     self.sweep_block(block);
-                    if block.has_free_cells::<VM>() {
+                    if block.has_free_cells() {
                         if stress_test {
-                            self.available_blocks_stress[bin].push::<VM>(block);
+                            self.available_blocks_stress[bin].push(block);
                         } else {
-                            self.available_blocks[bin].push::<VM>(block);
+                            self.available_blocks[bin].push(block);
                         }
                         return block;
                     } else {
-                        self.consumed_blocks[bin].push::<VM>(block);
+                        self.consumed_blocks[bin].push(block);
                     }
                 }
             }
@@ -538,16 +532,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             };
         };
 
-        block.store_free_list::<VM>(final_cell);
-        // block.store_local_free_list::<VM>(unsafe { Address::zero() });
-        // block.store_thread_free_list::<VM>(unsafe { Address::zero() });
-        block.store_block_cell_size::<VM>(cell_size);
+        block.store_free_list(final_cell);
+        // block.store_local_free_list(unsafe { Address::zero() });
+        // block.store_thread_free_list(unsafe { Address::zero() });
+        block.store_block_cell_size(cell_size);
 
         self.store_block_tls(block);
     }
 
     pub fn sweep_block(&self, block: Block) {
-        let cell_size = block.load_block_cell_size::<VM>();
+        let cell_size = block.load_block_cell_size();
         let mut cell = block.start();
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= block.start() + Block::BYTES {
@@ -569,7 +563,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             cell += cell_size;
         }
 
-        block.store_free_list::<VM>(last);
+        block.store_free_list(last);
     }
 
     // alloc bit required for non GC context
@@ -623,7 +617,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // }
 
     pub fn store_block_tls(&self, block: Block) {
-        block.store_tls::<VM>(self.tls);
+        block.store_tls(self.tls);
     }
 
     #[cfg(not(feature = "eager_sweeping"))]
@@ -636,15 +630,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let available = self.available_blocks.get_mut(bin).unwrap();
             unswept.lock();
             available.lock();
-            unswept.append::<VM>(available);
+            unswept.append(available);
             available.unlock();
             let consumed = self.consumed_blocks.get_mut(bin).unwrap();
             consumed.lock();
-            unswept.append::<VM>(consumed);
+            unswept.append(consumed);
             consumed.unlock();
             let available_stress = self.available_blocks_stress.get_mut(bin).unwrap();
             available_stress.lock();
-            unswept.append::<VM>(available_stress);
+            unswept.append(available_stress);
             available_stress.unlock();
             unswept.unlock();
             bin += 1;
@@ -661,7 +655,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
             let mut block = available.first;
             while !block.is_zero() {
-                let next = block.load_next_block::<VM>();
+                let next = block.load_next_block();
                 if !block.sweep(self.space) {
                     self.sweep_block(block);
                 }
@@ -672,13 +666,13 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let mut block = consumed.first;
             while !block.is_zero() {
                 self.sweep_block(block);
-                block = block.load_next_block::<VM>();
+                block = block.load_next_block();
             }
 
             self.available_blocks
                 .get_mut(bin)
                 .unwrap()
-                .append::<VM>(self.consumed_blocks.get_mut(bin).unwrap());
+                .append(self.consumed_blocks.get_mut(bin).unwrap());
             bin += 1;
         }
     }
@@ -697,22 +691,22 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         while i < MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {
-                abandoned[i].append::<VM>(available);
+                abandoned[i].append(available);
             }
 
             let available_stress = self.available_blocks_stress.get_mut(i).unwrap();
             if !available_stress.is_empty() {
-                abandoned[i].append::<VM>(available_stress);
+                abandoned[i].append(available_stress);
             }
 
             let consumed = self.consumed_blocks.get_mut(i).unwrap();
             if !consumed.is_empty() {
-                abandoned_consumed[i].append::<VM>(consumed);
+                abandoned_consumed[i].append(consumed);
             }
 
             let unswept = self.unswept_blocks.get_mut(i).unwrap();
             if !unswept.is_empty() {
-                abandoned_unswept[i].append::<VM>(unswept);
+                abandoned_unswept[i].append(unswept);
             }
             i += 1;
         }
