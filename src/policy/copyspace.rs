@@ -5,7 +5,6 @@ use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
@@ -20,8 +19,6 @@ use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
@@ -161,14 +158,9 @@ impl<VM: VMBinding> CopySpace<VM> {
         );
         CopySpace {
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(
-                    common.start,
-                    common.extent,
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
             from_space: AtomicBool::new(from_space),

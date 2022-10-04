@@ -213,9 +213,9 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
         MarkCompactSpace {
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(0, vm_map)
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
         }

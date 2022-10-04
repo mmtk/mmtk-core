@@ -5,7 +5,6 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
 
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
@@ -29,7 +28,6 @@ pub struct ImmortalSpace<VM: VMBinding> {
 }
 
 const GC_MARK_BIT_MASK: u8 = 1;
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn name(&self) -> &str {
@@ -162,14 +160,9 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
         ImmortalSpace {
             mark_state: 0,
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(
-                    common.start,
-                    common.extent,
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
         }
