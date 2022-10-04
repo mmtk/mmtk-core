@@ -332,8 +332,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    /// Reserve `meta_data_pages_per_region` if this is a contiguous space.
+    /// This method can only be called in the constructor.
+    /// Note: This method will be removed. We don't support `meta_data_pages_per_region` anymore.
     fn reserve_metadata(&mut self, extent: usize) {
-        let mut sync = self.sync.lock().unwrap();
         if self.meta_data_pages_per_region > 0 {
             debug_assert!(self.start.is_aligned_to(BYTES_IN_REGION));
             let size = (extent >> LOG_BYTES_IN_REGION) << LOG_BYTES_IN_REGION;
@@ -342,11 +344,15 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 cursor -= BYTES_IN_REGION;
                 let unit = (cursor - self.start) >> LOG_BYTES_IN_PAGE;
                 let meta_data_pages_per_region = self.meta_data_pages_per_region;
+                // This function is only called in the constructor. Modifying `free_list` without holding a lock here is safe.
                 let tmp = self
                     .free_list
                     .alloc_from_unit(meta_data_pages_per_region as _, unit as _)
                     as usize;
-                sync.pages_currently_on_freelist -= self.meta_data_pages_per_region;
+                {
+                    let mut sync = self.sync.lock().unwrap();
+                    sync.pages_currently_on_freelist -= self.meta_data_pages_per_region;
+                }
                 debug_assert!(tmp == unit);
             }
         }
