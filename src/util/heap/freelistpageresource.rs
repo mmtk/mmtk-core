@@ -309,7 +309,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         rtn
     }
 
-    fn free_contiguous_chunk(&mut self, chunk: Address) {
+    fn free_contiguous_chunk(&mut self, chunk: Address, sync: &mut FreeListPageResourceSync) {
         let num_chunks = self.vm_map().get_contiguous_region_chunks(chunk);
         debug_assert!(num_chunks == 1 || self.meta_data_pages_per_region == 0);
         /* nail down all pages associated with the chunk, so it is no longer on our free list */
@@ -326,16 +326,15 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 as usize; // then alloc the entire chunk
             debug_assert!(tmp == chunk_start);
             chunk_start += PAGES_IN_CHUNK;
-            {
-                let mut sync = self.sync.lock().unwrap();
-                sync.pages_currently_on_freelist -=
-                    PAGES_IN_CHUNK - self.meta_data_pages_per_region;
-            }
+            sync.pages_currently_on_freelist -= PAGES_IN_CHUNK - self.meta_data_pages_per_region;
         }
         /* now return the address space associated with the chunk for global reuse */
         self.common.release_discontiguous_chunks(chunk);
     }
 
+    /// Reserve `meta_data_pages_per_region` if this is a contiguous space.
+    /// This method can only be called in the constructor.
+    /// Note: This method will be removed. We don't support `meta_data_pages_per_region` anymore.
     fn reserve_metadata(&mut self, extent: usize) {
         if self.meta_data_pages_per_region > 0 {
             debug_assert!(self.start.is_aligned_to(BYTES_IN_REGION));
@@ -345,6 +344,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 cursor -= BYTES_IN_REGION;
                 let unit = (cursor - self.start) >> LOG_BYTES_IN_PAGE;
                 let meta_data_pages_per_region = self.meta_data_pages_per_region;
+                // This function is only called in the constructor. Modifying `free_list` without holding a lock here is safe.
                 let tmp = self
                     .free_list
                     .alloc_from_unit(meta_data_pages_per_region as _, unit as _)
@@ -370,29 +370,31 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
             self.mprotect(first, pages as _);
         }
 
+        let mut sync = self.sync.lock().unwrap();
         // FIXME
         #[allow(clippy::cast_ref_to_mut)]
         let me = unsafe { &mut *(self as *const _ as *mut Self) };
-        let freed = {
-            let mut sync = self.sync.lock().unwrap();
-            self.common.accounting.release(pages as _);
-            let freed = me.free_list.free(page_offset as _, true);
-            sync.pages_currently_on_freelist += pages as usize;
-            freed
-        };
+        self.common.accounting.release(pages as _);
+        let freed = me.free_list.free(page_offset as _, true);
+        sync.pages_currently_on_freelist += pages as usize;
         if !self.common.contiguous {
             // only discontiguous spaces use chunks
-            me.release_free_chunks(first, freed as _);
+            me.release_free_chunks(first, freed as _, &mut sync);
         }
     }
 
-    fn release_free_chunks(&mut self, freed_page: Address, pages_freed: usize) {
+    fn release_free_chunks(
+        &mut self,
+        freed_page: Address,
+        pages_freed: usize,
+        sync: &mut FreeListPageResourceSync,
+    ) {
         let page_offset = conversions::bytes_to_pages(freed_page - self.start);
 
         if self.meta_data_pages_per_region > 0 {
             // can only be a single chunk
             if pages_freed == (PAGES_IN_CHUNK - self.meta_data_pages_per_region) {
-                self.free_contiguous_chunk(conversions::chunk_align_down(freed_page));
+                self.free_contiguous_chunk(conversions::chunk_align_down(freed_page), sync);
             }
         } else {
             // may be multiple chunks
@@ -414,7 +416,10 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
                 debug_assert!(next_region_start < generic_freelist::MAX_UNITS as usize);
                 if pages_freed == next_region_start - region_start {
                     let start = self.start;
-                    self.free_contiguous_chunk(start + conversions::pages_to_bytes(region_start));
+                    self.free_contiguous_chunk(
+                        start + conversions::pages_to_bytes(region_start),
+                        sync,
+                    );
                 }
             }
         }
