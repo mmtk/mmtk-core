@@ -165,9 +165,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             heap,
         );
         let mut pr = if vmrequest.is_discontiguous() {
-            FreeListPageResource::new_discontiguous(vm_map)
+            FreeListPageResource::new_discontiguous(0, vm_map)
         } else {
-            FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
+            FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
         };
         pr.protect_memory_on_release = protect_memory_on_release;
         LargeObjectSpace {
