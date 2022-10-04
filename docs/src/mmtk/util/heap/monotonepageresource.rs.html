@@ -321,36 +321,6 @@
 <span id="319">319</span>
 <span id="320">320</span>
 <span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-<span id="328">328</span>
-<span id="329">329</span>
-<span id="330">330</span>
-<span id="331">331</span>
-<span id="332">332</span>
-<span id="333">333</span>
-<span id="334">334</span>
-<span id="335">335</span>
-<span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
-<span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::layout::vm_layout_constants</span>::{<span class="ident">BYTES_IN_CHUNK</span>, <span class="ident">PAGES_IN_CHUNK</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::required_chunks</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
@@ -372,9 +342,6 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MonotonePageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonPageResource</span>,
-
-    <span class="doccomment">/** Number of pages to reserve at the start of every allocation */</span>
-    <span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>,
     <span class="ident">sync</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">MonotonePageResourceSync</span><span class="op">&gt;</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
@@ -425,14 +392,13 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">space_descriptor</span>: <span class="ident">SpaceDescriptor</span>,
         <span class="ident">reserved_pages</span>: <span class="ident">usize</span>,
-        <span class="ident">immut_required_pages</span>: <span class="ident">usize</span>,
+        <span class="ident">required_pages</span>: <span class="ident">usize</span>,
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
         <span class="macro">debug!</span>(
             <span class="string">&quot;In MonotonePageResource, reserved_pages = {}, required_pages = {}&quot;</span>,
-            <span class="ident">reserved_pages</span>, <span class="ident">immut_required_pages</span>
+            <span class="ident">reserved_pages</span>, <span class="ident">required_pages</span>
         );
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">required_pages</span> <span class="op">=</span> <span class="ident">immut_required_pages</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_chunk</span> <span class="op">=</span> <span class="bool-val">false</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">sync</span>.<span class="ident">cursor</span>;
@@ -461,17 +427,6 @@
             );
         }
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">!</span><span class="op">=</span> <span class="number">0</span> {
-            <span class="comment">/* adjust allocation for metadata */</span>
-            <span class="kw">let</span> <span class="ident">region_start</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_region_start</span>(<span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="ident">pages_to_bytes</span>(<span class="ident">required_pages</span>));
-            <span class="kw">let</span> <span class="ident">region_delta</span> <span class="op">=</span> <span class="ident">region_start</span>.<span class="ident">get_offset</span>(<span class="ident">sync</span>.<span class="ident">cursor</span>);
-            <span class="kw">if</span> <span class="ident">region_delta</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span> {
-                <span class="comment">/* start new region, so adjust pages and return address accordingly */</span>
-                <span class="ident">required_pages</span> <span class="op">+</span><span class="op">=</span>
-                    <span class="ident">bytes_to_pages</span>(<span class="ident">region_delta</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">+</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">region_start</span> <span class="op">+</span> <span class="ident">pages_to_bytes</span>(<span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>);
-            }
-        }
         <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">pages_to_bytes</span>(<span class="ident">required_pages</span>);
         <span class="macro">debug!</span>(<span class="string">&quot;bytes={}&quot;</span>, <span class="ident">bytes</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="ident">sync</span>.<span class="ident">cursor</span> <span class="op">+</span> <span class="ident">bytes</span>;
@@ -518,27 +473,14 @@
             })
         }
     }
-
-    <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="ident">pages</span>
-            <span class="op">+</span> ((<span class="ident">pages</span> <span class="op">+</span> <span class="ident">PAGES_IN_REGION</span> <span class="op">-</span> <span class="number">1</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_PAGES_IN_REGION</span>)
-                <span class="op">*</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>
-    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MonotonePageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(
-        <span class="ident">start</span>: <span class="ident">Address</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">sentinel</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">bytes</span>;
 
         <span class="ident">MonotonePageResource</span> {
             <span class="ident">common</span>: <span class="ident">CommonPageResource::new</span>(<span class="bool-val">true</span>, <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>), <span class="ident">vm_map</span>),
-
-            <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">MonotonePageResourceSync</span> {
                 <span class="ident">cursor</span>: <span class="ident">start</span>,
                 <span class="ident">current_chunk</span>: <span class="ident">chunk_align_down</span>(<span class="ident">start</span>),
@@ -553,11 +495,9 @@
         }
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">MonotonePageResource</span> {
             <span class="ident">common</span>: <span class="ident">CommonPageResource::new</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="ident">vm_map</span>),
-
-            <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">MonotonePageResourceSync</span> {
                 <span class="ident">cursor</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },
                 <span class="ident">current_chunk</span>: <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() },

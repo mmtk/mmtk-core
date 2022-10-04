@@ -116,6 +116,7 @@
 <span id="114">114</span>
 <span id="115">115</span>
 <span id="116">116</span>
+<span id="117">117</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::embedded_meta_data::LOG_BYTES_IN_REGION</span>;
 
 <span class="doccomment">/**
@@ -152,6 +153,7 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_UNITS</span> <span class="op">+</span> <span class="ident">LOG_CARD_GRAIN</span>;
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_REGION</span> <span class="op">-</span> <span class="ident">LOG_CARD_BYTES</span> <span class="op">+</span> <span class="ident">LOG_CARD_META_SIZE</span>;
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">LOG_CARD_META_PAGES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_CARD_META_BYTES</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="doccomment">/// FIXME: Card scanning is not supported at the moment. Move this to side-metadata in the future.</span>
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">CARD_META_PAGES_PER_REGION</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">SUPPORT_CARD_SCANNING</span> {
     <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_CARD_META_PAGES</span>
 } <span class="kw">else</span> {

@@ -346,87 +346,6 @@
 <span id="344">344</span>
 <span id="345">345</span>
 <span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
-<span id="366">366</span>
-<span id="367">367</span>
-<span id="368">368</span>
-<span id="369">369</span>
-<span id="370">370</span>
-<span id="371">371</span>
-<span id="372">372</span>
-<span id="373">373</span>
-<span id="374">374</span>
-<span id="375">375</span>
-<span id="376">376</span>
-<span id="377">377</span>
-<span id="378">378</span>
-<span id="379">379</span>
-<span id="380">380</span>
-<span id="381">381</span>
-<span id="382">382</span>
-<span id="383">383</span>
-<span id="384">384</span>
-<span id="385">385</span>
-<span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
-<span id="389">389</span>
-<span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 
@@ -436,7 +355,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::PageResource</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::embedded_meta_data</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::generic_freelist</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::generic_freelist::GenericFreeList</span>;
@@ -470,8 +388,6 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonPageResource</span>,
     <span class="ident">common_flpr</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">CommonFreeListPageResource</span><span class="op">&gt;</span>,
-    <span class="doccomment">/** Number of pages to reserve at the start of every allocation */</span>
-    <span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>,
     <span class="ident">sync</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">FreeListPageResourceSync</span><span class="op">&gt;</span>,
     <span class="ident">_p</span>: <span class="ident">PhantomData</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Protect memory on release, and unprotect on re-allocate.</span>
@@ -513,7 +429,7 @@
                 .<span class="ident">vm_map</span>
                 .<span class="ident">get_available_discontiguous_chunks</span>()
                 .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">common</span>.<span class="ident">vm_map</span>.<span class="ident">get_chunk_consumer_count</span>());
-            <span class="ident">rtn</span> <span class="op">+</span><span class="op">=</span> <span class="ident">chunks</span> <span class="op">*</span> (<span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>);
+            <span class="ident">rtn</span> <span class="op">+</span><span class="op">=</span> <span class="ident">chunks</span> <span class="op">*</span> <span class="ident">PAGES_IN_CHUNK</span>;
         } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">growable</span> <span class="op">&amp;&amp;</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>) {
             <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">PAGES_IN_SPACE64</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">reserved_pages</span>();
         }
@@ -528,10 +444,6 @@
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span> {
-        <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">==</span> <span class="number">0</span>
-                <span class="op">|</span><span class="op">|</span> <span class="ident">required_pages</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>
-        );
         <span class="comment">// FIXME: We need a safe implementation</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
         <span class="kw">let</span> <span class="ident">self_mut</span>: <span class="kw-2">&amp;mut</span> <span class="self">Self</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
@@ -552,9 +464,6 @@
                 <span class="kw">if</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span> <span class="op">==</span> <span class="ident">UNINITIALIZED_WATER_MARK</span>
                     <span class="op">|</span><span class="op">|</span> (<span class="ident">page_offset</span> <span class="op">^</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span>) <span class="op">&gt;</span> <span class="ident">PAGES_IN_REGION</span> <span class="kw">as</span> <span class="ident">i32</span>
                 {
-                    <span class="kw">let</span> <span class="ident">regions</span> <span class="op">=</span> <span class="number">1</span> <span class="op">+</span> ((<span class="ident">page_offset</span> <span class="op">-</span> <span class="ident">sync</span>.<span class="ident">highwater_mark</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_PAGES_IN_REGION</span>);
-                    <span class="kw">let</span> <span class="ident">metapages</span> <span class="op">=</span> <span class="ident">regions</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">*</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                    <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">reserve_and_commit</span>(<span class="ident">metapages</span>);
                     <span class="ident">new_chunk</span> <span class="op">=</span> <span class="bool-val">true</span>;
                 }
                 <span class="ident">sync</span>.<span class="ident">highwater_mark</span> <span class="op">=</span> <span class="ident">page_offset</span>;
@@ -586,19 +495,10 @@
             <span class="ident">new_chunk</span>,
         })
     }
-
-    <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="ident">pages</span>
-    }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(
-        <span class="ident">start</span>: <span class="ident">Address</span>,
-        <span class="ident">bytes</span>: <span class="ident">usize</span>,
-        <span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">bytes</span>);
         <span class="comment">// We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.</span>
         <span class="comment">// FIXME: We should try either remove this kind of circular dependency or use MaybeUninit&lt;T&gt; instead of Box&lt;T&gt;</span>
@@ -616,27 +516,19 @@
             <span class="ident">common_flpr</span>
         };
         <span class="kw">let</span> <span class="ident">growable</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>);
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">flpr</span> <span class="op">=</span> <span class="ident">FreeListPageResource</span> {
+        <span class="ident">FreeListPageResource</span> {
             <span class="ident">common</span>: <span class="ident">CommonPageResource::new</span>(<span class="bool-val">true</span>, <span class="ident">growable</span>, <span class="ident">vm_map</span>),
             <span class="ident">common_flpr</span>,
-            <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">FreeListPageResourceSync</span> {
                 <span class="ident">pages_currently_on_freelist</span>: <span class="kw">if</span> <span class="ident">growable</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="ident">pages</span> },
                 <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
             }),
             <span class="ident">_p</span>: <span class="ident">PhantomData</span>,
             <span class="ident">protect_memory_on_release</span>: <span class="bool-val">false</span>,
-        };
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">flpr</span>.<span class="ident">common</span>.<span class="ident">growable</span> {
-            <span class="comment">// For non-growable space, we just need to reserve metadata according to the requested size.</span>
-            <span class="ident">flpr</span>.<span class="ident">reserve_metadata</span>(<span class="ident">bytes</span>);
-            <span class="comment">// reserveMetaData(space.getExtent());</span>
-            <span class="comment">// unimplemented!()</span>
         }
-        <span class="ident">flpr</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">meta_data_pages_per_region</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
         <span class="comment">// We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.</span>
         <span class="comment">// FIXME: We should try either remove this kind of circular dependency or use MaybeUninit&lt;T&gt; instead of Box&lt;T&gt;</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">invalid_value</span>)]</span>
@@ -655,7 +547,6 @@
         <span class="ident">FreeListPageResource</span> {
             <span class="ident">common</span>: <span class="ident">CommonPageResource::new</span>(<span class="bool-val">false</span>, <span class="bool-val">true</span>, <span class="ident">vm_map</span>),
             <span class="ident">common_flpr</span>,
-            <span class="ident">meta_data_pages_per_region</span>,
             <span class="ident">sync</span>: <span class="ident">Mutex::new</span>(<span class="ident">FreeListPageResourceSync</span> {
                 <span class="ident">pages_currently_on_freelist</span>: <span class="number">0</span>,
                 <span class="ident">highwater_mark</span>: <span class="ident">UNINITIALIZED_WATER_MARK</span>,
@@ -701,10 +592,6 @@
         <span class="ident">pages</span>: <span class="ident">usize</span>,
         <span class="ident">sync</span>: <span class="kw-2">&amp;mut</span> <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">FreeListPageResourceSync</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">i32</span> {
-        <span class="macro">debug_assert!</span>(
-            <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">==</span> <span class="number">0</span>
-                <span class="op">|</span><span class="op">|</span> <span class="ident">pages</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>
-        );
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">rtn</span> <span class="op">=</span> <span class="ident">generic_freelist::FAILURE</span>;
         <span class="kw">let</span> <span class="ident">required_chunks</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::policy::space::required_chunks</span>(<span class="ident">pages</span>);
         <span class="kw">let</span> <span class="ident">region</span> <span class="op">=</span> <span class="self">self</span>
@@ -722,16 +609,7 @@
                 }
                 <span class="kw">let</span> <span class="ident">liberated</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">free</span>(<span class="ident">p</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="bool-val">true</span>); <span class="comment">// add chunk to our free list</span>
                 <span class="macro">debug_assert!</span>(<span class="ident">liberated</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">==</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">+</span> (<span class="ident">p</span> <span class="op">-</span> <span class="ident">region_start</span>));
-                <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">1</span> {
-                    <span class="kw">let</span> <span class="ident">meta_data_pages_per_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                    <span class="self">self</span>.<span class="ident">free_list</span>
-                        .<span class="ident">alloc_from_unit</span>(<span class="ident">meta_data_pages_per_region</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">p</span> <span class="kw">as</span> <span class="kw">_</span>);
-                    <span class="comment">// carve out space for metadata</span>
-                }
-                {
-                    <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">+</span><span class="op">=</span>
-                        <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                }
+                <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">+</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
             }
             <span class="ident">rtn</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">alloc</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>); <span class="comment">// re-do the request which triggered this call</span>
         }
@@ -740,51 +618,21 @@
 
     <span class="kw">fn</span> <span class="ident">free_contiguous_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>, <span class="ident">sync</span>: <span class="kw-2">&amp;mut</span> <span class="ident">FreeListPageResourceSync</span>) {
         <span class="kw">let</span> <span class="ident">num_chunks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">vm_map</span>().<span class="ident">get_contiguous_region_chunks</span>(<span class="ident">chunk</span>);
-        <span class="macro">debug_assert!</span>(<span class="ident">num_chunks</span> <span class="op">==</span> <span class="number">1</span> <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">==</span> <span class="number">0</span>);
         <span class="comment">/* nail down all pages associated with the chunk, so it is no longer on our free list */</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">chunk_start</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">chunk</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>);
         <span class="kw">let</span> <span class="ident">chunk_end</span> <span class="op">=</span> <span class="ident">chunk_start</span> <span class="op">+</span> (<span class="ident">num_chunks</span> <span class="op">*</span> <span class="ident">PAGES_IN_CHUNK</span>);
         <span class="kw">while</span> <span class="ident">chunk_start</span> <span class="op">&lt;</span> <span class="ident">chunk_end</span> {
             <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">set_uncoalescable</span>(<span class="ident">chunk_start</span> <span class="kw">as</span> <span class="kw">_</span>);
-            <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
-                <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">free</span>(<span class="ident">chunk_start</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="bool-val">false</span>); <span class="comment">// first free any metadata pages</span>
-            }
             <span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="self">self</span>
                 .<span class="ident">free_list</span>
                 .<span class="ident">alloc_from_unit</span>(<span class="ident">PAGES_IN_CHUNK</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">chunk_start</span> <span class="kw">as</span> <span class="kw">_</span>)
                 <span class="kw">as</span> <span class="ident">usize</span>; <span class="comment">// then alloc the entire chunk</span>
             <span class="macro">debug_assert!</span>(<span class="ident">tmp</span> <span class="op">==</span> <span class="ident">chunk_start</span>);
             <span class="ident">chunk_start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
-            <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
+            <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
         }
         <span class="comment">/* now return the address space associated with the chunk for global reuse */</span>
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release_discontiguous_chunks</span>(<span class="ident">chunk</span>);
-    }
-
-    <span class="doccomment">/// Reserve `meta_data_pages_per_region` if this is a contiguous space.</span>
-    <span class="doccomment">/// This method can only be called in the constructor.</span>
-    <span class="doccomment">/// Note: This method will be removed. We don&#39;t support `meta_data_pages_per_region` anymore.</span>
-    <span class="kw">fn</span> <span class="ident">reserve_metadata</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">extent</span>: <span class="ident">usize</span>) {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_REGION</span>));
-            <span class="kw">let</span> <span class="ident">size</span> <span class="op">=</span> (<span class="ident">extent</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_REGION</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">LOG_BYTES_IN_REGION</span>;
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span> <span class="op">+</span> <span class="ident">size</span>;
-            <span class="kw">while</span> <span class="ident">cursor</span> <span class="op">&gt;</span> <span class="self">self</span>.<span class="ident">start</span> {
-                <span class="ident">cursor</span> <span class="op">-</span><span class="op">=</span> <span class="ident">BYTES_IN_REGION</span>;
-                <span class="kw">let</span> <span class="ident">unit</span> <span class="op">=</span> (<span class="ident">cursor</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
-                <span class="kw">let</span> <span class="ident">meta_data_pages_per_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                <span class="comment">// This function is only called in the constructor. Modifying `free_list` without holding a lock here is safe.</span>
-                <span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="self">self</span>
-                    .<span class="ident">free_list</span>
-                    .<span class="ident">alloc_from_unit</span>(<span class="ident">meta_data_pages_per_region</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">unit</span> <span class="kw">as</span> <span class="kw">_</span>)
-                    <span class="kw">as</span> <span class="ident">usize</span>;
-                {
-                    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                    <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-                }
-                <span class="macro">debug_assert!</span>(<span class="ident">tmp</span> <span class="op">==</span> <span class="ident">unit</span>);
-            }
-        }
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">first</span>: <span class="ident">Address</span>) {
@@ -820,36 +668,26 @@
     ) {
         <span class="kw">let</span> <span class="ident">page_offset</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">freed_page</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>);
 
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
-            <span class="comment">// can only be a single chunk</span>
-            <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">==</span> (<span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>) {
-                <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(<span class="ident">conversions::chunk_align_down</span>(<span class="ident">freed_page</span>), <span class="ident">sync</span>);
+        <span class="comment">// may be multiple chunks</span>
+        <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">%</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">==</span> <span class="number">0</span> {
+            <span class="comment">// necessary, but not sufficient condition</span>
+            <span class="comment">/* grow a region of chunks, starting with the chunk containing the freed page */</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region_start</span> <span class="op">=</span> <span class="ident">page_offset</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>);
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">next_region_start</span> <span class="op">=</span> <span class="ident">region_start</span> <span class="op">+</span> <span class="ident">PAGES_IN_CHUNK</span>;
+            <span class="comment">/* now try to grow (end point pages are marked as non-coalescing) */</span>
+            <span class="kw">while</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">is_coalescable</span>(<span class="ident">region_start</span> <span class="kw">as</span> <span class="kw">_</span>) {
+                <span class="comment">// region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.</span>
+                <span class="ident">region_start</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
             }
-        } <span class="kw">else</span> {
-            <span class="comment">// may be multiple chunks</span>
-            <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">%</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">==</span> <span class="number">0</span> {
-                <span class="comment">// necessary, but not sufficient condition</span>
-                <span class="comment">/* grow a region of chunks, starting with the chunk containing the freed page */</span>
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">region_start</span> <span class="op">=</span> <span class="ident">page_offset</span> <span class="op">&amp;</span> <span class="op">!</span>(<span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="number">1</span>);
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">next_region_start</span> <span class="op">=</span> <span class="ident">region_start</span> <span class="op">+</span> <span class="ident">PAGES_IN_CHUNK</span>;
-                <span class="comment">/* now try to grow (end point pages are marked as non-coalescing) */</span>
-                <span class="kw">while</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">is_coalescable</span>(<span class="ident">region_start</span> <span class="kw">as</span> <span class="kw">_</span>) {
-                    <span class="comment">// region_start is guaranteed to be positive. Otherwise this line will fail due to subtraction overflow.</span>
-                    <span class="ident">region_start</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
-                }
-                <span class="kw">while</span> <span class="ident">next_region_start</span> <span class="op">&lt;</span> <span class="ident">generic_freelist::MAX_UNITS</span> <span class="kw">as</span> <span class="ident">usize</span>
-                    <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">is_coalescable</span>(<span class="ident">next_region_start</span> <span class="kw">as</span> <span class="kw">_</span>)
-                {
-                    <span class="ident">next_region_start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
-                }
-                <span class="macro">debug_assert!</span>(<span class="ident">next_region_start</span> <span class="op">&lt;</span> <span class="ident">generic_freelist::MAX_UNITS</span> <span class="kw">as</span> <span class="ident">usize</span>);
-                <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">==</span> <span class="ident">next_region_start</span> <span class="op">-</span> <span class="ident">region_start</span> {
-                    <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>;
-                    <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(
-                        <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">region_start</span>),
-                        <span class="ident">sync</span>,
-                    );
-                }
+            <span class="kw">while</span> <span class="ident">next_region_start</span> <span class="op">&lt;</span> <span class="ident">generic_freelist::MAX_UNITS</span> <span class="kw">as</span> <span class="ident">usize</span>
+                <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">free_list</span>.<span class="ident">is_coalescable</span>(<span class="ident">next_region_start</span> <span class="kw">as</span> <span class="kw">_</span>)
+            {
+                <span class="ident">next_region_start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
+            }
+            <span class="macro">debug_assert!</span>(<span class="ident">next_region_start</span> <span class="op">&lt;</span> <span class="ident">generic_freelist::MAX_UNITS</span> <span class="kw">as</span> <span class="ident">usize</span>);
+            <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">==</span> <span class="ident">next_region_start</span> <span class="op">-</span> <span class="ident">region_start</span> {
+                <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>;
+                <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">region_start</span>), <span class="ident">sync</span>);
             }
         }
     }

@@ -939,9 +939,9 @@
         );
         <span class="ident">ImmixSpace</span> {
             <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
-                <span class="ident">FreeListPageResource::new_discontiguous</span>(<span class="number">0</span>, <span class="ident">vm_map</span>)
+                <span class="ident">FreeListPageResource::new_discontiguous</span>(<span class="ident">vm_map</span>)
             } <span class="kw">else</span> {
-                <span class="ident">FreeListPageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="number">0</span>, <span class="ident">vm_map</span>)
+                <span class="ident">FreeListPageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="ident">vm_map</span>)
             },
             <span class="ident">common</span>,
             <span class="ident">chunk_map</span>: <span class="ident">ChunkMap::new</span>(),

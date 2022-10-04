@@ -185,9 +185,6 @@
 <span id="183">183</span>
 <span id="184">184</span>
 <span id="185">185</span>
-<span id="186">186</span>
-<span id="187">187</span>
-<span id="188">188</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
@@ -217,9 +214,8 @@
     <span class="comment">// XXX: In the original code reserve_pages &amp; clear_request explicitly</span>
     <span class="comment">//      acquired a lock.</span>
     <span class="kw">fn</span> <span class="ident">reserve_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
-        <span class="kw">let</span> <span class="ident">adj_pages</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">adjust_for_metadata</span>(<span class="ident">pages</span>);
-        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">adj_pages</span>);
-        <span class="ident">adj_pages</span>
+        <span class="self">self</span>.<span class="ident">common</span>().<span class="ident">accounting</span>.<span class="ident">reserve</span>(<span class="ident">pages</span>);
+        <span class="ident">pages</span>
     }
 
     <span class="kw">fn</span> <span class="ident">clear_request</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">reserved_pages</span>: <span class="ident">usize</span>) {
@@ -250,8 +246,6 @@
         <span class="ident">required_pages</span>: <span class="ident">usize</span>,
         <span class="ident">tls</span>: <span class="ident">VMThread</span>,
     ) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">PRAllocResult</span>, <span class="ident">PRAllocFail</span><span class="op">&gt;</span>;
-
-    <span class="kw">fn</span> <span class="ident">adjust_for_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pages</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span>;
 
     <span class="doccomment">/**
      * Commit pages to the page budget.  This is called after
