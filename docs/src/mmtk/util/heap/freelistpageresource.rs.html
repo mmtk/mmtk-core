@@ -422,6 +422,11 @@
 <span id="420">420</span>
 <span id="421">421</span>
 <span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 
@@ -733,7 +738,7 @@
         <span class="ident">rtn</span>
     }
 
-    <span class="kw">fn</span> <span class="ident">free_contiguous_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>) {
+    <span class="kw">fn</span> <span class="ident">free_contiguous_chunk</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">chunk</span>: <span class="ident">Address</span>, <span class="ident">sync</span>: <span class="kw-2">&amp;mut</span> <span class="ident">FreeListPageResourceSync</span>) {
         <span class="kw">let</span> <span class="ident">num_chunks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">vm_map</span>().<span class="ident">get_contiguous_region_chunks</span>(<span class="ident">chunk</span>);
         <span class="macro">debug_assert!</span>(<span class="ident">num_chunks</span> <span class="op">==</span> <span class="number">1</span> <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">==</span> <span class="number">0</span>);
         <span class="comment">/* nail down all pages associated with the chunk, so it is no longer on our free list */</span>
@@ -750,16 +755,15 @@
                 <span class="kw">as</span> <span class="ident">usize</span>; <span class="comment">// then alloc the entire chunk</span>
             <span class="macro">debug_assert!</span>(<span class="ident">tmp</span> <span class="op">==</span> <span class="ident">chunk_start</span>);
             <span class="ident">chunk_start</span> <span class="op">+</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span>;
-            {
-                <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-                <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span>
-                    <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
-            }
+            <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">-</span><span class="op">=</span> <span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
         }
         <span class="comment">/* now return the address space associated with the chunk for global reuse */</span>
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release_discontiguous_chunks</span>(<span class="ident">chunk</span>);
     }
 
+    <span class="doccomment">/// Reserve `meta_data_pages_per_region` if this is a contiguous space.</span>
+    <span class="doccomment">/// This method can only be called in the constructor.</span>
+    <span class="doccomment">/// Note: This method will be removed. We don&#39;t support `meta_data_pages_per_region` anymore.</span>
     <span class="kw">fn</span> <span class="ident">reserve_metadata</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">extent</span>: <span class="ident">usize</span>) {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_REGION</span>));
@@ -769,6 +773,7 @@
                 <span class="ident">cursor</span> <span class="op">-</span><span class="op">=</span> <span class="ident">BYTES_IN_REGION</span>;
                 <span class="kw">let</span> <span class="ident">unit</span> <span class="op">=</span> (<span class="ident">cursor</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
                 <span class="kw">let</span> <span class="ident">meta_data_pages_per_region</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>;
+                <span class="comment">// This function is only called in the constructor. Modifying `free_list` without holding a lock here is safe.</span>
                 <span class="kw">let</span> <span class="ident">tmp</span> <span class="op">=</span> <span class="self">self</span>
                     .<span class="ident">free_list</span>
                     .<span class="ident">alloc_from_unit</span>(<span class="ident">meta_data_pages_per_region</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="ident">unit</span> <span class="kw">as</span> <span class="kw">_</span>)
@@ -794,29 +799,31 @@
             <span class="self">self</span>.<span class="ident">mprotect</span>(<span class="ident">first</span>, <span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>);
         }
 
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
         <span class="comment">// FIXME</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>
         <span class="kw">let</span> <span class="ident">me</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="self">Self</span>) };
-        <span class="kw">let</span> <span class="ident">freed</span> <span class="op">=</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">sync</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">sync</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-            <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>);
-            <span class="kw">let</span> <span class="ident">freed</span> <span class="op">=</span> <span class="ident">me</span>.<span class="ident">free_list</span>.<span class="ident">free</span>(<span class="ident">page_offset</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="bool-val">true</span>);
-            <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">+</span><span class="op">=</span> <span class="ident">pages</span> <span class="kw">as</span> <span class="ident">usize</span>;
-            <span class="ident">freed</span>
-        };
+        <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">accounting</span>.<span class="ident">release</span>(<span class="ident">pages</span> <span class="kw">as</span> <span class="kw">_</span>);
+        <span class="kw">let</span> <span class="ident">freed</span> <span class="op">=</span> <span class="ident">me</span>.<span class="ident">free_list</span>.<span class="ident">free</span>(<span class="ident">page_offset</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="bool-val">true</span>);
+        <span class="ident">sync</span>.<span class="ident">pages_currently_on_freelist</span> <span class="op">+</span><span class="op">=</span> <span class="ident">pages</span> <span class="kw">as</span> <span class="ident">usize</span>;
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">common</span>.<span class="ident">contiguous</span> {
             <span class="comment">// only discontiguous spaces use chunks</span>
-            <span class="ident">me</span>.<span class="ident">release_free_chunks</span>(<span class="ident">first</span>, <span class="ident">freed</span> <span class="kw">as</span> <span class="kw">_</span>);
+            <span class="ident">me</span>.<span class="ident">release_free_chunks</span>(<span class="ident">first</span>, <span class="ident">freed</span> <span class="kw">as</span> <span class="kw">_</span>, <span class="kw-2">&amp;mut</span> <span class="ident">sync</span>);
         }
     }
 
-    <span class="kw">fn</span> <span class="ident">release_free_chunks</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">freed_page</span>: <span class="ident">Address</span>, <span class="ident">pages_freed</span>: <span class="ident">usize</span>) {
+    <span class="kw">fn</span> <span class="ident">release_free_chunks</span>(
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
+        <span class="ident">freed_page</span>: <span class="ident">Address</span>,
+        <span class="ident">pages_freed</span>: <span class="ident">usize</span>,
+        <span class="ident">sync</span>: <span class="kw-2">&amp;mut</span> <span class="ident">FreeListPageResourceSync</span>,
+    ) {
         <span class="kw">let</span> <span class="ident">page_offset</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">freed_page</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">start</span>);
 
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span> <span class="op">&gt;</span> <span class="number">0</span> {
             <span class="comment">// can only be a single chunk</span>
             <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">==</span> (<span class="ident">PAGES_IN_CHUNK</span> <span class="op">-</span> <span class="self">self</span>.<span class="ident">meta_data_pages_per_region</span>) {
-                <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(<span class="ident">conversions::chunk_align_down</span>(<span class="ident">freed_page</span>));
+                <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(<span class="ident">conversions::chunk_align_down</span>(<span class="ident">freed_page</span>), <span class="ident">sync</span>);
             }
         } <span class="kw">else</span> {
             <span class="comment">// may be multiple chunks</span>
@@ -838,7 +845,10 @@
                 <span class="macro">debug_assert!</span>(<span class="ident">next_region_start</span> <span class="op">&lt;</span> <span class="ident">generic_freelist::MAX_UNITS</span> <span class="kw">as</span> <span class="ident">usize</span>);
                 <span class="kw">if</span> <span class="ident">pages_freed</span> <span class="op">==</span> <span class="ident">next_region_start</span> <span class="op">-</span> <span class="ident">region_start</span> {
                     <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">start</span>;
-                    <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(<span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">region_start</span>));
+                    <span class="self">self</span>.<span class="ident">free_contiguous_chunk</span>(
+                        <span class="ident">start</span> <span class="op">+</span> <span class="ident">conversions::pages_to_bytes</span>(<span class="ident">region_start</span>),
+                        <span class="ident">sync</span>,
+                    );
                 }
             }
         }
