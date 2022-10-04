@@ -320,8 +320,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
     }
 
-    pub fn acquire_block(&self, tls: VMThread, size: usize) -> BlockAcquireResult {
-        let bin = mi_bin(size);
+    pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
+        let bin = mi_bin::<VM>(size, align);
 
         {
             let mut abandoned = self.abandoned_available.lock().unwrap();

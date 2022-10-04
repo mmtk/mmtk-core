@@ -140,3 +140,27 @@ impl FixtureContent for TwoObjects {
         TwoObjects { objref1, objref2 }
     }
 }
+
+use mmtk::plan::Mutator;
+
+pub struct MutatorFixture {
+    pub mmtk: &'static MMTK<DummyVM>,
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl FixtureContent for MutatorFixture {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        MutatorFixture {
+            mmtk: &crate::SINGLETON,
+            mutator: handle,
+        }
+    }
+}

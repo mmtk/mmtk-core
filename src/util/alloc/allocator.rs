@@ -26,11 +26,20 @@ pub fn align_allocation_no_fill<VM: VMBinding>(
     alignment: usize,
     offset: isize,
 ) -> Address {
-    align_allocation::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
+    align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
 }
 
 #[inline(always)]
 pub fn align_allocation<VM: VMBinding>(
+    region: Address,
+    alignment: usize,
+    offset: isize,
+) -> Address {
+    align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, true)
+}
+
+#[inline(always)]
+pub fn align_allocation_inner<VM: VMBinding>(
     region: Address,
     alignment: usize,
     offset: isize,
@@ -91,7 +100,12 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
 }
 
 #[inline(always)]
-pub fn get_maximum_aligned_size<VM: VMBinding>(
+pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize) -> usize {
+    get_maximum_aligned_size_inner::<VM>(size, alignment, VM::MIN_ALIGNMENT)
+}
+
+#[inline(always)]
+pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
     size: usize,
     alignment: usize,
     known_alignment: usize,
