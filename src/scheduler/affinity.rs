@@ -35,7 +35,7 @@ impl AffinityKind {
             AffinityKind::OsDefault => {}
             AffinityKind::RoundRobin(cpuset) => {
                 let cpu = cpuset[thread % cpuset.len()];
-                info!("Set affinity for thread {} to core {}", thread, cpu);
+                debug!("Set affinity for thread {} to core {}", thread, cpu);
                 bind_current_thread_to_core(cpu);
             }
         }
