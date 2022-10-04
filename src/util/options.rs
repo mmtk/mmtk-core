@@ -300,7 +300,8 @@ impl AffinityKind {
                         if let Ok(end) = range[1].parse::<u16>() {
                             if start >= end {
                                 return Err(
-                                    "Starting core id in range should be less than the end".to_string()
+                                    "Starting core id in range should be less than the end"
+                                        .to_string(),
                                 );
                             }
 
@@ -685,10 +686,7 @@ mod tests {
 
                     let options = Options::default();
                     // invalid value from env var, use default.
-                    assert_eq!(
-                        *options.thread_affinity,
-                        AffinityKind::OsDefault
-                    );
+                    assert_eq!(*options.thread_affinity, AffinityKind::OsDefault);
                 },
                 || {
                     std::env::remove_var("MMTK_THREAD_AFFINITY");
@@ -707,7 +705,7 @@ mod tests {
                     let options = Options::default();
                     assert_eq!(
                         *options.thread_affinity,
-                        AffinityKind::RoundRobin(vec![0 as u16])
+                        AffinityKind::RoundRobin(vec![0_u16])
                     );
                 },
                 || {
@@ -722,7 +720,7 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let mut vec = vec![0 as u16];
+                    let mut vec = vec![0_u16];
                     let mut cpu_list = String::new();
                     let num_cpus = get_total_num_cpus();
 
@@ -734,10 +732,7 @@ mod tests {
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
                     let options = Options::default();
-                    assert_eq!(
-                        *options.thread_affinity,
-                        AffinityKind::RoundRobin(vec)
-                    );
+                    assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec));
                 },
                 || {
                     std::env::remove_var("MMTK_THREAD_AFFINITY");
@@ -750,10 +745,7 @@ mod tests {
     fn test_thread_affinity_single_range() {
         serial_test(|| {
             let affinity = "0-1".parse::<AffinityKind>();
-            assert_eq!(
-                affinity,
-                Ok(AffinityKind::RoundRobin(vec![0 as u16, 1 as u16]))
-            );
+            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16])));
         })
     }
 
@@ -763,7 +755,7 @@ mod tests {
             let affinity = "0,1-2,4".parse::<AffinityKind>();
             assert_eq!(
                 affinity,
-                Ok(AffinityKind::RoundRobin(vec![0 as u16, 1 as u16, 2 as u16, 4 as u16]))
+                Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16, 2_u16, 4_u16]))
             );
         })
     }
