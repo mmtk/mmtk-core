@@ -12,6 +12,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
+/// Represents the ID of a GC worker thread.
+pub type ThreadId = usize;
+
 /// The part shared between a GCWorker and the scheduler.
 /// This structure is used for communication, e.g. adding new work packets.
 pub struct GCWorkerShared<VM: VMBinding> {
@@ -42,9 +45,9 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 pub struct GCWorker<VM: VMBinding> {
     /// The VM-specific thread-local state of the GC thread.
     pub tls: VMWorkerThread,
-    /// The ordinal of the worker, numbered from 0 to the number of workers minus one.
-    /// 0 if it is the embedded worker of the GC controller thread.
-    pub ordinal: usize,
+    /// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal
+    /// is usize::MAX if it is the embedded worker of the GC controller thread.
+    pub ordinal: ThreadId,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
     /// The copy context, used to implement copying GC.
@@ -82,7 +85,7 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 impl<VM: VMBinding> GCWorker<VM> {
     pub fn new(
         mmtk: &'static MMTK<VM>,
-        ordinal: usize,
+        ordinal: ThreadId,
         scheduler: Arc<GCWorkScheduler<VM>>,
         is_coordinator: bool,
         sender: Sender<CoordinatorMessage<VM>>,
@@ -167,9 +170,10 @@ impl<VM: VMBinding> GCWorker<VM> {
         work.do_work(self, self.mmtk);
     }
 
-    /// Entry of the worker thread.
+    /// Entry of the worker thread. Resolve thread affinity, if it has been specified by the user.
     /// Each worker will keep polling and executing work packets in a loop.
     pub fn run(&mut self, tls: VMWorkerThread, mmtk: &'static MMTK<VM>) {
+        self.scheduler.resolve_affinity(self.ordinal);
         self.tls = tls;
         self.copy = crate::plan::create_gc_worker_context(tls, mmtk);
         loop {

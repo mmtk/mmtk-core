@@ -107,7 +107,8 @@ impl<VM: VMBinding> MMTK<VM> {
             *options.threads
         };
 
-        let scheduler = GCWorkScheduler::new(num_workers);
+        let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
+
         let plan = crate::plan::create_plan(
             *options.plan,
             &VM_MAP,
