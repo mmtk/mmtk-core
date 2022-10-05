@@ -26,7 +26,6 @@ pub fn ms_mutator_release<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWor
 
 #[cfg(not(feature = "malloc_mark_sweep"))]
 pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
-    // FIXME: rebind?
     let allocator = unsafe {
         mutator
             .allocators
@@ -34,13 +33,7 @@ pub fn ms_mutator_release<VM: VMBinding>(mutator: &mut Mutator<VM>, _tls: VMWork
     }
     .downcast_mut::<FreeListAllocator<VM>>()
     .unwrap();
-    allocator.rebind(
-        mutator
-            .plan
-            .downcast_ref::<MarkSweep<VM>>()
-            .unwrap()
-            .ms_space(),
-    );
+    allocator.reset();
 }
 
 const RESERVED_ALLOCATORS: ReservedAllocators = ReservedAllocators {

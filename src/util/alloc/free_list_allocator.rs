@@ -734,12 +734,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
     }
 
-    pub fn rebind(&mut self, space: &'static MarkSweepSpace<VM>) {
-        trace!("rebind");
-        self.reset();
-        self.space = space;
-    }
-
     pub fn abandon_blocks(&mut self) {
         let mut abandoned = self.space.abandoned_available.lock().unwrap();
         let mut abandoned_consumed = self.space.abandoned_consumed.lock().unwrap();
