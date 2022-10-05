@@ -459,12 +459,22 @@
 <span id="457">457</span>
 <span id="458">458</span>
 <span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">GCWorkerShared</span>, <span class="ident">WorkerGroup</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">GCWorkerShared</span>, <span class="ident">ThreadId</span>, <span class="ident">WorkerGroup</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::AffinityKind</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::Collection</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">GCThreadContext</span>, <span class="ident">VMBinding</span>};
 <span class="kw">use</span> <span class="ident">crossbeam::deque</span>::{<span class="self">self</span>, <span class="ident">Steal</span>};
@@ -505,6 +515,8 @@
     <span class="ident">closure_end</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Counter for pending coordinator messages.</span>
     <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize</span>,
+    <span class="doccomment">/// How to assign the affinity of each GC thread. Specified by the user.</span>
+    <span class="ident">affinity</span>: <span class="ident">AffinityKind</span>,
 }
 
 <span class="comment">// FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.</span>
@@ -513,7 +525,7 @@
 <span class="kw">unsafe</span> <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Sync</span> <span class="kw">for</span> <span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {}
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>, <span class="ident">affinity</span>: <span class="ident">AffinityKind</span>) -&gt; <span class="ident">Arc</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">worker_monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span> <span class="op">=</span> <span class="ident">Default::default</span>();
         <span class="kw">let</span> <span class="ident">worker_group</span> <span class="op">=</span> <span class="ident">WorkerGroup::new</span>(<span class="ident">num_workers</span>);
 
@@ -577,6 +589,7 @@
             <span class="ident">worker_monitor</span>,
             <span class="ident">closure_end</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
             <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
+            <span class="ident">affinity</span>,
         })
     }
 
@@ -610,6 +623,11 @@
         <span class="ident">VM::VMCollection::spawn_gc_thread</span>(<span class="ident">tls</span>, <span class="ident">GCThreadContext</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::Controller</span>(<span class="ident">gc_controller</span>));
 
         <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">spawn</span>(<span class="ident">mmtk</span>, <span class="ident">sender</span>, <span class="ident">tls</span>)
+    }
+
+    <span class="doccomment">/// Resolve the affinity of a thread.</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">resolve_affinity</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">thread</span>: <span class="ident">ThreadId</span>) {
+        <span class="self">self</span>.<span class="ident">affinity</span>.<span class="ident">resolve_affinity</span>(<span class="ident">thread</span>);
     }
 
     <span class="doccomment">/// Schedule all the common work packets</span>
