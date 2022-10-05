@@ -323,8 +323,8 @@
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="doccomment">/// The VM-specific thread-local state of the GC thread.</span>
     <span class="kw">pub</span> <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>,
-    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one.</span>
-    <span class="doccomment">/// 0 if it is the embedded worker of the GC controller thread.</span>
+    <span class="doccomment">/// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal</span>
+    <span class="doccomment">/// is usize::MAX if it is the embedded worker of the GC controller thread.</span>
     <span class="kw">pub</span> <span class="ident">ordinal</span>: <span class="ident">usize</span>,
     <span class="doccomment">/// The reference to the scheduler.</span>
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
