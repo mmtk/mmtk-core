@@ -45,8 +45,8 @@ impl<VM: VMBinding> GCWorkerShared<VM> {
 pub struct GCWorker<VM: VMBinding> {
     /// The VM-specific thread-local state of the GC thread.
     pub tls: VMWorkerThread,
-    /// The ordinal of the worker, numbered from 0 to the number of workers minus one.
-    /// 0 if it is the embedded worker of the GC controller thread.
+    /// The ordinal of the worker, numbered from 0 to the number of workers minus one. The ordinal
+    /// is usize::MAX if it is the embedded worker of the GC controller thread.
     pub ordinal: ThreadId,
     /// The reference to the scheduler.
     scheduler: Arc<GCWorkScheduler<VM>>,
