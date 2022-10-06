@@ -76,9 +76,9 @@ define_side_metadata_specs!(
     // Mark blocks by immix
     IX_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::block::Block::LOG_BYTES),
     // Mark chunks by immix
-    IX_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::immix::chunk::Chunk::LOG_BYTES),
+    IX_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::heap::chunk_map::Chunk::LOG_BYTES),
     // Mark chunks by (native mimalloc) marksweep
-    MS_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::chunk::Chunk::LOG_BYTES),
+    // MS_CHUNK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::chunk::Chunk::LOG_BYTES),
     // Mark blocks by (native mimalloc) marksweep
     MS_BLOCK_MARK   = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::policy::marksweepspace::block::Block::LOG_BYTES),
     // Next block in list for native mimalloc

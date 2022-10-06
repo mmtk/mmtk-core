@@ -6,7 +6,6 @@ use crate::{
     policy::{
         marksweepspace::{
             block::{Block, BlockState},
-            chunk::Chunk,
             metadata::{is_marked, set_mark_bit},
         },
         sft::GCWorkerMutRef,
@@ -31,15 +30,13 @@ use crate::{
     vm::VMBinding,
 };
 
-use super::{
-    super::space::{CommonSpace, Space},
-    chunk::{ChunkMap, ChunkState},
-};
+use super::super::space::{CommonSpace, Space};
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
 use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::util::VMThread;
 use crate::vm::ObjectModel;
@@ -257,11 +254,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn prepare(&mut self) {
         if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-            for chunk in self
-                .chunk_map
-                .all_chunks()
-                .filter(|c| self.chunk_map.get(*c) == ChunkState::Allocated)
-            {
+            for chunk in self.chunk_map.all_chunks() {
                 side.bzero_metadata(chunk.start(), Chunk::BYTES);
             }
         } else {
@@ -272,8 +265,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
         use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
-        let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_sweep_tasks(space);
+        let work_packets = self.generate_sweep_tasks();
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
         let mut abandoned_consumed = self.abandoned_consumed.lock().unwrap();
@@ -335,5 +327,45 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         BlockAcquireResult::Fresh(Block::from(
             self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE),
         ))
+    }
+
+    pub fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
+        let space = unsafe { &*(self as *const Self) };
+        self.chunk_map
+            .generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
+    }
+}
+
+use crate::scheduler::GCWork;
+use crate::MMTK;
+
+/// Chunk sweeping work packet.
+struct SweepChunk<VM: VMBinding> {
+    space: &'static MarkSweepSpace<VM>,
+    chunk: Chunk,
+}
+
+impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
+        // number of allocated blocks.
+        let mut allocated_blocks = 0;
+        // Iterate over all allocated blocks in this chunk.
+        for block in self
+            .chunk
+            .iter_region::<Block>()
+            .filter(|block| block.get_state() != BlockState::Unallocated)
+        {
+            if !block.attempt_release(self.space) {
+                // Block is live. Increment the allocated block count.
+                allocated_blocks += 1;
+            }
+        }
+        // Set this chunk as free if there is not live blocks.
+        if allocated_blocks == 0 {
+            self.space.chunk_map.set(self.chunk, ChunkState::Free)
+        }
     }
 }

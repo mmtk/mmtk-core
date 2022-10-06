@@ -1,5 +1,4 @@
 pub mod block;
-pub mod chunk;
 pub mod defrag;
 pub mod immixspace;
 pub mod line;

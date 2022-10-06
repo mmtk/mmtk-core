@@ -1,15 +1,12 @@
 use super::line::*;
-use super::{
-    block::*,
-    chunk::{Chunk, ChunkMap, ChunkState},
-    defrag::Defrag,
-};
+use super::{block::*, defrag::Defrag};
 use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
+use crate::util::heap::chunk_map::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
@@ -321,14 +318,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             self.reusable_blocks.reset();
         }
         // Sweep chunks and blocks
-        // # Safety: ImmixSpace reference is always valid within this collection cycle.
-        let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_sweep_tasks(space);
+        let work_packets = self.generate_sweep_tasks();
         self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         if super::DEFRAG {
             self.defrag.release(self);
         }
         did_defrag
+    }
+
+    /// Generate chunk sweep tasks
+    fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
+        self.defrag.mark_histograms.lock().clear();
+        // # Safety: ImmixSpace reference is always valid within this collection cycle.
+        let space = unsafe { &*(self as *const Self) };
+        self.chunk_map
+            .generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
     }
 
     /// Release a block.
@@ -629,7 +633,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
         // Clear object mark table for this chunk
         Self::reset_object_mark(self.chunk);
         // Iterate over all blocks in this chunk
-        for block in self.chunk.blocks() {
+        for block in self.chunk.iter_region::<Block>() {
             let state = block.get_state();
             // Skip unallocated blocks.
             if state == BlockState::Unallocated {
@@ -646,6 +650,44 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
             debug_assert!(!block.get_state().is_reusable());
             debug_assert_ne!(block.get_state(), BlockState::Marked);
         }
+    }
+}
+
+/// Chunk sweeping work packet.
+struct SweepChunk<VM: VMBinding> {
+    space: &'static ImmixSpace<VM>,
+    chunk: Chunk,
+}
+
+impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        let mut histogram = self.space.defrag.new_histogram();
+        if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
+            let line_mark_state = if super::BLOCK_ONLY {
+                None
+            } else {
+                Some(self.space.line_mark_state.load(Ordering::Acquire))
+            };
+            // number of allocated blocks.
+            let mut allocated_blocks = 0;
+            // Iterate over all allocated blocks in this chunk.
+            for block in self
+                .chunk
+                .iter_region::<Block>()
+                .filter(|block| block.get_state() != BlockState::Unallocated)
+            {
+                if !block.sweep(self.space, &mut histogram, line_mark_state) {
+                    // Block is live. Increment the allocated block count.
+                    allocated_blocks += 1;
+                }
+            }
+            // Set this chunk as free if there is not live blocks.
+            if allocated_blocks == 0 {
+                self.space.chunk_map.set(self.chunk, ChunkState::Free)
+            }
+        }
+        self.space.defrag.add_completed_mark_histogram(histogram);
     }
 }
 

@@ -2,6 +2,9 @@
 
 use atomic::Ordering;
 
+use super::MarkSweepSpace;
+use crate::util::heap::chunk_map::*;
+use crate::util::linear_scan::Region;
 use crate::{
     util::{
         alloc::free_list_allocator::BlockList, metadata::side_metadata::SideMetadataSpec, Address,
@@ -9,9 +12,6 @@ use crate::{
     },
     vm::VMBinding,
 };
-
-use super::{chunk::Chunk, MarkSweepSpace};
-use crate::util::linear_scan::Region;
 
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
