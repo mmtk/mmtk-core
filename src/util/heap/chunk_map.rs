@@ -38,7 +38,9 @@ impl Chunk {
     /// Get an iterator for regions within this chunk.
     #[inline(always)]
     pub fn iter_region<R: Region>(&self) -> RegionIterator<R> {
-        // We assume we have multiple Rs in a region.
+        // R should be smaller than a chunk
+        debug_assert!(R::LOG_BYTES < Self::LOG_BYTES);
+        // R should be aligned to chunk boundary
         debug_assert!(R::is_aligned(self.start()));
         debug_assert!(R::is_aligned(self.end()));
 
@@ -58,7 +60,9 @@ pub enum ChunkState {
     Allocated = 1,
 }
 
-/// A byte-map to record all the allocated chunks
+/// A byte-map to record all the allocated chunks.
+/// A plan can use this to maintain records for the chunks that they used, and the states of the chunks.
+/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their local sidemetadata specs
 pub struct ChunkMap {
     chunk_range: Mutex<Range<Chunk>>,
 }
@@ -66,7 +70,7 @@ pub struct ChunkMap {
 impl ChunkMap {
     /// Chunk alloc table
     pub const ALLOC_TABLE: SideMetadataSpec =
-        crate::util::metadata::side_metadata::spec_defs::IX_CHUNK_MARK;
+        crate::util::metadata::side_metadata::spec_defs::CHUNK_MARK;
 
     pub fn new() -> Self {
         Self {
@@ -113,7 +117,7 @@ impl ChunkMap {
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
-    /// Helper function to create per-chunk processing work packets.
+    /// Helper function to create per-chunk processing work packets for each allocated chunks.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
         func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
