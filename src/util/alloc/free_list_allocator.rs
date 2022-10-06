@@ -241,7 +241,6 @@ impl BlockList {
                 .lock
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok();
-            debug_assert!(success, "Do we really need lock?");
         }
     }
 
