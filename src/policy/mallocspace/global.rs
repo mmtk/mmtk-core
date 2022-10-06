@@ -380,6 +380,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
+    pub fn prepare(&mut self) {}
+
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
         let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];

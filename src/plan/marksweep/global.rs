@@ -92,8 +92,7 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        #[cfg(not(feature = "malloc_mark_sweep"))]
-        self.ms.reset();
+        self.ms.prepare();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {

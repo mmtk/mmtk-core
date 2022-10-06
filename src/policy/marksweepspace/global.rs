@@ -231,18 +231,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         object
     }
 
-    pub fn zero_mark_bits(&self) {
-        // todo: concurrent zeroing
-        use crate::vm::*;
-        for chunk in self.chunk_map.all_chunks() {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-                side.bzero_metadata(chunk.start(), Chunk::BYTES);
-            } else {
-                unimplemented!();
-            }
-        }
-    }
-
     pub fn block_has_no_objects(&self, block: Block) -> bool {
         // for debugging, delete this later
         // assumes block is allocated (has metadata)
@@ -267,8 +255,18 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         Block::NEXT_BLOCK_TABLE
     }
 
-    pub fn reset(&mut self) {
-        self.zero_mark_bits();
+    pub fn prepare(&mut self) {
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+            for chunk in self
+                .chunk_map
+                .all_chunks()
+                .filter(|c| self.chunk_map.get(*c) == ChunkState::Allocated)
+            {
+                side.bzero_metadata(chunk.start(), Chunk::BYTES);
+            }
+        } else {
+            unimplemented!("in header mark bit is not supported");
+        }
     }
 
     pub fn release(&mut self) {
