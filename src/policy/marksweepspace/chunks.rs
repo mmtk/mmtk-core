@@ -60,26 +60,26 @@ impl Chunk {
         start..end
     }
 
-    /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) {
-        // let line_mark_state = None;
-        // number of allocated blocks.
-        let mut allocated_blocks = 0;
-        // Iterate over all allocated blocks in this chunk.
-        for block in self
-            .blocks()
-            .filter(|block| block.get_state() != BlockState::Unallocated)
-        {
-            if !block.sweep(space) {
-                // Block is live. Increment the allocated block count.
-                allocated_blocks += 1;
-            }
-        }
-        // Set this chunk as free if there is not live blocks.
-        if allocated_blocks == 0 {
-            space.chunk_map.set(*self, ChunkState::Free)
-        }
-    }
+    // /// Sweep this chunk.
+    // pub fn sweep<VM: VMBinding>(&self, space: &MarkSweepSpace<VM>) {
+    //     // let line_mark_state = None;
+    //     // number of allocated blocks.
+    //     let mut allocated_blocks = 0;
+    //     // Iterate over all allocated blocks in this chunk.
+    //     for block in self
+    //         .blocks()
+    //         .filter(|block| block.get_state() != BlockState::Unallocated)
+    //     {
+    //         if !block.sweep(space) {
+    //             // Block is live. Increment the allocated block count.
+    //             allocated_blocks += 1;
+    //         }
+    //     }
+    //     // Set this chunk as free if there is not live blocks.
+    //     if allocated_blocks == 0 {
+    //         space.chunk_map.set(*self, ChunkState::Free)
+    //     }
+    // }
 }
 
 unsafe impl Step for Chunk {

@@ -23,8 +23,10 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
+use crate::scheduler::GCWorkScheduler;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
+use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
 
@@ -39,6 +41,8 @@ pub struct MallocSpace<VM: VMBinding> {
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadataContext,
+    /// Work packet scheduler
+    scheduler: Arc<GCWorkScheduler<VM>>,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -210,7 +214,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 }
 
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
+    pub fn new(
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
+    ) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -224,6 +231,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
+            scheduler,
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -370,6 +378,39 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 }
             }
         }
+    }
+
+    pub fn release(&mut self) {
+        use crate::scheduler::WorkBucketStage;
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
+        let mut chunk = unsafe { Address::from_usize(self.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
+        let end = unsafe { Address::from_usize(self.chunk_addr_max.load(Ordering::Relaxed)) }
+            + BYTES_IN_CHUNK;
+
+        // Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
+        // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
+        // non-atomic accesses
+        let space = unsafe { &*(self as *const Self) };
+        while chunk < end {
+            if is_chunk_mapped(chunk)
+                && unsafe { crate::policy::marksweepspace::metadata::is_chunk_marked_unsafe(chunk) }
+            {
+                work_packets.push(Box::new(MSSweepChunk { ms: space, chunk }));
+            }
+
+            chunk += BYTES_IN_CHUNK;
+        }
+
+        debug!("Generated {} sweep work packets", work_packets.len());
+        #[cfg(debug_assertions)]
+        {
+            self.total_work_packets
+                .store(work_packets.len() as u32, Ordering::SeqCst);
+            self.completed_work_packets.store(0, Ordering::SeqCst);
+            self.work_live_bytes.store(0, Ordering::SeqCst);
+        }
+
+        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
     }
 
     pub fn sweep_chunk(&self, chunk_start: Address) {
@@ -643,5 +684,22 @@ impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObj
     fn size(object: ObjectReference) -> usize {
         let (_, _, bytes) = MallocSpace::<VM>::get_malloc_addr_size(object);
         bytes
+    }
+}
+
+use crate::scheduler::GCWork;
+use crate::MMTK;
+
+/// Simple work packet that just sweeps a single chunk
+pub struct MSSweepChunk<VM: VMBinding> {
+    ms: &'static MallocSpace<VM>,
+    // starting address of a chunk
+    chunk: Address,
+}
+
+impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.ms.sweep_chunk(self.chunk);
     }
 }

@@ -184,8 +184,7 @@ impl Block {
     }
 
     pub fn load_block_cell_size(&self) -> usize {
-        // FIXME: cannot cast u64 to usize
-        Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst) as usize
+        Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst)
     }
 
     pub fn store_block_cell_size(&self, size: usize) {
@@ -232,25 +231,16 @@ impl Block {
         Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
-    /// Sweep this block.
-    /// Return true if the block is swept.
+    /// Release this block if it is unmarked. Return true if the block is release.
     #[inline(always)]
-    pub fn sweep<VM: VMBinding>(self, space: &MarkSweepSpace<VM>) -> bool {
+    pub fn attempt_release<VM: VMBinding>(self, space: &MarkSweepSpace<VM>) -> bool {
         match self.get_state() {
             BlockState::Unallocated => false,
             BlockState::Unmarked => {
-                unsafe {
-                    let block_list = loop {
-                        let list = self.load_block_list();
-                        (*list).lock();
-                        if list == self.load_block_list() {
-                            break list;
-                        }
-                        (*list).unlock();
-                    };
-                    (*block_list).remove(self);
-                    (*block_list).unlock();
-                }
+                let block_list: &mut BlockList = unsafe { &mut *self.load_block_list() };
+                block_list.lock();
+                block_list.remove(self);
+                block_list.unlock();
                 space.release_block(self);
                 true
             }

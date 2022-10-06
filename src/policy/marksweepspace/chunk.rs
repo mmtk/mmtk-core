@@ -63,7 +63,7 @@ impl Chunk {
             .blocks()
             .filter(|block| block.get_state() != BlockState::Unallocated)
         {
-            if !block.sweep(space) {
+            if !block.attempt_release(space) {
                 // Block is live. Increment the allocated block count.
                 allocated_blocks += 1;
             }
@@ -178,8 +178,7 @@ struct SweepChunk<VM: VMBinding> {
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
     #[inline]
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
-            self.chunk.sweep(self.space);
-        }
+        debug_assert!(self.space.chunk_map.get(self.chunk) == ChunkState::Allocated);
+        self.chunk.sweep(self.space);
     }
 }

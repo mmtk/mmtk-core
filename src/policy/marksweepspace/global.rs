@@ -12,7 +12,7 @@ use crate::{
         sft::GCWorkerMutRef,
         space::SpaceOptions,
     },
-    scheduler::{GCWorkScheduler, GCWorker, WorkBucketStage},
+    scheduler::{GCWorkScheduler, GCWorker},
     util::{
         alloc::free_list_allocator::mi_bin,
         alloc_bit::is_alloced,
@@ -38,7 +38,6 @@ use super::{
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
-use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
 use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::linear_scan::Region;
@@ -141,11 +140,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 }
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
-    /// Get work packet scheduler
-    fn scheduler(&self) -> &GCWorkScheduler<VM> {
-        &self.scheduler
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,
@@ -277,10 +271,12 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         self.zero_mark_bits();
     }
 
-    pub fn block_level_sweep(&self) {
+    pub fn release(&mut self) {
+        use crate::scheduler::WorkBucketStage;
+        use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
         let space = unsafe { &*(self as *const Self) };
         let work_packets = self.chunk_map.generate_sweep_tasks(space);
-        self.scheduler().work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
         let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
         let mut abandoned_consumed = self.abandoned_consumed.lock().unwrap();
         let mut i = 0;

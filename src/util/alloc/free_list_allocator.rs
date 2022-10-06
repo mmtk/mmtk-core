@@ -241,6 +241,7 @@ impl BlockList {
                 .lock
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
                 .is_ok();
+            debug_assert!(success, "Do we really need lock?");
         }
     }
 
@@ -664,20 +665,15 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             let unswept = self.unswept_blocks.get_mut(bin).unwrap();
             unswept.lock();
 
-            let available = self.available_blocks.get_mut(bin).unwrap();
-            available.lock();
-            unswept.append(available);
-            available.unlock();
+            let mut sweep_later = |list: &mut BlockList| {
+                list.lock();
+                unswept.append(list);
+                list.unlock();
+            };
 
-            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
-            consumed.lock();
-            unswept.append(consumed);
-            consumed.unlock();
-
-            let available_stress = self.available_blocks_stress.get_mut(bin).unwrap();
-            available_stress.lock();
-            unswept.append(available_stress);
-            available_stress.unlock();
+            sweep_later(&mut self.available_blocks[bin]);
+            sweep_later(&mut self.available_blocks_stress[bin]);
+            sweep_later(&mut self.consumed_blocks[bin]);
 
             unswept.unlock();
             bin += 1;
@@ -694,37 +690,30 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
         while bin < MAX_BIN + 1 {
-            let available = self.available_blocks.get_mut(bin).unwrap();
-
-            let mut block = available.first;
-            while !block.is_zero() {
-                let next = block.load_next_block();
-                if !block.sweep(self.space) {
-                    self.sweep_block(block);
+            let sweep = |first_block: Block, used_blocks: bool| {
+                let mut cursor = first_block;
+                while !cursor.is_zero() {
+                    if used_blocks {
+                        self.sweep_block(cursor);
+                        cursor = cursor.load_next_block();
+                    } else {
+                        let next = cursor.load_next_block();
+                        if !cursor.attempt_release(self.space) {
+                            self.sweep_block(cursor);
+                        }
+                        cursor = next;
+                    }
                 }
-                block = next;
-            }
+            };
 
-            let available = self.available_blocks_stress.get_mut(bin).unwrap();
+            sweep(self.available_blocks[bin].first, true);
+            sweep(self.available_blocks_stress[bin].first, true);
 
-            let mut block = available.first;
-            while !block.is_zero() {
-                let next = block.load_next_block();
-                if !block.sweep(self.space) {
-                    self.sweep_block(block);
-                }
-                block = next;
-            }
-
-            let consumed = self.consumed_blocks.get_mut(bin).unwrap();
-            let mut block = consumed.first;
-            while !block.is_zero() {
-                self.sweep_block(block);
-                block = block.load_next_block();
-            }
-
+            // Sweep consumed blocks, and also push the blocks back to the available list.
+            sweep(self.consumed_blocks[bin].first, false);
             if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled()
             {
+                debug_assert!(self.plan.base().is_precise_stress());
                 self.available_blocks_stress[bin].append(&mut self.consumed_blocks[bin]);
             } else {
                 self.available_blocks[bin].append(&mut self.consumed_blocks[bin]);

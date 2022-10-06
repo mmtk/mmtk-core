@@ -2,8 +2,6 @@ use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
-#[cfg(feature = "malloc_mark_sweep")]
-use crate::plan::marksweep::gc_work::MSSweepChunks;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -18,8 +16,6 @@ use crate::policy::marksweepspace::block::Block;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
-#[cfg(feature = "malloc_mark_sweep")]
-use crate::scheduler::WorkBucketStage;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "malloc_mark_sweep")]
 use crate::util::constants::MAX_INT;
@@ -88,8 +84,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
-        #[cfg(feature = "malloc_mark_sweep")]
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -103,8 +97,9 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        #[cfg(not(any(feature = "malloc_mark_sweep", feature = "eager_sweeping")))]
-        self.ms.block_level_sweep();
+        // We sweep and release unmarked blocks here. For sweeping cells inside each block, we either
+        // do that when we release mutators (eager sweeping), or do that at allocation time (lazy sweeping).
+        self.ms.release();
         self.common.release(tls, true);
     }
 
@@ -190,7 +185,7 @@ impl<VM: VMBinding> MarkSweep<VM> {
                 ACTIVE_CHUNK_METADATA_SPEC,
             ]);
             MarkSweep {
-                ms: MallocSpace::new(global_metadata_specs.clone()),
+                ms: MallocSpace::new(global_metadata_specs.clone(), scheduler),
                 common: CommonPlan::new(
                     vm_map,
                     mmapper,
