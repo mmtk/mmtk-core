@@ -245,6 +245,11 @@ pub(crate) fn create_allocator_mapping(
 
         map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(reserved.n_large_object);
         reserved.n_large_object += 1;
+
+        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
+        map[AllocationSemantics::NonMoving] =
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer);
+        reserved.n_bump_pointer += 1;
     }
 
     reserved.validate();
@@ -306,6 +311,12 @@ pub(crate) fn create_space_mapping<VM: VMBinding>(
             plan.common().get_los(),
         ));
         reserved.n_large_object += 1;
+        // TODO: This should be freelist allocator once we use marksweep for nonmoving space.
+        vec.push((
+            AllocatorSelector::BumpPointer(reserved.n_bump_pointer),
+            plan.common().get_nonmoving(),
+        ));
+        reserved.n_bump_pointer += 1;
     }
 
     reserved.validate();
