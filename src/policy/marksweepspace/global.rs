@@ -34,7 +34,7 @@ use super::super::space::{CommonSpace, Space};
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
-use crate::util::alloc::free_list_allocator::{BlockLists, BLOCK_LISTS_EMPTY};
+use crate::util::alloc::free_list_allocator::{new_empty_block_lists, BlockLists};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
@@ -199,9 +199,9 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             common,
             chunk_map: ChunkMap::new(),
             scheduler,
-            abandoned_available: Mutex::from(BLOCK_LISTS_EMPTY),
-            abandoned_unswept: Mutex::from(BLOCK_LISTS_EMPTY),
-            abandoned_consumed: Mutex::from(BLOCK_LISTS_EMPTY),
+            abandoned_available: Mutex::from(new_empty_block_lists()),
+            abandoned_unswept: Mutex::from(new_empty_block_lists()),
+            abandoned_consumed: Mutex::from(new_empty_block_lists()),
         }
     }
 

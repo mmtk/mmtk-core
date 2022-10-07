@@ -22,63 +22,66 @@ pub const MI_BIN_FULL: usize = MAX_BIN + 1;
 pub const BYTES_IN_BLOCK_WSIZE: usize = Block::BYTES / MI_INTPTR_SIZE;
 pub const MAX_BIN: usize = 48;
 const ZERO_BLOCK: Block = Block::ZERO_BLOCK;
-pub type BlockLists = [BlockList; MAX_BIN + 1];
 
-// FIXME: Due to https://rust-lang.github.io/rust-clippy/master/index.html#declare_interior_mutable_const, this should be static.
-// If this is a const, each time it is referenced, a new copy of this constant will be used. Do we actually want one copy or multiple copies?
-// Need to double check on this
-#[allow(clippy::declare_interior_mutable_const)]
-pub(crate) const BLOCK_LISTS_EMPTY: BlockLists = [
-    BlockList::new(MI_INTPTR_SIZE),
-    BlockList::new(MI_INTPTR_SIZE),
-    BlockList::new(2 * MI_INTPTR_SIZE),
-    BlockList::new(3 * MI_INTPTR_SIZE),
-    BlockList::new(4 * MI_INTPTR_SIZE),
-    BlockList::new(5 * MI_INTPTR_SIZE),
-    BlockList::new(6 * MI_INTPTR_SIZE),
-    BlockList::new(7 * MI_INTPTR_SIZE),
-    BlockList::new(8 * MI_INTPTR_SIZE), /* 8 */
-    BlockList::new(10 * MI_INTPTR_SIZE),
-    BlockList::new(12 * MI_INTPTR_SIZE),
-    BlockList::new(14 * MI_INTPTR_SIZE),
-    BlockList::new(16 * MI_INTPTR_SIZE),
-    BlockList::new(20 * MI_INTPTR_SIZE),
-    BlockList::new(24 * MI_INTPTR_SIZE),
-    BlockList::new(28 * MI_INTPTR_SIZE),
-    BlockList::new(32 * MI_INTPTR_SIZE), /* 16 */
-    BlockList::new(40 * MI_INTPTR_SIZE),
-    BlockList::new(48 * MI_INTPTR_SIZE),
-    BlockList::new(56 * MI_INTPTR_SIZE),
-    BlockList::new(64 * MI_INTPTR_SIZE),
-    BlockList::new(80 * MI_INTPTR_SIZE),
-    BlockList::new(96 * MI_INTPTR_SIZE),
-    BlockList::new(112 * MI_INTPTR_SIZE),
-    BlockList::new(128 * MI_INTPTR_SIZE), /* 24 */
-    BlockList::new(160 * MI_INTPTR_SIZE),
-    BlockList::new(192 * MI_INTPTR_SIZE),
-    BlockList::new(224 * MI_INTPTR_SIZE),
-    BlockList::new(256 * MI_INTPTR_SIZE),
-    BlockList::new(320 * MI_INTPTR_SIZE),
-    BlockList::new(384 * MI_INTPTR_SIZE),
-    BlockList::new(448 * MI_INTPTR_SIZE),
-    BlockList::new(512 * MI_INTPTR_SIZE), /* 32 */
-    BlockList::new(640 * MI_INTPTR_SIZE),
-    BlockList::new(768 * MI_INTPTR_SIZE),
-    BlockList::new(896 * MI_INTPTR_SIZE),
-    BlockList::new(1024 * MI_INTPTR_SIZE),
-    BlockList::new(1280 * MI_INTPTR_SIZE),
-    BlockList::new(1536 * MI_INTPTR_SIZE),
-    BlockList::new(1792 * MI_INTPTR_SIZE),
-    BlockList::new(2048 * MI_INTPTR_SIZE), /* 40 */
-    BlockList::new(2560 * MI_INTPTR_SIZE),
-    BlockList::new(3072 * MI_INTPTR_SIZE),
-    BlockList::new(3584 * MI_INTPTR_SIZE),
-    BlockList::new(4096 * MI_INTPTR_SIZE),
-    BlockList::new(5120 * MI_INTPTR_SIZE),
-    BlockList::new(6144 * MI_INTPTR_SIZE),
-    BlockList::new(7168 * MI_INTPTR_SIZE),
-    BlockList::new(8192 * MI_INTPTR_SIZE), /* 48 */
-];
+/// All the bins for the block lists
+// Each block list takes roughly 8bytes * 4 * 49 = 1658 bytes. It is more reasonable to heap allocate them, and
+// just put them behind a boxed pointer.
+pub type BlockLists = Box<[BlockList; MAX_BIN + 1]>;
+
+/// Create an empty set of block lists of different size classes (bins)
+pub(crate) fn new_empty_block_lists() -> BlockLists {
+    Box::new([
+        BlockList::new(MI_INTPTR_SIZE),
+        BlockList::new(MI_INTPTR_SIZE),
+        BlockList::new(2 * MI_INTPTR_SIZE),
+        BlockList::new(3 * MI_INTPTR_SIZE),
+        BlockList::new(4 * MI_INTPTR_SIZE),
+        BlockList::new(5 * MI_INTPTR_SIZE),
+        BlockList::new(6 * MI_INTPTR_SIZE),
+        BlockList::new(7 * MI_INTPTR_SIZE),
+        BlockList::new(8 * MI_INTPTR_SIZE), /* 8 */
+        BlockList::new(10 * MI_INTPTR_SIZE),
+        BlockList::new(12 * MI_INTPTR_SIZE),
+        BlockList::new(14 * MI_INTPTR_SIZE),
+        BlockList::new(16 * MI_INTPTR_SIZE),
+        BlockList::new(20 * MI_INTPTR_SIZE),
+        BlockList::new(24 * MI_INTPTR_SIZE),
+        BlockList::new(28 * MI_INTPTR_SIZE),
+        BlockList::new(32 * MI_INTPTR_SIZE), /* 16 */
+        BlockList::new(40 * MI_INTPTR_SIZE),
+        BlockList::new(48 * MI_INTPTR_SIZE),
+        BlockList::new(56 * MI_INTPTR_SIZE),
+        BlockList::new(64 * MI_INTPTR_SIZE),
+        BlockList::new(80 * MI_INTPTR_SIZE),
+        BlockList::new(96 * MI_INTPTR_SIZE),
+        BlockList::new(112 * MI_INTPTR_SIZE),
+        BlockList::new(128 * MI_INTPTR_SIZE), /* 24 */
+        BlockList::new(160 * MI_INTPTR_SIZE),
+        BlockList::new(192 * MI_INTPTR_SIZE),
+        BlockList::new(224 * MI_INTPTR_SIZE),
+        BlockList::new(256 * MI_INTPTR_SIZE),
+        BlockList::new(320 * MI_INTPTR_SIZE),
+        BlockList::new(384 * MI_INTPTR_SIZE),
+        BlockList::new(448 * MI_INTPTR_SIZE),
+        BlockList::new(512 * MI_INTPTR_SIZE), /* 32 */
+        BlockList::new(640 * MI_INTPTR_SIZE),
+        BlockList::new(768 * MI_INTPTR_SIZE),
+        BlockList::new(896 * MI_INTPTR_SIZE),
+        BlockList::new(1024 * MI_INTPTR_SIZE),
+        BlockList::new(1280 * MI_INTPTR_SIZE),
+        BlockList::new(1536 * MI_INTPTR_SIZE),
+        BlockList::new(1792 * MI_INTPTR_SIZE),
+        BlockList::new(2048 * MI_INTPTR_SIZE), /* 40 */
+        BlockList::new(2560 * MI_INTPTR_SIZE),
+        BlockList::new(3072 * MI_INTPTR_SIZE),
+        BlockList::new(3584 * MI_INTPTR_SIZE),
+        BlockList::new(4096 * MI_INTPTR_SIZE),
+        BlockList::new(5120 * MI_INTPTR_SIZE),
+        BlockList::new(6144 * MI_INTPTR_SIZE),
+        BlockList::new(7168 * MI_INTPTR_SIZE),
+        BlockList::new(8192 * MI_INTPTR_SIZE), /* 48 */
+    ])
+}
 
 // Free list allocator
 #[repr(C)]
@@ -324,6 +327,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
         // mimic what fastpath allocation does, except that we allocate from available_blocks_stress.
         let block = self.find_free_block_stress(size, align);
+        if block.is_zero() {
+            return Address::ZERO;
+        }
         let cell = self.block_alloc(block);
         allocator::align_allocation::<VM>(cell, align, offset)
     }
@@ -356,10 +362,10 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             tls,
             space,
             plan,
-            available_blocks: BLOCK_LISTS_EMPTY,
-            available_blocks_stress: BLOCK_LISTS_EMPTY,
-            unswept_blocks: BLOCK_LISTS_EMPTY,
-            consumed_blocks: BLOCK_LISTS_EMPTY,
+            available_blocks: new_empty_block_lists(),
+            available_blocks_stress: new_empty_block_lists(),
+            unswept_blocks: new_empty_block_lists(),
+            consumed_blocks: new_empty_block_lists(),
         }
     }
 
@@ -397,7 +403,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         if block.is_zero() {
             block = self.acquire_fresh_block(size, align, true);
         }
-        debug_assert!(!block.is_zero());
         block
     }
 
