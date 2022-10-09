@@ -31,17 +31,26 @@ pub struct MutatorConfig<VM: VMBinding> {
 
 impl<VM: VMBinding> std::fmt::Debug for MutatorConfig<VM> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("MutatorConfig: ").unwrap();
-        f.write_str("allocator_mapping = ").unwrap();
-        f.debug_set()
-            .entries(self.allocator_mapping.iter())
-            .finish()
-            .unwrap();
-        f.write_str(", space_mapping = ").unwrap();
-        f.debug_set()
-            .entries(self.space_mapping.iter().map(|e| (e.0, e.1.name())))
-            .finish()
-            .unwrap();
+        f.write_str("MutatorConfig:\n")?;
+        f.write_str("Semantics mapping:\n")?;
+        for (semantic, selector) in self.allocator_mapping.iter() {
+            let space_name: &str = match self
+                .space_mapping
+                .iter()
+                .find(|(selector_to_find, _)| selector_to_find == selector)
+            {
+                Some((_, space)) => space.name(),
+                None => "!!!missing space here!!!",
+            };
+            f.write_fmt(format_args!(
+                "- {:?} = {:?} ({:?})\n",
+                semantic, selector, space_name
+            ))?;
+        }
+        f.write_str("Space mapping:\n")?;
+        for (selector, space) in self.space_mapping.iter() {
+            f.write_fmt(format_args!("- {:?} = {:?}\n", selector, space.name()))?;
+        }
         Ok(())
     }
 }
