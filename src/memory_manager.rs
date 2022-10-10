@@ -97,7 +97,13 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
-    crate::plan::create_mutator(tls, mmtk)
+    let mutator = crate::plan::create_mutator(tls, mmtk);
+
+    const LOG_ALLOCATOR_MAPPING: bool = false;
+    if LOG_ALLOCATOR_MAPPING {
+        info!("{:?}", mutator.config);
+    }
+    mutator
 }
 
 /// Report to MMTk that a mutator that is no longer needed. A binding should not attempt
