@@ -51,12 +51,6 @@ paste = "1.0.8"
 [build-dependencies]
 built = { version = "0.5.1", features = ["git2"] }
 
-[profile.release]
-debug = true
-
-[profile.dev]
-opt-level = 3
-
 [features]
 default = []
 
