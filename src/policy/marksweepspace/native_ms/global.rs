@@ -138,6 +138,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 pub const MAX_OBJECT_SIZE: usize = Block::BYTES;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
+    pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {
+        // MarkSweepSpace does not need any special global specs. This method exists, as
+        // we need this method for MallocSpace, and we want those two spaces to be used interchangably.
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &'static str,

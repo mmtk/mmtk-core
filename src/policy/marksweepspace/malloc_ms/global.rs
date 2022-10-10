@@ -222,23 +222,30 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
 
 impl<VM: VMBinding> MallocSpace<VM> {
+    pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
+        // MallocSpace needs to use alloc bit. If the feature is turned on, the alloc bit spec is in the global specs.
+        // Otherwise, we manually add it.
+        if !cfg!(feature = "global_alloc_bit") {
+            specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
+        }
+        // MallocSpace also need a global chunk metadata.
+        // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
+        // One reason could be that the address range in this space is not in our control, and it could be anywhere in the heap, thus we have
+        // to make it a global spec. I am not too sure about this.
+        specs.push(ACTIVE_CHUNK_METADATA_SPEC);
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         _name: &'static str,
         _zeroed: bool,
         _vmrequest: VMRequest,
-        mut global_side_metadata_specs: Vec<SideMetadataSpec>,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
         _vm_map: &'static VMMap,
         _mmapper: &'static Mmapper,
         _heap: &mut HeapMeta,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
-        // This space uses alloc bit. If the feature is turned on, the alloc bit spec is in the global specs. Otherwise, we manually add it.
-        if !cfg!(feature = "global_alloc_bit") {
-            global_side_metadata_specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
-        }
-        global_side_metadata_specs.push(ACTIVE_CHUNK_METADATA_SPEC);
-
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),

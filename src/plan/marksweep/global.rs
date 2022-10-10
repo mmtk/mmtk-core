@@ -110,7 +110,8 @@ impl<VM: VMBinding> MarkSweep<VM> {
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
         let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let mut global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_metadata_specs);
 
         let res = {
             let ms = MarkSweepSpace::new(
