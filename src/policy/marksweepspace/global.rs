@@ -135,6 +135,10 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
     }
 }
 
+// We cannot allocate objects more than 1 block.
+#[allow(dead_code)]
+pub const MAX_OBJECT_SIZE: usize = Block::BYTES;
+
 impl<VM: VMBinding> MarkSweepSpace<VM> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

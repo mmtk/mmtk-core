@@ -29,7 +29,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
-
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::VMRequest;
+use crate::util::heap::HeapMeta;
+use crate::util::heap::layout::heap_layout::Mmapper;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
@@ -213,11 +216,27 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
     }
 }
 
+// Actually no max object size.
+#[allow(dead_code)]
+pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
+
 impl<VM: VMBinding> MallocSpace<VM> {
     pub fn new(
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        _name: &'static str,
+        _zeroed: bool,
+        _vmrequest: VMRequest,
+        mut global_side_metadata_specs: Vec<SideMetadataSpec>,
+        _vm_map: &'static VMMap,
+        _mmapper: &'static Mmapper,
+        _heap: &mut HeapMeta,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
+        // This space uses alloc bit. If the feature is turned on, the alloc bit spec is in the global specs. Otherwise, we manually add it.
+        if !cfg!(feature = "global_alloc_bit") {
+            global_side_metadata_specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
+        }
+        global_side_metadata_specs.push(ACTIVE_CHUNK_METADATA_SPEC);
+
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
