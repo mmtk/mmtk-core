@@ -1076,7 +1076,7 @@ pub enum AllocationSemantics {
     /// The actual semantic of the default will depend on the GC plan in use.
     Default = 0,
     /// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
-    /// reclaim the objects even through they are dead.
+    /// reclaim the objects even if they are dead.
     Immortal = 1,
     /// Large objects. It is usually desirable to allocate large objects specially. Large objects
     /// are allocated with page granularity and will not be moved.
@@ -1093,6 +1093,6 @@ pub enum AllocationSemantics {
     ReadOnly = 4,
     /// Los + Code.
     LargeCode = 5,
-    /// Non moving objects will not moved by GC.
+    /// Non moving objects will not be moved by GC.
     NonMoving = 6,
 }
