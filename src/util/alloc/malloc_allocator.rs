@@ -1,4 +1,4 @@
-use crate::policy::mallocspace::MallocSpace;
+use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::object_ref_guard::object_ref_may_cross_chunk;
 use crate::util::alloc::Allocator;

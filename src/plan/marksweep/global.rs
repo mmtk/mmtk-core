@@ -22,15 +22,14 @@ use mmtk_macros::PlanTraceObject;
 use std::sync::Arc;
 
 #[cfg(feature = "malloc_mark_sweep")]
-pub type MarkSweepSpace<VM> = crate::policy::mallocspace::MallocSpace<VM>;
+pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::malloc_ms::MallocSpace<VM>;
 #[cfg(feature = "malloc_mark_sweep")]
-use crate::policy::mallocspace::MAX_OBJECT_SIZE as MS_MAX_OBJECT_SIZE;
+use crate::policy::marksweepspace::malloc_ms::MAX_OBJECT_SIZE;
 
 #[cfg(not(feature = "malloc_mark_sweep"))]
-pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::MarkSweepSpace<VM>;
+pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
 #[cfg(not(feature = "malloc_mark_sweep"))]
-use crate::policy::marksweepspace::MAX_OBJECT_SIZE as MS_MAX_OBJECT_SIZE;
-
+use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
@@ -45,7 +44,7 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
-    max_non_los_default_alloc_bytes: MS_MAX_OBJECT_SIZE,
+    max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: true,
     ..PlanConstraints::default()
 };

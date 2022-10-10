@@ -24,20 +24,21 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
 use crate::scheduler::GCWorkScheduler;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::VMRequest;
-use crate::util::heap::HeapMeta;
-use crate::util::heap::layout::heap_layout::Mmapper;
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
 const ASSERT_ALLOCATION: bool = false;
 
+/// This space uses malloc to get new memory, and performs mark-sweep for the memory.
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
@@ -221,6 +222,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
 pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
 
 impl<VM: VMBinding> MallocSpace<VM> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         _name: &'static str,
         _zeroed: bool,
@@ -413,9 +415,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // non-atomic accesses
         let space = unsafe { &*(self as *const Self) };
         while chunk < end {
-            if is_chunk_mapped(chunk)
-                && unsafe { crate::policy::mallocspace::metadata::is_chunk_marked_unsafe(chunk) }
-            {
+            if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
                 work_packets.push(Box::new(MSSweepChunk { ms: space, chunk }));
             }
 

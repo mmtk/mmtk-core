@@ -1,16 +1,16 @@
 // This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
-use crate::policy::marksweepspace::block::Block;
+use crate::policy::marksweepspace::native_ms::Block;
 // use crate::policy::marksweepspace::metadata::is_marked;
-use crate::policy::marksweepspace::MarkSweepSpace;
+use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
+use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
-use crate::vm::ObjectModel;
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
 
@@ -523,7 +523,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let bin = mi_bin::<VM>(size, align);
         loop {
             match self.space.acquire_block(self.tls, size, align) {
-                crate::policy::marksweepspace::BlockAcquireResult::Fresh(block) => {
+                crate::policy::marksweepspace::native_ms::BlockAcquireResult::Fresh(block) => {
                     if block.is_zero() {
                         // GC
                         return block;
@@ -534,7 +534,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     return block;
                 }
 
-                crate::policy::marksweepspace::BlockAcquireResult::AbandonedAvailable(block) => {
+                crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedAvailable(block) => {
                     block.store_tls(self.tls);
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
@@ -544,7 +544,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     }
                 }
 
-                crate::policy::marksweepspace::BlockAcquireResult::AbandonedUnswept(block) => {
+                crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedUnswept(block) => {
                     block.store_tls(self.tls);
                     self.sweep_block(block);
                     if block.has_free_cells() {
@@ -591,7 +591,9 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= block.start() + Block::BYTES {
             // FIXME: we cannot cast cell to object reference
-            if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst) {
+            if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
+            {
                 // FIXME: allocator should not know about the alloc bit
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]

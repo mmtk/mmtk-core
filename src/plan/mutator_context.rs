@@ -132,7 +132,13 @@ impl<VM: VMBinding> Mutator<VM> {
     /// Get all the valid allocator selector (no duplicate)
     fn get_all_allocator_selectors(&self) -> Vec<AllocatorSelector> {
         use itertools::Itertools;
-        self.config.allocator_mapping.iter().map(|(_, selector)| *selector).dedup().filter(|selector| *selector != AllocatorSelector::None).collect()
+        self.config
+            .allocator_mapping
+            .iter()
+            .map(|(_, selector)| *selector)
+            .dedup()
+            .filter(|selector| *selector != AllocatorSelector::None)
+            .collect()
     }
 
     /// Inform each allocator about destroying. Call allocator-specific on destroy methods.

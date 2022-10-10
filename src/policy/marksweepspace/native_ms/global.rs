@@ -4,9 +4,7 @@ use atomic::Ordering;
 
 use crate::{
     policy::{
-        marksweepspace::{
-            block::{Block, BlockState},
-        },
+        marksweepspace::native_ms::{Block, BlockState},
         sft::GCWorkerMutRef,
         space::SpaceOptions,
     },
@@ -29,10 +27,10 @@ use crate::{
     vm::VMBinding,
 };
 
-use super::super::space::{CommonSpace, Space};
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::alloc::free_list_allocator::{new_empty_block_lists, BlockLists};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;

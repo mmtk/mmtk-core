@@ -2,8 +2,8 @@ use std::mem::MaybeUninit;
 
 use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::mallocspace::MallocSpace;
-use crate::policy::marksweepspace::MarkSweepSpace;
+use crate::policy::marksweepspace::malloc_ms::MallocSpace;
+use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
