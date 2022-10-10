@@ -128,6 +128,21 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     }
 }
 
+impl<VM: VMBinding> Mutator<VM> {
+    /// Get all the valid allocator selector (no duplicate)
+    fn get_all_allocator_selectors(&self) -> Vec<AllocatorSelector> {
+        use itertools::Itertools;
+        self.config.allocator_mapping.iter().map(|(_, selector)| *selector).dedup().filter(|selector| *selector != AllocatorSelector::None).collect()
+    }
+
+    /// Inform each allocator about destroying. Call allocator-specific on destroy methods.
+    pub fn on_destroy(&mut self) {
+        for selector in self.get_all_allocator_selectors() {
+            unsafe { self.allocators.get_allocator_mut(selector) }.on_mutator_destroy();
+        }
+    }
+}
+
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
 /// per-plan mutator implementation and we will remove this trait as well in the future.*
 

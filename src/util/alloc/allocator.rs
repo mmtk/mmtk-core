@@ -365,6 +365,12 @@ pub trait Allocator<VM: VMBinding>: Downcast {
         }
         self.alloc_slow_once(size, align, offset)
     }
+
+    /// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators
+    /// may need to save/transfer its thread local data to the space.
+    fn on_mutator_destroy(&mut self) {
+        // By default, do nothing
+    }
 }
 
 impl_downcast!(Allocator<VM> where VM: VMBinding);

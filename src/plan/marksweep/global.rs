@@ -17,8 +17,6 @@ use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSani
 use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
-#[cfg(not(feature = "malloc_mark_sweep"))]
-use crate::Mutator;
 use enum_map::EnumMap;
 use mmtk_macros::PlanTraceObject;
 use std::sync::Arc;
@@ -101,15 +99,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn constraints(&self) -> &'static PlanConstraints {
         &MS_CONSTRAINTS
-    }
-
-    #[cfg(not(feature = "malloc_mark_sweep"))]
-    fn destroy_mutator(&self, mutator: &mut Mutator<VM>) {
-        unsafe {
-            mutator.allocators.free_list[0]
-                .assume_init_mut()
-                .abandon_blocks();
-        }
     }
 }
 

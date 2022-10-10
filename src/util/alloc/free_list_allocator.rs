@@ -350,6 +350,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
     //     consumed.append(available);
     //     unsafe { Address::zero() }
     // }
+
+    fn on_mutator_destroy(&mut self) {
+        self.abandon_blocks();
+    }
 }
 
 impl<VM: VMBinding> FreeListAllocator<VM> {
