@@ -847,6 +847,12 @@
 <span id="845">845</span>
 <span id="846">846</span>
 <span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -943,7 +949,13 @@
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">tls</span>: <span class="ident">VMMutatorThread</span>,
 ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-    <span class="ident"><span class="kw">crate</span>::plan::create_mutator</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>)
+    <span class="kw">let</span> <span class="ident">mutator</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::plan::create_mutator</span>(<span class="ident">tls</span>, <span class="ident">mmtk</span>);
+
+    <span class="kw">const</span> <span class="ident">LOG_ALLOCATOR_MAPPING</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+    <span class="kw">if</span> <span class="ident">LOG_ALLOCATOR_MAPPING</span> {
+        <span class="macro">info!</span>(<span class="string">&quot;{:?}&quot;</span>, <span class="ident">mutator</span>.<span class="ident">config</span>);
+    }
+    <span class="ident">mutator</span>
 }
 
 <span class="doccomment">/// Reclaim a mutator that is no longer needed.</span>

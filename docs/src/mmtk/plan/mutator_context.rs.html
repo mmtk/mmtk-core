@@ -313,6 +313,26 @@
 <span id="311">311</span>
 <span id="312">312</span>
 <span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
+<span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Mutator context for each application thread.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::barriers::Barrier</span>;
@@ -346,17 +366,26 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">std::fmt::Debug</span> <span class="kw">for</span> <span class="ident">MutatorConfig</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">fmt</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="kw-2">&amp;mut</span> <span class="ident">std::fmt::Formatter</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) -&gt; <span class="ident">std::fmt::Result</span> {
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;MutatorConfig: &quot;</span>).<span class="ident">unwrap</span>();
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;allocator_mapping = &quot;</span>).<span class="ident">unwrap</span>();
-        <span class="ident">f</span>.<span class="ident">debug_set</span>()
-            .<span class="ident">entries</span>(<span class="self">self</span>.<span class="ident">allocator_mapping</span>.<span class="ident">iter</span>())
-            .<span class="ident">finish</span>()
-            .<span class="ident">unwrap</span>();
-        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;, space_mapping = &quot;</span>).<span class="ident">unwrap</span>();
-        <span class="ident">f</span>.<span class="ident">debug_set</span>()
-            .<span class="ident">entries</span>(<span class="self">self</span>.<span class="ident">space_mapping</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">e</span><span class="op">|</span> (<span class="ident">e</span>.<span class="number">0</span>, <span class="ident">e</span>.<span class="number">1</span>.<span class="ident">name</span>())))
-            .<span class="ident">finish</span>()
-            .<span class="ident">unwrap</span>();
+        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;MutatorConfig:\n&quot;</span>)<span class="question-mark">?</span>;
+        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Semantics mapping:\n&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">for</span> (<span class="ident">semantic</span>, <span class="ident">selector</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">allocator_mapping</span>.<span class="ident">iter</span>() {
+            <span class="kw">let</span> <span class="ident">space_name</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="kw">match</span> <span class="self">self</span>
+                .<span class="ident">space_mapping</span>
+                .<span class="ident">iter</span>()
+                .<span class="ident">find</span>(<span class="op">|</span>(<span class="ident">selector_to_find</span>, <span class="kw">_</span>)<span class="op">|</span> <span class="ident">selector_to_find</span> <span class="op">==</span> <span class="ident">selector</span>)
+            {
+                <span class="prelude-val">Some</span>((<span class="kw">_</span>, <span class="ident">space</span>)) =&gt; <span class="ident">space</span>.<span class="ident">name</span>(),
+                <span class="prelude-val">None</span> =&gt; <span class="string">&quot;!!!missing space here!!!&quot;</span>,
+            };
+            <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(
+                <span class="string">&quot;- {:?} = {:?} ({:?})\n&quot;</span>,
+                <span class="ident">semantic</span>, <span class="ident">selector</span>, <span class="ident">space_name</span>
+            ))<span class="question-mark">?</span>;
+        }
+        <span class="ident">f</span>.<span class="ident">write_str</span>(<span class="string">&quot;Space mapping:\n&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">for</span> (<span class="ident">selector</span>, <span class="ident">space</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">space_mapping</span>.<span class="ident">iter</span>() {
+            <span class="ident">f</span>.<span class="ident">write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;- {:?} = {:?}\n&quot;</span>, <span class="ident">selector</span>, <span class="ident">space</span>.<span class="ident">name</span>()))<span class="question-mark">?</span>;
+        }
         <span class="prelude-val">Ok</span>(())
     }
 }
@@ -560,6 +589,11 @@
 
         <span class="ident">map</span>[<span class="ident">AllocationSemantics::Los</span>] <span class="op">=</span> <span class="ident">AllocatorSelector::LargeObject</span>(<span class="ident">reserved</span>.<span class="ident">n_large_object</span>);
         <span class="ident">reserved</span>.<span class="ident">n_large_object</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+
+        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.</span>
+        <span class="ident">map</span>[<span class="ident">AllocationSemantics::NonMoving</span>] <span class="op">=</span>
+            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>);
+        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
 
     <span class="ident">reserved</span>.<span class="ident">validate</span>();
@@ -621,6 +655,12 @@
             <span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">get_los</span>(),
         ));
         <span class="ident">reserved</span>.<span class="ident">n_large_object</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+        <span class="comment">// TODO: This should be freelist allocator once we use marksweep for nonmoving space.</span>
+        <span class="ident">vec</span>.<span class="ident">push</span>((
+            <span class="ident">AllocatorSelector::BumpPointer</span>(<span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span>),
+            <span class="ident">plan</span>.<span class="ident">common</span>().<span class="ident">get_nonmoving</span>(),
+        ));
+        <span class="ident">reserved</span>.<span class="ident">n_bump_pointer</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
     }
 
     <span class="ident">reserved</span>.<span class="ident">validate</span>();

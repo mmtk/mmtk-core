@@ -1052,6 +1052,52 @@
 <span id="1050">1050</span>
 <span id="1051">1051</span>
 <span id="1052">1052</span>
+<span id="1053">1053</span>
+<span id="1054">1054</span>
+<span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
+<span id="1067">1067</span>
+<span id="1068">1068</span>
+<span id="1069">1069</span>
+<span id="1070">1070</span>
+<span id="1071">1071</span>
+<span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
+<span id="1085">1085</span>
+<span id="1086">1086</span>
+<span id="1087">1087</span>
+<span id="1088">1088</span>
+<span id="1089">1089</span>
+<span id="1090">1090</span>
+<span id="1091">1091</span>
+<span id="1092">1092</span>
+<span id="1093">1093</span>
+<span id="1094">1094</span>
+<span id="1095">1095</span>
+<span id="1096">1096</span>
+<span id="1097">1097</span>
+<span id="1098">1098</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1943,6 +1989,9 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="kw">pub</span> <span class="ident">immortal</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">trace</span>]</span>
     <span class="kw">pub</span> <span class="ident">los</span>: <span class="ident">LargeObjectSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="comment">// TODO: We should use a marksweep space for nonmoving.</span>
+    <span class="attribute">#[<span class="ident">trace</span>]</span>
+    <span class="kw">pub</span> <span class="ident">nonmoving</span>: <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
     <span class="kw">pub</span> <span class="ident">base</span>: <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
@@ -1978,6 +2027,16 @@ CommonPlan is for representing state and features used by _many_ plans, but that
                 <span class="ident">constraints</span>,
                 <span class="bool-val">false</span>,
             ),
+            <span class="ident">nonmoving</span>: <span class="ident">ImmortalSpace::new</span>(
+                <span class="string">&quot;nonmoving&quot;</span>,
+                <span class="bool-val">true</span>,
+                <span class="ident">VMRequest::discontiguous</span>(),
+                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
+                <span class="ident">vm_map</span>,
+                <span class="ident">mmapper</span>,
+                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
+                <span class="ident">constraints</span>,
+            ),
             <span class="ident">base</span>: <span class="ident">BasePlan::new</span>(
                 <span class="ident">vm_map</span>,
                 <span class="ident">mmapper</span>,
@@ -1993,11 +2052,15 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_spaces</span>();
         <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">immortal</span>);
         <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">los</span>);
+        <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nonmoving</span>);
         <span class="ident">ret</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_used_pages</span>()
+        <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">reserved_pages</span>()
+            <span class="op">+</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">reserved_pages</span>()
+            <span class="op">+</span> <span class="self">self</span>.<span class="ident">nonmoving</span>.<span class="ident">reserved_pages</span>()
+            <span class="op">+</span> <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">get_used_pages</span>()
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">trace_object</span><span class="op">&lt;</span><span class="ident">Q</span>: <span class="ident">ObjectQueue</span><span class="op">&gt;</span>(
@@ -2014,18 +2077,24 @@ CommonPlan is for representing state and features used by _many_ plans, but that
             <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in los&quot;</span>);
             <span class="kw">return</span> <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
         }
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">nonmoving</span>.<span class="ident">in_space</span>(<span class="ident">object</span>) {
+            <span class="macro">trace!</span>(<span class="string">&quot;trace_object: object in nonmoving space&quot;</span>);
+            <span class="kw">return</span> <span class="self">self</span>.<span class="ident">nonmoving</span>.<span class="ident">trace_object</span>(<span class="ident">queue</span>, <span class="ident">object</span>);
+        }
         <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">trace_object</span>::<span class="op">&lt;</span><span class="ident">Q</span><span class="op">&gt;</span>(<span class="ident">queue</span>, <span class="ident">object</span>, <span class="ident">worker</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">prepare</span>();
         <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">prepare</span>(<span class="ident">full_heap</span>);
+        <span class="self">self</span>.<span class="ident">nonmoving</span>.<span class="ident">prepare</span>();
         <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>)
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>, <span class="ident">full_heap</span>: <span class="ident">bool</span>) {
         <span class="self">self</span>.<span class="ident">immortal</span>.<span class="ident">release</span>();
         <span class="self">self</span>.<span class="ident">los</span>.<span class="ident">release</span>(<span class="ident">full_heap</span>);
+        <span class="self">self</span>.<span class="ident">nonmoving</span>.<span class="ident">release</span>();
         <span class="self">self</span>.<span class="ident">base</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="ident">full_heap</span>)
     }
 
@@ -2041,6 +2110,10 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">los</span>
     }
 
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_nonmoving</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">nonmoving</span>
+    }
+
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">verify_side_metadata_sanity</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         <span class="ident">side_metadata_sanity_checker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">SideMetadataSanity</span>,
@@ -2050,6 +2123,8 @@ CommonPlan is for representing state and features used by _many_ plans, but that
         <span class="self">self</span>.<span class="ident">immortal</span>
             .<span class="ident">verify_side_metadata_sanity</span>(<span class="ident">side_metadata_sanity_checker</span>);
         <span class="self">self</span>.<span class="ident">los</span>
+            .<span class="ident">verify_side_metadata_sanity</span>(<span class="ident">side_metadata_sanity_checker</span>);
+        <span class="self">self</span>.<span class="ident">nonmoving</span>
             .<span class="ident">verify_side_metadata_sanity</span>(<span class="ident">side_metadata_sanity_checker</span>);
     }
 }
@@ -2097,12 +2172,29 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">i32</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">Debug</span>, <span class="ident">Enum</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">enum</span> <span class="ident">AllocationSemantics</span> {
+    <span class="doccomment">/// The default semantic. This means there is no specific requirement for the allocation.</span>
+    <span class="doccomment">/// The actual semantic of the default will depend on the GC plan in use.</span>
     <span class="ident">Default</span> <span class="op">=</span> <span class="number">0</span>,
+    <span class="doccomment">/// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not</span>
+    <span class="doccomment">/// reclaim the objects even if they are dead.</span>
     <span class="ident">Immortal</span> <span class="op">=</span> <span class="number">1</span>,
+    <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects</span>
+    <span class="doccomment">/// are allocated with page granularity and will not be moved.</span>
+    <span class="doccomment">/// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::plan_constraints::PlanConstraints`]),</span>
+    <span class="doccomment">/// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the</span>
+    <span class="doccomment">/// threshold must be allocated with the `Los` semantic.</span>
+    <span class="doccomment">/// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.</span>
     <span class="ident">Los</span> <span class="op">=</span> <span class="number">2</span>,
+    <span class="doccomment">/// Code objects have execution permission.</span>
+    <span class="doccomment">/// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.</span>
     <span class="ident">Code</span> <span class="op">=</span> <span class="number">3</span>,
+    <span class="doccomment">/// Read-only objects cannot be mutated once it is initialized.</span>
+    <span class="doccomment">/// Note that this is a place holder for now. It does not provide read only semantic.</span>
     <span class="ident">ReadOnly</span> <span class="op">=</span> <span class="number">4</span>,
+    <span class="doccomment">/// Los + Code.</span>
     <span class="ident">LargeCode</span> <span class="op">=</span> <span class="number">5</span>,
+    <span class="doccomment">/// Non moving objects will not be moved by GC.</span>
+    <span class="ident">NonMoving</span> <span class="op">=</span> <span class="number">6</span>,
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
