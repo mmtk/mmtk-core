@@ -200,6 +200,10 @@ pub fn is_chunk_marked(chunk_start: Address) -> bool {
     ACTIVE_CHUNK_METADATA_SPEC.load_atomic::<u8>(chunk_start, Ordering::SeqCst) == 1
 }
 
+pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
+    ACTIVE_CHUNK_METADATA_SPEC.load::<u8>(chunk_start) == 1
+}
+
 pub fn set_alloc_bit(object: ObjectReference) {
     alloc_bit::set_alloc_bit(object);
 }

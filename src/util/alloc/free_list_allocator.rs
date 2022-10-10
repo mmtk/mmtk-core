@@ -1,7 +1,7 @@
 // This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 use crate::policy::marksweepspace::block::Block;
-use crate::policy::marksweepspace::metadata::is_marked;
+// use crate::policy::marksweepspace::metadata::is_marked;
 use crate::policy::marksweepspace::MarkSweepSpace;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
@@ -10,6 +10,7 @@ use crate::util::Address;
 use crate::util::VMThread;
 use crate::vm::VMBinding;
 use crate::Plan;
+use crate::vm::ObjectModel;
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
 
@@ -586,7 +587,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= block.start() + Block::BYTES {
             // FIXME: we cannot cast cell to object reference
-            if !is_marked::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst) {
+            if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst) {
                 // FIXME: allocator should not know about the alloc bit
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]

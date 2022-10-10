@@ -395,7 +395,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let space = unsafe { &*(self as *const Self) };
         while chunk < end {
             if is_chunk_mapped(chunk)
-                && unsafe { crate::policy::marksweepspace::metadata::is_chunk_marked_unsafe(chunk) }
+                && unsafe { crate::policy::mallocspace::metadata::is_chunk_marked_unsafe(chunk) }
             {
                 work_packets.push(Box::new(MSSweepChunk { ms: space, chunk }));
             }
