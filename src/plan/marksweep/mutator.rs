@@ -55,8 +55,6 @@ lazy_static! {
     pub static ref ALLOCATOR_MAPPING: EnumMap<AllocationSemantics, AllocatorSelector> = {
         let mut map = create_allocator_mapping(RESERVED_ALLOCATORS, true);
         map[AllocationSemantics::Default] = AllocatorSelector::FreeList(0);
-        map[AllocationSemantics::Immortal] = AllocatorSelector::BumpPointer(0);
-        map[AllocationSemantics::Los] = AllocatorSelector::LargeObject(0);
         map
     };
 }
@@ -74,13 +72,6 @@ pub fn create_ms_mutator<VM: VMBinding>(
             vec.push((AllocatorSelector::Malloc(0), ms.ms_space()));
             #[cfg(not(feature = "malloc_mark_sweep"))]
             vec.push((AllocatorSelector::FreeList(0), ms.ms_space()));
-            #[cfg(not(feature = "malloc_mark_sweep"))]
-            vec.push((
-                AllocatorSelector::BumpPointer(0),
-                ms.common().get_immortal(),
-            ));
-            #[cfg(not(feature = "malloc_mark_sweep"))]
-            vec.push((AllocatorSelector::LargeObject(0), ms.common().get_los()));
             vec
         }),
         prepare_func: &ms_mutator_prepare,

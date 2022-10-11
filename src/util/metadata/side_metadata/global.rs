@@ -106,9 +106,10 @@ impl SideMetadataSpec {
     pub(crate) fn assert_metadata_mapped(&self, data_addr: Address) {
         let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
 
-        debug!(
+        trace!(
             "ensure_metadata_is_mapped({}).meta_start({})",
-            data_addr, meta_start
+            data_addr,
+            meta_start
         );
 
         memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);

@@ -127,14 +127,6 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     fn barrier(&mut self) -> &mut dyn Barrier<VM> {
         &mut *self.barrier
     }
-
-    fn flush_remembered_sets(&mut self) {
-        self.barrier().flush();
-    }
-
-    fn flush(&mut self) {
-        self.flush_remembered_sets();
-    }
 }
 
 impl<VM: VMBinding> Mutator<VM> {
