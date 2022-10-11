@@ -14,15 +14,25 @@ use crate::Plan;
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
 
-const MI_INTPTR_SHIFT: usize = 3;
+/// Log2 of pointer size
+const MI_INTPTR_SHIFT: usize = crate::util::constants::LOG_BYTES_IN_ADDRESS as usize;
+/// pointer size in bytes
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
-pub const MI_LARGE_OBJ_SIZE_MAX: usize = 1 << 21;
-pub const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
+/// pointer size in bits
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
-pub const MI_BIN_FULL: usize = MAX_BIN + 1;
-pub const BYTES_IN_BLOCK_WSIZE: usize = Block::BYTES / MI_INTPTR_SIZE;
-pub const MAX_BIN: usize = 48;
+/// Number of bins in BlockLists. Reserve bin0 as an empty bin.
+pub(crate) const MI_BIN_FULL: usize = MAX_BIN + 1;
+/// The largest valid bin.
+pub(crate) const MAX_BIN: usize = 48;
+
 const ZERO_BLOCK: Block = Block::ZERO_BLOCK;
+
+/// Largest object size allowed with our mimalloc implementation, in bytes
+pub(crate) const MI_LARGE_OBJ_SIZE_MAX: usize = MAX_BIN_SIZE;
+/// Largest object size in words
+const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
+/// The object size for the last bin. We should not try allocate objects larger than this with the allocator.
+const MAX_BIN_SIZE: usize = 8192 * MI_INTPTR_SIZE;
 
 /// All the bins for the block lists
 // Each block list takes roughly 8bytes * 4 * 49 = 1658 bytes. It is more reasonable to heap allocate them, and
@@ -31,7 +41,7 @@ pub type BlockLists = Box<[BlockList; MAX_BIN + 1]>;
 
 /// Create an empty set of block lists of different size classes (bins)
 pub(crate) fn new_empty_block_lists() -> BlockLists {
-    Box::new([
+    let ret = Box::new([
         BlockList::new(MI_INTPTR_SIZE),
         BlockList::new(MI_INTPTR_SIZE),
         BlockList::new(2 * MI_INTPTR_SIZE),
@@ -81,7 +91,15 @@ pub(crate) fn new_empty_block_lists() -> BlockLists {
         BlockList::new(6144 * MI_INTPTR_SIZE),
         BlockList::new(7168 * MI_INTPTR_SIZE),
         BlockList::new(8192 * MI_INTPTR_SIZE), /* 48 */
-    ])
+    ]);
+
+    debug_assert_eq!(
+        ret[MAX_BIN].size, MAX_BIN_SIZE,
+        "MAX_BIN_SIZE = {}, actual max bin size  = {}, please update the constants",
+        MAX_BIN_SIZE, ret[MAX_BIN].size
+    );
+
+    ret
 }
 
 // Free list allocator
@@ -233,12 +251,6 @@ impl BlockList {
 
     // Lock list
     pub fn lock(&mut self) {
-        debug_assert!(
-            self.size <= MI_LARGE_OBJ_SIZE_MAX,
-            "{:?} {}",
-            self as *mut _,
-            self.size
-        );
         let mut success = false;
         while !success {
             success = self
@@ -269,9 +281,9 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
     // Find a block with free space and allocate to it
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        trace!("alloc s={}", size);
+        // trace!("alloc s={}", size);
         debug_assert!(
-            size <= Block::BYTES,
+            size <= MAX_BIN_SIZE,
             "Alloc request for {} bytes is too big.",
             size
         );
@@ -764,30 +776,64 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 }
 
+/// Align a byte size to a size in machine words
+/// i.e. byte size == `wsize*sizeof(void*)`
+/// adapted from _mi_wsize_from_size in mimalloc
 fn mi_wsize_from_size(size: usize) -> usize {
-    // Align a byte size to a size in machine words
-    // i.e. byte size == `wsize*sizeof(void*)`
-    // adapted from _mi_wsize_from_size in mimalloc
     (size + MI_INTPTR_SIZE - 1) / MI_INTPTR_SIZE
 }
 
 pub fn mi_bin<VM: VMBinding>(size: usize, align: usize) -> usize {
     let size = allocator::get_maximum_aligned_size::<VM>(size, align);
+    mi_bin_from_size(size)
+}
+
+fn mi_bin_from_size(size: usize) -> usize {
     // adapted from _mi_bin in mimalloc
     let mut wsize: usize = mi_wsize_from_size(size);
+    debug_assert!(wsize <= MI_LARGE_OBJ_WSIZE_MAX);
     let bin: u8;
     if wsize <= 1 {
         bin = 1;
     } else if wsize <= 8 {
         bin = wsize as u8;
         // bin = ((wsize + 1) & !1) as u8; // round to double word sizes
-    } else if wsize > MI_LARGE_OBJ_WSIZE_MAX {
-        // bin = MAX_BIN;
-        panic!(); // this should not be reached, because I'm sending objects bigger than this to the immortal space
     } else {
         wsize -= 1;
-        let b = (MI_INTPTR_BITS - 1 - (u64::leading_zeros(wsize as u64)) as usize) as u8; // note: wsize != 0
+        let b = (MI_INTPTR_BITS - 1 - usize::leading_zeros(wsize) as usize) as u8; // note: wsize != 0
         bin = ((b << 2) + ((wsize >> (b - 2)) & 0x03) as u8) - 3;
     }
     bin as usize
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_bin_size_range(bin: usize, bins: &BlockLists) -> Option<(usize, usize)> {
+        if bin == 0 || bin > MAX_BIN {
+            None
+        } else if bin == 1 {
+            Some((0, bins[1].size))
+        } else {
+            Some((bins[bin - 1].size, bins[bin].size))
+        }
+    }
+
+    #[test]
+    fn test_mi_bin() {
+        let block_lists = new_empty_block_lists();
+        for size in 0..=MAX_BIN_SIZE {
+            let bin = mi_bin_from_size(size);
+            let bin_range = get_bin_size_range(bin, &block_lists);
+            assert!(bin_range.is_some(), "Invalid bin {} for size {}", bin, size);
+            assert!(
+                size >= bin_range.unwrap().0 && bin < bin_range.unwrap().1,
+                "Assigning size={} to bin={} ({:?}) incorrect",
+                size,
+                bin,
+                bin_range.unwrap()
+            );
+        }
+    }
 }

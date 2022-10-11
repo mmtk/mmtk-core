@@ -133,9 +133,9 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
     }
 }
 
-// We cannot allocate objects more than 1 block.
+// We cannot allocate objects that are larger than the max bin size.
 #[allow(dead_code)]
-pub const MAX_OBJECT_SIZE: usize = Block::BYTES;
+pub const MAX_OBJECT_SIZE: usize = crate::util::alloc::free_list_allocator::MI_LARGE_OBJ_SIZE_MAX;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {
