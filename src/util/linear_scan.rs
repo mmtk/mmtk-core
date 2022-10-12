@@ -41,9 +41,9 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
             let is_object = if ATOMIC_LOAD_ALLOC_BIT {
-                vo_bit::is_alloced_object(self.cursor)
+                vo_bit::is_vo_bit_set_for_addr(self.cursor)
             } else {
-                unsafe { vo_bit::is_alloced_object_unsafe(self.cursor) }
+                unsafe { vo_bit::is_vo_bit_set_for_addr_unsafe(self.cursor) }
             };
 
             if is_object {

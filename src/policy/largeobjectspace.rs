@@ -73,7 +73,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_alloc_bit(object);
+        crate::util::vo_bit::set_vo_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
@@ -205,7 +205,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_alloced(object),
+            crate::util::vo_bit::is_vo_bit_set(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -235,14 +235,14 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
                 #[cfg(feature = "vo_bit")]
-                crate::util::vo_bit::unset_addr_alloc_bit(cell);
+                crate::util::vo_bit::unset_vo_bit_for_addr(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
                 #[cfg(feature = "vo_bit")]
-                crate::util::vo_bit::unset_addr_alloc_bit(cell);
+                crate::util::vo_bit::unset_vo_bit_for_addr(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         }

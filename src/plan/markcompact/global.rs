@@ -16,7 +16,7 @@ use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(not(feature = "vo_bit"))]
-use crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC;
+use crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
