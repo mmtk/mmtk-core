@@ -39,6 +39,8 @@ impl Region for Block {
 impl Block {
     pub const ZERO_BLOCK: Self = Self(Address::ZERO);
 
+    pub const METADATA_SPECS: [SideMetadataSpec; 7] = [Self::MARK_TABLE, Self::NEXT_BLOCK_TABLE, Self::PREV_BLOCK_TABLE, Self::FREE_LIST_TABLE, Self::SIZE_TABLE, Self::BLOCK_LIST_TABLE, Self::TLS_TABLE];
+
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_MARK;

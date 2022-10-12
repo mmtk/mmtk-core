@@ -304,9 +304,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             6 => spec.store_atomic::<u64>(block.start(), 0, Ordering::SeqCst),
             _ => unreachable!(),
         };
-        for metadata_spec in &self.common.metadata.local {
-            // FIXME: is all local metadata based on block?
-            clear_metadata(metadata_spec);
+        for metadata_spec in Block::METADATA_SPECS {
+            clear_metadata(&metadata_spec);
         }
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
