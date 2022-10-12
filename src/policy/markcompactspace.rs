@@ -232,7 +232,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO-bit not set",
             object
         );
         if MarkCompactSpace::<VM>::test_and_mark(object) {
@@ -248,7 +248,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     ) -> ObjectReference {
         debug_assert!(
             crate::util::vo_bit::is_vo_bit_set(object),
-            "{:x}: alloc bit not set",
+            "{:x}: VO-bit not set",
             object
         );
         // from this stage and onwards, mark bit is no longer needed
@@ -376,7 +376,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 start, end,
             );
         for obj in linear_scan {
-            // clear the alloc bit
+            // clear the VO-bit
+            // FIXME: MarkCompact should use a local metadata to record allocated units.
             vo_bit::unset_vo_bit_for_addr(obj.to_address());
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
@@ -390,7 +391,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 // copy object
                 trace!(" copy from {} to {}", obj, new_object);
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
-                // update alloc_bit,
+                // update VO-bit
+                // FIXME: MarkCompact should use a local metadata to record allocated units.
                 vo_bit::set_vo_bit(new_object);
                 to = new_object.to_address() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);

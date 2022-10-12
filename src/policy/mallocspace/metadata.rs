@@ -162,6 +162,7 @@ pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
 /// This function doesn't check if `addr` is aligned.
 /// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
 pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
+    // FIXME: MallocSpace should use a local metadata to record allocated units.
     is_meta_space_mapped_for_address(addr) && vo_bit::is_vo_bit_set_for_addr(addr)
 }
 
@@ -205,6 +206,7 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
 }
 
 pub fn set_alloc_bit(object: ObjectReference) {
+    // FIXME: MallocSpace should use a local metadata to record allocated units.
     vo_bit::set_vo_bit(object);
 }
 
@@ -214,6 +216,7 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) 
 
 #[allow(unused)]
 pub fn unset_alloc_bit(object: ObjectReference) {
+    // FIXME: MallocSpace should use a local metadata to record allocated units.
     vo_bit::unset_vo_bit(object);
 }
 
@@ -238,6 +241,7 @@ pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
 }
 
 pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
+    // FIXME: MallocSpace should use a local metadata to record allocated units.
     vo_bit::unset_vo_bit_unsafe(object);
 }
 

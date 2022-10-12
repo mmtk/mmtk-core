@@ -77,7 +77,7 @@ pub trait SFT {
         if !addr.is_mapped() {
             return false;
         }
-        // The `addr` is mapped. We use the global alloc bit to get the exact answer.
+        // The `addr` is mapped. We use the VO-bit to get the exact answer.
         vo_bit::is_vo_bit_set_for_addr(addr)
     }
 
