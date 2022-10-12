@@ -72,8 +72,8 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
 
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::vo_bit::set_alloc_bit(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
@@ -203,9 +203,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         queue: &mut Q,
         object: ObjectReference,
     ) -> ObjectReference {
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::vo_bit::is_alloced(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -234,15 +234,15 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
+                #[cfg(feature = "vo_bit")]
+                crate::util::vo_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
+                #[cfg(feature = "vo_bit")]
+                crate::util::vo_bit::unset_addr_alloc_bit(cell);
                 self.pr.release_pages(get_super_page(cell));
             }
         }

@@ -1,7 +1,7 @@
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
 #[cfg(feature = "is_mmtk_object")]
-use crate::util::alloc_bit;
+use crate::util::vo_bit;
 use crate::util::conversions;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -78,7 +78,7 @@ pub trait SFT {
             return false;
         }
         // The `addr` is mapped. We use the global alloc bit to get the exact answer.
-        alloc_bit::is_alloced_object(addr)
+        vo_bit::is_alloced_object(addr)
     }
 
     /// Initialize object metadata (in the header, or in the side metadata).

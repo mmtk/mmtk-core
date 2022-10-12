@@ -1,3 +1,13 @@
+//! Valid-object bit (VO-bit)
+//!
+//! The valid-object bit (VO-bit) metadata is a one-bit-per-object side metadata.  It is set for
+//! every object at allocation time (more precisely, during `post_alloc`), and cleared when either
+//! -   the object reclaims by the GC, or
+//! -   the VM explicitly clears the VO-bit of the object.
+//!
+//! The main purpose of VO-bit is supporting conservative GC.  It is the canonical source of
+//! information about whether there is an object in the MMTk heap at any given address.
+
 use atomic::Ordering;
 
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;

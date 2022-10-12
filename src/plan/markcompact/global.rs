@@ -15,8 +15,8 @@ use crate::policy::space::Space;
 use crate::scheduler::gc_work::*;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+#[cfg(not(feature = "vo_bit"))]
+use crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
@@ -181,11 +181,11 @@ impl<VM: VMBinding> MarkCompact<VM> {
         let mut heap = HeapMeta::new(&options);
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         // if global_alloc_bit is NOT enabled,
         // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "global_alloc_bit"))]
+        #[cfg(not(feature = "vo_bit"))]
         let global_metadata_specs =
             SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 

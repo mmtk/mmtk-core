@@ -7,7 +7,7 @@ use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-#[cfg(feature = "global_alloc_bit")]
+#[cfg(feature = "vo_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
@@ -46,8 +46,8 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
-        #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        #[cfg(feature = "vo_bit")]
+        crate::util::vo_bit::set_alloc_bit(_object);
     }
 
     #[inline(always)]
@@ -182,7 +182,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
     pub fn release(&self) {
         unsafe {
-            #[cfg(feature = "global_alloc_bit")]
+            #[cfg(feature = "vo_bit")]
             self.reset_alloc_bit();
             self.pr.reset();
         }
@@ -190,13 +190,13 @@ impl<VM: VMBinding> CopySpace<VM> {
         self.from_space.store(false, Ordering::SeqCst);
     }
 
-    #[cfg(feature = "global_alloc_bit")]
+    #[cfg(feature = "vo_bit")]
     unsafe fn reset_alloc_bit(&self) {
         let current_chunk = self.pr.get_current_chunk();
         if self.common.contiguous {
             // If we have allocated something into this space, we need to clear its alloc bit.
             if current_chunk != self.common.start {
-                crate::util::alloc_bit::bzero_alloc_bit(
+                crate::util::vo_bit::bzero_alloc_bit(
                     self.common.start,
                     current_chunk + BYTES_IN_CHUNK - self.common.start,
                 );
@@ -229,9 +229,9 @@ impl<VM: VMBinding> CopySpace<VM> {
         // This object is in from space, we will copy. Make sure we have a valid copy semantic.
         debug_assert!(semantics.is_some());
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::vo_bit::is_alloced(object),
             "{:x}: alloc bit not set",
             object
         );

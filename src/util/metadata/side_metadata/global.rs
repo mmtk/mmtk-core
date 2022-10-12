@@ -1,6 +1,6 @@
 use super::*;
-#[cfg(feature = "global_alloc_bit")]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
+#[cfg(feature = "vo_bit")]
+use crate::util::vo_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::constants::{BYTES_IN_PAGE, LOG_BITS_IN_BYTE};
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
 use crate::util::memory;
@@ -158,7 +158,7 @@ impl SideMetadataSpec {
         let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
         // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
-        #[cfg(not(feature = "global_alloc_bit"))]
+        #[cfg(not(feature = "vo_bit"))]
         debug_assert!(start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(self, start) == 0);
 
         #[cfg(feature = "extreme_assertions")]
@@ -713,7 +713,7 @@ impl SideMetadataContext {
     pub fn new_global_specs(specs: &[SideMetadataSpec]) -> Vec<SideMetadataSpec> {
         let mut ret = vec![];
 
-        #[cfg(feature = "global_alloc_bit")]
+        #[cfg(feature = "vo_bit")]
         ret.push(ALLOC_SIDE_METADATA_SPEC);
 
         {
