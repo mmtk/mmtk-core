@@ -14,7 +14,7 @@ use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-/// An VO-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
+/// A VO-bit is required per min-object-size aligned address, rather than per object, and can only exist as side metadata.
 pub(crate) const VO_BIT_SIDE_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::VO_BIT;
 
