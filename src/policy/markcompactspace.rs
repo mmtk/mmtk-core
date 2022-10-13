@@ -11,7 +11,8 @@ use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
 use crate::util::metadata::extract_side_metadata;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::{vo_bit, Address, ObjectReference};
+use crate::util::metadata::vo_bit;
+use crate::util::{Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
 
@@ -57,7 +58,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::vo_bit::set_vo_bit(object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -231,7 +232,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO-bit not set",
             object
         );
@@ -247,7 +248,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO-bit not set",
             object
         );

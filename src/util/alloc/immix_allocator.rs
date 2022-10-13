@@ -258,7 +258,7 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     self.tls
                 );
                 #[cfg(feature = "vo_bit")]
-                crate::util::vo_bit::bzero_vo_bit(self.cursor, self.limit - self.cursor);
+                crate::util::metadata::vo_bit::bzero_vo_bit(self.cursor, self.limit - self.cursor);
                 crate::util::memory::zero(self.cursor, self.limit - self.cursor);
                 debug_assert!(
                     align_allocation_no_fill::<VM>(self.cursor, align, offset) + size <= self.limit

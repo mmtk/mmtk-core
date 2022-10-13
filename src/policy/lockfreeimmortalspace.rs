@@ -59,7 +59,7 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_vo_bit(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
     fn sft_trace_object(
         &self,

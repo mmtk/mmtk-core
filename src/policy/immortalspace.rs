@@ -70,7 +70,7 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_vo_bit(object);
+        crate::util::metadata::vo_bit::set_vo_bit(object);
     }
     #[inline(always)]
     fn sft_trace_object(
@@ -209,7 +209,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO-bit not set",
             object
         );

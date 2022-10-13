@@ -15,9 +15,9 @@ use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::options::Options;
 #[cfg(not(feature = "vo_bit"))]
-use crate::util::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+use crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC;
+use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use std::sync::Arc;

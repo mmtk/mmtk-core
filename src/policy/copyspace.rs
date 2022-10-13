@@ -47,7 +47,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "vo_bit")]
-        crate::util::vo_bit::set_vo_bit(_object);
+        crate::util::metadata::vo_bit::set_vo_bit(_object);
     }
 
     #[inline(always)]
@@ -196,7 +196,7 @@ impl<VM: VMBinding> CopySpace<VM> {
         if self.common.contiguous {
             // If we have allocated something into this space, we need to clear its VO-bit.
             if current_chunk != self.common.start {
-                crate::util::vo_bit::bzero_vo_bit(
+                crate::util::metadata::vo_bit::bzero_vo_bit(
                     self.common.start,
                     current_chunk + BYTES_IN_CHUNK - self.common.start,
                 );
@@ -231,7 +231,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
         #[cfg(feature = "vo_bit")]
         debug_assert!(
-            crate::util::vo_bit::is_vo_bit_set(object),
+            crate::util::metadata::vo_bit::is_vo_bit_set(object),
             "{:x}: VO-bit not set",
             object
         );
