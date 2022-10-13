@@ -1,8 +1,8 @@
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
+use crate::util::conversions;
 #[cfg(feature = "is_mmtk_object")]
 use crate::util::vo_bit;
-use crate::util::conversions;
 use crate::util::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
