@@ -97,16 +97,16 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 impl<VM: VMBinding> MarkSweep<VM> {
     pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
         let heap = HeapMeta::new(&options);
-        // if vo_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
+        // if vo_bit is enabled, VO_BIT_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "vo_bit")]
         let global_metadata_specs =
             SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
         // if vo_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
+        // we need to add VO_BIT_SIDE_METADATA_SPEC to SideMetadataContext here.
         #[cfg(not(feature = "vo_bit"))]
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[
-            ALLOC_SIDE_METADATA_SPEC,
+            VO_BIT_SIDE_METADATA_SPEC,
             ACTIVE_CHUNK_METADATA_SPEC,
         ]);
 
