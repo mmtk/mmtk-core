@@ -107,10 +107,10 @@ pub extern "C" fn mmtk_is_live_object(object: ObjectReference) -> bool{
     memory_manager::is_live_object(object)
 }
 
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 #[no_mangle]
-pub extern "C" fn mmtk_is_mmtk_object(addr: Address) -> bool {
-    memory_manager::is_mmtk_object(addr)
+pub extern "C" fn mmtk_is_valid_mmtk_object(object: ObjectReference) -> bool {
+    mmtk::util::metadata::vo_bit::is_valid_mmtk_object(object)
 }
 
 #[no_mangle]

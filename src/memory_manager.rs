@@ -570,54 +570,6 @@ pub fn is_live_object(object: ObjectReference) -> bool {
     object.is_live()
 }
 
-/// Check if `addr` is the address of an object reference to an MMTk object.
-///
-/// Concretely:
-/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any
-///     space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` such that
-///     -   `objref` is a valid object reference to an object in any space in MMTk, and
-///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
-///         -   `hi = lo + VO_BIT_REGION_SIZE` and
-///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the VO-bit.
-/// 3.  Return false otherwise.  This function never panics.
-///
-/// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the VO-bit side metadata, i.e. a bitmap.
-/// For space efficiency, each bit of the bitmap governs a small region of memory.
-/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
-/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
-/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
-/// The alignment of a region is also the region size.
-/// If a VO-bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
-/// is the valid object reference.
-/// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
-/// reference, this function may still return true.
-///
-/// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
-/// function.  For most VMs, valid object references are always aligned to the word size, so
-/// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///
-/// This function is useful for conservative root scanning.  The VM can iterate through all words in
-/// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
-/// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
-/// word is really a reference.
-///
-/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See `crate::plan::global::BasePlan::vm_space`.
-///
-/// Argument:
-/// * `addr`: An arbitrary address.
-#[cfg(feature = "is_mmtk_object")]
-pub fn is_mmtk_object(addr: Address) -> bool {
-    use crate::mmtk::SFT_MAP;
-    use crate::policy::sft_map::SFTMap;
-    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
-}
-
 /// Return true if the `object` lies in a region of memory where
 /// -   only MMTk can allocate into, or
 /// -   only MMTk's delegated memory allocator (such as a malloc implementation) can allocate into

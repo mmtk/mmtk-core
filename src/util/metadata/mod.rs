@@ -225,6 +225,9 @@ pub mod side_metadata;
 pub use metadata_val_traits::*;
 
 pub(crate) mod log_bit;
-pub(crate) mod vo_bit;
+
+// FIXME: vo_bit should only be enabled if the "vo_bit" feature is on.
+// Currently it is used in MallocSpace and MarkCompactSpace.
+pub mod vo_bit;
 
 pub use global::*;

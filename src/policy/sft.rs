@@ -1,7 +1,7 @@
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
 use crate::util::conversions;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 use crate::util::metadata::vo_bit;
 use crate::util::*;
 use crate::vm::VMBinding;
@@ -67,18 +67,18 @@ pub trait SFT {
     /// This default implementation works for all spaces that use MMTk's mapper to allocate memory.
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     #[inline(always)]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        // Having found the SFT means the `addr` is in one of our spaces.
+    fn is_valid_mmtk_object(&self, object: ObjectReference) -> bool {
+        // Having found the SFT means the `object` is in one of our spaces.
         // Although the SFT map is allocated eagerly when the space is contiguous,
         // the pages of the space itself are acquired on demand.
-        // Therefore, the page of `addr` may not have been mapped, yet.
-        if !addr.is_mapped() {
+        // Therefore, the page of `object` may not have been mapped, yet.
+        if !object.to_address().is_mapped() {
             return false;
         }
         // The `addr` is mapped. We use the VO-bit to get the exact answer.
-        vo_bit::is_vo_bit_set(unsafe { addr.to_object_reference() })
+        vo_bit::is_vo_bit_set(object)
     }
 
     /// Initialize object metadata (in the header, or in the side metadata).
@@ -145,9 +145,9 @@ impl SFT for EmptySpaceSFT {
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
-    #[cfg(feature = "is_mmtk_object")]
+    #[cfg(feature = "vo_bit")]
     #[inline(always)]
-    fn is_mmtk_object(&self, _addr: Address) -> bool {
+    fn is_valid_mmtk_object(&self, _object: ObjectReference) -> bool {
         false
     }
 

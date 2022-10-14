@@ -152,18 +152,15 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
     }
 }
 
-/// Check if a given object was allocated by malloc
-pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    has_object_alloced_by_malloc(object.to_address())
-}
-
-/// Check if there is an object allocated by malloc at the address.
+/// Check if there is an object allocated by malloc at the address of `object`.
 ///
 /// This function doesn't check if `addr` is aligned.
 /// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
-pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
+pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
     // FIXME: MallocSpace should use a local metadata to record allocated units.
-    is_meta_space_mapped_for_address(addr) && vo_bit::is_vo_bit_set(unsafe { addr.to_object_reference() })
+    // The VO-bit can be cleared explicitly by the VM.  If we don't introduce another metadata,
+    // MallocSpace will not be able to free objects.
+    is_meta_space_mapped_for_address(object.to_address()) && vo_bit::is_vo_bit_set(object)
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {

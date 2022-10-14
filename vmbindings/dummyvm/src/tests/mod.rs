@@ -16,7 +16,7 @@ mod malloc_api;
 #[cfg(feature = "malloc_counted_size")]
 mod malloc_counted;
 mod malloc_ms;
-#[cfg(feature = "is_mmtk_object")]
+#[cfg(feature = "vo_bit")]
 mod conservatism;
 mod is_in_mmtk_spaces;
 mod fixtures;

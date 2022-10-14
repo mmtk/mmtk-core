@@ -5,7 +5,7 @@ use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
 use crate::tests::fixtures::{Fixture, SingleObject};
 use mmtk::util::constants::LOG_BITS_IN_WORD;
-use mmtk::util::is_mmtk_object::VO_BIT_REGION_SIZE;
+use mmtk::util::metadata::vo_bit::VO_BIT_REGION_SIZE;
 use mmtk::util::*;
 
 lazy_static! {
@@ -16,35 +16,35 @@ fn basic_filter(addr: Address) -> bool {
     !addr.is_zero() && addr.as_usize() % VO_BIT_REGION_SIZE == (OBJECT_REF_OFFSET % VO_BIT_REGION_SIZE)
 }
 
-fn assert_filter_pass(addr: Address) {
+fn assert_filter_pass(object: ObjectReference) {
     assert!(
-        basic_filter(addr),
+        basic_filter(object.to_address()),
         "{} should pass basic filter, but failed.",
-        addr,
+        object,
     );
 }
 
-fn assert_filter_fail(addr: Address) {
+fn assert_filter_fail(object: ObjectReference) {
     assert!(
-        !basic_filter(addr),
+        !basic_filter(object.to_address()),
         "{} should fail basic filter, but passed.",
-        addr,
+        object,
     );
 }
 
-fn assert_valid_objref(addr: Address) {
+fn assert_valid_objref(object: ObjectReference) {
     assert!(
-        mmtk_is_mmtk_object(addr),
+        mmtk_is_valid_mmtk_object(object),
         "mmtk_is_mmtk_object({}) should return true. Got false.",
-        addr,
+        object,
     );
 }
 
-fn assert_invalid_objref(addr: Address, real: Address) {
+fn assert_invalid_objref(object: ObjectReference, real: ObjectReference) {
     assert!(
-        !mmtk_is_mmtk_object(addr),
+        !mmtk_is_valid_mmtk_object(object),
         "mmtk_is_mmtk_object({}) should return false. Got true. Real object: {}",
-        addr,
+        object,
         real,
     );
 }
@@ -52,9 +52,9 @@ fn assert_invalid_objref(addr: Address, real: Address) {
 #[test]
 pub fn null() {
     SINGLE_OBJECT.with_fixture(|fixture| {
-        let addr = Address::ZERO;
-        assert_filter_fail(addr);
-        assert_invalid_objref(addr, fixture.objref.to_address());
+        let object = ObjectReference::NULL;
+        assert_filter_fail(object);
+        assert_invalid_objref(object, fixture.objref);
     });
 }
 
@@ -66,7 +66,7 @@ pub fn too_small() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for offset in 1usize..SMALL_OFFSET {
             let addr = Address::ZERO + offset;
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(unsafe { addr.to_object_reference() }, fixture.objref);
         }
     });
 }
@@ -75,7 +75,8 @@ pub fn too_small() {
 pub fn max() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         let addr = Address::MAX;
-        assert_invalid_objref(addr, fixture.objref.to_address());
+        let object = unsafe { addr.to_object_reference() };
+        assert_invalid_objref(object, fixture.objref);
     });
 }
 
@@ -84,7 +85,8 @@ pub fn too_big() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for offset in 1usize..SMALL_OFFSET {
             let addr = Address::MAX - offset;
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            let object = unsafe { addr.to_object_reference() };
+            assert_invalid_objref(object, fixture.objref);
         }
     });
 }
@@ -92,9 +94,9 @@ pub fn too_big() {
 #[test]
 pub fn direct_hit() {
     SINGLE_OBJECT.with_fixture(|fixture| {
-        let addr = fixture.objref.to_address();
-        assert_filter_pass(addr);
-        assert_valid_objref(addr);
+        let object = fixture.objref;
+        assert_filter_pass(object);
+        assert_valid_objref(object);
     });
 }
 
@@ -106,7 +108,8 @@ pub fn small_offsets() {
         for offset in 1usize..SEVERAL_PAGES {
             let addr = fixture.objref.to_address() + offset;
             if basic_filter(addr) {
-                assert_invalid_objref(addr, fixture.objref.to_address());
+                let object = unsafe { addr.to_object_reference() };
+                assert_invalid_objref(object, fixture.objref);
             }
         }
     });
@@ -118,8 +121,9 @@ pub fn medium_offsets_aligned() {
         let alignment = std::mem::align_of::<Address>();
         for offset in (alignment..(alignment * SEVERAL_PAGES)).step_by(alignment) {
             let addr = fixture.objref.to_address() + offset;
-            assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            let object = unsafe { addr.to_object_reference() };
+            assert_filter_pass(object);
+            assert_invalid_objref(object, fixture.objref);
         }
     });
 }
@@ -133,8 +137,9 @@ pub fn large_offsets_aligned() {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
-            assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            let object = unsafe { addr.to_object_reference() };
+            assert_filter_pass(object);
+            assert_invalid_objref(object, fixture.objref);
         }
     });
 }
@@ -149,8 +154,9 @@ pub fn negative_offsets() {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
-            assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            let object = unsafe { addr.to_object_reference() };
+            assert_filter_pass(object);
+            assert_invalid_objref(object, fixture.objref);
         }
     });
 }
