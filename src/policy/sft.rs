@@ -78,7 +78,7 @@ pub trait SFT {
             return false;
         }
         // The `addr` is mapped. We use the VO-bit to get the exact answer.
-        vo_bit::is_vo_bit_set_for_addr(addr)
+        vo_bit::is_vo_bit_set(unsafe { addr.to_object_reference() })
     }
 
     /// Initialize object metadata (in the header, or in the side metadata).

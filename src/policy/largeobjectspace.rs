@@ -231,18 +231,22 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         // FIXME: borrow checker fighting
         // didn't call self.release_multiple_pages
         // so the compiler knows I'm borrowing two different fields
+
+        // FIXME: Use local metadata instead of VO-bit.
+        // The `unsafe { cell.to_object_reference() }` below indicates that VO-bit is not what we
+        // want here.  VO-bit is set at ObjectReference, which is different from the cell address.
         if sweep_nursery {
             for cell in self.treadmill.collect_nursery() {
                 // println!("- cn {}", cell);
                 #[cfg(feature = "vo_bit")]
-                crate::util::metadata::vo_bit::unset_vo_bit_for_addr(cell);
+                crate::util::metadata::vo_bit::unset_vo_bit(unsafe { cell.to_object_reference() });
                 self.pr.release_pages(get_super_page(cell));
             }
         } else {
             for cell in self.treadmill.collect() {
                 // println!("- ts {}", cell);
                 #[cfg(feature = "vo_bit")]
-                crate::util::metadata::vo_bit::unset_vo_bit_for_addr(cell);
+                crate::util::metadata::vo_bit::unset_vo_bit(unsafe { cell.to_object_reference() });
                 self.pr.release_pages(get_super_page(cell));
             }
         }

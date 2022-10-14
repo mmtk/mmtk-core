@@ -43,9 +43,9 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> 
             let is_object = if ATOMIC_LOAD_ALLOC_BIT {
                 // FIXME: Any space that supports linear scan (such as MarkCompact space) should
                 // introduce its own allocation bit rather than using VO-bit.
-                vo_bit::is_vo_bit_set_for_addr(self.cursor)
+                vo_bit::is_vo_bit_set(unsafe { self.cursor.to_object_reference() })
             } else {
-                unsafe { vo_bit::is_vo_bit_set_for_addr_unsafe(self.cursor) }
+                unsafe { vo_bit::is_vo_bit_set_unsafe(self.cursor.to_object_reference()) }
             };
 
             if is_object {

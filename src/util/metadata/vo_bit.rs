@@ -25,18 +25,13 @@ pub fn set_vo_bit(object: ObjectReference) {
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
 }
 
-pub fn unset_vo_bit_for_addr(address: Address) {
-    debug_assert!(
-        is_vo_bit_set_for_addr(address),
-        "{:x}: VO-bit not set",
-        address
-    );
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(address, 0, Ordering::SeqCst);
-}
-
 pub fn unset_vo_bit(object: ObjectReference) {
     debug_assert!(is_vo_bit_set(object), "{:x}: VO-bit not set", object);
     VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
+}
+
+pub fn is_vo_bit_set(object: ObjectReference) -> bool {
+    VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(object.to_address(), Ordering::SeqCst) == 1
 }
 
 /// # Safety
@@ -48,20 +43,12 @@ pub unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
     VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_address(), 0);
 }
 
-pub fn is_vo_bit_set(object: ObjectReference) -> bool {
-    is_vo_bit_set_for_addr(object.to_address())
-}
-
-pub fn is_vo_bit_set_for_addr(address: Address) -> bool {
-    VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(address, Ordering::SeqCst) == 1
-}
-
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
 ///
-pub unsafe fn is_vo_bit_set_for_addr_unsafe(address: Address) -> bool {
-    VO_BIT_SIDE_METADATA_SPEC.load::<u8>(address) == 1
+pub unsafe fn is_vo_bit_set_unsafe(object: ObjectReference) -> bool {
+    VO_BIT_SIDE_METADATA_SPEC.load::<u8>(object.to_address()) == 1
 }
 
 pub fn bzero_vo_bit(start: Address, size: usize) {

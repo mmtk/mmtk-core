@@ -163,7 +163,7 @@ pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
 /// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
 pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
     // FIXME: MallocSpace should use a local metadata to record allocated units.
-    is_meta_space_mapped_for_address(addr) && vo_bit::is_vo_bit_set_for_addr(addr)
+    is_meta_space_mapped_for_address(addr) && vo_bit::is_vo_bit_set(unsafe { addr.to_object_reference() })
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {

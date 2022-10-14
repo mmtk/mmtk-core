@@ -379,7 +379,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         for obj in linear_scan {
             // clear the VO-bit
             // FIXME: MarkCompact should use a local metadata to record allocated units.
-            vo_bit::unset_vo_bit_for_addr(obj.to_address());
+            vo_bit::unset_vo_bit(obj);
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
