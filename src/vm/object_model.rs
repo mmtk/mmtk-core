@@ -386,7 +386,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// `ObjectReference` always points to an address in the cell (i.e. `[cell, cell + bytes)`),
     /// they can leave this as `None`.
     /// MMTk allocators use this value to make sure that the metadata for object reference is properly set.
+    // TODO: We should remove it.
     const OBJECT_REF_OFFSET_BEYOND_CELL: Option<usize> = None;
+
+    /// For our allocation result, we expect the binding to have a constant offset between the allocation result
+    /// and their object reference.
+    const OBJECT_REF_OFFSET_FROM_ALLOCATION: isize = 0;
 
     /// Return the lowest address of the storage associated with an object.
     ///

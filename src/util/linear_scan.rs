@@ -116,6 +116,11 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
         Self::from(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
     }
+    /// Check if the given address is in the region.
+    #[inline(always)]
+    fn includes_address(&self, addr: Address) -> bool {
+        addr >= self.start() && addr < self.end()
+    }
 }
 
 pub struct RegionIterator<R: Region> {

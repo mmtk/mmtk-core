@@ -8,7 +8,6 @@ use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::Address;
 use crate::util::VMThread;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
 use atomic::Ordering;
@@ -402,7 +401,33 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             // return self.alloc_slow(size, align, offset);
             return cell; // return failed allocation
         }
-        block.store_free_list(unsafe { cell.load::<Address>() });
+        let next_cell = unsafe { cell.load::<Address>() };
+        // Clear the link
+        unsafe { cell.store::<Address>(Address::ZERO) };
+        debug_assert!(
+            next_cell.is_zero() || block.includes_address(next_cell),
+            "next_cell {} is not in {:?}",
+            next_cell,
+            block
+        );
+        block.store_free_list(next_cell);
+
+        // Zeroing memory right before we return it.
+        // If we move the zeroing to somewhere else, we need to clear the list link here: cell.store::<Address>(Address::ZERO)
+        let cell_size = block.load_block_cell_size();
+        crate::util::memory::zero(cell, cell_size);
+
+        // Make sure the memory is zeroed. This looks silly as we zero the cell right before this check.
+        // But we would need to move the zeroing to somewhere so we can do zeroing at a coarser grainularity.
+        #[cfg(debug_assertions)]
+        {
+            let mut cursor = cell;
+            while cursor < cell + cell_size {
+                debug_assert_eq!(unsafe { cursor.load::<usize>() }, 0);
+                cursor += crate::util::constants::BYTES_IN_ADDRESS;
+            }
+        }
+
         cell
     }
 
@@ -500,7 +525,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 // no more blocks to sweep
                 break;
             }
-            self.sweep_block(block);
+            block.sweep::<VM>();
             if block.has_free_cells() {
                 // recyclable block
                 self.add_to_available_blocks(
@@ -558,7 +583,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedUnswept(block) => {
                     block.store_tls(self.tls);
-                    self.sweep_block(block);
+                    block.sweep::<VM>();
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
                         return block;
@@ -595,34 +620,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_block_cell_size(cell_size);
 
         self.store_block_tls(block);
-    }
-
-    pub fn sweep_block(&self, block: Block) {
-        let cell_size = block.load_block_cell_size();
-        let mut cell = block.start();
-        let mut last = unsafe { Address::zero() };
-        while cell + cell_size <= block.start() + Block::BYTES {
-            // FIXME: we cannot cast cell to object reference
-            if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
-            {
-                // FIXME: allocator should not know about the alloc bit
-                // clear alloc bit if it is ever set.
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
-                    cell,
-                    0,
-                    Ordering::SeqCst,
-                );
-                unsafe {
-                    cell.store::<Address>(last);
-                }
-                last = cell;
-            }
-            cell += cell_size;
-        }
-
-        block.store_free_list(last);
     }
 
     // alloc bit required for non GC context
@@ -717,12 +714,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                 let mut cursor = first_block;
                 while !cursor.is_zero() {
                     if used_blocks {
-                        self.sweep_block(cursor);
+                        cursor.sweep::<VM>();
                         cursor = cursor.load_next_block();
                     } else {
                         let next = cursor.load_next_block();
                         if !cursor.attempt_release(self.space) {
-                            self.sweep_block(cursor);
+                            cursor.sweep::<VM>();
                         }
                         cursor = next;
                     }

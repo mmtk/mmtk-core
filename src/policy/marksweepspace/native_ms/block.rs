@@ -39,7 +39,15 @@ impl Region for Block {
 impl Block {
     pub const ZERO_BLOCK: Self = Self(Address::ZERO);
 
-    pub const METADATA_SPECS: [SideMetadataSpec; 7] = [Self::MARK_TABLE, Self::NEXT_BLOCK_TABLE, Self::PREV_BLOCK_TABLE, Self::FREE_LIST_TABLE, Self::SIZE_TABLE, Self::BLOCK_LIST_TABLE, Self::TLS_TABLE];
+    pub const METADATA_SPECS: [SideMetadataSpec; 7] = [
+        Self::MARK_TABLE,
+        Self::NEXT_BLOCK_TABLE,
+        Self::PREV_BLOCK_TABLE,
+        Self::FREE_LIST_TABLE,
+        Self::SIZE_TABLE,
+        Self::BLOCK_LIST_TABLE,
+        Self::TLS_TABLE,
+    ];
 
     /// Block mark table (side)
     pub const MARK_TABLE: SideMetadataSpec =
@@ -259,6 +267,113 @@ impl Block {
                 false
             }
         }
+    }
+
+    // FIXME: This sweep method is incorrect, and should be removed before merging.
+    // This implementation uses object reference and cell address interchangably, which is obviously wrong.
+    // pub fn sweep<VM: VMBinding>(&self) {
+    //     use crate::vm::ObjectModel;
+    //     let cell_size = self.load_block_cell_size();
+    //     let mut cell = self.start();
+    //     let mut last = unsafe { Address::zero() };
+    //     while cell + cell_size <= self.start() + Block::BYTES {
+    //         // FIXME: we cannot cast cell to object reference
+    //         if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+    //             .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
+    //         {
+    //             // FIXME: allocator should not know about the alloc bit
+    //             // clear alloc bit if it is ever set.
+    //             #[cfg(feature = "global_alloc_bit")]
+    //             crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
+    //                 cell,
+    //                 0,
+    //                 Ordering::SeqCst,
+    //             );
+    //             unsafe {
+    //                 cell.store::<Address>(last);
+    //             }
+    //             last = cell;
+    //         }
+    //         cell += cell_size;
+    //     }
+
+    //     self.store_free_list(last);
+    // }
+
+    // This is a simple implementation that is inefficient but should be correct.
+    // The important point here is that we need to distinguish cell address, allocation address, and object reference.
+    // We only know cell addresses here, but the mark bit is set for object references. Thus, we need to figure out for
+    // a cell address, where the object reference is. In this implementation, we simply go through each possible object
+    // reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn't find
+    // the mark bit in the entire cell, it means the cell is dead.
+    pub fn sweep<VM: VMBinding>(&self) {
+        use crate::util::constants::MIN_OBJECT_SIZE;
+        use crate::vm::ObjectModel;
+
+        // Cell size for this block.
+        let cell_size = self.load_block_cell_size();
+        // Current cell
+        let mut cell = self.start();
+        // Last free cell in the free list
+        let mut last = Address::ZERO;
+        // Current cursor
+        let mut cursor = cell;
+
+        debug!("Sweep block {:?}, cell size {}", self, cell_size);
+
+        while cell + cell_size <= self.end() {
+            // possible object ref
+            let potential_object_ref =
+                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_FROM_ALLOCATION;
+            trace!(
+                "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
+                self,
+                cell,
+                last,
+                cursor,
+                potential_object_ref
+            );
+
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(
+                unsafe { potential_object_ref.to_object_reference() },
+                Ordering::SeqCst,
+            ) {
+                debug!("{:?} Live cell: {}", self, cell);
+                // If the mark bit is set, the cell is alive.
+                // We directly jump to the end of the cell.
+                cell += cell_size;
+                cursor = cell;
+            } else {
+                // If the mark bit is not set, we don't know if the cell is alive or not. We keep search for the mark bit.
+                cursor += MIN_OBJECT_SIZE;
+
+                if cursor >= cell + cell_size {
+                    // We now stepped to the next cell. This means we did not find mark bit in the current cell, and we can add this cell to free list.
+                    debug!(
+                        "{:?} Free cell: {}, last cell in freelist is {}",
+                        self, cell, last
+                    );
+
+                    // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the possible area.
+                    #[cfg(feature = "global_alloc_bit")]
+                    crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.bzero_metadata(
+                        cell + VM::VMObjectModel::OBJECT_REF_OFFSET_FROM_ALLOCATION,
+                        cell_size,
+                    );
+
+                    // store the previous cell to make the free list
+                    debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));
+                    unsafe {
+                        cell.store::<Address>(last);
+                    }
+                    last = cell;
+                    cell += cell_size;
+                    debug_assert_eq!(cursor, cell);
+                }
+            }
+        }
+
+        self.store_free_list(last);
     }
 
     /// Get the chunk containing the block.
