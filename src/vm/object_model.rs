@@ -379,19 +379,32 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// For our allocation result `[cell, cell + bytes)`, if a binding's
-    /// definition of `ObjectReference` may point outside the cell (i.e. `object_ref >= cell + bytes`),
-    /// the binding needs to provide a `Some` value for this constant and
-    /// the value is the maximum of `object_ref - cell`. If a binding's
-    /// `ObjectReference` always points to an address in the cell (i.e. `[cell, cell + bytes)`),
-    /// they can leave this as `None`.
+    /// For our allocation result `[alloc, alloc + bytes)`, if a binding's
+    /// definition of `ObjectReference` may point outside the allocation region, including pointing
+    /// to the end of the region (i.e. `object_ref >= alloc + bytes`, or
+    /// `object_ref < alloc`), the binding needs to set this constant to `true`. Otherwise, a binding can leave this field as `false`.
     /// MMTk allocators use this value to make sure that the metadata for object reference is properly set.
-    // TODO: We should remove it.
-    const OBJECT_REF_OFFSET_BEYOND_CELL: Option<usize> = None;
+    const OBJECT_REF_MAYBE_OUTSIDE_ALLOCATION: bool;
 
-    /// For our allocation result, we expect the binding to have a constant offset between the allocation result
-    /// and their object reference.
-    const OBJECT_REF_OFFSET_FROM_ALLOCATION: isize = 0;
+    /// For our allocation result, we expect the binding to have an offset between the allocation result
+    /// and their object reference, i.e. object ref = alloc + offset. The offset is not necessary to be a
+    /// constant for all the objects. This constant defines the smallest possible offset.
+    ///
+    /// We should have the invariants:
+    /// * OBJECT_REF_OFFSET_LOWER_BOUND <= possible offset <= OBJECT_REF_OFFSET_UPPER_BOUND
+    /// * object ref >= alloc + OBJECT_REF_OFFSET_LOWER_BOUND
+    /// * object ref <= alloc + OBJECT_REF_OFFSET_UPPER_BOUND
+    const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
+
+    /// For our allocation result, we expect the binding to have an offset between the allocation result
+    /// and their object reference, i.e. object ref = alloc + offset. The offset is not necessary to be a
+    /// constant for all the objects. This constant defines the biggest possible offset.
+    ///
+    /// We should have the invariants:
+    /// * OBJECT_REF_OFFSET_LOWER_BOUND <= possible offset <= OBJECT_REF_OFFSET_UPPER_BOUND
+    /// * object ref >= alloc + OBJECT_REF_OFFSET_LOWER_BOUND
+    /// * object ref <= alloc + OBJECT_REF_OFFSET_UPPER_BOUND
+    const OBJECT_REF_OFFSET_UPPER_BOUND: isize;
 
     /// Return the lowest address of the storage associated with an object.
     ///

@@ -323,8 +323,7 @@ impl Block {
 
         while cell + cell_size <= self.end() {
             // possible object ref
-            let potential_object_ref =
-                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_FROM_ALLOCATION;
+            let potential_object_ref = cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND;
             trace!(
                 "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
                 self,
@@ -357,7 +356,7 @@ impl Block {
                     // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the possible area.
                     #[cfg(feature = "global_alloc_bit")]
                     crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.bzero_metadata(
-                        cell + VM::VMObjectModel::OBJECT_REF_OFFSET_FROM_ALLOCATION,
+                        cell + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
                         cell_size,
                     );
 

@@ -1,5 +1,5 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use super::object_ref_guard::adjust_thread_local_buffer_limit;
+use super::object_ref_guard::adjust_thread_local_buffer_range;
 use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
@@ -247,8 +247,10 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
             if let Some((start_line, end_line)) = self.immix_space().get_next_available_lines(line)
             {
                 // Find recyclable lines. Update the bump allocation cursor and limit.
-                self.cursor = start_line.start();
-                self.limit = adjust_thread_local_buffer_limit::<VM>(end_line.start());
+                let (cursor, limit) =
+                    adjust_thread_local_buffer_range::<VM>(start_line.start(), end_line.start());
+                self.cursor = cursor;
+                self.limit = limit;
                 trace!(
                     "{:?}: acquire_recyclable_lines -> {:?} [{:?}, {:?}) {:?}",
                     self.tls,
@@ -304,12 +306,14 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
                     block.start(),
                     block.end()
                 );
+                let (cursor, limit) =
+                    adjust_thread_local_buffer_range::<VM>(block.start(), block.end());
                 if self.request_for_large {
-                    self.large_cursor = block.start();
-                    self.large_limit = adjust_thread_local_buffer_limit::<VM>(block.end());
+                    self.large_cursor = cursor;
+                    self.large_limit = limit;
                 } else {
-                    self.cursor = block.start();
-                    self.limit = adjust_thread_local_buffer_limit::<VM>(block.end());
+                    self.cursor = cursor;
+                    self.limit = limit;
                 }
                 self.alloc(size, align, offset)
             }
