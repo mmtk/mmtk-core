@@ -380,7 +380,7 @@ mod tests {
                     // We need to do this because of the static NO_METADATA
                     // sanity::reset();
                     let data_addr = vm_layout_constants::HEAP_START
-                        + (vm_layout_constants::BYTES_IN_CHUNK << 1);
+                        + (vm_layout_constants::BYTES_IN_CHUNK << 1) * 2;
 
                     let metadata_1_spec = SideMetadataSpec {
                         name: "metadata_1_spec",
@@ -415,6 +415,65 @@ mod tests {
 
                     let one = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(one, 1);
+
+                    metadata_1_spec.store_atomic::<u8>(data_addr, 0, Ordering::SeqCst);
+
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
+                },
+                || {
+                    sanity::reset();
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn test_side_metadata_atomic_fetch_and_or_2bits() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    let data_addr = vm_layout_constants::HEAP_START
+                        + (vm_layout_constants::BYTES_IN_CHUNK << 1);
+
+                    let metadata_1_spec = SideMetadataSpec {
+                        name: "metadata_1_spec",
+                        is_global: true,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: 1,
+                        log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
+                    };
+
+                    let metadata = SideMetadataContext {
+                        global: vec![metadata_1_spec],
+                        local: vec![],
+                    };
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
+
+                    assert!(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    let zero =
+                        metadata_1_spec.fetch_or_atomic::<u8>(data_addr, 0b11, Ordering::SeqCst);
+                    assert_eq!(zero, 0);
+
+                    let value_11 = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(value_11, 0b11);
+
+                    let another_value_11 =
+                        metadata_1_spec.fetch_and_atomic::<u8>(data_addr, 0b01, Ordering::SeqCst);
+                    assert_eq!(another_value_11, 0b11);
+
+                    let value_01 = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(value_01, 0b01);
+
+                    metadata_1_spec.store_atomic::<u8>(data_addr, 0, Ordering::SeqCst);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
 

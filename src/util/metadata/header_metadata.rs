@@ -402,12 +402,12 @@ impl HeaderMetadataSpec {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            let (_, mask) = self.get_shift_and_mask_for_bits();
-            let new_val = val.to_u8().unwrap() | !mask;
+            let (lshift, mask) = self.get_shift_and_mask_for_bits();
+            let new_val = (val.to_u8().unwrap() | !mask) << lshift;
             // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
             let old_raw_byte =
                 unsafe { <u8 as MetadataValue>::fetch_and(self.meta_addr(object), new_val, order) };
-            let old_val = self.get_bits_from_u8(old_raw_byte);
+            let old_val = (old_raw_byte >> lshift) & mask;
             FromPrimitive::from_u8(old_val).unwrap()
         } else {
             unsafe { T::fetch_and(self.meta_addr(object), val, order) }
@@ -425,12 +425,12 @@ impl HeaderMetadataSpec {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            let (_, mask) = self.get_shift_and_mask_for_bits();
-            let new_val = val.to_u8().unwrap() & mask;
+            let (lshift, mask) = self.get_shift_and_mask_for_bits();
+            let new_val = (val.to_u8().unwrap() & mask) << lshift;
             // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
             let old_raw_byte =
                 unsafe { <u8 as MetadataValue>::fetch_or(self.meta_addr(object), new_val, order) };
-            let old_val = self.get_bits_from_u8(old_raw_byte);
+            let old_val = (old_raw_byte >> lshift) & mask;
             FromPrimitive::from_u8(old_val).unwrap()
         } else {
             unsafe { T::fetch_or(self.meta_addr(object), val, order) }
