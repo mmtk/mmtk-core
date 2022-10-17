@@ -1,5 +1,5 @@
 // GITHUB-CI: MMTK_PLAN=all
-// GITHUB-CI: FEATURES=vo_map
+// GITHUB-CI: FEATURES=vo_bit
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
