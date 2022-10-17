@@ -59,7 +59,7 @@ pub const VO_BIT_REGION_SIZE: usize =
 /// Set the VO-bit of `object` atomically.
 pub(crate) fn set_vo_bit(object: ObjectReference) {
     debug_assert!(!is_vo_bit_set(object), "{:x}: VO-bit already set", object);
-    VO_BIT_SIDE_METADATA_SPEC.fetch_or_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
+    VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
 }
 
 /// Unset the VO-bit of `object` atomically.
@@ -69,7 +69,7 @@ pub(crate) fn unset_vo_bit(object: ObjectReference) {
     // VO-bit again.  So it is valid to assert the VO-bit must still be set when this function is
     // called.
     debug_assert!(is_vo_bit_set(object), "{:x}: VO-bit not set", object);
-    VO_BIT_SIDE_METADATA_SPEC.fetch_and_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
+    VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
 }
 
 /// Check if the VO-bit of `object` is set atomically.
