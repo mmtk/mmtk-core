@@ -30,11 +30,8 @@ impl VMBinding for DummyVM {
     type VMEdge = edges::DummyVMEdge;
     type VMMemorySlice = edges::DummyVMMemorySlice;
 
-    /// Allowed maximum alignment as shift by min alignment.
-    const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;
-
     /// Allowed maximum alignment in bytes.
-    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
+    const MAX_ALIGNMENT: usize = 1 << 6;
 }
 
 use std::sync::atomic::{AtomicBool, Ordering};
