@@ -11,7 +11,6 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         alloc::free_list_allocator::mi_bin,
-        alloc_bit::is_alloced,
         copy::CopySemantics,
         heap::{
             layout::heap_layout::{Mmapper, VMMap},
@@ -220,7 +219,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             return object;
         }
         let address = object.to_address();
-        assert!(
+        debug_assert!(
             self.in_space(object),
             "Cannot mark an object {} that was not alloced by free list allocator.",
             address,
@@ -232,20 +231,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             queue.enqueue(object);
         }
         object
-    }
-
-    pub fn block_has_no_objects(&self, block: Block) -> bool {
-        // for debugging, delete this later
-        // assumes block is allocated (has metadata)
-        let size = block.load_block_cell_size();
-        let mut cell = block.start();
-        while cell < block.start() + Block::BYTES {
-            if is_alloced(unsafe { cell.to_object_reference() }) {
-                return false;
-            }
-            cell += size;
-        }
-        true
     }
 
     pub fn record_new_block(&self, block: Block) {

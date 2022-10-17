@@ -152,8 +152,8 @@ pub fn alloc<VM: VMBinding>(
     // Assert alignment
     debug_assert!(align >= VM::MIN_ALIGNMENT);
     debug_assert!(align <= VM::MAX_ALIGNMENT);
-    // Assert offset: either the binding declares they will use offset, or the offset is always 0.
-    debug_assert!(VM::USE_ALLOCATION_OFFSET || (!VM::USE_ALLOCATION_OFFSET && offset == 0));
+    // Assert offset
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
 
     mutator.alloc(size, align, offset, semantics)
 }
