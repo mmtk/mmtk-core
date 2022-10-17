@@ -56,38 +56,55 @@ pub(crate) const VO_BIT_SIDE_METADATA_ADDR: Address =
 pub const VO_BIT_REGION_SIZE: usize =
     1usize << crate::util::metadata::vo_bit::VO_BIT_SIDE_METADATA_SPEC.log_bytes_in_region;
 
+/// Set the VO-bit of `object` atomically.
 pub(crate) fn set_vo_bit(object: ObjectReference) {
     debug_assert!(!is_vo_bit_set(object), "{:x}: VO-bit already set", object);
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
+    VO_BIT_SIDE_METADATA_SPEC.fetch_or_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
 }
 
+/// Unset the VO-bit of `object` atomically.
 pub(crate) fn unset_vo_bit(object: ObjectReference) {
+    // Note: Both the VM and the GC are allowed to unset VO-bit.  However, if the VM unsets the
+    // VO-bit first, that object will not be traced by the GC, and the GC will not try to clear its
+    // VO-bit again.  So it is valid to assert the VO-bit must still be set when this function is
+    // called.
     debug_assert!(is_vo_bit_set(object), "{:x}: VO-bit not set", object);
-    VO_BIT_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
+    VO_BIT_SIDE_METADATA_SPEC.fetch_and_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
 }
 
+/// Check if the VO-bit of `object` is set atomically.
 pub(crate) fn is_vo_bit_set(object: ObjectReference) -> bool {
     VO_BIT_SIDE_METADATA_SPEC.load_atomic::<u8>(object.to_address(), Ordering::SeqCst) == 1
 }
 
+/// Unset the VO-bit of `object` non-atomically.
+///
 /// # Safety
 ///
-/// This is unsafe: check the comment on `side_metadata::store`
-///
+/// It will be a data race if another thread concurrently accesses any bit in the/ same byte.
+/// It should only be used when such a race is impossible.
 pub(crate) unsafe fn unset_vo_bit_unsafe(object: ObjectReference) {
     debug_assert!(is_vo_bit_set(object), "{:x}: VO-bit not set", object);
     VO_BIT_SIDE_METADATA_SPEC.store::<u8>(object.to_address(), 0);
 }
 
+/// Check if the VO-bit of `object` is set non-atomically.
+///
 /// # Safety
 ///
-/// This is unsafe: check the comment on `side_metadata::load`
-///
+/// It will be a data race if another thread concurrently modifies any bit in the same byte.
+/// It should only be used when such a race is impossible.
 pub(crate) unsafe fn is_vo_bit_set_unsafe(object: ObjectReference) -> bool {
     VO_BIT_SIDE_METADATA_SPEC.load::<u8>(object.to_address()) == 1
 }
 
-pub(crate) fn bzero_vo_bit(start: Address, size: usize) {
+/// Unset all VO-bits for all objects in the region of `start <= addr < start + size`.
+///
+/// # Safety
+///
+/// It will be a data race if another thread concurrently accesses any bit in the region.
+/// It should only be used when such a race is impossible.
+pub(crate) unsafe fn bzero_vo_bit(start: Address, size: usize) {
     VO_BIT_SIDE_METADATA_SPEC.bzero_metadata(start, size);
 }
 
@@ -120,9 +137,6 @@ pub fn is_valid_mmtk_object(object: ObjectReference) -> bool {
 /// Argument:
 /// * `object`: An object that is still valid.
 #[cfg(feature = "vo_bit")] // Eventually the entire `vo_bit` module will be guarded by this feature.
-pub fn invalidate_object(object: ObjectReference) {
-    debug_assert!(SFT_MAP
-        .get_checked(object.to_address())
-        .is_valid_mmtk_object(object));
-    unset_vo_bit(object);
+pub fn invalidate_object(_object: ObjectReference) {
+    unimplemented!("GC algorithms need to be updated to skip invalid objects during tracing.")
 }

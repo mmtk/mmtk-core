@@ -184,7 +184,9 @@ impl Block {
     #[inline]
     pub fn deinit(&self) {
         #[cfg(feature = "vo_bit")]
-        crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+        unsafe {
+            crate::util::metadata::vo_bit::bzero_vo_bit(self.start(), Self::BYTES);
+        }
         self.set_state(BlockState::Unallocated);
     }
 
