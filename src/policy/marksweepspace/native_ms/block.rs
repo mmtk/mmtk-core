@@ -14,6 +14,8 @@ use crate::{
     vm::VMBinding,
 };
 
+/// A 64KB region for MiMalloc.
+/// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Block(Address);
