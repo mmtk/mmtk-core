@@ -419,12 +419,13 @@ pub struct BasePlan<VM: VMBinding> {
     /// A VM space is a space allocated and populated by the VM.  Currently it is used by JikesRVM
     /// for boot image.
     ///
-    /// If VM space is present, it has some special interaction with the
-    /// `memory_manager::is_mmtk_object` and the `memory_manager::is_in_mmtk_spaces` functions.
+    /// If VM space is present, it has some special interaction with the VO-bit metadata and the
+    /// `memory_manager::is_in_mmtk_spaces` functions.
     ///
-    /// -   The `is_mmtk_object` function requires the VO-bit side metadata to identify objects,
-    ///     but currently we do not require the boot image to provide it, so it will not work if the
-    ///     address argument is in the VM space.
+    /// -   Currently we do not require the boot image to provide a bitmap to be used as the VO-bit
+    ///     metadata, so features that require the VO-bit will not work.  Conservative GC will not
+    ///     be able to identify if an address is a valid object reference if it points into the VM
+    ///     space.
     ///
     /// -   The `is_in_mmtk_spaces` currently returns `true` if the given object reference is in
     ///     the VM space.

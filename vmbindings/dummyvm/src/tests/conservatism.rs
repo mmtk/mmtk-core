@@ -1,5 +1,5 @@
 // GITHUB-CI: MMTK_PLAN=all
-// GITHUB-CI: FEATURES=is_mmtk_object
+// GITHUB-CI: FEATURES=vo_map
 
 use crate::api::*;
 use crate::object_model::OBJECT_REF_OFFSET;
@@ -35,7 +35,7 @@ fn assert_filter_fail(object: ObjectReference) {
 fn assert_valid_objref(object: ObjectReference) {
     assert!(
         mmtk_is_valid_mmtk_object(object),
-        "mmtk_is_mmtk_object({}) should return true. Got false.",
+        "mmtk_is_valid_mmtk_object({}) should return true. Got false.",
         object,
     );
 }
@@ -43,7 +43,7 @@ fn assert_valid_objref(object: ObjectReference) {
 fn assert_invalid_objref(object: ObjectReference, real: ObjectReference) {
     assert!(
         !mmtk_is_valid_mmtk_object(object),
-        "mmtk_is_mmtk_object({}) should return false. Got true. Real object: {}",
+        "mmtk_is_valid_mmtk_object({}) should return false. Got true. Real object: {}",
         object,
         real,
     );

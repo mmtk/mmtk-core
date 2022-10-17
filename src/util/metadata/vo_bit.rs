@@ -2,28 +2,38 @@
 //!
 //! The valid-object bit (VO-bit) metadata is a one-bit-per-object side metadata.  It is set for
 //! every object at allocation time (more precisely, during `post_alloc`), and cleared when either
-//! -   the object reclaims by the GC, or
-//! -   the VM explicitly clears the VO-bit of the object.
+//! -   the object is reclaimed by the GC, or
+//! -   the VM explicitly clears the VO-bit of the object (using the [`invalidate_object`] API).
 //!
 //! The main purpose of VO-bit is supporting conservative GC.  It is the canonical source of
 //! information about whether there is an object in the MMTk heap at any given address.
 //!
-//! The VO-bit has the granularity of one bit per minimum object alignment.  Each bit governs the
+//! The granularity of VO-bit is one bit per minimum object alignment.  Each bit governs the
 //! region of `lo <= addr < hi`, where
 //! -   `lo = addr.align_down(VO_BIT_REGION_SIZE)`
 //! -   `hi = lo + VO_BIT_REGION_SIZE`
 //! -   The constant [`VO_BIT_REGION_SIZE`] is size of the region (in bytes) each bit governs.
 //!
-//! Because of the granularity, if the user wants to check if an *arbitrary* address points to a
-//! valid object, it must check if the address is properly aligned.
+//! Because of the granularity, the VO-bit metadata cannot tell *which* address in each region
+//! has a valid object.  Therefore, the VM **must check if an address is properly aligned** before
+//! consulting the VO-bit metadata (by calling the [`is_valid_mmtk_object`] function).  For most
+//! VMs, the alignment requirement of object references is usually equal to [`VO_BIT_REGION_SIZE`],
+//! so checking `object.to_address().is_aligned_to(VO_BIT_REGION_SIZE)` should usually work.
+//!
+//! This function is useful for conservative root scanning.  The VM can iterate through all words
+//! in a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
+//! greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if
+//! the word is really a reference.
+//!
+//! Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
+//! is present.  See `crate::plan::global::BasePlan::vm_space`.
+//!
 
 use atomic::Ordering;
 
 #[cfg(feature = "vo_bit")]
-// Eventually the entire `vo_bit` module will be guarded by this feature.
 use crate::mmtk::SFT_MAP;
 #[cfg(feature = "vo_bit")]
-// Eventually the entire `vo_bit` module will be guarded by this feature.
 use crate::policy::sft_map::SFTMap;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
@@ -83,42 +93,14 @@ pub(crate) fn bzero_vo_bit(start: Address, size: usize) {
 
 /// Check if `object` is a reference to a valid MMTk object.
 ///
-/// Concretely:
-/// 1.  Return true if `addr.to_object_reference()` is a valid object reference to an object in any
-///     space in MMTk.
-/// 2.  Also return true if there exists an `objref: ObjectReference` such that
-///     -   `objref` is a valid object reference to an object in any space in MMTk, and
-///     -   `lo <= objref.to_address() < hi`, where
-///         -   `lo = addr.align_down(VO_BIT_REGION_SIZE)` and
-///         -   `hi = lo + VO_BIT_REGION_SIZE` and
-///         -   `VO_BIT_REGION_SIZE` is [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///             It is the byte granularity of the VO-bit.
-/// 3.  Return false otherwise.  This function never panics.
+/// This function returns true if the VO-bit is set for the address of `object`.
 ///
-/// Case 2 means **this function is imprecise for misaligned addresses**.
-/// This function uses the VO-bit side metadata, i.e. a bitmap.
-/// For space efficiency, each bit of the bitmap governs a small region of memory.
-/// The size of a region is currently defined as the [minimum object size](crate::util::constants::MIN_OBJECT_SIZE),
-/// which is currently defined as the [word size](crate::util::constants::BYTES_IN_WORD),
-/// which is 4 bytes on 32-bit systems or 8 bytes on 64-bit systems.
-/// The alignment of a region is also the region size.
-/// If a VO-bit is `1`, the bitmap cannot tell which address within the 4-byte or 8-byte region
-/// is the valid object reference.
-/// Therefore, if the input `addr` is not properly aligned, but is close to a valid object
-/// reference, this function may still return true.
+/// The input parameter `object` can be converted from an arbitrary address.  This function will
+/// always return true or false, and will never panic.
 ///
-/// For the reason above, the VM **must check if `addr` is properly aligned** before calling this
-/// function.  For most VMs, valid object references are always aligned to the word size, so
-/// checking `addr.is_aligned_to(BYTES_IN_WORD)` should usually work.  If you are paranoid, you can
-/// always check against [`crate::util::is_mmtk_object::VO_BIT_REGION_SIZE`].
-///
-/// This function is useful for conservative root scanning.  The VM can iterate through all words in
-/// a stack, filter out zeros, misaligned words, obviously out-of-range words (such as addresses
-/// greater than `0x0000_7fff_ffff_ffff` on Linux on x86_64), and use this function to deside if the
-/// word is really a reference.
-///
-/// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See `crate::plan::global::BasePlan::vm_space`.
+/// Due to the granularity of the VO-bit metadata (see [module-level documentation][self]), the
+/// user must check the alignment of `object` before calling this function in order to get the
+/// correct result.
 ///
 /// Argument:
 /// * `object`: An ObjectReference converted from an arbitrary address
