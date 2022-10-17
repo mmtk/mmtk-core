@@ -584,7 +584,7 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// object for the VM in response to `memory_manager::alloc`, this function will return true; but
 /// if the VM directly called `malloc` to allocate the object, this function will return false.
 ///
-/// If `src::util::metadata::vo_map::is_valid_mmtk_object(object)` returns true,
+/// If `src::util::metadata::vo_bit::is_valid_mmtk_object(object)` returns true,
 /// `is_in_mmtk_spaces(object)` must also return true.
 ///
 /// This function is useful if an object reference in the VM can be either a pointer into the MMTk
