@@ -5,6 +5,7 @@ use atomic::Ordering;
 use super::MarkSweepSpace;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
+use crate::vm::ObjectModel;
 use crate::{
     util::{
         alloc::free_list_allocator::BlockList, metadata::side_metadata::SideMetadataSpec, Address,
@@ -269,46 +270,69 @@ impl Block {
         }
     }
 
-    // FIXME: This sweep method is incorrect, and should be removed before merging.
-    // This implementation uses object reference and cell address interchangably, which is obviously wrong.
-    // pub fn sweep<VM: VMBinding>(&self) {
-    //     use crate::vm::ObjectModel;
-    //     let cell_size = self.load_block_cell_size();
-    //     let mut cell = self.start();
-    //     let mut last = unsafe { Address::zero() };
-    //     while cell + cell_size <= self.start() + Block::BYTES {
-    //         // FIXME: we cannot cast cell to object reference
-    //         if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-    //             .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
-    //         {
-    //             // FIXME: allocator should not know about the alloc bit
-    //             // clear alloc bit if it is ever set.
-    //             #[cfg(feature = "global_alloc_bit")]
-    //             crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
-    //                 cell,
-    //                 0,
-    //                 Ordering::SeqCst,
-    //             );
-    //             unsafe {
-    //                 cell.store::<Address>(last);
-    //             }
-    //             last = cell;
-    //         }
-    //         cell += cell_size;
-    //     }
-
-    //     self.store_free_list(last);
-    // }
-
-    // This is a simple implementation that is inefficient but should be correct.
-    // The important point here is that we need to distinguish cell address, allocation address, and object reference.
-    // We only know cell addresses here, but the mark bit is set for object references. Thus, we need to figure out for
-    // a cell address, where the object reference is. In this implementation, we simply go through each possible object
-    // reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn't find
-    // the mark bit in the entire cell, it means the cell is dead.
+    /// Sweep the block. This is done either lazily in the allocation phase, or eagerly at the end of a GC.
     pub fn sweep<VM: VMBinding>(&self) {
+        // The important point here is that we need to distinguish cell address, allocation address, and object reference.
+        // We only know cell addresses here. We do not know the allocation address, and we also do not know the object reference.
+        // The mark bit is set for object references, and we need to use the mark bit to decide whether a cell is live or not.
+
+        // Check if we can treat it as the simple case: cell address === object reference.
+        // If the binding does not use allocation offset, and they use the same allocation alignment which the cell size is aligned to,
+        // then we have cell address === allocation address.
+        // Furthermore, if the binding does not have an offset between allocation and object reference, then allocation address === cell address.
+        if !VM::USE_ALLOCATION_OFFSET
+            && VM::MAX_ALIGNMENT == VM::MIN_ALIGNMENT
+            && crate::util::conversions::raw_is_aligned(
+                self.load_block_cell_size(),
+                VM::MAX_ALIGNMENT,
+            )
+            && VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND == 0
+            && VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND == 0
+        {
+            // In this case, we can use the simplest and the most efficicent sweep.
+            self.simple_sweep::<VM>()
+        } else {
+            // Otherwise we fallback to a generic but slow sweep.
+            self.naive_brute_force_sweep::<VM>()
+        }
+    }
+
+    /// This implementation uses object reference and cell address interchangably. This is not correct for most cases.
+    /// However, in certain cases, such as OpenJDK, this is correct, and efficient. See the sweep method for the invariants
+    /// that we need to use this method correctly.
+    fn simple_sweep<VM: VMBinding>(&self) {
+        let cell_size = self.load_block_cell_size();
+        let mut cell = self.start();
+        let mut last = unsafe { Address::zero() };
+        while cell + cell_size <= self.start() + Block::BYTES {
+            // We know the cell and the object reference is the same.
+            if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
+            {
+                // clear alloc bit if it is ever set.
+                #[cfg(feature = "global_alloc_bit")]
+                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
+                    cell,
+                    0,
+                    Ordering::SeqCst,
+                );
+                unsafe {
+                    cell.store::<Address>(last);
+                }
+                last = cell;
+            }
+            cell += cell_size;
+        }
+
+        self.store_free_list(last);
+    }
+
+    /// This is a naive implementation that is inefficient but should be correct.
+    /// In this implementation, we simply go through each possible object
+    /// reference and see if it has the mark bit set. If we find mark bit, that means the cell is alive. If we didn't find
+    /// the mark bit in the entire cell, it means the cell is dead.
+    fn naive_brute_force_sweep<VM: VMBinding>(&self) {
         use crate::util::constants::MIN_OBJECT_SIZE;
-        use crate::vm::ObjectModel;
 
         // Cell size for this block.
         let cell_size = self.load_block_cell_size();

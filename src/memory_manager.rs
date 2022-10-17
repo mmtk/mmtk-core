@@ -149,6 +149,12 @@ pub fn alloc<VM: VMBinding>(
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
+    // Assert alignment
+    debug_assert!(align >= VM::MIN_ALIGNMENT);
+    debug_assert!(align <= VM::MAX_ALIGNMENT);
+    // Assert offset: either the binding declares they will use offset, or the offset is always 0.
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || (!VM::USE_ALLOCATION_OFFSET && offset == 0));
+
     mutator.alloc(size, align, offset, semantics)
 }
 
