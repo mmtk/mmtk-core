@@ -536,12 +536,12 @@ impl SideMetadataSpec {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
-                    let mask = meta_byte_mask(self);
+                    let mask = meta_byte_mask(self) << lshift;
                     // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
-                    let rhs = (val.to_u8().unwrap() | !mask) << lshift;
+                    let rhs = (val.to_u8().unwrap() << lshift) | !mask;
                     let old_raw_byte =
                         unsafe { <u8 as MetadataValue>::fetch_and(meta_addr, rhs, order) };
-                    let old_val = (old_raw_byte >> lshift) & mask;
+                    let old_val = (old_raw_byte & mask) >> lshift;
                     FromPrimitive::from_u8(old_val).unwrap()
                 } else {
                     unsafe { T::fetch_and(meta_addr, val, order) }
@@ -568,12 +568,12 @@ impl SideMetadataSpec {
                 let meta_addr = address_to_meta_address(self, data_addr);
                 if self.log_num_of_bits < 3 {
                     let lshift = meta_byte_lshift(self, data_addr);
-                    let mask = meta_byte_mask(self);
+                    let mask = meta_byte_mask(self) << lshift;
                     // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 0, and do fetch_or
-                    let rhs = (val.to_u8().unwrap() & mask) << lshift;
+                    let rhs = (val.to_u8().unwrap() << lshift) & mask;
                     let old_raw_byte =
                         unsafe { <u8 as MetadataValue>::fetch_or(meta_addr, rhs, order) };
-                    let old_val = (old_raw_byte >> lshift) & mask;
+                    let old_val = (old_raw_byte & mask) >> lshift;
                     FromPrimitive::from_u8(old_val).unwrap()
                 } else {
                     unsafe { T::fetch_or(meta_addr, val, order) }
@@ -1019,7 +1019,6 @@ mod tests {
 
             let data_addr = vm_layout_constants::HEAP_START;
             let meta_addr = address_to_meta_address(&spec, data_addr);
-
             with_cleanup(
                 || {
                     let mmap_result = context.try_map_metadata_space(data_addr, BYTES_IN_PAGE);
