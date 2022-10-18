@@ -218,15 +218,14 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         if object.is_null() {
             return object;
         }
-        let address = object.to_address();
         debug_assert!(
             self.in_space(object),
             "Cannot mark an object {} that was not alloced by free list allocator.",
-            address,
+            object,
         );
         if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(object, Ordering::SeqCst) {
             VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.set::<VM>(object, Ordering::SeqCst);
-            let block = Block::from(Block::align(address));
+            let block = Block::from(Block::containing::<VM>(object));
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
         }
