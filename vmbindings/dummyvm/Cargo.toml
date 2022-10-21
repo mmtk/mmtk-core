@@ -23,3 +23,4 @@ atomic = "0.4.6"
 default = []
 is_mmtk_object = ["mmtk/is_mmtk_object"]
 malloc_counted_size = ["mmtk/malloc_counted_size"]
+malloc_mark_sweep = ["mmtk/malloc_mark_sweep"]

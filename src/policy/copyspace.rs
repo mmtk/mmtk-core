@@ -1,10 +1,10 @@
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
@@ -13,14 +13,12 @@ use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::{extract_side_metadata, side_metadata, MetadataSpec};
+use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
@@ -160,14 +158,9 @@ impl<VM: VMBinding> CopySpace<VM> {
         );
         CopySpace {
             pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(
-                    common.start,
-                    common.extent,
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
             from_space: AtomicBool::new(from_space),
@@ -182,11 +175,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         if let MetadataSpec::OnSide(side_forwarding_status_table) =
             *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
         {
-            side_metadata::bzero_metadata(
-                &side_forwarding_status_table,
-                self.common.start,
-                self.pr.cursor() - self.common.start,
-            );
+            side_forwarding_status_table
+                .bzero_metadata(self.common.start, self.pr.cursor() - self.common.start);
         }
     }
 

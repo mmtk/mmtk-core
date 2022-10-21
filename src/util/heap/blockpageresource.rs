@@ -58,11 +58,6 @@ impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
         self.alloc_pages_fast(reserved_pages, required_pages, tls)
     }
 
-    #[inline(always)]
-    fn adjust_for_metadata(&self, pages: usize) -> usize {
-        pages // No legacy metadata support
-    }
-
     fn get_available_physical_pages(&self) -> usize {
         debug_assert!(self.common.contiguous);
         let _sync = self.sync.lock().unwrap();

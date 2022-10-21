@@ -889,6 +889,9 @@ pub struct CommonPlan<VM: VMBinding> {
     pub immortal: ImmortalSpace<VM>,
     #[trace]
     pub los: LargeObjectSpace<VM>,
+    // TODO: We should use a marksweep space for nonmoving.
+    #[trace]
+    pub nonmoving: ImmortalSpace<VM>,
     #[fallback_trace]
     pub base: BasePlan<VM>,
 }
@@ -924,6 +927,16 @@ impl<VM: VMBinding> CommonPlan<VM> {
                 constraints,
                 false,
             ),
+            nonmoving: ImmortalSpace::new(
+                "nonmoving",
+                true,
+                VMRequest::discontiguous(),
+                global_side_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                constraints,
+            ),
             base: BasePlan::new(
                 vm_map,
                 mmapper,
@@ -939,11 +952,15 @@ impl<VM: VMBinding> CommonPlan<VM> {
         let mut ret = self.base.get_spaces();
         ret.push(&self.immortal);
         ret.push(&self.los);
+        ret.push(&self.nonmoving);
         ret
     }
 
     pub fn get_used_pages(&self) -> usize {
-        self.immortal.reserved_pages() + self.los.reserved_pages() + self.base.get_used_pages()
+        self.immortal.reserved_pages()
+            + self.los.reserved_pages()
+            + self.nonmoving.reserved_pages()
+            + self.base.get_used_pages()
     }
 
     pub fn trace_object<Q: ObjectQueue>(
@@ -960,18 +977,24 @@ impl<VM: VMBinding> CommonPlan<VM> {
             trace!("trace_object: object in los");
             return self.los.trace_object(queue, object);
         }
+        if self.nonmoving.in_space(object) {
+            trace!("trace_object: object in nonmoving space");
+            return self.nonmoving.trace_object(queue, object);
+        }
         self.base.trace_object::<Q>(queue, object, worker)
     }
 
     pub fn prepare(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.prepare();
         self.los.prepare(full_heap);
+        self.nonmoving.prepare();
         self.base.prepare(tls, full_heap)
     }
 
     pub fn release(&mut self, tls: VMWorkerThread, full_heap: bool) {
         self.immortal.release();
         self.los.release(full_heap);
+        self.nonmoving.release();
         self.base.release(tls, full_heap)
     }
 
@@ -987,6 +1010,10 @@ impl<VM: VMBinding> CommonPlan<VM> {
         &self.los
     }
 
+    pub fn get_nonmoving(&self) -> &ImmortalSpace<VM> {
+        &self.nonmoving
+    }
+
     pub(crate) fn verify_side_metadata_sanity(
         &self,
         side_metadata_sanity_checker: &mut SideMetadataSanity,
@@ -996,6 +1023,8 @@ impl<VM: VMBinding> CommonPlan<VM> {
         self.immortal
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
         self.los
+            .verify_side_metadata_sanity(side_metadata_sanity_checker);
+        self.nonmoving
             .verify_side_metadata_sanity(side_metadata_sanity_checker);
     }
 }
@@ -1043,10 +1072,27 @@ use enum_map::Enum;
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Enum, PartialEq, Eq)]
 pub enum AllocationSemantics {
+    /// The default semantic. This means there is no specific requirement for the allocation.
+    /// The actual semantic of the default will depend on the GC plan in use.
     Default = 0,
+    /// Immortal objects will not be reclaimed. MMTk still traces immortal objects, but will not
+    /// reclaim the objects even if they are dead.
     Immortal = 1,
+    /// Large objects. It is usually desirable to allocate large objects specially. Large objects
+    /// are allocated with page granularity and will not be moved.
+    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::plan_constraints::PlanConstraints`]),
+    /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
+    /// threshold must be allocated with the `Los` semantic.
+    /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.
     Los = 2,
+    /// Code objects have execution permission.
+    /// Note that this is a place holder for now. Currently all the memory MMTk allocates has execution permission.
     Code = 3,
+    /// Read-only objects cannot be mutated once it is initialized.
+    /// Note that this is a place holder for now. It does not provide read only semantic.
     ReadOnly = 4,
+    /// Los + Code.
     LargeCode = 5,
+    /// Non moving objects will not be moved by GC.
+    NonMoving = 6,
 }

@@ -2,7 +2,7 @@ use super::block::{Block, BlockState};
 use super::defrag::Histogram;
 use super::immixspace::ImmixSpace;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, SideMetadataSpec};
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::{
     scheduler::*,
     util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
@@ -112,7 +112,7 @@ impl ChunkMap {
             return;
         }
         // Update alloc byte
-        unsafe { side_metadata::store(&Self::ALLOC_TABLE, chunk.start(), state as u8 as _) };
+        unsafe { Self::ALLOC_TABLE.store::<u8>(chunk.start(), state as u8) };
         // If this is a newly allcoated chunk, then expand the chunk range.
         if state == ChunkState::Allocated {
             debug_assert!(!chunk.start().is_zero());
@@ -130,7 +130,7 @@ impl ChunkMap {
 
     /// Get chunk state
     pub fn get(&self, chunk: Chunk) -> ChunkState {
-        let byte = unsafe { side_metadata::load(&Self::ALLOC_TABLE, chunk.start()) as u8 };
+        let byte = unsafe { Self::ALLOC_TABLE.load::<u8>(chunk.start()) };
         match byte {
             0 => ChunkState::Free,
             1 => ChunkState::Allocated,

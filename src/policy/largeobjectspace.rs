@@ -3,19 +3,17 @@ use atomic::Ordering;
 use crate::plan::ObjectQueue;
 use crate::plan::PlanConstraints;
 use crate::plan::VectorObjectQueue;
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
 use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
 use crate::util::metadata;
-use crate::util::metadata::compare_exchange_metadata;
-use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::store_metadata;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -24,16 +22,16 @@ use crate::vm::VMBinding;
 
 #[allow(unused)]
 const PAGE_MASK: usize = !(BYTES_IN_PAGE - 1);
-const MARK_BIT: usize = 0b01;
-const NURSERY_BIT: usize = 0b10;
-const LOS_BIT_MASK: usize = 0b11;
+const MARK_BIT: u8 = 0b01;
+const NURSERY_BIT: u8 = 0b10;
+const LOS_BIT_MASK: u8 = 0b11;
 
 /// This type implements a policy for large objects. Each instance corresponds
 /// to one Treadmill space.
 pub struct LargeObjectSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
-    mark_state: usize,
+    mark_state: u8,
     in_nursery_gc: bool,
     treadmill: TreadMill,
 }
@@ -53,22 +51,20 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool) {
-        let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+        let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let mut new_value = (old_value & (!LOS_BIT_MASK)) | self.mark_state;
         if alloc {
             new_value |= NURSERY_BIT;
         }
-        store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.store_atomic::<VM, u8>(
             object,
             new_value,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
 
         // If this object is freshly allocated, we do not set it as unlogged
@@ -169,9 +165,9 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             heap,
         );
         let mut pr = if vmrequest.is_discontiguous() {
-            FreeListPageResource::new_discontiguous(0, vm_map)
+            FreeListPageResource::new_discontiguous(vm_map)
         } else {
-            FreeListPageResource::new_contiguous(common.start, common.extent, 0, vm_map)
+            FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
         };
         pr.protect_memory_on_release = protect_memory_on_release;
         LargeObjectSpace {
@@ -257,55 +253,54 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         self.acquire(tls, pages)
     }
 
-    fn test_and_mark(&self, object: ObjectReference, value: usize) -> bool {
+    fn test_and_mark(&self, object: ObjectReference, value: u8) -> bool {
         loop {
             let mask = if self.in_nursery_gc {
                 LOS_BIT_MASK
             } else {
                 MARK_BIT
             };
-            let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            let old_value = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             let mark_bit = old_value & mask;
             if mark_bit == value {
                 return false;
             }
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
-                object,
-                old_value,
-                old_value & !LOS_BIT_MASK | value,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    old_value & !LOS_BIT_MASK | value,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
         true
     }
 
-    fn test_mark_bit(&self, object: ObjectReference, value: usize) -> bool {
-        load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+    fn test_mark_bit(&self, object: ObjectReference, value: u8) -> bool {
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         ) & MARK_BIT
             == value
     }
 
     /// Check if a given object is in nursery
     fn is_in_nursery(&self, object: ObjectReference) -> bool {
-        load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+        VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::Relaxed),
+            Ordering::Relaxed,
         ) & NURSERY_BIT
             == NURSERY_BIT
     }
@@ -313,22 +308,23 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     /// Move a given object out of nursery
     fn clear_nursery(&self, object: ObjectReference) {
         loop {
-            let old_val = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
+            let old_val = VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::Relaxed),
+                Ordering::Relaxed,
             );
             let new_val = old_val & !NURSERY_BIT;
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
-                object,
-                old_val,
-                new_val,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_val,
+                    new_val,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }

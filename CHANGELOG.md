@@ -1,3 +1,34 @@
+0.15.0 (2022-09-20)
+===
+
+GC Plans
+---
+* Generational plans now support bounded nursery size and fixed nursery size.
+* Immix can be used in a non-moving variant (with no defragmentation) to facilitate early porting stages
+  where a non-moving GC is expected by the VM. Enable the feature `immix_no_defrag` to use the variant.
+  Note that this variant performs poorly, compared to normal immix.
+
+API
+---
+* Add `mod build_info` for bindings to get information about the current build.
+* Add `trait Edge`. A binding can implement its own edge type if they need more sophisiticated edges than a simple address slot,
+  e.g. to support compressed pointers, base pointers with offsets, or tagged pointers.
+* Add APIs for implementing write barriers. MMTk provides subusming barriers `object_reference_write()` and pre/post write barriers `object_reference_write_pre/post()`.
+* Add APIs for implementing barriers for memory copying such as `array_copy` in Java. MMTk provides `memory_region_copy()` (subsuming) and `memory_region_copy_pre/post()`.
+* The `ignore_system_g_c` option is renamed to `ignore_system_gc` to be consistent with our naming convention.
+* The `max/min_nursery` option is replaced by `nursery`. Bindings can use `nursery=Fixed:<size>` or `Bounded:<size>` to config the nursery size.
+* Metadata access methods now requires a type parameter for the metadata value.
+* Metadata compare-exchange methods now return a `Result` rather than a boolean, which is more consistent with Rust atomic types.
+* Metadata now supports `fetch_and`, `fetch_or` and `fetch_update`.
+* Header metadata access methods in `ObjectModel` now have default implementations.
+
+Misc
+---
+* Remove all stdout printing in MMTk.
+* Fix a bug that `CopySpace` should not try zeroing alloc bit if there is no allocation in the space.
+* Fix a few issues in documentation.
+
+
 0.14.0 (2022-08-08)
 ===
 

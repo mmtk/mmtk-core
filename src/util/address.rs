@@ -5,6 +5,7 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
+use crate::policy::sft_map::SFTMap;
 use crate::util::heap::layout::mmapper::Mmapper;
 
 /// size in bytes
@@ -215,6 +216,10 @@ impl Address {
         Address(self.0 - size)
     }
 
+    pub const fn and(self, mask: usize) -> usize {
+        self.0 & mask
+    }
+
     // Perform a saturating subtract on the Address
     pub const fn saturating_sub(self, size: usize) -> Address {
         Address(self.0.saturating_sub(size))
@@ -239,6 +244,7 @@ impl Address {
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
@@ -247,6 +253,7 @@ impl Address {
     /// atomic operation: store
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
         let loc = &*(self.0 as *const T);
         loc.store(val, order)
@@ -255,6 +262,7 @@ impl Address {
     /// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn compare_exchange<T: Atomic>(
         self,
         old: T::Type,
@@ -312,6 +320,15 @@ impl Address {
     #[inline(always)]
     pub fn to_mut_ptr<T>(self) -> *mut T {
         self.0 as *mut T
+    }
+
+    /// converts the Address to a Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    #[inline(always)]
+    pub unsafe fn as_ref<'a, T>(self) -> &'a T {
+        &*self.to_mut_ptr()
     }
 
     /// converts the Address to a pointer-sized integer
@@ -479,7 +496,7 @@ impl ObjectReference {
         if self.is_null() {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_reachable(self)
+            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_reachable(self)
         }
     }
 
@@ -488,27 +505,27 @@ impl ObjectReference {
         if self.0 == 0 {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_live(self)
+            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_live(self)
         }
     }
 
     pub fn is_movable(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_movable()
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     pub fn get_forwarded_object(self) -> Option<Self> {
-        SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.get_forwarded_object(self)
     }
 
     pub fn is_in_any_space(self) -> bool {
-        SFT_MAP.is_in_any_space(self)
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_sane()
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_sane()
     }
 }
 

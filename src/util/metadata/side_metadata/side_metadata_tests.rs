@@ -234,14 +234,12 @@ mod tests {
                         )
                         .is_ok());
 
-                    ensure_metadata_is_mapped(&gspec, vm_layout_constants::HEAP_START);
-                    ensure_metadata_is_mapped(&lspec, vm_layout_constants::HEAP_START);
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    lspec.assert_metadata_mapped(vm_layout_constants::HEAP_START);
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + constants::BYTES_IN_PAGE - 1,
                     );
 
@@ -272,21 +270,17 @@ mod tests {
                         )
                         .is_ok());
 
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK,
                     );
-                    ensure_metadata_is_mapped(
-                        &gspec,
+                    gspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 8,
                     );
-                    ensure_metadata_is_mapped(
-                        &lspec,
+                    lspec.assert_metadata_mapped(
                         vm_layout_constants::HEAP_START + vm_layout_constants::BYTES_IN_CHUNK * 2
                             - 16,
                     );
@@ -340,30 +334,32 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero =
+                        metadata_1_spec.fetch_add_atomic::<u16>(data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    let zero = fetch_add_atomic(&metadata_2_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero =
+                        metadata_2_spec.fetch_add_atomic::<u8>(data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
                     let another_five =
-                        fetch_sub_atomic(&metadata_1_spec, data_addr, 2, Ordering::SeqCst);
+                        metadata_1_spec.fetch_sub_atomic::<u16>(data_addr, 2, Ordering::SeqCst);
                     assert_eq!(another_five, 5);
 
-                    let three = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let three = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(three, 3);
 
                     let another_five =
-                        fetch_sub_atomic(&metadata_2_spec, data_addr, 2, Ordering::SeqCst);
+                        metadata_2_spec.fetch_sub_atomic::<u8>(data_addr, 2, Ordering::SeqCst);
                     assert_eq!(another_five, 5);
 
-                    let three = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let three = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(three, 3);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
@@ -378,6 +374,63 @@ mod tests {
 
     #[test]
     fn test_side_metadata_atomic_fetch_add_sub_2bits() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    // We need to do this because of the static NO_METADATA
+                    // sanity::reset();
+                    let data_addr = vm_layout_constants::HEAP_START
+                        + (vm_layout_constants::BYTES_IN_CHUNK << 1) * 2;
+
+                    let metadata_1_spec = SideMetadataSpec {
+                        name: "metadata_1_spec",
+                        is_global: true,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: 1,
+                        log_bytes_in_region: constants::LOG_BYTES_IN_WORD as usize,
+                    };
+
+                    let metadata = SideMetadataContext {
+                        global: vec![metadata_1_spec],
+                        local: vec![],
+                    };
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
+
+                    assert!(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    let zero =
+                        metadata_1_spec.fetch_add_atomic::<u8>(data_addr, 2, Ordering::SeqCst);
+                    assert_eq!(zero, 0);
+
+                    let two = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(two, 2);
+
+                    let another_two =
+                        metadata_1_spec.fetch_sub_atomic::<u8>(data_addr, 1, Ordering::SeqCst);
+                    assert_eq!(another_two, 2);
+
+                    let one = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(one, 1);
+
+                    metadata_1_spec.store_atomic::<u8>(data_addr, 0, Ordering::SeqCst);
+
+                    metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
+
+                    metadata_sanity.reset();
+                },
+                || {
+                    sanity::reset();
+                },
+            );
+        });
+    }
+
+    #[test]
+    fn test_side_metadata_atomic_fetch_and_or_2bits() {
         serial_test(|| {
             with_cleanup(
                 || {
@@ -406,18 +459,21 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 2, Ordering::SeqCst);
+                    let zero =
+                        metadata_1_spec.fetch_or_atomic::<u8>(data_addr, 0b11, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let two = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
-                    assert_eq!(two, 2);
+                    let value_11 = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(value_11, 0b11);
 
-                    let another_two =
-                        fetch_sub_atomic(&metadata_1_spec, data_addr, 1, Ordering::SeqCst);
-                    assert_eq!(another_two, 2);
+                    let another_value_11 =
+                        metadata_1_spec.fetch_and_atomic::<u8>(data_addr, 0b01, Ordering::SeqCst);
+                    assert_eq!(another_value_11, 0b11);
 
-                    let one = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
-                    assert_eq!(one, 1);
+                    let value_01 = metadata_1_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
+                    assert_eq!(value_01, 0b01);
+
+                    metadata_1_spec.store_atomic::<u8>(data_addr, 0, Ordering::SeqCst);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
 
@@ -486,30 +542,32 @@ mod tests {
                         .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
                         .is_ok());
 
-                    let zero = fetch_add_atomic(&metadata_1_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero =
+                        metadata_1_spec.fetch_add_atomic::<u16>(data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    let zero = fetch_add_atomic(&metadata_2_spec, data_addr, 5, Ordering::SeqCst);
+                    let zero =
+                        metadata_2_spec.fetch_add_atomic::<u8>(data_addr, 5, Ordering::SeqCst);
                     assert_eq!(zero, 0);
 
-                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
 
-                    bzero_metadata(&metadata_2_spec, data_addr, constants::BYTES_IN_PAGE);
+                    metadata_2_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
 
-                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 5);
-                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
 
-                    bzero_metadata(&metadata_1_spec, data_addr, constants::BYTES_IN_PAGE);
+                    metadata_1_spec.bzero_metadata(data_addr, constants::BYTES_IN_PAGE);
 
-                    let five = load_atomic(&metadata_1_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_1_spec.load_atomic::<u16>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
-                    let five = load_atomic(&metadata_2_spec, data_addr, Ordering::SeqCst);
+                    let five = metadata_2_spec.load_atomic::<u8>(data_addr, Ordering::SeqCst);
                     assert_eq!(five, 0);
 
                     metadata.ensure_unmap_metadata_space(data_addr, constants::BYTES_IN_PAGE);
