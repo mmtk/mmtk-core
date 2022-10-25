@@ -396,7 +396,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
         let cell = block.load_free_list();
         if cell.is_zero() {
-            // return self.alloc_slow(size, align, offset);
             return cell; // return failed allocation
         }
         let next_cell = unsafe { cell.load::<Address>() };
@@ -613,9 +612,12 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         };
 
         block.store_free_list(final_cell);
-        // block.store_local_free_list(unsafe { Address::zero() });
-        // block.store_thread_free_list(unsafe { Address::zero() });
         block.store_block_cell_size(cell_size);
+        #[cfg(feature = "malloc_native_mimalloc")]
+        {
+            block.store_local_free_list(Address::ZERO);
+            block.store_thread_free_list(Address::ZERO);
+        }
 
         self.store_block_tls(block);
     }

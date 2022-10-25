@@ -28,4 +28,4 @@ jobs:
       - name: Install cargo-public-api
         run: cargo install cargo-public-api
       - name: API Diff
-        run: cargo public-api --diff-git-checkouts ${GITHUB_BASE_REF} ${{ github.event.pull_request.head.sha }} --deny=all
+        run: cargo public-api --diff-git-checkouts origin/${GITHUB_BASE_REF} ${{ github.event.pull_request.head.sha }} --deny=all
