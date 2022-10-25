@@ -3,14 +3,9 @@ use std::sync::Arc;
 use atomic::Ordering;
 
 use crate::{
-    policy::{
-        marksweepspace::native_ms::{Block, BlockState},
-        sft::GCWorkerMutRef,
-        space::SpaceOptions,
-    },
+    policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef, space::SpaceOptions},
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
-        alloc::free_list_allocator::mi_bin,
         copy::CopySemantics,
         heap::{
             layout::heap_layout::{Mmapper, VMMap},
@@ -30,7 +25,6 @@ use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
-use crate::util::alloc::free_list_allocator::{new_empty_block_lists, BlockLists};
 use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
@@ -72,7 +66,6 @@ pub struct AbandonedBlockLists {
 
 impl AbandonedBlockLists {
     fn move_consumed_to_unswept(&mut self) {
-        use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
         let mut i = 0;
         while i < MI_BIN_FULL {
             if !self.consumed[i].is_empty() {
@@ -160,7 +153,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MarkSweepS
 
 // We cannot allocate objects that are larger than the max bin size.
 #[allow(dead_code)]
-pub const MAX_OBJECT_SIZE: usize = crate::util::alloc::free_list_allocator::MI_LARGE_OBJ_SIZE_MAX;
+pub const MAX_OBJECT_SIZE: usize = crate::policy::marksweepspace::native_ms::MI_LARGE_OBJ_SIZE_MAX;
 
 impl<VM: VMBinding> MarkSweepSpace<VM> {
     pub fn extend_global_side_metadata_specs(_specs: &mut Vec<SideMetadataSpec>) {

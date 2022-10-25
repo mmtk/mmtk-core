@@ -2,15 +2,13 @@
 
 use atomic::Ordering;
 
+use super::BlockList;
 use super::MarkSweepSpace;
 use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::vm::ObjectModel;
 use crate::{
-    util::{
-        alloc::free_list_allocator::BlockList, metadata::side_metadata::SideMetadataSpec, Address,
-        OpaquePointer, VMThread,
-    },
+    util::{metadata::side_metadata::SideMetadataSpec, Address, OpaquePointer, VMThread},
     vm::VMBinding,
 };
 
