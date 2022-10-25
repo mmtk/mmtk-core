@@ -38,12 +38,19 @@ use crate::util::VMThread;
 use crate::vm::ObjectModel;
 use std::sync::Mutex;
 
+/// The result for `MarkSweepSpace.acquire_block()`. `MarkSweepSpace` will attempt
+/// to allocate from abandoned blocks first. If none found, it will get a new block
+/// from the page resource.
 pub enum BlockAcquireResult {
+    /// A new block we just acquired from the page resource
     Fresh(Block),
+    /// An available block. The block can be directly used if there is any free cell in it.
     AbandonedAvailable(Block),
+    /// An unswept block. The block needs to be swept first before it can be used.
     AbandonedUnswept(Block),
 }
 
+/// A mark sweep space.
 pub struct MarkSweepSpace<VM: VMBinding> {
     pub common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
@@ -51,6 +58,9 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
+    /// Abandoned blocks. If a mutator dies, all its blocks go to this abandoned block
+    /// lists. In a GC, we also 'flush' all the local blocks to this global pool so they
+    /// can be used by allocators from other threads.
     pub abandoned: Mutex<AbandonedBlockLists>,
 }
 
@@ -75,7 +85,7 @@ impl AbandonedBlockLists {
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     fn name(&self) -> &str {
-        "MarkSweepSpace"
+        self.common.name
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
@@ -92,7 +102,6 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
-        // do nothing
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
@@ -170,21 +179,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         heap: &mut HeapMeta,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> MarkSweepSpace<VM> {
-        // FIXME: alloc bit should be optional
-        // let alloc_bits =
-        //     &mut metadata::extract_side_metadata(&[MetadataSpec::OnSide(ALLOC_SIDE_METADATA_SPEC)]);
-
-        // let mark_bits =
-        //     &mut metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
-
         let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::PREV_BLOCK_TABLE),
                 MetadataSpec::OnSide(Block::FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::SIZE_TABLE),
-                // MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-                // MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
+                #[cfg(feature = "malloc_native_mimalloc")]
+                MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
+                #[cfg(feature = "malloc_native_mimalloc")]
+                MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
                 MetadataSpec::OnSide(Block::BLOCK_LIST_TABLE),
                 MetadataSpec::OnSide(Block::TLS_TABLE),
                 MetadataSpec::OnSide(Block::MARK_TABLE),
@@ -192,8 +196,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };
-
-        // local_specs.append(mark_bits);
 
         let common = CommonSpace::new(
             SpaceOptions {
@@ -272,6 +274,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn release(&mut self) {
+        // We sweep and release unmarked blocks here. For sweeping cells inside each block, we either
+        // do that when we release mutators (eager sweeping), or do that at allocation time (lazy sweeping).
         use crate::scheduler::WorkBucketStage;
         let work_packets = self.generate_sweep_tasks();
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);

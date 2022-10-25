@@ -74,8 +74,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        // We sweep and release unmarked blocks here. For sweeping cells inside each block, we either
-        // do that when we release mutators (eager sweeping), or do that at allocation time (lazy sweeping).
         self.ms.release();
         self.common.release(tls, true);
     }

@@ -127,6 +127,9 @@ malloc_counted_size = []
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
 malloc_hoard = ["hoard-sys"]
+# Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
+# is not compiled in default builds.
+malloc_native_mimalloc = []
 
 # If there are more groups, they should be inserted above this line
 # Group:end

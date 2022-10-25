@@ -66,11 +66,13 @@ impl Block {
         crate::util::metadata::side_metadata::spec_defs::MS_FREE;
 
     // needed for non GC context
-    // pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec =
-    //     crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
+    #[cfg(feature = "malloc_native_mimalloc")]
+    pub const LOCAL_FREE_LIST_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::MS_LOCAL_FREE;
 
-    // pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec =
-    //     crate::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
+    #[cfg(feature = "malloc_native_mimalloc")]
+    pub const THREAD_FREE_LIST_TABLE: SideMetadataSpec =
+        crate::util::metadata::side_metadata::spec_defs::MS_THREAD_FREE;
 
     pub const SIZE_TABLE: SideMetadataSpec =
         crate::util::metadata::side_metadata::spec_defs::MS_BLOCK_SIZE;
@@ -91,69 +93,47 @@ impl Block {
         unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.0, free_list.as_usize()) }
     }
 
-    // #[inline]
-    // pub fn load_local_free_list<VM: VMBinding>(&self) -> Address {
-    //     unsafe {
-    //         Address::from_usize(load_metadata::<VM>(
-    //             &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-    //             self.0.to_object_reference(),
-    //             None,
-    //             None,
-    //         ))
-    //     }
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    #[inline]
+    pub fn load_local_free_list(&self) -> Address {
+        unsafe { Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::<usize>(self.0)) }
+    }
 
-    // #[inline]
-    // pub fn store_local_free_list<VM: VMBinding>(&self, local_free: Address) {
-    //     store_metadata::<VM>(
-    //         &MetadataSpec::OnSide(Block::LOCAL_FREE_LIST_TABLE),
-    //         unsafe { self.0.to_object_reference() },
-    //         local_free.as_usize(),
-    //         None,
-    //         None,
-    //     );
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    #[inline]
+    pub fn store_local_free_list(&self, local_free: Address) {
+        unsafe { Block::LOCAL_FREE_LIST_TABLE.store::<usize>(self.0, local_free.as_usize()) }
+    }
 
-    // #[inline]
-    // pub fn load_thread_free_list<VM: VMBinding>(&self) -> Address {
-    //     unsafe {
-    //         Address::from_usize(load_metadata::<VM>(
-    //             &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-    //             self.0.to_object_reference(),
-    //             None,
-    //             Some(Ordering::SeqCst),
-    //         ))
-    //     }
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    #[inline]
+    pub fn load_thread_free_list(&self) -> Address {
+        unsafe {
+            Address::from_usize(
+                Block::THREAD_FREE_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst),
+            )
+        }
+    }
 
-    // #[inline]
-    // pub fn store_thread_free_list<VM: VMBinding>(&self, thread_free: Address) {
-    //     store_metadata::<VM>(
-    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-    //         unsafe { self.0.to_object_reference() },
-    //         thread_free.as_usize(),
-    //         None,
-    //         None,
-    //     );
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    #[inline]
+    pub fn store_thread_free_list(&self, thread_free: Address) {
+        unsafe { Block::THREAD_FREE_LIST_TABLE.store::<usize>(self.0, thread_free.as_usize()) }
+    }
 
-    // #[inline]
-    // pub fn cas_thread_free_list(
-    //     &self,
-    //     block: Address,
-    //     old_thread_free: Address,
-    //     new_thread_free: Address,
-    // ) -> bool {
-    //     compare_exchange_metadata::<VM>(
-    //         &MetadataSpec::OnSide(Block::THREAD_FREE_LIST_TABLE),
-    //         unsafe { block.to_object_reference() },
-    //         old_thread_free.as_usize(),
-    //         new_thread_free.as_usize(),
-    //         None,
-    //         Ordering::SeqCst,
-    //         Ordering::SeqCst,
-    //     )
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    #[inline]
+    pub fn cas_thread_free_list(&self, old_thread_free: Address, new_thread_free: Address) -> bool {
+        Block::THREAD_FREE_LIST_TABLE
+            .compare_exchange_atomic::<usize>(
+                self.0,
+                old_thread_free.as_usize(),
+                new_thread_free.as_usize(),
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_ok()
+    }
 
     pub fn load_prev_block(&self) -> Block {
         debug_assert!(!self.0.is_zero());
@@ -278,6 +258,11 @@ impl Block {
         // We only know cell addresses here. We do not know the allocation address, and we also do not know the object reference.
         // The mark bit is set for object references, and we need to use the mark bit to decide whether a cell is live or not.
 
+        // We haven't implemented for malloc/free cases, for which we do not have mark bit. We could use valid object bit instead.
+        if cfg!(feature = "malloc_native_mimalloc") {
+            unimplemented!()
+        }
+
         // Check if we can treat it as the simple case: cell address === object reference.
         // If the binding does not use allocation offset, and they use the same allocation alignment which the cell size is aligned to,
         // then we have cell address === allocation address.
@@ -294,7 +279,7 @@ impl Block {
             // In this case, we can use the simplest and the most efficicent sweep.
             self.simple_sweep::<VM>()
         } else {
-            // Otherwise we fallback to a generic but slow sweep.
+            // Otherwise we fallback to a generic but slow sweep. This roughly has ~10% mutator overhead for lazy sweeping.
             self.naive_brute_force_sweep::<VM>()
         }
     }

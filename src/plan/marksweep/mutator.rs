@@ -8,8 +8,6 @@ use crate::plan::mutator_context::SpaceMapping;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::util::alloc::allocators::{AllocatorSelector, Allocators};
-#[cfg(not(feature = "malloc_mark_sweep"))]
-use crate::util::alloc::FreeListAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 
@@ -53,6 +51,7 @@ mod malloc_mark_sweep {
 #[cfg(not(feature = "malloc_mark_sweep"))]
 mod native_mark_sweep {
     use super::*;
+    use crate::util::alloc::FreeListAllocator;
 
     fn get_freelist_allocator_mut<VM: VMBinding>(
         mutator: &mut Mutator<VM>,

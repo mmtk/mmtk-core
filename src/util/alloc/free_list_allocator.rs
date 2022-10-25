@@ -1,7 +1,6 @@
 // This is a free list allocator written based on Microsoft's mimalloc allocator https://www.microsoft.com/en-us/research/publication/mimalloc-free-list-sharding-in-action/
 
 use crate::policy::marksweepspace::native_ms::Block;
-// use crate::policy::marksweepspace::metadata::is_marked;
 use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::util::alloc::allocator;
 use crate::util::alloc::Allocator;
@@ -129,7 +128,7 @@ pub struct FreeListAllocator<VM: VMBinding> {
     /// blocks with free space for precise stress GC
     /// For precise stress GC, we need to be able to trigger slowpath allocation for
     /// each allocation. To achieve this, we put available blocks to this list. So
-    /// normal fastpath allocation will fail, as they will see the normal
+    /// normal fastpath allocation will fail, as they will see the block lists
     /// as empty.
     pub available_blocks_stress: BlockLists,
     /// blocks that are marked, not swept
@@ -297,7 +296,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
 
     // Find a block with free space and allocate to it
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        // trace!("alloc s={}", size);
         debug_assert!(
             size <= MAX_BIN_SIZE,
             "Alloc request for {} bytes is too big.",
@@ -305,7 +303,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         );
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
-        // debug_assert!(offset == 0);
 
         let block = self.find_free_block_local(size, align);
         let addr = self.block_alloc(block);
@@ -362,22 +359,6 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let cell = self.block_alloc(block);
         allocator::align_allocation::<VM>(cell, align, offset)
     }
-
-    // #[cfg(feature = "eager_sweeping")]
-    // #[allow(unused_variables)]
-    // fn alloc_slow_once_precise_stress(
-    //     &mut self,
-    //     size: usize,
-    //     align: usize,
-    //     offset: isize,
-    //     need_poll: bool,
-    // ) -> Address {
-    //     let bin = mi_bin::<VM>(size, align) as usize;
-    //     let consumed = self.consumed_blocks.get_mut(bin).unwrap();
-    //     let available = self.available_blocks.get_mut(bin).unwrap();
-    //     consumed.append(available);
-    //     unsafe { Address::zero() }
-    // }
 
     fn on_mutator_destroy(&mut self) {
         self.abandon_blocks();
@@ -639,55 +620,41 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         self.store_block_tls(block);
     }
 
-    // alloc bit required for non GC context
-    // pub fn sweep_block(&self, block: Block) {
-    // let cell_size = block.load_block_cell_size::<VM>();
-    // debug_assert!(cell_size != 0);
-    // let mut cell = block.start();
-    // while cell < block.start() + Block::BYTES {
-    //     let alloced = is_alloced(unsafe { cell.to_object_reference() });
-    //     if alloced {
-    //         let marked = is_marked::<VM>(
-    //             unsafe { cell.to_object_reference() },
-    //             Some(Ordering::SeqCst),
-    //         );
-    //         if !marked {
-    //             self.free(cell);
-    //         }
-    //     }
-    //     cell += cell_size;
-    // }
-    // self.block_free_collect(block);
-    // }
+    #[cfg(feature = "malloc_native_mimalloc")]
+    pub fn free(&self, addr: Address) {
+        let block = Block::from(Block::align(addr));
+        let block_tls = block.load_tls();
 
-    // pub fn free(&self, addr: Address) {
+        if self.tls == block_tls {
+            // same thread that allocated
+            let local_free = block.load_local_free_list();
+            unsafe {
+                addr.store(local_free);
+            }
+            block.store_local_free_list(addr);
+        } else {
+            // different thread to allocator
+            unreachable!(
+                "tlss don't match freeing from block {}, my tls = {:?}, block tls = {:?}",
+                block.start(),
+                self.tls,
+                block.load_tls()
+            );
 
-    //     let block = Block::from(Block::align(addr));
-    //     let block_tls = block.load_tls::<VM>();
+            // I am not sure whether the following code would be used to free a block for other thread. I will just keep it here as commented out.
+            // let mut success = false;
+            // while !success {
+            //     let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
+            //     unsafe {
+            //         addr.store(thread_free);
+            //     }
+            //     success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
+            // }
+        }
 
-    //     if self.tls.0 == block_tls {
-    //         // same thread that allocated
-    //         let local_free = block.load_local_free_list::<VM>();
-    //         unsafe {
-    //             addr.store(local_free);
-    //         }
-    //         block.store_local_free_list::<VM>(addr);
-    //     } else {
-    //         // different thread to allocator
-    //         unreachable!("tlss don't match freeing from block {}, my tls = {:?}, block tls = {:?}", block.start(), self.tls, block.load_tls::<VM>());
-    //         // let mut success = false;
-    //         // while !success {
-    //         //     let thread_free = FreeListAllocator::<VM>::load_thread_free_list(block);
-    //         //     unsafe {
-    //         //         addr.store(thread_free);
-    //         //     }
-    //         //     success = FreeListAllocator::<VM>::cas_thread_free_list(&self, block, thread_free, addr);
-    //         // }
-    //     }
-
-    //     // unset allocation bit
-    //     unsafe { unset_alloc_bit_unsafe(addr.to_object_reference()) };
-    // }
+        // unset allocation bit
+        unsafe { crate::util::alloc_bit::unset_alloc_bit_unsafe(addr.to_object_reference()) };
+    }
 
     pub fn store_block_tls(&self, block: Block) {
         block.store_tls(self.tls);
@@ -696,7 +663,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     pub fn prepare(&mut self) {
         // For lazy sweeping, it doesn't matter whether we do it in prepare or release.
         // However, in the release phase, we will do block-level sweeping. And that will cause
-        // race if we also do reset in release. So we just move reset to the prepare phase.
+        // race if we also reset the allocator in release (which will mutate on the block lists).
+        // So we just move reset to the prepare phase.
         #[cfg(not(feature = "eager_sweeping"))]
         self.reset();
     }
