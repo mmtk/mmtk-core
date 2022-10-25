@@ -101,6 +101,23 @@ pub(crate) fn new_empty_block_lists() -> BlockLists {
     ret
 }
 
+/// Returns how many pages the block lists uses.
+pub(crate) fn pages_used_by_blocklists(lists: &BlockLists) -> usize {
+    let mut pages = 0;
+    for bin in 1..=MAX_BIN {
+        let list = &lists[bin];
+
+        // walk the blocks
+        let mut block = list.first;
+        while !block.is_zero() {
+            pages += Block::BYTES >> crate::util::constants::LOG_BYTES_IN_PAGE;
+            block = block.load_next_block();
+        }
+    }
+
+    pages
+}
+
 // Free list allocator
 #[repr(C)]
 pub struct FreeListAllocator<VM: VMBinding> {
@@ -676,6 +693,26 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         block.store_tls(self.tls);
     }
 
+    pub fn prepare(&mut self) {
+        // For lazy sweeping, it doesn't matter whether we do it in prepare or release.
+        // However, in the release phase, we will do block-level sweeping. And that will cause
+        // race if we also do reset in release. So we just move reset to the prepare phase.
+        #[cfg(not(feature = "eager_sweeping"))]
+        self.reset();
+    }
+
+    pub fn release(&mut self) {
+        // For eager sweeping, we have to do this in the release phase when we know the liveness of the blocks
+        #[cfg(feature = "eager_sweeping")]
+        self.reset();
+    }
+
+    /// Do we abandon allocator local blocks in reset?
+    /// We should do this for GC. Otherwise, blocks will be held by each allocator, and they cannot
+    /// be reused by other allocators. This is measured to cause up to 100% increase of the min heap size
+    /// for mark sweep.
+    const ABANDON_BLOCKS_IN_RESET: bool = true;
+
     #[cfg(not(feature = "eager_sweeping"))]
     pub fn reset(&mut self) {
         trace!("reset");
@@ -699,7 +736,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             bin += 1;
         }
 
-        if self.plan.base().is_precise_stress() && self.plan.base().is_stress_test_gc_enabled() {
+        if Self::ABANDON_BLOCKS_IN_RESET {
             self.abandon_blocks();
         }
     }
@@ -740,33 +777,39 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             }
 
             bin += 1;
+
+            if Self::ABANDON_BLOCKS_IN_RESET {
+                self.abandon_blocks();
+            }
+        }
+
+        if Self::ABANDON_BLOCKS_IN_RESET {
+            self.abandon_blocks();
         }
     }
 
     pub fn abandon_blocks(&mut self) {
-        let mut abandoned = self.space.abandoned_available.lock().unwrap();
-        let mut abandoned_consumed = self.space.abandoned_consumed.lock().unwrap();
-        let mut abandoned_unswept = self.space.abandoned_unswept.lock().unwrap();
+        let mut abandoned = self.space.abandoned.lock().unwrap();
         let mut i = 0;
         while i < MI_BIN_FULL {
             let available = self.available_blocks.get_mut(i).unwrap();
             if !available.is_empty() {
-                abandoned[i].append(available);
+                abandoned.available[i].append(available);
             }
 
             let available_stress = self.available_blocks_stress.get_mut(i).unwrap();
             if !available_stress.is_empty() {
-                abandoned[i].append(available_stress);
+                abandoned.available[i].append(available_stress);
             }
 
             let consumed = self.consumed_blocks.get_mut(i).unwrap();
             if !consumed.is_empty() {
-                abandoned_consumed[i].append(consumed);
+                abandoned.consumed[i].append(consumed);
             }
 
             let unswept = self.unswept_blocks.get_mut(i).unwrap();
             if !unswept.is_empty() {
-                abandoned_unswept[i].append(unswept);
+                abandoned.unswept[i].append(unswept);
             }
             i += 1;
         }

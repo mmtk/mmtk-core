@@ -11,7 +11,7 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
+pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
@@ -196,6 +196,7 @@ pub(crate) struct ReservedAllocators {
     pub n_malloc: u8,
     pub n_immix: u8,
     pub n_mark_compact: u8,
+    pub n_free_list: u8,
 }
 
 impl ReservedAllocators {
@@ -205,6 +206,7 @@ impl ReservedAllocators {
         n_malloc: 0,
         n_immix: 0,
         n_mark_compact: 0,
+        n_free_list: 0,
     };
     /// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
     fn validate(&self) {
@@ -228,6 +230,10 @@ impl ReservedAllocators {
         assert!(
             self.n_mark_compact as usize <= MAX_MARK_COMPACT_ALLOCATORS,
             "Allocator mapping declared more mark compact allocators than the max allowed."
+        );
+        assert!(
+            self.n_free_list as usize <= MAX_FREE_LIST_ALLOCATORS,
+            "Allocator mapping declared more free list allocators than the max allowed."
         );
     }
 }

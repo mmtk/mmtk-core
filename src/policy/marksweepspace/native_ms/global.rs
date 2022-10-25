@@ -51,9 +51,26 @@ pub struct MarkSweepSpace<VM: VMBinding> {
     pub chunk_map: ChunkMap,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
-    pub abandoned_available: Mutex<BlockLists>,
-    pub abandoned_unswept: Mutex<BlockLists>,
-    pub abandoned_consumed: Mutex<BlockLists>,
+    pub abandoned: Mutex<AbandonedBlockLists>,
+}
+
+pub struct AbandonedBlockLists {
+    pub available: BlockLists,
+    pub unswept: BlockLists,
+    pub consumed: BlockLists,
+}
+
+impl AbandonedBlockLists {
+    fn move_consumed_to_unswept(&mut self) {
+        use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
+        let mut i = 0;
+        while i < MI_BIN_FULL {
+            if !self.consumed[i].is_empty() {
+                self.unswept[i].append(&mut self.consumed[i]);
+            }
+            i += 1;
+        }
+    }
 }
 
 impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
@@ -204,9 +221,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             common,
             chunk_map: ChunkMap::new(),
             scheduler,
-            abandoned_available: Mutex::from(new_empty_block_lists()),
-            abandoned_unswept: Mutex::from(new_empty_block_lists()),
-            abandoned_consumed: Mutex::from(new_empty_block_lists()),
+            abandoned: Mutex::new(AbandonedBlockLists {
+                available: new_empty_block_lists(),
+                unswept: new_empty_block_lists(),
+                consumed: new_empty_block_lists(),
+            }),
         }
     }
 
@@ -225,7 +244,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         );
         if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(object, Ordering::SeqCst) {
             VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.set::<VM>(object, Ordering::SeqCst);
-            let block = Block::from(Block::containing::<VM>(object));
+            let block = Block::containing::<VM>(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
         }
@@ -254,22 +273,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     pub fn release(&mut self) {
         use crate::scheduler::WorkBucketStage;
-        use crate::util::alloc::free_list_allocator::MI_BIN_FULL;
         let work_packets = self.generate_sweep_tasks();
         self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
-        let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-        let mut abandoned_consumed = self.abandoned_consumed.lock().unwrap();
-        let mut i = 0;
-        while i < MI_BIN_FULL {
-            if !abandoned_consumed[i].is_empty() {
-                abandoned_consumed[i].lock();
-                abandoned_unswept[i].lock();
-                abandoned_unswept[i].append(&mut abandoned_consumed[i]);
-                abandoned_unswept[i].unlock();
-                abandoned_consumed[i].unlock();
-            }
-            i += 1;
-        }
+
+        let mut abandoned = self.abandoned.lock().unwrap();
+        abandoned.move_consumed_to_unswept();
     }
 
     /// Release a block.
@@ -296,23 +304,27 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn acquire_block(&self, tls: VMThread, size: usize, align: usize) -> BlockAcquireResult {
-        let bin = mi_bin::<VM>(size, align);
-
         {
-            let mut abandoned = self.abandoned_available.lock().unwrap();
-            if !abandoned[bin].is_empty() {
-                let block = Block::from(abandoned[bin].pop().start());
-                return BlockAcquireResult::AbandonedAvailable(block);
+            let mut abandoned = self.abandoned.lock().unwrap();
+            let bin = mi_bin::<VM>(size, align);
+
+            {
+                let abandoned_available = &mut abandoned.available;
+                if !abandoned_available[bin].is_empty() {
+                    let block = Block::from(abandoned_available[bin].pop().start());
+                    return BlockAcquireResult::AbandonedAvailable(block);
+                }
+            }
+
+            {
+                let abandoned_unswept = &mut abandoned.unswept;
+                if !abandoned_unswept[bin].is_empty() {
+                    let block = Block::from(abandoned_unswept[bin].pop().start());
+                    return BlockAcquireResult::AbandonedUnswept(block);
+                }
             }
         }
 
-        {
-            let mut abandoned_unswept = self.abandoned_unswept.lock().unwrap();
-            if !abandoned_unswept[bin].is_empty() {
-                let block = Block::from(abandoned_unswept[bin].pop().start());
-                return BlockAcquireResult::AbandonedUnswept(block);
-            }
-        }
         BlockAcquireResult::Fresh(Block::from(
             self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE),
         ))
