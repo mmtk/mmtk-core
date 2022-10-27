@@ -36,7 +36,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
-    pub active_pages: AtomicUsize,
+    active_pages: AtomicUsize,
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadataContext,
@@ -502,106 +502,119 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
     fn sweep_chunk_mark_on_side(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
-        #[cfg(debug_assertions)]
-        let mut live_bytes = 0;
+        // We can do xor on bulk for mark bits and valid object bits. If the result is zero, that means
+        // the objects in it are all alive (both valid object bit and mark bit is set), and we do not
+        // need to do anything for the region. Otherwise, we will sweep each single object in the region.
+        // Note: Enabling this would result in inaccurate page accounting. When the result is zero,
+        // we do not know whether the last live object in the region could span pages. But we are not checking
+        // for that specific case, so the page accounting could be inaccurate. If you care about
+        // page accounting, probably disable this, and we will sweep object one by one.
+        const BULK_XOR_ON_MARK_BITS: bool = false;
 
-        debug!("Check active chunk {:?}", chunk_start);
-        let mut address = chunk_start;
-        let chunk_end = chunk_start + BYTES_IN_CHUNK;
+        if BULK_XOR_ON_MARK_BITS {
+            #[cfg(debug_assertions)]
+            let mut live_bytes = 0;
 
-        debug_assert!(
-            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
-                == mark_bit_spec.log_bytes_in_region,
-            "Alloc-bit and mark-bit metadata have different minimum object sizes!"
-        );
+            debug!("Check active chunk {:?}", chunk_start);
+            let mut address = chunk_start;
+            let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
-        // For bulk xor'ing 128-bit vectors on architectures with vector instructions
-        // Each bit represents an object of LOG_MIN_OBJ_SIZE size
-        let bulk_load_size: usize =
-            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+            debug_assert!(
+                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                    == mark_bit_spec.log_bytes_in_region,
+                "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+            );
 
-        // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
-        let mut empty_page_start = Address::ZERO;
+            // For bulk xor'ing 128-bit vectors on architectures with vector instructions
+            // Each bit represents an object of LOG_MIN_OBJ_SIZE size
+            let bulk_load_size: usize =
+                128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
 
-        // Scan the chunk by every 'bulk_load_size' region.
-        while address < chunk_end {
-            let alloc_128: u128 =
-                unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
-            let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
+            // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
+            let mut empty_page_start = Address::ZERO;
 
-            // Check if there are dead objects in the bulk loaded region
-            if alloc_128 ^ mark_128 != 0 {
-                let end = address + bulk_load_size;
+            // Scan the chunk by every 'bulk_load_size' region.
+            while address < chunk_end {
+                let alloc_128: u128 =
+                    unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+                let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
-                // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
-                // Linear scan through the bulk load region.
-                let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
+                // Check if there are dead objects in the bulk loaded region
+                if alloc_128 ^ mark_128 != 0 {
+                    let end = address + bulk_load_size;
+
+                    // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
+                    // Linear scan through the bulk load region.
+                    let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
+                        VM,
+                        MallocObjectSize<VM>,
+                        false,
+                    >::new(address, end);
+                    for object in bulk_load_scan {
+                        self.sweep_object(object, &mut empty_page_start);
+                    }
+                } else {
+                    // TODO we aren't actually accounting for the case where an object is alive and spans
+                    // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
+                    if alloc_128 != 0 {
+                        empty_page_start = address + bulk_load_size;
+                    }
+                }
+
+                // We have processed this bulk load memory. Step to the next.
+                address += bulk_load_size;
+                debug_assert!(address.is_aligned_to(bulk_load_size));
+            }
+
+            // Linear scan through the chunk, and add up all the live object sizes.
+            // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
+            #[cfg(debug_assertions)]
+            {
+                let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
                     VM,
                     MallocObjectSize<VM>,
                     false,
-                >::new(address, end);
-                for object in bulk_load_scan {
-                    self.sweep_object(object, &mut empty_page_start);
-                }
-            } else {
-                // TODO we aren't actually accounting for the case where an object is alive and spans
-                // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
-                if alloc_128 != 0 {
-                    empty_page_start = address + bulk_load_size;
-                }
-            }
+                >::new(chunk_start, chunk_end);
+                for object in chunk_linear_scan {
+                    let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
 
-            // We have processed this bulk load memory. Step to the next.
-            address += bulk_load_size;
-            debug_assert!(address.is_aligned_to(bulk_load_size));
-        }
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
 
-        // Linear scan through the chunk, and add up all the live object sizes.
-        // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
-        #[cfg(debug_assertions)]
-        {
-            let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
-                VM,
-                MallocObjectSize<VM>,
-                false,
-            >::new(chunk_start, chunk_end);
-            for object in chunk_linear_scan {
-                let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
-
-                if ASSERT_ALLOCATION {
                     debug_assert!(
-                        self.active_mem.lock().unwrap().contains_key(&obj_start),
-                        "Address {} with alloc bit is not in active_mem",
-                        obj_start
+                        unsafe { is_marked_unsafe::<VM>(object) },
+                        "Dead object = {} found after sweep",
+                        object
                     );
-                    debug_assert_eq!(
-                        self.active_mem.lock().unwrap().get(&obj_start),
-                        Some(&bytes),
-                        "Address {} size in active_mem does not match the size from malloc_usable_size",
-                        obj_start
-                    );
+
+                    live_bytes += bytes;
                 }
-
-                debug_assert!(
-                    unsafe { is_marked_unsafe::<VM>(object) },
-                    "Dead object = {} found after sweep",
-                    object
-                );
-
-                live_bytes += bytes;
             }
+
+            // Clear all the mark bits
+            mark_bit_spec.bzero_metadata(chunk_start, BYTES_IN_CHUNK);
+
+            // If we never updated empty_page_start, the entire chunk is empty.
+            if empty_page_start.is_zero() {
+                self.clean_up_empty_chunk(chunk_start);
+            }
+
+            #[cfg(debug_assertions)]
+            self.debug_sweep_chunk_done(live_bytes);
+        } else {
+            self.sweep_each_object_in_chunk(chunk_start);
         }
-
-        // Clear all the mark bits
-        mark_bit_spec.bzero_metadata(chunk_start, BYTES_IN_CHUNK);
-
-        // If we never updated empty_page_start, the entire chunk is empty.
-        if empty_page_start.is_zero() {
-            self.clean_up_empty_chunk(chunk_start);
-        }
-
-        #[cfg(debug_assertions)]
-        self.debug_sweep_chunk_done(live_bytes);
     }
 
     /// This sweep function is called when the mark bit sits in the object header
@@ -610,6 +623,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
     fn sweep_chunk_mark_in_header(&self, chunk_start: Address) {
+        self.sweep_each_object_in_chunk(chunk_start)
+    }
+
+    fn sweep_each_object_in_chunk(&self, chunk_start: Address) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
