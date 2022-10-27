@@ -175,7 +175,9 @@ pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
 
 #[allow(unused)]
 pub(super) fn compare_exchange_page_mark(page_addr: Address) -> bool {
-    side_metadata::compare_exchange_atomic(&ACTIVE_PAGE_METADATA_SPEC, page_addr, 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+    ACTIVE_PAGE_METADATA_SPEC
+        .compare_exchange_atomic::<u8>(page_addr, 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
 }
 
 #[allow(unused)]
