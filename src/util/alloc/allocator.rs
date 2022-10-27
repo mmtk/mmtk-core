@@ -244,7 +244,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                     // This is the allocation hook for the analysis trait. If you want to call
                     // an analysis counter specific allocation hook, then here is the place to do so
                     #[cfg(feature = "analysis")]
-                    if _allocation_bytes > *plan.options.stress_factor {
+                    if _allocation_bytes > *plan.options.analysis_factor {
                         trace!(
                             "Analysis: allocation_bytes = {} more than analysis_factor = {}",
                             _allocation_bytes,

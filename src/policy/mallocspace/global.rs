@@ -177,9 +177,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     }
 
     fn reserved_pages(&self) -> usize {
+        use crate::util::constants::LOG_BYTES_IN_PAGE;
+        debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
         // TODO: figure out a better way to get the total number of active pages from the metadata
         let data_pages = self.active_pages.load(Ordering::SeqCst)
-            << (LOG_BYTES_IN_MALLOC_PAGE - crate::util::constants::LOG_BYTES_IN_PAGE);
+            << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
     }
