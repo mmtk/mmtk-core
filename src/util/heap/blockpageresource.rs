@@ -1,19 +1,17 @@
 use super::pageresource::{PRAllocFail, PRAllocResult};
-use super::PageResource;
+use super::{FreeListPageResource, PageResource};
 use crate::util::address::Address;
 use crate::util::constants::*;
-use crate::util::conversions::bytes_to_pages;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
-use atomic::{Atomic, Ordering};
+use atomic::Ordering;
 use spin::RwLock;
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
-use std::marker::PhantomData;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
@@ -22,46 +20,41 @@ const LOCAL_BUFFER_SIZE: usize = 128;
 
 /// A fast PageResource for fixed-size block allocation only.
 pub struct BlockPageResource<VM: VMBinding> {
-    common: CommonPageResource,
+    flpr: FreeListPageResource<VM>,
     /// Block granularity
     log_pages: usize,
     /// A buffer for storing all the free blocks
     block_queue: BlockPool<Address>,
-    /// Top address of the allocated contiguous space
-    highwater: Atomic<Address>,
-    /// Limit of the contiguous space
-    limit: Address,
     /// Slow-path allocation synchronization
     sync: Mutex<()>,
-    _p: PhantomData<VM>,
 }
 
 impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
     #[inline(always)]
     fn common(&self) -> &CommonPageResource {
-        &self.common
+        &self.flpr.common()
     }
 
     #[inline(always)]
     fn common_mut(&mut self) -> &mut CommonPageResource {
-        &mut self.common
+        self.flpr.common_mut()
     }
 
     #[inline]
     fn alloc_pages(
         &self,
-        _space_descriptor: SpaceDescriptor,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
-        self.alloc_pages_fast(reserved_pages, required_pages, tls)
+        self.alloc_pages_fast(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     fn get_available_physical_pages(&self) -> usize {
-        debug_assert!(self.common.contiguous);
+        debug_assert!(self.common().contiguous);
         let _sync = self.sync.lock().unwrap();
-        bytes_to_pages(self.limit - self.highwater.load(Ordering::SeqCst))
+        self.flpr.get_available_physical_pages()
     }
 }
 
@@ -73,17 +66,12 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         vm_map: &'static VMMap,
         num_workers: usize,
     ) -> Self {
-        let growable = cfg!(target_pointer_width = "64");
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
             log_pages,
-            common: CommonPageResource::new(true, growable, vm_map),
-            // Highwater starts from the start address of the contiguous space
-            highwater: Atomic::new(start),
-            limit: (start + bytes).align_up(BYTES_IN_CHUNK),
+            flpr: FreeListPageResource::new_contiguous(start, bytes, vm_map),
             block_queue: BlockPool::new(num_workers),
             sync: Mutex::new(()),
-            _p: PhantomData,
         }
     }
 
@@ -91,6 +79,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     #[cold]
     fn alloc_pages_slow_sync(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
@@ -106,20 +95,11 @@ impl<VM: VMBinding> BlockPageResource<VM> {
             });
         }
         // Grow space (a chunk at a time)
-        // 1. Raise highwater by chunk size
-        let start: Address =
-            match self
-                .highwater
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                    if x >= self.limit {
-                        None
-                    } else {
-                        Some(x + BYTES_IN_CHUNK)
-                    }
-                }) {
-                Ok(a) => a,
-                _ => return Result::Err(PRAllocFail),
-            };
+        // 1. Grow space
+        let start: Address = match self.flpr.allocate_one_chunk_no_commit(space_descriptor) {
+            Ok(result) => result.start,
+            err => return err,
+        };
         assert!(start.is_aligned_to(BYTES_IN_CHUNK));
         // 2. Take the first block int the chunk as the allocation result
         let first_block = start;
@@ -147,6 +127,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     #[inline(always)]
     fn alloc_pages_fast(
         &self,
+        space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
         required_pages: usize,
         tls: VMThread,
@@ -163,21 +144,22 @@ impl<VM: VMBinding> BlockPageResource<VM> {
             });
         }
         // Slow-path：we need to grow space
-        self.alloc_pages_slow_sync(reserved_pages, required_pages, tls)
+        self.alloc_pages_slow_sync(space_descriptor, reserved_pages, required_pages, tls)
     }
 
     #[inline]
     pub fn release_pages(&self, first: Address) {
-        debug_assert!(self.common.contiguous);
+        debug_assert!(self.common().contiguous);
         debug_assert!(first.is_aligned_to(1usize << (self.log_pages + LOG_BYTES_IN_PAGE as usize)));
         let pages = 1 << self.log_pages;
-        debug_assert!(pages as usize <= self.common.accounting.get_committed_pages());
-        self.common.accounting.release(pages as _);
+        debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
+        self.common().accounting.release(pages as _);
         self.block_queue.push(first)
     }
 
     pub fn flush_all(&self) {
         self.block_queue.flush_all()
+        // TODO: For 32-bit space, we may want to free some contiguous chunks.
     }
 }
 

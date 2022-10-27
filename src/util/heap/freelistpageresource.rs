@@ -238,6 +238,35 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
         }
     }
 
+    pub(crate) fn allocate_one_chunk_no_commit(
+        &self,
+        space_descriptor: SpaceDescriptor,
+    ) -> Result<PRAllocResult, PRAllocFail> {
+        assert!(self.common.growable);
+        // FIXME: We need a safe implementation
+        #[allow(clippy::cast_ref_to_mut)]
+        let self_mut: &mut Self = unsafe { &mut *(self as *const _ as *mut _) };
+        let mut sync = self.sync.lock().unwrap();
+        let page_offset =
+            self_mut.allocate_contiguous_chunks(space_descriptor, PAGES_IN_CHUNK, &mut sync);
+
+        if page_offset == generic_freelist::FAILURE {
+            return Result::Err(PRAllocFail);
+        } else {
+            sync.pages_currently_on_freelist -= PAGES_IN_CHUNK;
+            if page_offset > sync.highwater_mark {
+                sync.highwater_mark = page_offset;
+            }
+        }
+
+        let rtn = self.start + conversions::pages_to_bytes(page_offset as _);
+        Result::Ok(PRAllocResult {
+            start: rtn,
+            pages: PAGES_IN_CHUNK,
+            new_chunk: true,
+        })
+    }
+
     fn allocate_contiguous_chunks(
         &mut self,
         space_descriptor: SpaceDescriptor,
