@@ -7,12 +7,10 @@ use std::sync::{Arc, Mutex};
 pub mod gc_count;
 pub mod obj_num;
 pub mod obj_size;
-pub mod reserved_pages;
 
-// use self::gc_count::GcCounter;
-// use self::obj_num::ObjectCounter;
-// use self::obj_size::PerSizeClassObjectCounter;
-use self::reserved_pages::ReservedPagesCounter;
+use self::gc_count::GcCounter;
+use self::obj_num::ObjectCounter;
+use self::obj_size::PerSizeClassObjectCounter;
 
 ///
 /// This trait exposes hooks for developers to implement their own analysis routines.
@@ -59,14 +57,14 @@ impl<VM: VMBinding> AnalysisManager<VM> {
     // Initializing all routines. If you want to add a new routine, here is the place
     // to do so
     fn initialize_routines(&mut self, stats: &Stats) {
-        let rss_max_ctr = stats.new_single_counter("reserved_pages.max", true, true);
-        let rss_avg_ctr = stats.new_single_counter("reserved_pages.avg", true, true);
-        let rss = Arc::new(Mutex::new(ReservedPagesCounter::new(
-            true,
-            rss_max_ctr,
-            rss_avg_ctr,
-        )));
-        self.add_analysis_routine(rss);
+        let ctr = stats.new_event_counter("obj.num", true, true);
+        let gc_ctr = stats.new_event_counter("gc.num", true, true);
+        let obj_num = Arc::new(Mutex::new(ObjectCounter::new(true, ctr)));
+        let gc_count = Arc::new(Mutex::new(GcCounter::new(true, gc_ctr)));
+        let obj_size = Arc::new(Mutex::new(PerSizeClassObjectCounter::new(true)));
+        self.add_analysis_routine(obj_num);
+        self.add_analysis_routine(gc_count);
+        self.add_analysis_routine(obj_size);
     }
 
     pub fn add_analysis_routine(&mut self, routine: Arc<Mutex<dyn RtAnalysis<VM> + Send>>) {

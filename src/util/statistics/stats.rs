@@ -104,23 +104,6 @@ impl Stats {
         }
     }
 
-    pub fn new_single_counter(
-        &self,
-        name: &str,
-        implicit_start: bool,
-        merge_phases: bool,
-    ) -> Arc<Mutex<SingleCounter>> {
-        let mut guard = self.counters.lock().unwrap();
-        let counter = Arc::new(Mutex::new(SingleCounter::new(
-            name.to_string(),
-            self.shared.clone(),
-            implicit_start,
-            merge_phases,
-        )));
-        guard.push(counter.clone());
-        counter
-    }
-
     pub fn new_event_counter(
         &self,
         name: &str,

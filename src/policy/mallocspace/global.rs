@@ -506,10 +506,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // We can do xor on bulk for mark bits and valid object bits. If the result is zero, that means
         // the objects in it are all alive (both valid object bit and mark bit is set), and we do not
         // need to do anything for the region. Otherwise, we will sweep each single object in the region.
-        // Note: Enabling this would result in inaccurate page accounting. When the result is zero,
-        // we do not know whether the last live object in the region could span pages. But we are not checking
-        // for that specific case, so the page accounting could be inaccurate. If you care about
-        // page accounting, probably disable this, and we will sweep object one by one.
+        // Note: Enabling this would result in inaccurate page accounting. We disable this by default, and
+        // we will sweep object one by one.
         const BULK_XOR_ON_MARK_BITS: bool = false;
 
         if BULK_XOR_ON_MARK_BITS {
@@ -674,7 +672,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 }
             }
 
-            if let None = chunk_linear_scan_peek.peek() {
+            if chunk_linear_scan_peek.peek().is_none() {
                 // This is for the edge case where we have a live object and then no other live
                 // objects afterwards till the end of the chunk. For example consider chunk
                 // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
