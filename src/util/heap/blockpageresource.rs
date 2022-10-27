@@ -32,7 +32,7 @@ pub struct BlockPageResource<VM: VMBinding> {
 impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
     #[inline(always)]
     fn common(&self) -> &CommonPageResource {
-        &self.flpr.common()
+        self.flpr.common()
     }
 
     #[inline(always)]
