@@ -185,21 +185,19 @@ impl<VM: VMBinding> BlockPageResource<VM> {
 struct BlockArray<Block> {
     cursor: AtomicUsize,
     data: UnsafeCell<Vec<Block>>,
-    capacity: usize,
 }
 
 impl<Block: Copy> BlockArray<Block> {
-    const LOCAL_BUFFER_SIZE: usize = 256;
+    const CAPACITY: usize = 256;
 
     /// Create an array
     #[inline(always)]
     fn new() -> Self {
         let mut array = Self {
             cursor: AtomicUsize::new(0),
-            data: UnsafeCell::new(Vec::with_capacity(Self::LOCAL_BUFFER_SIZE)),
-            capacity: Self::LOCAL_BUFFER_SIZE,
+            data: UnsafeCell::new(Vec::with_capacity(Self::CAPACITY)),
         };
-        unsafe { array.data.get_mut().set_len(Self::LOCAL_BUFFER_SIZE) }
+        unsafe { array.data.get_mut().set_len(Self::CAPACITY) }
         array
     }
 
@@ -223,7 +221,7 @@ impl<Block: Copy> BlockArray<Block> {
     #[inline(always)]
     unsafe fn push_relaxed(&self, block: Block) -> Result<(), Block> {
         let i = self.cursor.load(Ordering::Relaxed);
-        if i < self.capacity {
+        if i < Self::CAPACITY {
             self.set_entry(i, block);
             self.cursor.store(i + 1, Ordering::Relaxed);
             Ok(())
@@ -277,7 +275,6 @@ impl<Block: Copy> BlockArray<Block> {
     /// Return the old array
     #[inline(always)]
     fn replace(&self, new_array: Self) -> Self {
-        debug_assert_eq!(self.capacity, new_array.capacity);
         // Swap cursor
         let temp = self.cursor.load(Ordering::Relaxed);
         self.cursor
@@ -414,4 +411,6 @@ impl<Block: Debug + Copy> BlockQueue<Block> {
             array.iterate_blocks(f);
         }
     }
+
+    pub fn reset(&self) {}
 }
