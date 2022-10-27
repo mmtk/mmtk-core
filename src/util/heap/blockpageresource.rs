@@ -75,6 +75,16 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         }
     }
 
+    pub fn new_discontiguous(log_pages: usize, vm_map: &'static VMMap, num_workers: usize) -> Self {
+        assert!((1 << log_pages) <= PAGES_IN_CHUNK);
+        Self {
+            log_pages,
+            flpr: FreeListPageResource::new_discontiguous(vm_map),
+            block_queue: BlockPool::new(num_workers),
+            sync: Mutex::new(()),
+        }
+    }
+
     /// Grow contiguous space
     #[cold]
     fn alloc_pages_slow_sync(

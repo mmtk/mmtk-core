@@ -11,6 +11,7 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::BlockPageResource;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -29,20 +30,12 @@ use crate::{
 use atomic::Ordering;
 use std::sync::{atomic::AtomicU8, Arc};
 
-// For 32-bit platforms, we still use FreeListPageResource
-#[cfg(target_pointer_width = "32")]
-use crate::util::heap::FreeListPageResource as ImmixPageResource;
-
-// BlockPageResource is for 64-bit platforms only
-#[cfg(target_pointer_width = "64")]
-use crate::util::heap::BlockPageResource as ImmixPageResource;
-
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: ImmixPageResource<VM>,
+    pr: BlockPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -215,20 +208,21 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             heap,
         );
         ImmixSpace {
-            #[cfg(target_pointer_width = "32")]
             pr: if common.vmrequest.is_discontiguous() {
-                ImmixPageResource::new_discontiguous(vm_map)
+                BlockPageResource::new_discontiguous(
+                    Block::LOG_PAGES,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             } else {
-                ImmixPageResource::new_contiguous(common.start, common.extent, vm_map)
+                BlockPageResource::new_contiguous(
+                    Block::LOG_PAGES,
+                    common.start,
+                    common.extent,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             },
-            #[cfg(target_pointer_width = "64")]
-            pr: ImmixPageResource::new_contiguous(
-                Block::LOG_PAGES,
-                common.start,
-                common.extent,
-                vm_map,
-                scheduler.num_workers(),
-            ),
             common,
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
