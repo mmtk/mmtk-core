@@ -187,18 +187,17 @@ struct BlockArray<Block> {
     data: UnsafeCell<Vec<Block>>,
 }
 
-impl<Block: Copy> BlockArray<Block> {
+impl<Block: Copy + Default> BlockArray<Block> {
     const CAPACITY: usize = 256;
 
     /// Create an array
     #[inline(always)]
     fn new() -> Self {
-        let mut array = Self {
+        let default_block = Default::default();
+        Self {
             cursor: AtomicUsize::new(0),
-            data: UnsafeCell::new(Vec::with_capacity(Self::CAPACITY)),
-        };
-        unsafe { array.data.get_mut().set_len(Self::CAPACITY) }
-        array
+            data: UnsafeCell::new(vec![default_block; Self::CAPACITY]),
+        }
     }
 
     /// Get an entry
@@ -305,7 +304,7 @@ pub struct BlockQueue<Block> {
     count: AtomicUsize,
 }
 
-impl<Block: Debug + Copy> BlockQueue<Block> {
+impl<Block: Debug + Copy + Default> BlockQueue<Block> {
     /// Create a BlockQueue
     pub fn new(num_workers: usize) -> Self {
         Self {

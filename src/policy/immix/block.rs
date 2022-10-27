@@ -68,6 +68,13 @@ impl BlockState {
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
+impl Default for Block {
+    #[inline(always)]
+    fn default() -> Self {
+        Self(Address::ZERO)
+    }
+}
+
 impl From<Address> for Block {
     #[inline(always)]
     fn from(address: Address) -> Block {
