@@ -26,7 +26,7 @@ pub struct BlockPageResource<VM: VMBinding> {
     /// Block granularity
     log_pages: usize,
     /// A buffer for storing all the free blocks
-    block_queue: BlockQueue<Address>,
+    block_queue: BlockPool<Address>,
     /// Top address of the allocated contiguous space
     highwater: Atomic<Address>,
     /// Limit of the contiguous space
@@ -81,7 +81,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
             // Highwater starts from the start address of the contiguous space
             highwater: Atomic::new(start),
             limit: (start + bytes).align_up(BYTES_IN_CHUNK),
-            block_queue: BlockQueue::new(num_workers),
+            block_queue: BlockPool::new(num_workers),
             sync: Mutex::new(()),
             _p: PhantomData,
         }
@@ -126,7 +126,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         // 3. Push all remaining blocks to a block list
         let last_block = start + BYTES_IN_CHUNK;
         let block_size = 1usize << (self.log_pages + LOG_BYTES_IN_PAGE as usize);
-        let array = BlockArray::new();
+        let array = BlockQueue::new();
         let mut cursor = start + block_size;
         while cursor < last_block {
             unsafe { array.push_relaxed(cursor).unwrap() };
@@ -182,12 +182,12 @@ impl<VM: VMBinding> BlockPageResource<VM> {
 }
 
 /// A block list that supports fast lock-free push/pop operations
-struct BlockArray<Block> {
+struct BlockQueue<Block> {
     cursor: AtomicUsize,
     data: UnsafeCell<Vec<Block>>,
 }
 
-impl<Block: Copy + Default> BlockArray<Block> {
+impl<Block: Copy + Default> BlockQueue<Block> {
     const CAPACITY: usize = 256;
 
     /// Create an array
@@ -293,30 +293,30 @@ impl<Block: Copy + Default> BlockArray<Block> {
 /// Mutator or collector threads always allocate blocks by poping from the global pool。
 ///
 /// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.
-pub struct BlockQueue<Block> {
+pub struct BlockPool<Block> {
     /// First global BlockArray for fast allocation
-    head_global_freed_blocks: RwLock<Option<BlockArray<Block>>>,
+    head_global_freed_blocks: RwLock<Option<BlockQueue<Block>>>,
     /// A list of BlockArray that is flushed to the global pool
-    global_freed_blocks: RwLock<Vec<BlockArray<Block>>>,
+    global_freed_blocks: RwLock<Vec<BlockQueue<Block>>>,
     /// Thread-local block queues
-    worker_local_freed_blocks: Vec<BlockArray<Block>>,
+    worker_local_freed_blocks: Vec<BlockQueue<Block>>,
     /// Total number of blocks in the whole BlockQueue
     count: AtomicUsize,
 }
 
-impl<Block: Debug + Copy + Default> BlockQueue<Block> {
+impl<Block: Debug + Copy + Default> BlockPool<Block> {
     /// Create a BlockQueue
     pub fn new(num_workers: usize) -> Self {
         Self {
             head_global_freed_blocks: Default::default(),
             global_freed_blocks: Default::default(),
-            worker_local_freed_blocks: (0..num_workers).map(|_| BlockArray::new()).collect(),
+            worker_local_freed_blocks: (0..num_workers).map(|_| BlockQueue::new()).collect(),
             count: AtomicUsize::new(0),
         }
     }
 
     /// Add a BlockArray to the global pool
-    fn add_global_array(&self, array: BlockArray<Block>) {
+    fn add_global_array(&self, array: BlockQueue<Block>) {
         self.count.fetch_add(array.len(), Ordering::SeqCst);
         self.global_freed_blocks.write().push(array);
     }
@@ -332,7 +332,7 @@ impl<Block: Debug + Copy + Default> BlockQueue<Block> {
                 .is_err()
         };
         if failed {
-            let queue = BlockArray::new();
+            let queue = BlockQueue::new();
             unsafe { queue.push_relaxed(block).unwrap() };
             let old_queue = self.worker_local_freed_blocks[id].replace(queue);
             assert!(!old_queue.is_empty());
@@ -374,7 +374,7 @@ impl<Block: Debug + Copy + Default> BlockQueue<Block> {
     #[inline(always)]
     fn flush(&self, id: usize) {
         if !self.worker_local_freed_blocks[id].is_empty() {
-            let queue = self.worker_local_freed_blocks[id].replace(BlockArray::new());
+            let queue = self.worker_local_freed_blocks[id].replace(BlockQueue::new());
             if !queue.is_empty() {
                 self.global_freed_blocks.write().push(queue)
             }

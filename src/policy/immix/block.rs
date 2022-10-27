@@ -3,7 +3,7 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
-use crate::util::heap::blockpageresource::BlockQueue;
+use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
@@ -282,16 +282,16 @@ impl Block {
 }
 
 /// A non-block single-linked list to store blocks.
-pub struct BlockList {
-    queue: BlockQueue<Block>,
+pub struct ReusableBlockPool {
+    queue: BlockPool<Block>,
     num_workers: usize,
 }
 
-impl BlockList {
+impl ReusableBlockPool {
     /// Create empty block list
     pub fn new(num_workers: usize) -> Self {
         Self {
-            queue: BlockQueue::new(num_workers),
+            queue: BlockPool::new(num_workers),
             num_workers,
         }
     }
@@ -316,7 +316,7 @@ impl BlockList {
 
     /// Clear the list.
     pub fn reset(&mut self) {
-        self.queue = BlockQueue::new(self.num_workers);
+        self.queue = BlockPool::new(self.num_workers);
     }
 
     /// Iterate all the blocks in the queue. Call the visitor for each reported block.
