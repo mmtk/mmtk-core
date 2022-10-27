@@ -88,10 +88,8 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         has_object_alloced_by_malloc(addr)
     }
 
-    fn initialize_object_metadata(&self, object: ObjectReference, bytes: usize, _alloc: bool) {
+    fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        let page_addr = conversions::page_align_down(object.to_address());
-        self.set_page_mark(page_addr, bytes);
         set_alloc_bit(object);
     }
 
@@ -241,11 +239,18 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    fn set_page_mark(&self, page_addr: Address, size: usize) {
-        let mut page = page_addr;
-        while page < page_addr + size {
-            if !is_page_marked(page) {
-                set_page_mark(page);
+    fn set_page_mark(&self, start: Address, size: usize) {
+        // Set first page
+        let mut page = start.align_down(BYTES_IN_MALLOC_PAGE);
+        if compare_exchange_page_mark(page) {
+            self.active_pages.fetch_add(1, Ordering::SeqCst);
+        }
+
+        page += BYTES_IN_MALLOC_PAGE;
+
+        // It is important to go to the end of the object, which may span a page boundary
+        while page < start + size {
+            if compare_exchange_page_mark(page) {
                 self.active_pages.fetch_add(1, Ordering::SeqCst);
             }
 
@@ -282,6 +287,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 assert!(crate::mmtk::SFT_MAP.has_sft_entry(address)); // make sure the address is okay with our SFT map
                 unsafe { crate::mmtk::SFT_MAP.update(self, address, actual_size) };
             }
+
+            // Set page marks for current object
+            self.set_page_mark(address, actual_size);
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
             if is_offset_malloc {

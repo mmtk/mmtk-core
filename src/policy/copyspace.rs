@@ -45,7 +45,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.is_from_space()
     }
 
-    fn initialize_object_metadata(&self, _object: ObjectReference, _bytes: usize, _alloc: bool) {
+    fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit(_object);
     }
