@@ -176,6 +176,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
         use crate::util::constants::LOG_BYTES_IN_PAGE;
         debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
