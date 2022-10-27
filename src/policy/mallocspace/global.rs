@@ -4,7 +4,6 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
-use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::PageResource;
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -23,6 +22,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
 // only used for debugging
+use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 #[cfg(debug_assertions)]
 use std::collections::HashMap;
 #[cfg(debug_assertions)]
@@ -178,7 +178,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn reserved_pages(&self) -> usize {
         // TODO: figure out a better way to get the total number of active pages from the metadata
-        let data_pages = self.active_pages.load(Ordering::SeqCst);
+        let data_pages = self.active_pages.load(Ordering::SeqCst)
+            << (LOG_BYTES_IN_MALLOC_PAGE - crate::util::constants::LOG_BYTES_IN_PAGE);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
     }
@@ -245,7 +246,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 self.active_pages.fetch_add(1, Ordering::SeqCst);
             }
 
-            page += BYTES_IN_PAGE;
+            page += BYTES_IN_MALLOC_PAGE;
         }
     }
 
@@ -426,7 +427,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         let mut page = chunk_start;
         while page < chunk_start + BYTES_IN_CHUNK {
             self.unset_page_mark(page);
-            page += BYTES_IN_PAGE;
+            page += BYTES_IN_MALLOC_PAGE;
         }
     }
 
@@ -452,17 +453,17 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page = object.to_address().align_down(BYTES_IN_PAGE);
+                let current_page = object.to_address().align_down(BYTES_IN_MALLOC_PAGE);
 
                 let mut page = *empty_page_start;
                 while page < current_page {
                     self.unset_page_mark(page);
-                    page += BYTES_IN_PAGE;
+                    page += BYTES_IN_MALLOC_PAGE;
                 }
             }
 
             // Update last_object_end
-            *empty_page_start = (obj_start + bytes).align_up(BYTES_IN_PAGE);
+            *empty_page_start = (obj_start + bytes).align_up(BYTES_IN_MALLOC_PAGE);
 
             false
         }
@@ -683,7 +684,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     let mut page = empty_page_start;
                     while page < chunk_start + BYTES_IN_CHUNK {
                         self.unset_page_mark(page);
-                        page += BYTES_IN_PAGE;
+                        page += BYTES_IN_MALLOC_PAGE;
                     }
                 }
             }

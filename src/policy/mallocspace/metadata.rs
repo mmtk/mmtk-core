@@ -48,7 +48,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
+    crate::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE;
 
 pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
