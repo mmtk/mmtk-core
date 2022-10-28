@@ -35,7 +35,7 @@ pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: BlockPageResource<VM>,
+    pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -349,7 +349,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Release a block.
     pub fn release_block(&self, block: Block) {
         block.deinit();
-        self.pr.release_pages(block.start());
+        self.pr.release_block(block);
     }
 
     /// Allocate a clean block.

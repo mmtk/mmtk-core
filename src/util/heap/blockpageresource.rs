@@ -6,12 +6,12 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::pageresource::CommonPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
+use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use atomic::Ordering;
 use spin::RwLock;
 use std::cell::UnsafeCell;
-use std::fmt::Debug;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Mutex;
 
@@ -19,17 +19,15 @@ const UNINITIALIZED_WATER_MARK: i32 = -1;
 const LOCAL_BUFFER_SIZE: usize = 128;
 
 /// A fast PageResource for fixed-size block allocation only.
-pub struct BlockPageResource<VM: VMBinding> {
+pub struct BlockPageResource<VM: VMBinding, B: Region + 'static> {
     flpr: FreeListPageResource<VM>,
-    /// Block granularity
-    log_pages: usize,
     /// A buffer for storing all the free blocks
-    block_queue: BlockPool<Address>,
+    block_queue: BlockPool<B>,
     /// Slow-path allocation synchronization
     sync: Mutex<()>,
 }
 
-impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
+impl<VM: VMBinding, B: Region> PageResource<VM> for BlockPageResource<VM, B> {
     #[inline(always)]
     fn common(&self) -> &CommonPageResource {
         self.flpr.common()
@@ -58,7 +56,10 @@ impl<VM: VMBinding> PageResource<VM> for BlockPageResource<VM> {
     }
 }
 
-impl<VM: VMBinding> BlockPageResource<VM> {
+impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
+    /// Block granularity in pages
+    const LOG_PAGES: usize = B::LOG_BYTES - LOG_BYTES_IN_PAGE as usize;
+
     pub fn new_contiguous(
         log_pages: usize,
         start: Address,
@@ -68,7 +69,6 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     ) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
-            log_pages,
             flpr: FreeListPageResource::new_contiguous(start, bytes, vm_map),
             block_queue: BlockPool::new(num_workers),
             sync: Mutex::new(()),
@@ -78,7 +78,6 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     pub fn new_discontiguous(log_pages: usize, vm_map: &'static VMMap, num_workers: usize) -> Self {
         assert!((1 << log_pages) <= PAGES_IN_CHUNK);
         Self {
-            log_pages,
             flpr: FreeListPageResource::new_discontiguous(vm_map),
             block_queue: BlockPool::new(num_workers),
             sync: Mutex::new(()),
@@ -99,7 +98,7 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         if let Some(block) = self.block_queue.pop() {
             self.commit_pages(reserved_pages, required_pages, tls);
             return Result::Ok(PRAllocResult {
-                start: block,
+                start: block.start(),
                 pages: required_pages,
                 new_chunk: false,
             });
@@ -115,12 +114,11 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         let first_block = start;
         // 3. Push all remaining blocks to a block list
         let last_block = start + BYTES_IN_CHUNK;
-        let block_size = 1usize << (self.log_pages + LOG_BYTES_IN_PAGE as usize);
         let array = BlockQueue::new();
-        let mut cursor = start + block_size;
+        let mut cursor = start + B::BYTES;
         while cursor < last_block {
-            unsafe { array.push_relaxed(cursor).unwrap() };
-            cursor += block_size;
+            unsafe { array.push_relaxed(B::from(cursor)).unwrap() };
+            cursor += B::BYTES;
         }
         // 4. Push the block list to the global pool
         self.block_queue.add_global_array(array);
@@ -143,12 +141,12 @@ impl<VM: VMBinding> BlockPageResource<VM> {
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug_assert_eq!(reserved_pages, required_pages);
-        debug_assert_eq!(reserved_pages, 1 << self.log_pages);
+        debug_assert_eq!(reserved_pages, 1 << Self::LOG_PAGES);
         // Fast allocate from the blocks list
         if let Some(block) = self.block_queue.pop() {
             self.commit_pages(reserved_pages, required_pages, tls);
             return Result::Ok(PRAllocResult {
-                start: block,
+                start: block.start(),
                 pages: required_pages,
                 new_chunk: false,
             });
@@ -158,13 +156,12 @@ impl<VM: VMBinding> BlockPageResource<VM> {
     }
 
     #[inline]
-    pub fn release_pages(&self, first: Address) {
+    pub fn release_block(&self, block: B) {
         debug_assert!(self.common().contiguous);
-        debug_assert!(first.is_aligned_to(1usize << (self.log_pages + LOG_BYTES_IN_PAGE as usize)));
-        let pages = 1 << self.log_pages;
+        let pages = 1 << Self::LOG_PAGES;
         debug_assert!(pages as usize <= self.common().accounting.get_committed_pages());
         self.common().accounting.release(pages as _);
-        self.block_queue.push(first)
+        self.block_queue.push(block)
     }
 
     pub fn flush_all(&self) {
@@ -174,27 +171,29 @@ impl<VM: VMBinding> BlockPageResource<VM> {
 }
 
 /// A block list that supports fast lock-free push/pop operations
-struct BlockQueue<Block> {
+struct BlockQueue<B: Region> {
     cursor: AtomicUsize,
-    data: UnsafeCell<Vec<Block>>,
+    data: UnsafeCell<Vec<B>>,
 }
 
-impl<Block: Copy + Default> BlockQueue<Block> {
-    const CAPACITY: usize = 256;
-
+impl<B: Region> BlockQueue<B> {
     /// Create an array
     #[inline(always)]
     fn new() -> Self {
-        let default_block = Default::default();
+        let default_block = B::from(Address::ZERO);
         Self {
             cursor: AtomicUsize::new(0),
             data: UnsafeCell::new(vec![default_block; Self::CAPACITY]),
         }
     }
+}
+
+impl<B: Region> BlockQueue<B> {
+    const CAPACITY: usize = 256;
 
     /// Get an entry
     #[inline(always)]
-    fn get_entry(&self, i: usize) -> Block {
+    fn get_entry(&self, i: usize) -> B {
         unsafe { (*self.data.get())[i] }
     }
 
@@ -202,7 +201,7 @@ impl<Block: Copy + Default> BlockQueue<Block> {
     ///
     /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     #[inline(always)]
-    unsafe fn set_entry(&self, i: usize, block: Block) {
+    unsafe fn set_entry(&self, i: usize, block: B) {
         (*self.data.get())[i] = block
     }
 
@@ -210,7 +209,7 @@ impl<Block: Copy + Default> BlockQueue<Block> {
     ///
     /// It's unsafe unless the array is accessed by only one thread (i.e. used as a thread-local array).
     #[inline(always)]
-    unsafe fn push_relaxed(&self, block: Block) -> Result<(), Block> {
+    unsafe fn push_relaxed(&self, block: B) -> Result<(), B> {
         let i = self.cursor.load(Ordering::Relaxed);
         if i < Self::CAPACITY {
             self.set_entry(i, block);
@@ -223,7 +222,7 @@ impl<Block: Copy + Default> BlockQueue<Block> {
 
     /// Atomically pop an element from the array.
     #[inline(always)]
-    fn pop(&self) -> Option<Block> {
+    fn pop(&self) -> Option<B> {
         let i = self
             .cursor
             .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |i| {
@@ -254,7 +253,7 @@ impl<Block: Copy + Default> BlockQueue<Block> {
 
     /// Iterate all elements in the array
     #[inline]
-    fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
+    fn iterate_blocks(&self, f: &mut impl FnMut(B)) {
         let len = self.len();
         for i in 0..len {
             f(self.get_entry(i))
@@ -285,18 +284,18 @@ impl<Block: Copy + Default> BlockQueue<Block> {
 /// Mutator or collector threads always allocate blocks by poping from the global pool。
 ///
 /// Collector threads free blocks to their thread-local queues, and then flush to the global pools before GC ends.
-pub struct BlockPool<Block> {
+pub struct BlockPool<B: Region> {
     /// First global BlockArray for fast allocation
-    head_global_freed_blocks: RwLock<Option<BlockQueue<Block>>>,
+    head_global_freed_blocks: RwLock<Option<BlockQueue<B>>>,
     /// A list of BlockArray that is flushed to the global pool
-    global_freed_blocks: RwLock<Vec<BlockQueue<Block>>>,
+    global_freed_blocks: RwLock<Vec<BlockQueue<B>>>,
     /// Thread-local block queues
-    worker_local_freed_blocks: Vec<BlockQueue<Block>>,
+    worker_local_freed_blocks: Vec<BlockQueue<B>>,
     /// Total number of blocks in the whole BlockQueue
     count: AtomicUsize,
 }
 
-impl<Block: Debug + Copy + Default> BlockPool<Block> {
+impl<B: Region> BlockPool<B> {
     /// Create a BlockQueue
     pub fn new(num_workers: usize) -> Self {
         Self {
@@ -308,14 +307,14 @@ impl<Block: Debug + Copy + Default> BlockPool<Block> {
     }
 
     /// Add a BlockArray to the global pool
-    fn add_global_array(&self, array: BlockQueue<Block>) {
+    fn add_global_array(&self, array: BlockQueue<B>) {
         self.count.fetch_add(array.len(), Ordering::SeqCst);
         self.global_freed_blocks.write().push(array);
     }
 
     /// Push a block to the thread-local queue
     #[inline(always)]
-    pub fn push(&self, block: Block) {
+    pub fn push(&self, block: B) {
         self.count.fetch_add(1, Ordering::SeqCst);
         let id = crate::scheduler::current_worker_ordinal().unwrap();
         let failed = unsafe {
@@ -334,7 +333,7 @@ impl<Block: Debug + Copy + Default> BlockPool<Block> {
 
     /// Pop a block from the global pool
     #[inline(always)]
-    pub fn pop(&self) -> Option<Block> {
+    pub fn pop(&self) -> Option<B> {
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
         if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::SeqCst);
@@ -391,7 +390,7 @@ impl<Block: Debug + Copy + Default> BlockPool<Block> {
 
     /// Iterate all the blocks in the BlockQueue
     #[inline]
-    pub fn iterate_blocks(&self, f: &mut impl FnMut(Block)) {
+    pub fn iterate_blocks(&self, f: &mut impl FnMut(B)) {
         for array in &*self.head_global_freed_blocks.read() {
             array.iterate_blocks(f)
         }
