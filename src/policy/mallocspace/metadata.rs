@@ -173,8 +173,10 @@ pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
     VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
 }
 
-#[allow(unused)]
-pub(super) fn compare_exchange_page_mark(page_addr: Address) -> bool {
+/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
+pub(super) fn compare_exchange_set_page_mark(page_addr: Address) -> bool {
+    // The spec has 1 byte per each page. So it won't be the case that other threads may race and access other bits for the spec.
+    // If the compare-exchange fails, we know the byte was set to 1 before this call.
     ACTIVE_PAGE_METADATA_SPEC
         .compare_exchange_atomic::<u8>(page_addr, 0, 1, Ordering::SeqCst, Ordering::SeqCst)
         .is_ok()

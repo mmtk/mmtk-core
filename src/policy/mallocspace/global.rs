@@ -177,8 +177,8 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
         use crate::util::constants::LOG_BYTES_IN_PAGE;
+        // Assume malloc pages are no smaller than 4K pages. Otherwise the substraction below will fail.
         debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
-        // TODO: figure out a better way to get the total number of active pages from the metadata
         let data_pages = self.active_pages.load(Ordering::SeqCst)
             << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
@@ -239,18 +239,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
+    // This is called by mutators. We have to make sure this is correct if more than one threads are calling this method for
+    // objects in the same page.
     fn set_page_mark(&self, start: Address, size: usize) {
         // Set first page
         let mut page = start.align_down(BYTES_IN_MALLOC_PAGE);
-        if compare_exchange_page_mark(page) {
-            self.active_pages.fetch_add(1, Ordering::SeqCst);
-        }
-
-        page += BYTES_IN_MALLOC_PAGE;
 
         // It is important to go to the end of the object, which may span a page boundary
         while page < start + size {
-            if compare_exchange_page_mark(page) {
+            if compare_exchange_set_page_mark(page) {
                 self.active_pages.fetch_add(1, Ordering::SeqCst);
             }
 
@@ -258,6 +255,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
+    // This is called during GC when we sweep chunks. We have divided work by chunks, and each chunk is only swept by one GC thread.
+    // We can assume there is no race for the same page.
     fn unset_page_mark(&self, page_addr: Address) {
         if unsafe { is_page_marked_unsafe(page_addr) } {
             self.active_pages.fetch_sub(1, Ordering::SeqCst);
