@@ -405,7 +405,7 @@ impl ReferenceProcessor {
             if !referent.is_null() {
                 Self::keep_referent_alive(trace, referent);
             }
-            trace!(" ~> {:?} (retained)", referent.to_address());
+            trace!(" ~> {:?} (retained)", referent);
         }
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);

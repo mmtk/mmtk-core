@@ -70,7 +70,7 @@ impl HeaderMetadataSpec {
 
     #[inline(always)]
     fn meta_addr(&self, object: ObjectReference) -> Address {
-        object.to_address() + self.byte_offset()
+        object.to_header_address() + self.byte_offset()
     }
 
     // Some common methods for header metadata that is smaller than 1 byte.

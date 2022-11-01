@@ -2,7 +2,6 @@ use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
 #[cfg(feature = "is_mmtk_object")]
 use crate::util::alloc_bit;
-use crate::util::conversions;
 use crate::util::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -166,9 +165,8 @@ impl SFT for EmptySpaceSFT {
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
             object,
-            conversions::chunk_align_down(object.to_address()),
         )
     }
 }

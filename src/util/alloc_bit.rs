@@ -5,6 +5,8 @@ use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
+use crate::vm::VMBinding;
+use crate::vm::ObjectModel;
 
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
 pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec =
@@ -21,9 +23,9 @@ pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Add
     );
 }
 
-pub fn set_alloc_bit(object: ObjectReference) {
-    debug_assert!(!is_alloced(object), "{:x}: alloc bit already set", object);
-    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 1, Ordering::SeqCst);
+pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    debug_assert!(!is_alloced::<VM>(object), "{:x}: alloc bit already set", object);
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(VM::VMObjectModel::ref_to_address(object), 1, Ordering::SeqCst);
 }
 
 pub fn unset_addr_alloc_bit(address: Address) {
@@ -35,22 +37,22 @@ pub fn unset_addr_alloc_bit(address: Address) {
     ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(address, 0, Ordering::SeqCst);
 }
 
-pub fn unset_alloc_bit(object: ObjectReference) {
-    debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
-    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address(), 0, Ordering::SeqCst);
+pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    debug_assert!(is_alloced::<VM>(object), "{:x}: alloc bit not set", object);
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(VM::VMObjectModel::ref_to_address(object), 0, Ordering::SeqCst);
 }
 
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::store`
 ///
-pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    debug_assert!(is_alloced(object), "{:x}: alloc bit not set", object);
-    ALLOC_SIDE_METADATA_SPEC.store::<u8>(object.to_address(), 0);
+pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    debug_assert!(is_alloced::<VM>(object), "{:x}: alloc bit not set", object);
+    ALLOC_SIDE_METADATA_SPEC.store::<u8>(VM::VMObjectModel::ref_to_address(object), 0);
 }
 
-pub fn is_alloced(object: ObjectReference) -> bool {
-    is_alloced_object(object.to_address())
+pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
+    is_alloced_object(VM::VMObjectModel::ref_to_address(object))
 }
 
 pub fn is_alloced_object(address: Address) -> bool {

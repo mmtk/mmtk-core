@@ -86,7 +86,7 @@ pub fn forward_object<VM: VMBinding>(
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
-            new_object.to_address().as_usize() | ((FORWARDED as usize) << shift),
+            new_object.as_forwarding_pointer() | ((FORWARDED as usize) << shift),
             None,
             Ordering::SeqCst,
         )
@@ -185,7 +185,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
-        new_object.to_address().as_usize(),
+        new_object.as_forwarding_pointer(),
         Some(FORWARDING_POINTER_MASK),
         Ordering::SeqCst,
     )

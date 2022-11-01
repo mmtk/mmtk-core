@@ -472,9 +472,18 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    /// converts the ObjectReference to an Address
+    // /// converts the ObjectReference to an Address
+    // #[inline(always)]
+    // pub fn to_address(self) -> Address {
+    //     Address(self.0)
+    // }
     #[inline(always)]
-    pub fn to_address(self) -> Address {
+    pub fn as_forwarding_pointer(self) -> usize {
+        self.0
+    }
+
+    #[inline(always)]
+    pub fn to_header_address(self) -> Address {
         Address(self.0)
     }
 

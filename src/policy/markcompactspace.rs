@@ -57,7 +57,7 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        crate::util::alloc_bit::set_alloc_bit(object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
     }
 
     #[cfg(feature = "sanity")]
@@ -231,7 +231,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -247,7 +247,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         object: ObjectReference,
     ) -> ObjectReference {
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -377,13 +377,12 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             );
         for obj in linear_scan {
             // clear the alloc bit
-            alloc_bit::unset_addr_alloc_bit(obj.to_address());
+            alloc_bit::unset_addr_alloc_bit(VM::VMObjectModel::ref_to_address(obj));
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 
             trace!("Compact {} to {}", obj, forwarding_pointer);
             if !forwarding_pointer.is_null() {
-                let copied_size = VM::VMObjectModel::get_size_when_copied(obj);
                 let new_object = forwarding_pointer;
                 Self::clear_header_forwarding_pointer(new_object);
 
@@ -391,9 +390,8 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 trace!(" copy from {} to {}", obj, new_object);
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                 // update alloc_bit,
-                alloc_bit::set_alloc_bit(new_object);
-                to = new_object.to_address() + copied_size;
-                debug_assert_eq!(end_of_new_object, to);
+                alloc_bit::set_alloc_bit::<VM>(new_object);
+                to = end_of_new_object;
             }
         }
 

@@ -646,10 +646,11 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
+pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;
-    SFT_MAP.get_checked(object.to_address()).is_in_space(object)
+    use crate::vm::ObjectModel;
+    SFT_MAP.get_checked(VM::VMObjectModel::ref_to_address(object)).is_in_space(object)
 }
 
 /// Is the address in the mapped memory? The runtime can use this function to check

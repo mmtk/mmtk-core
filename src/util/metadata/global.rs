@@ -48,7 +48,7 @@ impl MetadataSpec {
         mask: Option<T>,
     ) -> T {
         match self {
-            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(object.to_address()),
+            MetadataSpec::OnSide(metadata_spec) => metadata_spec.load(VM::VMObjectModel::ref_to_address(object)),
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata::<T>(metadata_spec, object, mask)
             }
@@ -73,7 +73,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.load_atomic(object.to_address(), ordering)
+                metadata_spec.load_atomic(VM::VMObjectModel::ref_to_address(object), ordering)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::load_metadata_atomic::<T>(metadata_spec, object, mask, ordering)
@@ -100,7 +100,7 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.store(object.to_address(), val);
+                metadata_spec.store(VM::VMObjectModel::ref_to_address(object), val);
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::store_metadata::<T>(metadata_spec, object, val, mask)
@@ -126,7 +126,7 @@ impl MetadataSpec {
     ) {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.store_atomic(object.to_address(), val, ordering);
+                metadata_spec.store_atomic(VM::VMObjectModel::ref_to_address(object), val, ordering);
             }
             MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::store_metadata_atomic::<T>(
                 metadata_spec,
@@ -162,7 +162,7 @@ impl MetadataSpec {
     ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => metadata_spec.compare_exchange_atomic(
-                object.to_address(),
+                VM::VMObjectModel::ref_to_address(object),
                 old_val,
                 new_val,
                 success_order,
@@ -200,7 +200,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_add_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_add_atomic(VM::VMObjectModel::ref_to_address(object), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_add_metadata::<T>(metadata_spec, object, val, order)
@@ -226,7 +226,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_sub_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_sub_atomic(VM::VMObjectModel::ref_to_address(object), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_sub_metadata::<T>(metadata_spec, object, val, order)
@@ -252,7 +252,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_and_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_and_atomic(VM::VMObjectModel::ref_to_address(object), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_and_metadata::<T>(metadata_spec, object, val, order)
@@ -278,7 +278,7 @@ impl MetadataSpec {
     ) -> T {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_or_atomic(object.to_address(), val, order)
+                metadata_spec.fetch_or_atomic(VM::VMObjectModel::ref_to_address(object), val, order)
             }
             MetadataSpec::InHeader(metadata_spec) => {
                 VM::VMObjectModel::fetch_or_metadata::<T>(metadata_spec, object, val, order)
@@ -310,7 +310,7 @@ impl MetadataSpec {
     ) -> std::result::Result<T, T> {
         match self {
             MetadataSpec::OnSide(metadata_spec) => {
-                metadata_spec.fetch_update_atomic(object.to_address(), set_order, fetch_order, f)
+                metadata_spec.fetch_update_atomic(VM::VMObjectModel::ref_to_address(object), set_order, fetch_order, f)
             }
             MetadataSpec::InHeader(metadata_spec) => VM::VMObjectModel::fetch_update_metadata(
                 metadata_spec,

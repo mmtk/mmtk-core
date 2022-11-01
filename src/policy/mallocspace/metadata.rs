@@ -153,8 +153,8 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 }
 
 /// Check if a given object was allocated by malloc
-pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    has_object_alloced_by_malloc(object.to_address())
+pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
+    has_object_alloced_by_malloc(VM::VMObjectModel::ref_to_address(object))
 }
 
 /// Check if there is an object allocated by malloc at the address.
@@ -204,8 +204,8 @@ pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
     ACTIVE_CHUNK_METADATA_SPEC.load::<u8>(chunk_start) == 1
 }
 
-pub fn set_alloc_bit(object: ObjectReference) {
-    alloc_bit::set_alloc_bit(object);
+pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::set_alloc_bit::<VM>(object);
 }
 
 pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
@@ -213,8 +213,8 @@ pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) 
 }
 
 #[allow(unused)]
-pub fn unset_alloc_bit(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit(object);
+pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit::<VM>(object);
 }
 
 pub(super) fn set_page_mark(page_addr: Address) {
@@ -237,8 +237,8 @@ pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
 }
 
-pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit_unsafe(object);
+pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit_unsafe::<VM>(object);
 }
 
 #[allow(unused)]
