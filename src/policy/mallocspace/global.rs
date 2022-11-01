@@ -700,7 +700,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
                 // for 0x0-0x100 but then not unset it for the pages after 0x100. This if block
                 // will take care of this edge case
-                if !empty_page_start.is_zero() {
+                if !empty_page_start.is_zero() && empty_page_start < chunk_start + BYTES_IN_CHUNK {
                     unsafe {
                         self.unset_page_mark(
                             empty_page_start,
