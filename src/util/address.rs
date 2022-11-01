@@ -300,15 +300,15 @@ impl Address {
         conversions::raw_is_aligned(self.0, align)
     }
 
-    /// converts the Address into an ObjectReference
-    /// # Safety
-    /// We would expect ObjectReferences point to valid objects,
-    /// but an arbitrary Address may not reside an object. This conversion is unsafe,
-    /// and it is the user's responsibility to ensure the safety.
-    #[inline(always)]
-    pub unsafe fn to_object_reference(self) -> ObjectReference {
-        mem::transmute(self.0)
-    }
+    // /// converts the Address into an ObjectReference
+    // /// # Safety
+    // /// We would expect ObjectReferences point to valid objects,
+    // /// but an arbitrary Address may not reside an object. This conversion is unsafe,
+    // /// and it is the user's responsibility to ensure the safety.
+    // #[inline(always)]
+    // pub unsafe fn to_object_reference(self) -> ObjectReference {
+    //     mem::transmute(self.0)
+    // }
 
     /// converts the Address to a pointer
     #[inline(always)]
@@ -478,8 +478,12 @@ impl ObjectReference {
     //     Address(self.0)
     // }
     #[inline(always)]
-    pub fn as_forwarding_pointer(self) -> usize {
+    pub fn to_forwarding_pointer(self) -> usize {
         self.0
+    }
+
+    pub unsafe fn from_forwarding_pointer(ptr: usize) -> ObjectReference {
+        Self(ptr)
     }
 
     #[inline(always)]

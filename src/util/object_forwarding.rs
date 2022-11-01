@@ -1,7 +1,7 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{constants, Address, ObjectReference};
+use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
@@ -86,7 +86,7 @@ pub fn forward_object<VM: VMBinding>(
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
-            new_object.as_forwarding_pointer() | ((FORWARDED as usize) << shift),
+            new_object.to_forwarding_pointer() | ((FORWARDED as usize) << shift),
             None,
             Ordering::SeqCst,
         )
@@ -158,14 +158,13 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
     );
 
     unsafe {
-        Address::from_usize(
+        ObjectReference::from_forwarding_pointer(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
                 object,
                 Some(FORWARDING_POINTER_MASK),
                 Ordering::SeqCst,
             ),
         )
-        .to_object_reference()
     }
 }
 
@@ -185,7 +184,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
-        new_object.as_forwarding_pointer(),
+        new_object.to_forwarding_pointer(),
         Some(FORWARDING_POINTER_MASK),
         Ordering::SeqCst,
     )
