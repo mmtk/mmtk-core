@@ -5,6 +5,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::util::heap::PageResource;
+use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
@@ -17,14 +18,12 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+#[cfg(debug_assertions)]
+use std::collections::HashMap;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
-// only used for debugging
-use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
-#[cfg(debug_assertions)]
-use std::collections::HashMap;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
 
@@ -239,30 +238,47 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
-    // This is called by mutators. We have to make sure this is correct if more than one threads are calling this method for
-    // objects in the same page.
+    /// Set multiple pages, starting from the given address, for the given size, and increase the active page count if we set any page mark in the region.
+    /// This is a thread-safe method, and can be used during mutator phase when mutators may access the same page.
+    /// Performance-wise, this method may impose overhead, as we are doing a compare-exchange for every page in the range.
     fn set_page_mark(&self, start: Address, size: usize) {
         // Set first page
         let mut page = start.align_down(BYTES_IN_MALLOC_PAGE);
+        let mut used_pages = 0;
 
         // It is important to go to the end of the object, which may span a page boundary
         while page < start + size {
             if compare_exchange_set_page_mark(page) {
-                self.active_pages.fetch_add(1, Ordering::SeqCst);
+                used_pages += 1;
             }
 
             page += BYTES_IN_MALLOC_PAGE;
         }
+
+        if used_pages != 0 {
+            self.active_pages.fetch_add(used_pages, Ordering::SeqCst);
+        }
     }
 
-    // This is called during GC when we sweep chunks. We have divided work by chunks, and each chunk is only swept by one GC thread.
-    // We can assume there is no race for the same page.
-    fn unset_page_mark(&self, page_addr: Address) {
-        if unsafe { is_page_marked_unsafe(page_addr) } {
-            self.active_pages.fetch_sub(1, Ordering::SeqCst);
+    /// Unset multiple pages, starting from the given address, for the given size, and decrease the active page count if we unset any page mark in the region
+    ///
+    /// # Safety
+    /// We need to ensure that only one GC thread is accessing the range.
+    unsafe fn unset_page_mark(&self, start: Address, size: usize) {
+        debug_assert!(start.is_aligned_to(BYTES_IN_MALLOC_PAGE));
+        let mut page = start;
+        let mut cleared_pages = 0;
+        while page < start + size {
+            if is_page_marked_unsafe(page) {
+                cleared_pages += 1;
+            }
+            page += BYTES_IN_MALLOC_PAGE;
         }
 
-        unsafe { unset_page_mark_unsafe(page_addr) };
+        if cleared_pages != 0 {
+            self.active_pages.fetch_sub(cleared_pages, Ordering::SeqCst);
+            bulk_zero_page_mark(start, size);
+        }
     }
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
@@ -433,12 +449,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
         unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
-
-        let mut page = chunk_start;
-        while page < chunk_start + BYTES_IN_CHUNK {
-            self.unset_page_mark(page);
-            page += BYTES_IN_MALLOC_PAGE;
-        }
+        // Clear the page marks - we are the only GC thread that is accessing this chunk
+        unsafe { self.unset_page_mark(chunk_start, BYTES_IN_CHUNK) };
     }
 
     /// Sweep an object if it is dead, and unset page marks for empty pages before this object.
@@ -464,12 +476,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
                 let current_page = object.to_address().align_down(BYTES_IN_MALLOC_PAGE);
-
-                let mut page = *empty_page_start;
-                while page < current_page {
-                    self.unset_page_mark(page);
-                    page += BYTES_IN_MALLOC_PAGE;
-                }
+                // we are the only GC thread that is accessing this chunk
+                unsafe {
+                    self.unset_page_mark(*empty_page_start, current_page - *empty_page_start)
+                };
             }
 
             // Update last_object_end
@@ -689,11 +699,12 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 // for 0x0-0x100 but then not unset it for the pages after 0x100. This if block
                 // will take care of this edge case
                 if !empty_page_start.is_zero() {
-                    let mut page = empty_page_start;
-                    while page < chunk_start + BYTES_IN_CHUNK {
-                        self.unset_page_mark(page);
-                        page += BYTES_IN_MALLOC_PAGE;
-                    }
+                    unsafe {
+                        self.unset_page_mark(
+                            empty_page_start,
+                            chunk_start + BYTES_IN_CHUNK - empty_page_start,
+                        )
+                    };
                 }
             }
         }

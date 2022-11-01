@@ -256,8 +256,13 @@ pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
     VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
 }
 
+#[allow(unused)]
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
     ACTIVE_PAGE_METADATA_SPEC.store::<u8>(page_addr, 0)
+}
+
+pub(super) unsafe fn bulk_zero_page_mark(page_addr: Address, size: usize) {
+    ACTIVE_PAGE_METADATA_SPEC.bzero_metadata(page_addr, size)
 }
 
 pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
