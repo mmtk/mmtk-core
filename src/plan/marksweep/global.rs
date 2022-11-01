@@ -100,7 +100,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    #[allow(unused_variables)] // scheduler only used by marksweepspace
     pub fn new(
         vm_map: &'static VMMap,
         mmapper: &'static Mmapper,
