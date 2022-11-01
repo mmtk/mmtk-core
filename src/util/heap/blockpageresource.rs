@@ -401,6 +401,4 @@ impl<B: Region> BlockPool<B> {
             array.iterate_blocks(f);
         }
     }
-
-    pub fn reset(&self) {}
 }
