@@ -266,18 +266,22 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// We need to ensure that only one GC thread is accessing the range.
     unsafe fn unset_page_mark(&self, start: Address, size: usize) {
         debug_assert!(start.is_aligned_to(BYTES_IN_MALLOC_PAGE));
+        debug_assert!(crate::util::conversions::raw_is_aligned(
+            size,
+            BYTES_IN_MALLOC_PAGE
+        ));
         let mut page = start;
         let mut cleared_pages = 0;
         while page < start + size {
             if is_page_marked_unsafe(page) {
                 cleared_pages += 1;
+                unset_page_mark_unsafe(page);
             }
             page += BYTES_IN_MALLOC_PAGE;
         }
 
         if cleared_pages != 0 {
             self.active_pages.fetch_sub(cleared_pages, Ordering::SeqCst);
-            bulk_zero_page_mark(start, size);
         }
     }
 
@@ -661,9 +665,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             MallocObjectSize<VM>,
             false,
         >::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
-        let mut chunk_linear_scan_peek = chunk_linear_scan.peekable();
 
-        while let Some(object) = chunk_linear_scan_peek.next() {
+        for object in chunk_linear_scan {
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
                 let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
@@ -693,27 +696,23 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     live_bytes += bytes;
                 }
             }
-
-            if chunk_linear_scan_peek.peek().is_none() {
-                // This is for the edge case where we have a live object and then no other live
-                // objects afterwards till the end of the chunk. For example consider chunk
-                // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
-                // for 0x0-0x100 but then not unset it for the pages after 0x100. This if block
-                // will take care of this edge case
-                if !empty_page_start.is_zero() && empty_page_start < chunk_start + BYTES_IN_CHUNK {
-                    unsafe {
-                        self.unset_page_mark(
-                            empty_page_start,
-                            chunk_start + BYTES_IN_CHUNK - empty_page_start,
-                        )
-                    };
-                }
-            }
         }
 
         // If we never updated empty_page_start, the entire chunk is empty.
         if empty_page_start.is_zero() {
             self.clean_up_empty_chunk(chunk_start);
+        } else if empty_page_start < chunk_start + BYTES_IN_CHUNK {
+            // This is for the edge case where we have a live object and then no other live
+            // objects afterwards till the end of the chunk. For example consider chunk
+            // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
+            // for 0x0-0x100 but then not unset it for the pages after 0x100. This checks
+            // if we have empty pages at the end of a chunk that needs to be cleared.
+            unsafe {
+                self.unset_page_mark(
+                    empty_page_start,
+                    chunk_start + BYTES_IN_CHUNK - empty_page_start,
+                )
+            };
         }
 
         #[cfg(debug_assertions)]
