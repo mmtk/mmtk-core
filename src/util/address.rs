@@ -477,14 +477,14 @@ impl ObjectReference {
     // pub fn to_address(self) -> Address {
     //     Address(self.0)
     // }
-    #[inline(always)]
-    pub fn to_forwarding_pointer(self) -> usize {
-        self.0
-    }
+    // #[inline(always)]
+    // pub fn to_forwarding_pointer<VM: VMBinding>(self) -> Address {
+    //     VM::VMObjectModel::object_start_ref(self)
+    // }
 
-    pub unsafe fn from_forwarding_pointer(ptr: usize) -> ObjectReference {
-        Self(ptr)
-    }
+    // pub unsafe fn from_forwarding_pointer<VM: VMBinding>(ptr: Address) -> ObjectReference {
+    //     VM::VMObjectModel::get_object_from_start_address(ptr)
+    // }
 
     #[inline(always)]
     pub fn to_header_address(self) -> Address {
