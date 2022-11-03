@@ -77,7 +77,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
     #[inline(always)]
     fn sft_trace_object(
@@ -390,7 +390,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -483,7 +483,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 object
             } else {
                 #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit(object);
+                crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
                 ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             debug_assert_eq!(

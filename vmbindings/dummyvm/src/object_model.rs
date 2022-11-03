@@ -56,7 +56,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         object.to_address().sub(OBJECT_REF_OFFSET)
     }
 
-    fn ref_to_address(_object: ObjectReference) -> Address {
+    fn object_start_ref(_object: ObjectReference) -> Address {
         unimplemented!()
     }
 

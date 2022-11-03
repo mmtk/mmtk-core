@@ -73,7 +73,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
         let cell = VM::VMObjectModel::object_start_ref(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
@@ -205,7 +205,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );

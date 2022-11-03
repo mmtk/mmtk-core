@@ -89,7 +89,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        let page_addr = conversions::page_align_down(VM::VMObjectModel::ref_to_address(object));
+        let page_addr = conversions::page_align_down(VM::VMObjectModel::object_start_ref(object));
         set_page_mark(page_addr);
         set_alloc_bit::<VM>(object);
     }
@@ -318,7 +318,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
-            let chunk_start = conversions::chunk_align_down(VM::VMObjectModel::ref_to_address(object));
+            let chunk_start = conversions::chunk_align_down(VM::VMObjectModel::object_start_ref(object));
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
@@ -423,7 +423,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page = VM::VMObjectModel::ref_to_address(object).align_down(BYTES_IN_PAGE);
+                let current_page = VM::VMObjectModel::object_start_ref(object).align_down(BYTES_IN_PAGE);
 
                 let mut page = *empty_page_start;
                 while page < current_page {

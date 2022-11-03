@@ -394,13 +394,19 @@ pub trait ObjectModel<VM: VMBinding> {
     /// * `object`: The object to be queried.
     fn object_start_ref(object: ObjectReference) -> Address;
 
-    /// Return an address guaranteed to be inside the storage associated
-    /// with an object.
+    /// Get the object reference from the object start. This is the opposite of
+    /// `object_start_ref()`.
     ///
     /// Arguments:
-    /// * `object`: The object to be queried.
-    // FIXME: this doesn't seem essential. E.g. `get_object_end_address` or `object_start_ref` can cover its functionality.
-    fn ref_to_address(object: ObjectReference) -> Address;
+    /// * `start`: The object start address.
+    fn get_object_from_start_address(start: Address) -> ObjectReference;
+
+    // /// Return an address guaranteed to be inside the storage associated
+    // /// with an object.
+    // ///
+    // /// Arguments:
+    // /// * `object`: The object to be queried.
+    // fn object_start_ref(object: ObjectReference) -> Address;
 
     /// Dump debugging information for an object.
     ///
