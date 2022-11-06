@@ -491,6 +491,17 @@ impl ObjectReference {
         Address(self.0)
     }
 
+    #[deprecated]
+    #[inline(always)]
+    pub fn to_raw_address(self) -> Address {
+        Address(self.0)
+    }
+    #[deprecated]
+    #[inline(always)]
+    pub fn from_raw_address(addr: Address) -> ObjectReference {
+        ObjectReference(addr.0)
+    }
+
     /// is this object reference null reference?
     #[inline(always)]
     pub fn is_null(self) -> bool {
