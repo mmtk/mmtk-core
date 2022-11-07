@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["libc_malloc","If no malloc lib is specified, use the libc implementation"]]});
+initSidebarItems({"constant":[["BYTES_IN_MALLOC_PAGE","When we count page usage of library malloc, we assume they allocate in pages. For some malloc implementations, they may use a larger page (e.g. mimalloc’s 64K page). For libraries that we are not sure, we assume they use normal 4k pages."]],"mod":[["libc_malloc","If no malloc lib is specified, use the libc implementation"]]});

@@ -268,6 +268,17 @@
 <span id="266">266</span>
 <span id="267">267</span>
 <span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
@@ -318,7 +329,7 @@
 <span class="comment">// XXX: This metadata spec is currently unused as we need to add a performant way to calculate</span>
 <span class="comment">// how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
-    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE</span>;
+    <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE</span>;
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>: <span class="ident">SideMetadataSpec</span> <span class="op">=</span>
     <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC</span>;
@@ -443,6 +454,15 @@
     <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="prelude-val">None</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
+<span class="doccomment">/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.</span>
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">compare_exchange_set_page_mark</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+    <span class="comment">// The spec has 1 byte per each page. So it won&#39;t be the case that other threads may race and access other bits for the spec.</span>
+    <span class="comment">// If the compare-exchange fails, we know the byte was set to 1 before this call.</span>
+    <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>
+        .<span class="ident">compare_exchange_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">0</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>, <span class="ident">Ordering::SeqCst</span>)
+        .<span class="ident">is_ok</span>()
+}
+
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_page_marked</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
     <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">1</span>
@@ -487,6 +507,7 @@
     <span class="ident">alloc_bit::unset_alloc_bit</span>(<span class="ident">object</span>);
 }
 
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_page_mark</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
     <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
@@ -516,6 +537,7 @@
     <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="number">0</span>, <span class="prelude-val">None</span>);
 }
 
+<span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_page_mark_unsafe</span>(<span class="ident">page_addr</span>: <span class="ident">Address</span>) {
     <span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">page_addr</span>, <span class="number">0</span>)
 }

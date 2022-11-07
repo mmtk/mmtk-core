@@ -258,7 +258,7 @@
 <span class="macro">define_side_metadata_specs!</span>(
     <span class="ident">last_spec_as</span> <span class="ident">LAST_LOCAL_SIDE_METADATA_SPEC</span>,
     <span class="comment">// Mark pages by (malloc) marksweep</span>
-    <span class="ident">MS_ACTIVE_PAGE</span>  <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>),
+    <span class="ident">MALLOC_MS_ACTIVE_PAGE</span>  <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::util::malloc::library::LOG_BYTES_IN_MALLOC_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>),
     <span class="comment">// Record objects allocated with some offset</span>
     <span class="ident">MS_OFFSET_MALLOC</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">0</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident">LOG_MIN_OBJECT_SIZE</span> <span class="kw">as</span> <span class="ident">usize</span>),
     <span class="comment">// Mark lines by immix</span>

@@ -356,6 +356,7 @@
 <span id="354">354</span>
 <span id="355">355</span>
 <span id="356">356</span>
+<span id="357">357</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
@@ -608,6 +609,7 @@
                             <span class="ident">_allocation_bytes</span>,
                             <span class="kw-2">*</span><span class="ident">plan</span>.<span class="ident">options</span>.<span class="ident">analysis_factor</span>
                         );
+
                         <span class="ident">plan</span>.<span class="ident">analysis_manager</span>.<span class="ident">alloc_hook</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
                     }
                 }
