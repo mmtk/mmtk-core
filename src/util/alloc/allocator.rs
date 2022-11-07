@@ -250,6 +250,7 @@ pub trait Allocator<VM: VMBinding>: Downcast {
                             _allocation_bytes,
                             *plan.options.analysis_factor
                         );
+
                         plan.analysis_manager.alloc_hook(size, align, offset);
                     }
                 }

@@ -20,6 +20,7 @@ if ! cat $project_root/src/plan/mod.rs | grep -q "pub mod mygc;"; then
 fi
 cargo build
 
-cargo install mdbook
+# Install mdbook using the stable toolchain (mdbook uses scoped-tls which requires rust 1.59.0)
+cargo +stable install mdbook
 mdbook build $project_root/docs/portingguide
 mdbook build $project_root/docs/tutorial

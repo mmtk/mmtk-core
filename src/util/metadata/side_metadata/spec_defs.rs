@@ -66,7 +66,7 @@ define_side_metadata_specs!(
 define_side_metadata_specs!(
     last_spec_as LAST_LOCAL_SIDE_METADATA_SPEC,
     // Mark pages by (malloc) marksweep
-    MS_ACTIVE_PAGE  = (global: false, log_num_of_bits: 3, log_bytes_in_region: LOG_BYTES_IN_PAGE as usize),
+    MALLOC_MS_ACTIVE_PAGE  = (global: false, log_num_of_bits: 3, log_bytes_in_region: crate::util::malloc::library::LOG_BYTES_IN_MALLOC_PAGE as usize),
     // Record objects allocated with some offset
     MS_OFFSET_MALLOC = (global: false, log_num_of_bits: 0, log_bytes_in_region: LOG_MIN_OBJECT_SIZE as usize),
     // Mark lines by immix
