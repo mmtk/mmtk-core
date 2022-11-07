@@ -379,25 +379,33 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// Return the lowest address of the storage associated with an object.
-    ///
-    /// Arguments:
-    /// * `object`: The object to be queried.
-    fn object_start_ref(object: ObjectReference) -> Address;
-
-    /// Get the object reference from the object start. This is the opposite of
-    /// `object_start_ref()`.
-    ///
-    /// Arguments:
-    /// * `start`: The object start address.
-    fn get_object_from_start_address(start: Address) -> ObjectReference;
-
-    // /// Return an address guaranteed to be inside the storage associated
-    // /// with an object.
+    // /// Return the lowest address of the storage associated with an object.
     // ///
     // /// Arguments:
     // /// * `object`: The object to be queried.
-    // fn object_start_ref(object: ObjectReference) -> Address;
+    // fn ref_to_address(object: ObjectReference) -> Address;
+
+    // /// Get the object reference from the object start. This is the opposite of
+    // /// `ref_to_address()`.
+    // ///
+    // /// Arguments:
+    // /// * `start`: The object start address.
+    // fn get_object_from_start_address(start: Address) -> ObjectReference;
+
+    /// Return an address guaranteed to be inside the storage associated
+    /// with an object. The returned address needs to be deterministic
+    /// for an given object.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried.
+    fn ref_to_address(object: ObjectReference) -> Address;
+
+    /// Return an object for a given address returned by `ref_to_address()`.
+    /// This does exactly the opposite of `ref_to_address()`.
+    ///
+    /// Arguments:
+    /// * `addr`: An address that is returned from `ref_to_address()`
+    fn address_to_ref(addr: Address) -> ObjectReference;
 
     /// Dump debugging information for an object.
     ///

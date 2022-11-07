@@ -153,7 +153,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     /// Get the address for header forwarding pointer
     #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
-        VM::VMObjectModel::object_start_ref(object) - GC_EXTRA_HEADER_BYTES
+        VM::VMObjectModel::ref_to_address(object) - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
@@ -377,7 +377,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
             );
         for obj in linear_scan {
             // clear the alloc bit
-            alloc_bit::unset_addr_alloc_bit(VM::VMObjectModel::object_start_ref(obj));
+            alloc_bit::unset_addr_alloc_bit(VM::VMObjectModel::ref_to_address(obj));
 
             let forwarding_pointer = Self::get_header_forwarding_pointer(obj);
 

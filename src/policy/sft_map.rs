@@ -67,8 +67,8 @@ pub trait SFTMap {
     #[cfg(debug_assertions)]
     fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
         use crate::vm::ObjectModel;
-        let object_sft = self.get_checked(VM::VMObjectModel::object_start_ref(object));
-        let object_start_sft = self.get_checked(VM::VMObjectModel::object_start_ref(object));
+        let object_sft = self.get_checked(VM::VMObjectModel::ref_to_address(object));
+        let object_start_sft = self.get_checked(VM::VMObjectModel::ref_to_address(object));
 
         debug_assert!(
             object_sft.name() != EMPTY_SFT_NAME,

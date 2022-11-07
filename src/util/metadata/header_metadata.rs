@@ -668,7 +668,7 @@ mod tests {
                         assert_eq!(unsafe { *(ptr_mid.offset(-1)) }, 0, "memory at offset -1 is not zero");
                         assert_eq!(unsafe { *ptr_mid }, 0, "memory at offset 0 is not zero");
                         assert_eq!(unsafe { *(ptr_mid.offset(1)) }, 0, "memory at offset 1 is not zero");
-                        (unsafe { Address::from_ptr(ptr_mid).to_object_reference() }, ptr_mid)
+                        (ObjectReference::from_raw_address(Address::from_ptr(ptr_mid)), ptr_mid)
                     };
                     crate::util::test_util::with_cleanup(
                         || f(obj, ptr),

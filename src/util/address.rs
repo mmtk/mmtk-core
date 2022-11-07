@@ -472,31 +472,29 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    // /// converts the ObjectReference to an Address
-    // #[inline(always)]
-    // pub fn to_address(self) -> Address {
-    //     Address(self.0)
-    // }
-    // #[inline(always)]
-    // pub fn to_forwarding_pointer<VM: VMBinding>(self) -> Address {
-    //     VM::VMObjectModel::object_start_ref(self)
-    // }
-
-    // pub unsafe fn from_forwarding_pointer<VM: VMBinding>(ptr: Address) -> ObjectReference {
-    //     VM::VMObjectModel::get_object_from_start_address(ptr)
-    // }
-
+    /// Returns the header base address from an object reference. Any object header metadata
+    /// in the [`crate::vm::ObjectModel`] declars a piece of header metadata with an offset
+    /// from this address.
     #[inline(always)]
     pub fn to_header_address(self) -> Address {
         Address(self.0)
     }
 
-    #[deprecated]
+    /// Cast the object reference to an address.
+    // FIXME: This will be removed when we use an opaque type for `ObjectReference`, as
+    // we can no longer assume we can cast between an object reference and an address. If
+    // a binding implements object references as addresses, they can implement such a method
+    // at the binding side.
     #[inline(always)]
     pub fn to_raw_address(self) -> Address {
         Address(self.0)
     }
-    #[deprecated]
+
+    /// Cast an address to an object reference.
+    // FIXME: This will be removed when we use an opaque type for `ObjectReference`, as
+    // we can no longer assume we can cast between an object reference and an address. If
+    // a binding implements object references as addresses, they can implement such a method
+    // at the binding side.
     #[inline(always)]
     pub fn from_raw_address(addr: Address) -> ObjectReference {
         ObjectReference(addr.0)

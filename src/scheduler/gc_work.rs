@@ -530,7 +530,9 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
         let worker = GCWorkerMutRef::new(self.worker());
 
         // Invoke trace object on sft
-        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(VM::VMObjectModel::object_start_ref(object)) };
+        let sft = unsafe {
+            crate::mmtk::SFT_MAP.get_unchecked(VM::VMObjectModel::ref_to_address(object))
+        };
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 

@@ -89,7 +89,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        let page_addr = conversions::page_align_down(VM::VMObjectModel::object_start_ref(object));
+        let page_addr = conversions::page_align_down(VM::VMObjectModel::ref_to_address(object));
         set_page_mark(page_addr);
         set_alloc_bit::<VM>(object);
     }
@@ -137,7 +137,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
-            let addr = VM::VMObjectModel::object_start_ref(object);
+            let addr = VM::VMObjectModel::ref_to_address(object);
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
@@ -318,7 +318,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
-            let chunk_start = conversions::chunk_align_down(VM::VMObjectModel::object_start_ref(object));
+            let chunk_start =
+                conversions::chunk_align_down(VM::VMObjectModel::ref_to_address(object));
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
@@ -386,7 +387,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
     #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
-        let obj_start = VM::VMObjectModel::object_start_ref(object);
+        let obj_start = VM::VMObjectModel::ref_to_address(object);
         let offset_malloc_bit = is_offset_malloc(obj_start);
         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
         (obj_start, offset_malloc_bit, bytes)
@@ -423,7 +424,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page = VM::VMObjectModel::object_start_ref(object).align_down(BYTES_IN_PAGE);
+                let current_page =
+                    VM::VMObjectModel::ref_to_address(object).align_down(BYTES_IN_PAGE);
 
                 let mut page = *empty_page_start;
                 while page < current_page {

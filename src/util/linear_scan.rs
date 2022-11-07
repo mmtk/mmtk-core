@@ -47,7 +47,7 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> 
             };
 
             if is_object {
-                let object = VM::VMObjectModel::get_object_from_start_address(self.cursor);
+                let object = VM::VMObjectModel::address_to_ref(self.cursor);
                 self.cursor += S::size(object);
                 return Some(object);
             } else {
@@ -114,7 +114,7 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     /// Return the region that contains the object (by its cell address).
     #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from(VM::VMObjectModel::object_start_ref(object).align_down(Self::BYTES))
+        Self::from(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
     }
 }
 
