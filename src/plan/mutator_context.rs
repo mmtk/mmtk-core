@@ -137,6 +137,7 @@ impl<VM: VMBinding> Mutator<VM> {
             .allocator_mapping
             .iter()
             .map(|(_, selector)| *selector)
+            .sorted()
             .dedup()
             .filter(|selector| *selector != AllocatorSelector::None)
             .collect()

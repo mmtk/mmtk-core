@@ -46,7 +46,6 @@ impl BlockList {
             }
         } else {
             if next.is_zero() {
-                prev.store_next_block(next);
                 prev.store_next_block(ZERO_BLOCK);
                 self.last = prev;
                 prev.store_block_list(self);
