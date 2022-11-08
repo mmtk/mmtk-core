@@ -18,7 +18,6 @@ use crate::util::memory;
 use crate::util::opaque_pointer::*;
 use crate::vm::*;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 
@@ -152,19 +151,17 @@ impl<VM: VMBinding> PageResource<VM> for FreeListPageResource<VM> {
 impl<VM: VMBinding> FreeListPageResource<VM> {
     pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static VMMap) -> Self {
         let pages = conversions::bytes_to_pages(bytes);
-        // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
-        // FIXME: We should try either remove this kind of circular dependency or use MaybeUninit<T> instead of Box<T>
-        #[allow(invalid_value)]
-        #[allow(clippy::uninit_assumed_init)]
-        let common_flpr = unsafe {
-            let mut common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: MaybeUninit::uninit().assume_init(),
+        let common_flpr = {
+            let common_flpr = Box::new(CommonFreeListPageResource {
+                free_list: vm_map.create_parent_freelist(start, pages, PAGES_IN_REGION as _),
                 start,
             });
-            ::std::ptr::write(
-                &mut common_flpr.free_list,
-                vm_map.create_parent_freelist(&common_flpr, pages, PAGES_IN_REGION as _),
-            );
+            // `CommonFreeListPageResource` lives as a member in space instances.
+            // Since `Space` instances are always stored as global variables, so it is okay here
+            // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
+            vm_map.bind_freelist(unsafe {
+                &*(&common_flpr as &CommonFreeListPageResource as *const _)
+            });
             common_flpr
         };
         let growable = cfg!(target_pointer_width = "64");
@@ -181,19 +178,18 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
     }
 
     pub fn new_discontiguous(vm_map: &'static VMMap) -> Self {
-        // We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.
-        // FIXME: We should try either remove this kind of circular dependency or use MaybeUninit<T> instead of Box<T>
-        #[allow(invalid_value)]
-        #[allow(clippy::uninit_assumed_init)]
-        let common_flpr = unsafe {
-            let mut common_flpr = Box::new(CommonFreeListPageResource {
-                free_list: MaybeUninit::uninit().assume_init(),
-                start: AVAILABLE_START,
+        let common_flpr = {
+            let start = AVAILABLE_START;
+            let common_flpr = Box::new(CommonFreeListPageResource {
+                free_list: vm_map.create_freelist(start),
+                start,
             });
-            ::std::ptr::write(
-                &mut common_flpr.free_list,
-                vm_map.create_freelist(&common_flpr),
-            );
+            // `CommonFreeListPageResource` lives as a member in space instances.
+            // Since `Space` instances are always stored as global variables, so it is okay here
+            // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
+            vm_map.bind_freelist(unsafe {
+                &*(&common_flpr as &CommonFreeListPageResource as *const _)
+            });
             common_flpr
         };
         FreeListPageResource {
