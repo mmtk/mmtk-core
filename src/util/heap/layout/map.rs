@@ -58,8 +58,6 @@ pub trait Map: Sized {
 
     fn is_finalized(&self) -> bool;
 
-    fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize;
-
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
     fn add_to_cumulative_committed_pages(&self, pages: usize);

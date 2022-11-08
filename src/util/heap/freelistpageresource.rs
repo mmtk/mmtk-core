@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 const UNINITIALIZED_WATER_MARK: i32 = -1;
 
 pub struct CommonFreeListPageResource {
-    free_list: Box<<VMMap as Map>::FreeList>,
+    pub(crate) free_list: Box<<VMMap as Map>::FreeList>,
     start: Address,
 }
 

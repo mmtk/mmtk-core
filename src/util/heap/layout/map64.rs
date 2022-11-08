@@ -202,10 +202,6 @@ impl Map for Map64 {
         self.finalized
     }
 
-    fn get_discontig_freelist_pr_ordinal(&self, _pr: &CommonFreeListPageResource) -> usize {
-        unreachable!()
-    }
-
     #[inline]
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = Self::space_index(address).unwrap();

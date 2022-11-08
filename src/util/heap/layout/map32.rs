@@ -89,7 +89,7 @@ impl Map for Map32 {
     }
 
     fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
-        let ordinal = pr.free_list.get_ordinal();
+        let ordinal: usize = pr.free_list.get_ordinal() as usize;
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[ordinal] = Some(pr);
     }
@@ -239,13 +239,6 @@ impl Map for Map32 {
         self.finalized
     }
 
-    fn get_discontig_freelist_pr_ordinal(&self) -> usize {
-        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
-        let self_mut: &mut Self = unsafe { self.mut_self() };
-        self_mut.shared_discontig_fl_count += 1;
-        self.shared_discontig_fl_count
-    }
-
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor {
         let index = address.chunk_index();
         self.descriptor_map[index]
@@ -295,6 +288,13 @@ impl Map32 {
             unsafe { SFT_MAP.clear(chunk_start) };
         }
         chunks as _
+    }
+
+    fn get_discontig_freelist_pr_ordinal(&self) -> usize {
+        // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
+        let self_mut: &mut Self = unsafe { self.mut_self() };
+        self_mut.shared_discontig_fl_count += 1;
+        self.shared_discontig_fl_count
     }
 }
 
