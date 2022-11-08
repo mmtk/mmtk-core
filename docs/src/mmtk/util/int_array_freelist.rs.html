@@ -383,6 +383,9 @@
 <span id="381">381</span>
 <span id="382">382</span>
 <span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::generic_freelist</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
 
@@ -432,6 +435,9 @@
         };
         <span class="macro">debug_assert!</span>(<span class="op">-</span><span class="ident">iafl</span>.<span class="ident">head</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">iafl</span>.<span class="ident">heads</span>);
         <span class="ident">iafl</span>
+    }
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">get_ordinal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">i32</span> {
+        <span class="op">-</span><span class="self">self</span>.<span class="ident">head</span> <span class="op">-</span> <span class="number">1</span>
     }
     <span class="kw">fn</span> <span class="ident">table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">i32</span><span class="op">&gt;</span> {
         <span class="kw">match</span> <span class="self">self</span>.<span class="ident">parent</span> {

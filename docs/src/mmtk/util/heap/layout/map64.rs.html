@@ -245,10 +245,6 @@
 <span id="243">243</span>
 <span id="244">244</span>
 <span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::map::Map</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
@@ -312,20 +308,19 @@
         <span class="ident">self_mut</span>.<span class="ident">descriptor_map</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">descriptor</span>;
     }
 
-    <span class="kw">fn</span> <span class="ident">create_freelist</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::FreeList</span><span class="op">&gt;</span> {
+    <span class="kw">fn</span> <span class="ident">create_freelist</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::FreeList</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">units</span> <span class="op">=</span> <span class="ident">SPACE_SIZE_64</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_PAGE</span>;
-        <span class="self">self</span>.<span class="ident">create_parent_freelist</span>(<span class="ident">pr</span>, <span class="ident">units</span>, <span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>)
+        <span class="self">self</span>.<span class="ident">create_parent_freelist</span>(<span class="ident">start</span>, <span class="ident">units</span>, <span class="ident">units</span> <span class="kw">as</span> <span class="kw">_</span>)
     }
 
     <span class="kw">fn</span> <span class="ident">create_parent_freelist</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>,
+        <span class="ident">start</span>: <span class="ident">Address</span>,
         <span class="kw-2">mut</span> <span class="ident">units</span>: <span class="ident">usize</span>,
         <span class="ident">grain</span>: <span class="ident">i32</span>,
     ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::FreeList</span><span class="op">&gt;</span> {
         <span class="comment">// This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.</span>
         <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">pr</span>.<span class="ident">get_start</span>();
         <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::space_index</span>(<span class="ident">start</span>).<span class="ident">unwrap</span>();
 
         <span class="ident">units</span> <span class="op">=</span> (<span class="ident">units</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">*</span> <span class="ident">NON_MAP_FRACTION</span>) <span class="kw">as</span> <span class="kw">_</span>;
@@ -343,11 +338,6 @@
             <span class="ident">heads</span>,
         ));
 
-        <span class="comment">// `CommonFreeListPageResource` lives as a member in space instances.</span>
-        <span class="comment">// Since `Space` instances are always stored as global variables, so it is safe here</span>
-        <span class="comment">// to turn `&amp;CommonFreeListPageResource` into `&amp;&#39;static CommonFreeListPageResource`</span>
-        <span class="ident">self_mut</span>.<span class="ident">fl_page_resources</span>[<span class="ident">index</span>] <span class="op">=</span>
-            <span class="prelude-val">Some</span>(<span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="ident">pr</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">CommonFreeListPageResource</span>) });
         <span class="ident">self_mut</span>.<span class="ident">fl_map</span>[<span class="ident">index</span>] <span class="op">=</span>
             <span class="prelude-val">Some</span>(<span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">list</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="ident">RawMemoryFreeList</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="ident">RawMemoryFreeList</span>) });
 
@@ -357,6 +347,12 @@
         <span class="ident">self_mut</span>.<span class="ident">high_water</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">base</span>;
         <span class="ident">self_mut</span>.<span class="ident">base_address</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="ident">base</span>;
         <span class="ident">list</span>
+    }
+
+    <span class="kw">fn</span> <span class="ident">bind_freelist</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">pr</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">CommonFreeListPageResource</span>) {
+        <span class="kw">let</span> <span class="ident">index</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::space_index</span>(<span class="ident">pr</span>.<span class="ident">get_start</span>()).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">self_mut</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">mut_self</span>() };
+        <span class="ident">self_mut</span>.<span class="ident">fl_page_resources</span>[<span class="ident">index</span>] <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">pr</span>);
     }
 
     <span class="kw">fn</span> <span class="ident">allocate_contiguous_chunks</span>(
@@ -451,10 +447,6 @@
 
     <span class="kw">fn</span> <span class="ident">is_finalized</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">finalized</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">get_discontig_freelist_pr_ordinal</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_pr</span>: <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span>) -&gt; <span class="ident">usize</span> {
-        <span class="macro">unreachable!</span>()
     }
 
     <span class="attribute">#[<span class="ident">inline</span>]</span>

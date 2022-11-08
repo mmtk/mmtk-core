@@ -342,10 +342,6 @@
 <span id="340">340</span>
 <span id="341">341</span>
 <span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::ops</span>::{<span class="ident">Deref</span>, <span class="ident">DerefMut</span>};
 <span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 
@@ -366,12 +362,11 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
-<span class="kw">use</span> <span class="ident">std::mem::MaybeUninit</span>;
 
 <span class="kw">const</span> <span class="ident">UNINITIALIZED_WATER_MARK</span>: <span class="ident">i32</span> <span class="op">=</span> <span class="op">-</span><span class="number">1</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CommonFreeListPageResource</span> {
-    <span class="ident">free_list</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VMMap</span> <span class="kw">as</span> <span class="ident">Map</span><span class="op">&gt;</span><span class="ident">::FreeList</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="ident">free_list</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="ident">VMMap</span> <span class="kw">as</span> <span class="ident">Map</span><span class="op">&gt;</span><span class="ident">::FreeList</span><span class="op">&gt;</span>,
     <span class="ident">start</span>: <span class="ident">Address</span>,
 }
 
@@ -500,19 +495,17 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_contiguous</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">bytes</span>: <span class="ident">usize</span>, <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident">conversions::bytes_to_pages</span>(<span class="ident">bytes</span>);
-        <span class="comment">// We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.</span>
-        <span class="comment">// FIXME: We should try either remove this kind of circular dependency or use MaybeUninit&lt;T&gt; instead of Box&lt;T&gt;</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">invalid_value</span>)]</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::uninit_assumed_init</span>)]</span>
-        <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">CommonFreeListPageResource</span> {
-                <span class="ident">free_list</span>: <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>(),
+        <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">CommonFreeListPageResource</span> {
+                <span class="ident">free_list</span>: <span class="ident">vm_map</span>.<span class="ident">create_parent_freelist</span>(<span class="ident">start</span>, <span class="ident">pages</span>, <span class="ident">PAGES_IN_REGION</span> <span class="kw">as</span> <span class="kw">_</span>),
                 <span class="ident">start</span>,
             });
-            <span class="ident">::std::ptr::write</span>(
-                <span class="kw-2">&amp;mut</span> <span class="ident">common_flpr</span>.<span class="ident">free_list</span>,
-                <span class="ident">vm_map</span>.<span class="ident">create_parent_freelist</span>(<span class="kw-2">&amp;</span><span class="ident">common_flpr</span>, <span class="ident">pages</span>, <span class="ident">PAGES_IN_REGION</span> <span class="kw">as</span> <span class="kw">_</span>),
-            );
+            <span class="comment">// `CommonFreeListPageResource` lives as a member in space instances.</span>
+            <span class="comment">// Since `Space` instances are always stored as global variables, so it is okay here</span>
+            <span class="comment">// to turn `&amp;CommonFreeListPageResource` into `&amp;&#39;static CommonFreeListPageResource`</span>
+            <span class="ident">vm_map</span>.<span class="ident">bind_freelist</span>(<span class="kw">unsafe</span> {
+                <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">common_flpr</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span>)
+            });
             <span class="ident">common_flpr</span>
         };
         <span class="kw">let</span> <span class="ident">growable</span> <span class="op">=</span> <span class="macro">cfg!</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>);
@@ -529,19 +522,18 @@
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new_discontiguous</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>) -&gt; <span class="self">Self</span> {
-        <span class="comment">// We use MaybeUninit::uninit().assume_init(), which is nul, for a Box value, which cannot be null.</span>
-        <span class="comment">// FIXME: We should try either remove this kind of circular dependency or use MaybeUninit&lt;T&gt; instead of Box&lt;T&gt;</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">invalid_value</span>)]</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::uninit_assumed_init</span>)]</span>
-        <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="kw">unsafe</span> {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">CommonFreeListPageResource</span> {
-                <span class="ident">free_list</span>: <span class="ident">MaybeUninit::uninit</span>().<span class="ident">assume_init</span>(),
-                <span class="ident">start</span>: <span class="ident">AVAILABLE_START</span>,
+        <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">AVAILABLE_START</span>;
+            <span class="kw">let</span> <span class="ident">common_flpr</span> <span class="op">=</span> <span class="ident">Box::new</span>(<span class="ident">CommonFreeListPageResource</span> {
+                <span class="ident">free_list</span>: <span class="ident">vm_map</span>.<span class="ident">create_freelist</span>(<span class="ident">start</span>),
+                <span class="ident">start</span>,
             });
-            <span class="ident">::std::ptr::write</span>(
-                <span class="kw-2">&amp;mut</span> <span class="ident">common_flpr</span>.<span class="ident">free_list</span>,
-                <span class="ident">vm_map</span>.<span class="ident">create_freelist</span>(<span class="kw-2">&amp;</span><span class="ident">common_flpr</span>),
-            );
+            <span class="comment">// `CommonFreeListPageResource` lives as a member in space instances.</span>
+            <span class="comment">// Since `Space` instances are always stored as global variables, so it is okay here</span>
+            <span class="comment">// to turn `&amp;CommonFreeListPageResource` into `&amp;&#39;static CommonFreeListPageResource`</span>
+            <span class="ident">vm_map</span>.<span class="ident">bind_freelist</span>(<span class="kw">unsafe</span> {
+                <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="ident">common_flpr</span> <span class="kw">as</span> <span class="kw-2">&amp;</span><span class="ident">CommonFreeListPageResource</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span>)
+            });
             <span class="ident">common_flpr</span>
         };
         <span class="ident">FreeListPageResource</span> {
