@@ -372,6 +372,13 @@ impl SideMetadataSpec {
 
     /// Non-atomically store zero to the side metadata for the given address.
     /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
     #[inline(always)]
     pub unsafe fn set_zero(&self, data_addr: Address) {
         use num_traits::Zero;
