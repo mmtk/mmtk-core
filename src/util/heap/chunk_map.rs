@@ -89,7 +89,7 @@ impl ChunkMap {
         unsafe { Self::ALLOC_TABLE.store::<u8>(chunk.start(), state as u8) };
         // If this is a newly allcoated chunk, then expand the chunk range.
         if state == ChunkState::Allocated {
-            assert!(!chunk.start().is_zero());
+            debug_assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
                 // FIXME: what if we actually use the first chunk?
