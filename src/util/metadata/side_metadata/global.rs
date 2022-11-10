@@ -370,6 +370,34 @@ impl SideMetadataSpec {
         )
     }
 
+    /// Non-atomically store zero to the side metadata for the given address.
+    /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
+    #[inline(always)]
+    pub unsafe fn set_zero(&self, data_addr: Address) {
+        use num_traits::Zero;
+        match self.log_num_of_bits {
+            0..=3 => self.store(data_addr, u8::zero()),
+            4 => self.store(data_addr, u16::zero()),
+            5 => self.store(data_addr, u32::zero()),
+            6 => self.store(data_addr, u64::zero()),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Atomiccally store zero to the side metadata for the given address.
+    /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
+    #[inline(always)]
+    pub fn set_zero_atomic(&self, data_addr: Address, order: Ordering) {
+        use num_traits::Zero;
+        match self.log_num_of_bits {
+            0..=3 => self.store_atomic(data_addr, u8::zero(), order),
+            4 => self.store_atomic(data_addr, u16::zero(), order),
+            5 => self.store_atomic(data_addr, u32::zero(), order),
+            6 => self.store_atomic(data_addr, u64::zero(), order),
+            _ => unreachable!(),
+        }
+    }
+
     #[inline(always)]
     pub fn compare_exchange_atomic<T: MetadataValue>(
         &self,

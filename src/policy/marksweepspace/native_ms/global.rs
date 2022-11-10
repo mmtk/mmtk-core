@@ -287,15 +287,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     pub fn block_clear_metadata(&self, block: Block) {
-        let clear_metadata = |spec: &SideMetadataSpec| match spec.log_num_of_bits {
-            0..=3 => spec.store_atomic::<u8>(block.start(), 0, Ordering::SeqCst),
-            4 => spec.store_atomic::<u16>(block.start(), 0, Ordering::SeqCst),
-            5 => spec.store_atomic::<u32>(block.start(), 0, Ordering::SeqCst),
-            6 => spec.store_atomic::<u64>(block.start(), 0, Ordering::SeqCst),
-            _ => unreachable!(),
-        };
         for metadata_spec in Block::METADATA_SPECS {
-            clear_metadata(&metadata_spec);
+            metadata_spec.set_zero_atomic(block.start(), Ordering::SeqCst);
         }
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::bzero_alloc_bit(block.start(), Block::BYTES);
