@@ -131,7 +131,14 @@ impl BlockList {
         self.last = None;
     }
 
-    /// Lock list
+    /// Lock the list. The MiMalloc allocator mostly uses thread-local block lists, and those operations on the list
+    /// do not need synchronisation. However, in cases where a block list may be accessed by multiple threads, we need
+    /// to lock the list before accessing it.
+    ///
+    /// Our current sole use for locking is parallel sweeping. During the Release phase, multiple GC worker threads can
+    /// sweep chunks and release mutators at the same time, and the same `BlockList` can be reached by traversing blocks in a chunk,
+    /// and also by traversing blocks held by a mutator.  This lock is necessary to prevent
+    /// multiple GC workers from mutating the same `BlockList` instance.
     pub fn lock(&mut self) {
         let mut success = false;
         while !success {
@@ -142,7 +149,7 @@ impl BlockList {
         }
     }
 
-    /// Unlock list
+    /// Unlock list. See the comments on the lock method.
     pub fn unlock(&mut self) {
         self.lock.store(false, Ordering::SeqCst);
     }
