@@ -4,7 +4,12 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
+use crate::scheduler::GCWorkScheduler;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
+use crate::util::heap::VMRequest;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -24,11 +29,6 @@ use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::scheduler::GCWorkScheduler;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;

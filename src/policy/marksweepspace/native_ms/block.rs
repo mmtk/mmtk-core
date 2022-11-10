@@ -16,10 +16,12 @@ use std::num::NonZeroUsize;
 
 /// A 64KB region for MiMalloc.
 /// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.
-/// This is a non-zero block, and `Option<Block>` can still a word size value.
-// TODO: What if we actually use the first block?
+/// This type always holds a non-zero address to refer to a block. The underlying `NonZeroUsize` type ensures the
+/// size of `Option<Block>` is the same as `Block` itself.
+// TODO: If we actually use the first block, we would need to turn the type into `Block(Address)`, and use `None` and
+// `Block(Address::ZERO)` to differentiate those.
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-#[repr(C)]
+#[repr(transparent)]
 pub struct Block(NonZeroUsize);
 
 impl From<Address> for Block {
@@ -140,20 +142,12 @@ impl Block {
 
     pub fn load_prev_block(&self) -> Option<Block> {
         let prev = unsafe { Block::PREV_BLOCK_TABLE.load::<usize>(self.start()) };
-        if prev == 0 {
-            None
-        } else {
-            Some(Block(unsafe { NonZeroUsize::new_unchecked(prev) }))
-        }
+        NonZeroUsize::new(prev).map(Block)
     }
 
     pub fn load_next_block(&self) -> Option<Block> {
         let next = unsafe { Block::NEXT_BLOCK_TABLE.load::<usize>(self.start()) };
-        if next == 0 {
-            None
-        } else {
-            Some(Block(unsafe { NonZeroUsize::new_unchecked(next) }))
-        }
+        NonZeroUsize::new(next).map(Block)
     }
 
     pub fn store_next_block(&self, next: Block) {
@@ -214,12 +208,7 @@ impl Block {
         }))
     }
 
-    pub fn is_zero(&self) -> bool {
-        self.start().is_zero()
-    }
-
     pub fn has_free_cells(&self) -> bool {
-        debug_assert!(!self.is_zero());
         !self.load_free_list().is_zero()
     }
 

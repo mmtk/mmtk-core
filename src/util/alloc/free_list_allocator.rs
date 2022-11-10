@@ -143,9 +143,6 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     // Find a free cell within a given block
     fn block_alloc(&mut self, block: Block) -> Address {
-        if block.is_zero() {
-            return unsafe { Address::zero() };
-        }
         let cell = block.load_free_list();
         if cell.is_zero() {
             return cell; // return failed allocation
