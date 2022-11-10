@@ -16,7 +16,8 @@ use std::num::NonZeroUsize;
 
 /// A 64KB region for MiMalloc.
 /// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.
-/// This is a non-zero block, which could help our implementation to deal with the zero/null case with Option<Block>.
+/// This is a non-zero block, and `Option<Block>` can still a word size value.
+// TODO: What if we actually use the first block?
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
 pub struct Block(NonZeroUsize);

@@ -33,6 +33,7 @@ impl Region for Chunk {
 
 impl Chunk {
     /// Chunk constant with zero address
+    // FIXME: We use this as an empty value. What if we actually use the first chunk?
     pub const ZERO: Self = Self(Address::ZERO);
 
     /// Get an iterator for regions within this chunk.
@@ -91,6 +92,7 @@ impl ChunkMap {
             assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
+                // FIXME: what if we actually use the first chunk?
                 range.start = chunk;
                 range.end = chunk.next();
             } else if chunk < range.start {
