@@ -4,8 +4,8 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
-use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::heap::PageResource;
+use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
     SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
@@ -18,18 +18,17 @@ use crate::util::{conversions, metadata};
 use crate::vm::VMBinding;
 use crate::vm::{ActivePlan, Collection, ObjectModel};
 use crate::{policy::space::Space, util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK};
+#[cfg(debug_assertions)]
+use std::collections::HashMap;
 use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
-// only used for debugging
 use crate::scheduler::GCWorkScheduler;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
-#[cfg(debug_assertions)]
-use std::collections::HashMap;
 use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
@@ -42,6 +41,7 @@ const ASSERT_ALLOCATION: bool = false;
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
+    active_pages: AtomicUsize,
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadataContext,
@@ -97,8 +97,6 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        let page_addr = conversions::page_align_down(object.to_address());
-        set_page_mark(page_addr);
         set_alloc_bit(object);
     }
 
@@ -183,9 +181,13 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
         "MallocSpace"
     }
 
+    #[allow(clippy::assertions_on_constants)]
     fn reserved_pages(&self) -> usize {
-        // TODO: figure out a better way to get the total number of active pages from the metadata
-        let data_pages = conversions::bytes_to_pages_up(self.active_bytes.load(Ordering::SeqCst));
+        use crate::util::constants::LOG_BYTES_IN_PAGE;
+        // Assume malloc pages are no smaller than 4K pages. Otherwise the substraction below will fail.
+        debug_assert!(LOG_BYTES_IN_MALLOC_PAGE >= LOG_BYTES_IN_PAGE);
+        let data_pages = self.active_pages.load(Ordering::SeqCst)
+            << (LOG_BYTES_IN_MALLOC_PAGE - LOG_BYTES_IN_PAGE);
         let meta_pages = self.metadata.calculate_reserved_pages(data_pages);
         data_pages + meta_pages
     }
@@ -249,6 +251,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
+            active_pages: AtomicUsize::new(0),
             chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
             chunk_addr_max: AtomicUsize::new(0),
             metadata: SideMetadataContext {
@@ -268,6 +271,53 @@ impl<VM: VMBinding> MallocSpace<VM> {
             completed_work_packets: AtomicU32::new(0),
             #[cfg(debug_assertions)]
             work_live_bytes: AtomicUsize::new(0),
+        }
+    }
+
+    /// Set multiple pages, starting from the given address, for the given size, and increase the active page count if we set any page mark in the region.
+    /// This is a thread-safe method, and can be used during mutator phase when mutators may access the same page.
+    /// Performance-wise, this method may impose overhead, as we are doing a compare-exchange for every page in the range.
+    fn set_page_mark(&self, start: Address, size: usize) {
+        // Set first page
+        let mut page = start.align_down(BYTES_IN_MALLOC_PAGE);
+        let mut used_pages = 0;
+
+        // It is important to go to the end of the object, which may span a page boundary
+        while page < start + size {
+            if compare_exchange_set_page_mark(page) {
+                used_pages += 1;
+            }
+
+            page += BYTES_IN_MALLOC_PAGE;
+        }
+
+        if used_pages != 0 {
+            self.active_pages.fetch_add(used_pages, Ordering::SeqCst);
+        }
+    }
+
+    /// Unset multiple pages, starting from the given address, for the given size, and decrease the active page count if we unset any page mark in the region
+    ///
+    /// # Safety
+    /// We need to ensure that only one GC thread is accessing the range.
+    unsafe fn unset_page_mark(&self, start: Address, size: usize) {
+        debug_assert!(start.is_aligned_to(BYTES_IN_MALLOC_PAGE));
+        debug_assert!(crate::util::conversions::raw_is_aligned(
+            size,
+            BYTES_IN_MALLOC_PAGE
+        ));
+        let mut page = start;
+        let mut cleared_pages = 0;
+        while page < start + size {
+            if is_page_marked_unsafe(page) {
+                cleared_pages += 1;
+                unset_page_mark_unsafe(page);
+            }
+            page += BYTES_IN_MALLOC_PAGE;
+        }
+
+        if cleared_pages != 0 {
+            self.active_pages.fetch_sub(cleared_pages, Ordering::SeqCst);
         }
     }
 
@@ -292,6 +342,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 assert!(crate::mmtk::SFT_MAP.has_sft_entry(address)); // make sure the address is okay with our SFT map
                 unsafe { crate::mmtk::SFT_MAP.update(self, address, actual_size) };
             }
+
+            // Set page marks for current object
+            self.set_page_mark(address, actual_size);
             self.active_bytes.fetch_add(actual_size, Ordering::SeqCst);
 
             if is_offset_malloc {
@@ -469,6 +522,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
         unsafe { crate::mmtk::SFT_MAP.clear(chunk_start) };
+        // Clear the page marks - we are the only GC thread that is accessing this chunk
+        unsafe { self.unset_page_mark(chunk_start, BYTES_IN_CHUNK) };
     }
 
     /// Sweep an object if it is dead, and unset page marks for empty pages before this object.
@@ -493,17 +548,17 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page = object.to_address().align_down(BYTES_IN_PAGE);
-
-                let mut page = *empty_page_start;
-                while page < current_page {
-                    unsafe { unset_page_mark_unsafe(page) };
-                    page += BYTES_IN_PAGE;
+                let current_page = object.to_address().align_down(BYTES_IN_MALLOC_PAGE);
+                if current_page > *empty_page_start {
+                    // we are the only GC thread that is accessing this chunk
+                    unsafe {
+                        self.unset_page_mark(*empty_page_start, current_page - *empty_page_start)
+                    };
                 }
             }
 
             // Update last_object_end
-            *empty_page_start = (obj_start + bytes).align_up(BYTES_IN_PAGE);
+            *empty_page_start = (obj_start + bytes).align_up(BYTES_IN_MALLOC_PAGE);
 
             false
         }
@@ -543,106 +598,117 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
     fn sweep_chunk_mark_on_side(&self, chunk_start: Address, mark_bit_spec: SideMetadataSpec) {
-        #[cfg(debug_assertions)]
-        let mut live_bytes = 0;
+        // We can do xor on bulk for mark bits and valid object bits. If the result is zero, that means
+        // the objects in it are all alive (both valid object bit and mark bit is set), and we do not
+        // need to do anything for the region. Otherwise, we will sweep each single object in the region.
+        // Note: Enabling this would result in inaccurate page accounting. We disable this by default, and
+        // we will sweep object one by one.
+        const BULK_XOR_ON_MARK_BITS: bool = false;
 
-        debug!("Check active chunk {:?}", chunk_start);
-        let mut address = chunk_start;
-        let chunk_end = chunk_start + BYTES_IN_CHUNK;
+        if BULK_XOR_ON_MARK_BITS {
+            #[cfg(debug_assertions)]
+            let mut live_bytes = 0;
 
-        debug_assert!(
-            crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
-                == mark_bit_spec.log_bytes_in_region,
-            "Alloc-bit and mark-bit metadata have different minimum object sizes!"
-        );
+            debug!("Check active chunk {:?}", chunk_start);
+            let mut address = chunk_start;
+            let chunk_end = chunk_start + BYTES_IN_CHUNK;
 
-        // For bulk xor'ing 128-bit vectors on architectures with vector instructions
-        // Each bit represents an object of LOG_MIN_OBJ_SIZE size
-        let bulk_load_size: usize =
-            128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
+            debug_assert!(
+                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region
+                    == mark_bit_spec.log_bytes_in_region,
+                "Alloc-bit and mark-bit metadata have different minimum object sizes!"
+            );
 
-        // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
-        let mut empty_page_start = Address::ZERO;
+            // For bulk xor'ing 128-bit vectors on architectures with vector instructions
+            // Each bit represents an object of LOG_MIN_OBJ_SIZE size
+            let bulk_load_size: usize =
+                128 * (1 << crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.log_bytes_in_region);
 
-        // Scan the chunk by every 'bulk_load_size' region.
-        while address < chunk_end {
-            let alloc_128: u128 =
-                unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
-            let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
+            // The start of a possibly empty page. This will be updated during the sweeping, and always points to the next page of last live objects.
+            let mut empty_page_start = Address::ZERO;
 
-            // Check if there are dead objects in the bulk loaded region
-            if alloc_128 ^ mark_128 != 0 {
-                let end = address + bulk_load_size;
+            // Scan the chunk by every 'bulk_load_size' region.
+            while address < chunk_end {
+                let alloc_128: u128 =
+                    unsafe { load128(&crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC, address) };
+                let mark_128: u128 = unsafe { load128(&mark_bit_spec, address) };
 
-                // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
-                // Linear scan through the bulk load region.
-                let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
+                // Check if there are dead objects in the bulk loaded region
+                if alloc_128 ^ mark_128 != 0 {
+                    let end = address + bulk_load_size;
+
+                    // We will do non atomic load on the alloc bit, as this is the only thread that access the alloc bit for a chunk.
+                    // Linear scan through the bulk load region.
+                    let bulk_load_scan = crate::util::linear_scan::ObjectIterator::<
+                        VM,
+                        MallocObjectSize<VM>,
+                        false,
+                    >::new(address, end);
+                    for object in bulk_load_scan {
+                        self.sweep_object(object, &mut empty_page_start);
+                    }
+                } else {
+                    // TODO we aren't actually accounting for the case where an object is alive and spans
+                    // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
+                    if alloc_128 != 0 {
+                        empty_page_start = address + bulk_load_size;
+                    }
+                }
+
+                // We have processed this bulk load memory. Step to the next.
+                address += bulk_load_size;
+                debug_assert!(address.is_aligned_to(bulk_load_size));
+            }
+
+            // Linear scan through the chunk, and add up all the live object sizes.
+            // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
+            #[cfg(debug_assertions)]
+            {
+                let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
                     VM,
                     MallocObjectSize<VM>,
                     false,
-                >::new(address, end);
-                for object in bulk_load_scan {
-                    self.sweep_object(object, &mut empty_page_start);
-                }
-            } else {
-                // TODO we aren't actually accounting for the case where an object is alive and spans
-                // a page boundary as we don't know what the object sizes are/what is alive in the bulk region
-                if alloc_128 != 0 {
-                    empty_page_start = address + bulk_load_size;
-                }
-            }
+                >::new(chunk_start, chunk_end);
+                for object in chunk_linear_scan {
+                    let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
 
-            // We have processed this bulk load memory. Step to the next.
-            address += bulk_load_size;
-            debug_assert!(address.is_aligned_to(bulk_load_size));
-        }
+                    if ASSERT_ALLOCATION {
+                        debug_assert!(
+                            self.active_mem.lock().unwrap().contains_key(&obj_start),
+                            "Address {} with alloc bit is not in active_mem",
+                            obj_start
+                        );
+                        debug_assert_eq!(
+                            self.active_mem.lock().unwrap().get(&obj_start),
+                            Some(&bytes),
+                            "Address {} size in active_mem does not match the size from malloc_usable_size",
+                            obj_start
+                        );
+                    }
 
-        // Linear scan through the chunk, and add up all the live object sizes.
-        // We have to do this as a separate pass, as in the above pass, we did not go through all the live objects
-        #[cfg(debug_assertions)]
-        {
-            let chunk_linear_scan = crate::util::linear_scan::ObjectIterator::<
-                VM,
-                MallocObjectSize<VM>,
-                false,
-            >::new(chunk_start, chunk_end);
-            for object in chunk_linear_scan {
-                let (obj_start, _, bytes) = Self::get_malloc_addr_size(object);
-
-                if ASSERT_ALLOCATION {
                     debug_assert!(
-                        self.active_mem.lock().unwrap().contains_key(&obj_start),
-                        "Address {} with alloc bit is not in active_mem",
-                        obj_start
+                        unsafe { is_marked_unsafe::<VM>(object) },
+                        "Dead object = {} found after sweep",
+                        object
                     );
-                    debug_assert_eq!(
-                        self.active_mem.lock().unwrap().get(&obj_start),
-                        Some(&bytes),
-                        "Address {} size in active_mem does not match the size from malloc_usable_size",
-                        obj_start
-                    );
+
+                    live_bytes += bytes;
                 }
-
-                debug_assert!(
-                    unsafe { is_marked_unsafe::<VM>(object) },
-                    "Dead object = {} found after sweep",
-                    object
-                );
-
-                live_bytes += bytes;
             }
+
+            // Clear all the mark bits
+            mark_bit_spec.bzero_metadata(chunk_start, BYTES_IN_CHUNK);
+
+            // If we never updated empty_page_start, the entire chunk is empty.
+            if empty_page_start.is_zero() {
+                self.clean_up_empty_chunk(chunk_start);
+            }
+
+            #[cfg(debug_assertions)]
+            self.debug_sweep_chunk_done(live_bytes);
+        } else {
+            self.sweep_each_object_in_chunk(chunk_start);
         }
-
-        // Clear all the mark bits
-        mark_bit_spec.bzero_metadata(chunk_start, BYTES_IN_CHUNK);
-
-        // If we never updated empty_page_start, the entire chunk is empty.
-        if empty_page_start.is_zero() {
-            self.clean_up_empty_chunk(chunk_start);
-        }
-
-        #[cfg(debug_assertions)]
-        self.debug_sweep_chunk_done(live_bytes);
     }
 
     /// This sweep function is called when the mark bit sits in the object header
@@ -651,6 +717,10 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// non-atomic accesses should not have race conditions associated with them)
     /// as well as calls libc functions (`malloc_usable_size()`, `free()`)
     fn sweep_chunk_mark_in_header(&self, chunk_start: Address) {
+        self.sweep_each_object_in_chunk(chunk_start)
+    }
+
+    fn sweep_each_object_in_chunk(&self, chunk_start: Address) {
         #[cfg(debug_assertions)]
         let mut live_bytes = 0;
 
@@ -664,6 +734,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             MallocObjectSize<VM>,
             false,
         >::new(chunk_start, chunk_start + BYTES_IN_CHUNK);
+
         for object in chunk_linear_scan {
             #[cfg(debug_assertions)]
             if ASSERT_ALLOCATION {
@@ -699,6 +770,18 @@ impl<VM: VMBinding> MallocSpace<VM> {
         // If we never updated empty_page_start, the entire chunk is empty.
         if empty_page_start.is_zero() {
             self.clean_up_empty_chunk(chunk_start);
+        } else if empty_page_start < chunk_start + BYTES_IN_CHUNK {
+            // This is for the edge case where we have a live object and then no other live
+            // objects afterwards till the end of the chunk. For example consider chunk
+            // 0x0-0x400000 where only one object at 0x100 is alive. We will unset page bits
+            // for 0x0-0x100 but then not unset it for the pages after 0x100. This checks
+            // if we have empty pages at the end of a chunk that needs to be cleared.
+            unsafe {
+                self.unset_page_mark(
+                    empty_page_start,
+                    chunk_start + BYTES_IN_CHUNK - empty_page_start,
+                )
+            };
         }
 
         #[cfg(debug_assertions)]

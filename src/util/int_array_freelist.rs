@@ -48,6 +48,9 @@ impl IntArrayFreeList {
         debug_assert!(-iafl.head <= iafl.heads);
         iafl
     }
+    pub(crate) fn get_ordinal(&self) -> i32 {
+        -self.head - 1
+    }
     fn table(&self) -> &Vec<i32> {
         match self.parent {
             Some(p) => p.table(),
