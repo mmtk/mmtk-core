@@ -52,31 +52,30 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align <= VM::MAX_ALIGNMENT);
         debug_assert!(align >= VM::MIN_ALIGNMENT);
 
-        let block = self.find_free_block_local(size, align);
-        let addr = self.block_alloc(block);
+        if let Some(block) = self.find_free_block_local(size, align) {
+            let addr = self.block_alloc(block);
+            if !addr.is_zero() {
+                // We succeeded in fastpath alloc, this cannot be precise stress test
+                debug_assert!(
+                    !(*self.plan.options().precise_stress
+                        && self.plan.base().is_stress_test_gc_enabled())
+                );
 
-        #[cfg(debug_assertions)]
-        if *self.plan.options().precise_stress && self.plan.base().is_stress_test_gc_enabled() {
-            // If we are doing precise stress GC, we should not get any memory from fastpath.
-            assert!(block.is_zero());
-            assert!(addr.is_zero());
+                return allocator::align_allocation::<VM>(addr, align, offset);
+            }
         }
 
-        if addr.is_zero() {
-            return self.alloc_slow(size, align, offset);
-        }
-        allocator::align_allocation::<VM>(addr, align, offset)
+        self.alloc_slow(size, align, offset)
     }
 
     fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
         // Try get a block from the space
-        let block = self.acquire_fresh_block(size, align, false);
-        if block.is_zero() {
-            return Address::ZERO;
+        if let Some(block) = self.acquire_fresh_block(size, align, false) {
+            let addr = self.block_alloc(block);
+            allocator::align_allocation::<VM>(addr, align, offset)
+        } else {
+            Address::ZERO
         }
-
-        let addr = self.block_alloc(block);
-        allocator::align_allocation::<VM>(addr, align, offset)
     }
 
     fn does_thread_local_allocation(&self) -> bool {
@@ -100,12 +99,12 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         }
 
         // mimic what fastpath allocation does, except that we allocate from available_blocks_stress.
-        let block = self.find_free_block_stress(size, align);
-        if block.is_zero() {
-            return Address::ZERO;
+        if let Some(block) = self.find_free_block_stress(size, align) {
+            let cell = self.block_alloc(block);
+            allocator::align_allocation::<VM>(cell, align, offset)
+        } else {
+            Address::ZERO
         }
-        let cell = self.block_alloc(block);
-        allocator::align_allocation::<VM>(cell, align, offset)
     }
 
     fn on_mutator_destroy(&mut self) {
@@ -177,36 +176,27 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     // Find an available block when stress GC is enabled. This includes getting a block from the space.
-    fn find_free_block_stress(&mut self, size: usize, align: usize) -> Block {
-        let mut block = Self::find_free_block_with(
+    fn find_free_block_stress(&mut self, size: usize, align: usize) -> Option<Block> {
+        Self::find_free_block_with(
             &mut self.available_blocks_stress,
             &mut self.consumed_blocks,
             size,
             align,
-        );
-        if block.is_zero() {
-            block = self.recycle_local_blocks(size, align, true);
-        }
-        if block.is_zero() {
-            block = self.acquire_fresh_block(size, align, true);
-        }
-        block
+        )
+        .or_else(|| self.recycle_local_blocks(size, align, true))
+        .or_else(|| self.acquire_fresh_block(size, align, true))
     }
 
     // Find an available block from local block lists
     #[inline(always)]
-    fn find_free_block_local(&mut self, size: usize, align: usize) -> Block {
-        let block = Self::find_free_block_with(
+    fn find_free_block_local(&mut self, size: usize, align: usize) -> Option<Block> {
+        Self::find_free_block_with(
             &mut self.available_blocks,
             &mut self.consumed_blocks,
             size,
             align,
-        );
-        if block.is_zero() {
-            self.recycle_local_blocks(size, align, false)
-        } else {
-            block
-        }
+        )
+        .or_else(|| self.recycle_local_blocks(size, align, false))
     }
 
     // Find an available block
@@ -219,7 +209,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         consumed_blocks: &mut BlockLists,
         size: usize,
         align: usize,
-    ) -> Block {
+    ) -> Option<Block> {
         let bin = mi_bin::<VM>(size, align);
         debug_assert!(bin <= MAX_BIN);
 
@@ -227,21 +217,21 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         debug_assert!(available.size >= size);
 
         if !available.is_empty() {
-            let mut block = available.first;
+            let mut cursor = available.first;
 
-            while !block.is_zero() {
+            while let Some(block) = cursor {
                 if block.has_free_cells() {
-                    return block;
+                    return Some(block);
                 }
                 available.pop();
                 consumed_blocks.get_mut(bin).unwrap().push(block);
 
-                block = available.first;
+                cursor = available.first;
             }
         }
 
         debug_assert!(available_blocks[bin].is_empty());
-        Block::ZERO_BLOCK
+        None
     }
 
     /// Add a block to the given bin in the available block lists. Depending on which available block list we are using, this
@@ -259,63 +249,77 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     /// Tries to recycle local blocks if there is any. This is a no-op for eager sweeping mark sweep.
     #[cfg(not(feature = "eager_sweeping"))]
     #[inline]
-    fn recycle_local_blocks(&mut self, size: usize, align: usize, _stress_test: bool) -> Block {
+    fn recycle_local_blocks(
+        &mut self,
+        size: usize,
+        align: usize,
+        _stress_test: bool,
+    ) -> Option<Block> {
         // attempt to sweep
         loop {
             let bin = mi_bin::<VM>(size, align);
             debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
 
-            let block = self.unswept_blocks.get_mut(bin).unwrap().pop();
-            if block.is_zero() {
-                // no more blocks to sweep
-                break;
-            }
-            block.sweep::<VM>();
-            if block.has_free_cells() {
-                // recyclable block
-                self.add_to_available_blocks(
-                    bin,
-                    block,
-                    self.plan.base().is_stress_test_gc_enabled(),
-                );
-                return block;
+            if let Some(block) = self.unswept_blocks.get_mut(bin).unwrap().pop() {
+                block.sweep::<VM>();
+                if block.has_free_cells() {
+                    // recyclable block
+                    self.add_to_available_blocks(
+                        bin,
+                        block,
+                        self.plan.base().is_stress_test_gc_enabled(),
+                    );
+                    return Some(block);
+                } else {
+                    // nothing was freed from this block
+                    self.consumed_blocks.get_mut(bin).unwrap().push(block);
+                }
             } else {
-                // nothing was freed from this block
-                self.consumed_blocks.get_mut(bin).unwrap().push(block);
+                return None;
             }
         }
-        Block::ZERO_BLOCK
     }
 
     /// Tries to recycle local blocks if there is any. This is a no-op for eager sweeping mark sweep.
     #[cfg(feature = "eager_sweeping")]
     #[inline]
-    fn recycle_local_blocks(&mut self, _size: usize, _align: usize, _stress_test: bool) -> Block {
-        Block::ZERO_BLOCK
+    fn recycle_local_blocks(
+        &mut self,
+        _size: usize,
+        _align: usize,
+        _stress_test: bool,
+    ) -> Option<Block> {
+        None
     }
 
     /// Get a block from the space.
-    fn acquire_fresh_block(&mut self, size: usize, align: usize, stress_test: bool) -> Block {
+    fn acquire_fresh_block(
+        &mut self,
+        size: usize,
+        align: usize,
+        stress_test: bool,
+    ) -> Option<Block> {
         // fresh block
         let bin = mi_bin::<VM>(size, align);
         loop {
             match self.space.acquire_block(self.tls, size, align) {
+                crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
+                    // GC
+                    return None;
+                }
+
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Fresh(block) => {
-                    if block.is_zero() {
-                        // GC
-                        return block;
-                    }
                     self.add_to_available_blocks(bin, block, stress_test);
                     self.init_block(block, self.available_blocks[bin].size);
 
-                    return block;
+                    return Some(block);
                 }
 
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::AbandonedAvailable(block) => {
                     block.store_tls(self.tls);
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
-                        return block;
+                        return Some(block);
                     } else {
                         self.consumed_blocks[bin].push(block);
                     }
@@ -326,7 +330,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
                     block.sweep::<VM>();
                     if block.has_free_cells() {
                         self.add_to_available_blocks(bin, block, stress_test);
-                        return block;
+                        return Some(block);
                     } else {
                         self.consumed_blocks[bin].push(block);
                     }
@@ -460,16 +464,16 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         // sweep all blocks and push consumed onto available list
         let mut bin = 0;
         while bin < MAX_BIN + 1 {
-            let sweep = |first_block: Block, used_blocks: bool| {
+            let sweep = |first_block: Option<Block>, used_blocks: bool| {
                 let mut cursor = first_block;
-                while !cursor.is_zero() {
+                while let Some(block) = cursor {
                     if used_blocks {
-                        cursor.sweep::<VM>();
-                        cursor = cursor.load_next_block();
+                        block.sweep::<VM>();
+                        cursor = block.load_next_block();
                     } else {
-                        let next = cursor.load_next_block();
-                        if !cursor.attempt_release(self.space) {
-                            cursor.sweep::<VM>();
+                        let next = block.load_next_block();
+                        if !block.attempt_release(self.space) {
+                            block.sweep::<VM>();
                         }
                         cursor = next;
                     }

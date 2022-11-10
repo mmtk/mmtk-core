@@ -12,24 +12,28 @@ use crate::{
     vm::VMBinding,
 };
 
+use std::num::NonZeroUsize;
+
 /// A 64KB region for MiMalloc.
 /// This is also known as MiMalloc page. We try to avoid getting confused with the OS 4K page. So we call it block.
+/// This is a non-zero block, which could help our implementation to deal with the zero/null case with Option<Block>.
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 #[repr(C)]
-pub struct Block(Address);
+pub struct Block(NonZeroUsize);
 
 impl From<Address> for Block {
     #[inline(always)]
     fn from(address: Address) -> Block {
         debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
+        debug_assert!(!address.is_zero());
+        Self(unsafe { NonZeroUsize::new_unchecked(address.as_usize()) })
     }
 }
 
 impl From<Block> for Address {
     #[inline(always)]
     fn from(block: Block) -> Address {
-        block.0
+        unsafe { Address::from_usize(block.0.get()) }
     }
 }
 
@@ -38,8 +42,6 @@ impl Region for Block {
 }
 
 impl Block {
-    pub const ZERO_BLOCK: Self = Self(Address::ZERO);
-
     pub const METADATA_SPECS: [SideMetadataSpec; 7] = [
         Self::MARK_TABLE,
         Self::NEXT_BLOCK_TABLE,
@@ -83,24 +85,24 @@ impl Block {
 
     #[inline]
     pub fn load_free_list(&self) -> Address {
-        unsafe { Address::from_usize(Block::FREE_LIST_TABLE.load::<usize>(self.0)) }
+        unsafe { Address::from_usize(Block::FREE_LIST_TABLE.load::<usize>(self.start())) }
     }
 
     #[inline]
     pub fn store_free_list(&self, free_list: Address) {
-        unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.0, free_list.as_usize()) }
+        unsafe { Block::FREE_LIST_TABLE.store::<usize>(self.start(), free_list.as_usize()) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
     #[inline]
     pub fn load_local_free_list(&self) -> Address {
-        unsafe { Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::<usize>(self.0)) }
+        unsafe { Address::from_usize(Block::LOCAL_FREE_LIST_TABLE.load::<usize>(self.start())) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
     #[inline]
     pub fn store_local_free_list(&self, local_free: Address) {
-        unsafe { Block::LOCAL_FREE_LIST_TABLE.store::<usize>(self.0, local_free.as_usize()) }
+        unsafe { Block::LOCAL_FREE_LIST_TABLE.store::<usize>(self.start(), local_free.as_usize()) }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
@@ -108,7 +110,7 @@ impl Block {
     pub fn load_thread_free_list(&self) -> Address {
         unsafe {
             Address::from_usize(
-                Block::THREAD_FREE_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst),
+                Block::THREAD_FREE_LIST_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst),
             )
         }
     }
@@ -116,7 +118,9 @@ impl Block {
     #[cfg(feature = "malloc_native_mimalloc")]
     #[inline]
     pub fn store_thread_free_list(&self, thread_free: Address) {
-        unsafe { Block::THREAD_FREE_LIST_TABLE.store::<usize>(self.0, thread_free.as_usize()) }
+        unsafe {
+            Block::THREAD_FREE_LIST_TABLE.store::<usize>(self.start(), thread_free.as_usize())
+        }
     }
 
     #[cfg(feature = "malloc_native_mimalloc")]
@@ -124,7 +128,7 @@ impl Block {
     pub fn cas_thread_free_list(&self, old_thread_free: Address, new_thread_free: Address) -> bool {
         Block::THREAD_FREE_LIST_TABLE
             .compare_exchange_atomic::<usize>(
-                self.0,
+                self.start(),
                 old_thread_free.as_usize(),
                 new_thread_free.as_usize(),
                 Ordering::SeqCst,
@@ -133,53 +137,68 @@ impl Block {
             .is_ok()
     }
 
-    pub fn load_prev_block(&self) -> Block {
-        debug_assert!(!self.0.is_zero());
-        let prev = unsafe { Address::from_usize(Block::PREV_BLOCK_TABLE.load::<usize>(self.0)) };
-        Block::from(prev)
+    pub fn load_prev_block(&self) -> Option<Block> {
+        let prev = unsafe { Block::PREV_BLOCK_TABLE.load::<usize>(self.start()) };
+        if prev == 0 {
+            None
+        } else {
+            Some(Block(unsafe { NonZeroUsize::new_unchecked(prev) }))
+        }
     }
 
-    pub fn load_next_block(&self) -> Block {
-        debug_assert!(!self.is_zero());
-        let next = unsafe { Address::from_usize(Block::NEXT_BLOCK_TABLE.load::<usize>(self.0)) };
-        Block::from(next)
+    pub fn load_next_block(&self) -> Option<Block> {
+        let next = unsafe { Block::NEXT_BLOCK_TABLE.load::<usize>(self.start()) };
+        if next == 0 {
+            None
+        } else {
+            Some(Block(unsafe { NonZeroUsize::new_unchecked(next) }))
+        }
     }
 
     pub fn store_next_block(&self, next: Block) {
-        debug_assert!(!self.0.is_zero());
         unsafe {
-            Block::NEXT_BLOCK_TABLE.store::<usize>(self.0, next.start().as_usize());
+            Block::NEXT_BLOCK_TABLE.store::<usize>(self.start(), next.start().as_usize());
+        }
+    }
+
+    pub fn clear_next_block(&self) {
+        unsafe {
+            Block::NEXT_BLOCK_TABLE.store::<usize>(self.start(), 0);
         }
     }
 
     pub fn store_prev_block(&self, prev: Block) {
-        debug_assert!(!self.0.is_zero());
         unsafe {
-            Block::PREV_BLOCK_TABLE.store::<usize>(self.0, prev.start().as_usize());
+            Block::PREV_BLOCK_TABLE.store::<usize>(self.start(), prev.start().as_usize());
+        }
+    }
+
+    pub fn clear_prev_block(&self) {
+        unsafe {
+            Block::PREV_BLOCK_TABLE.store::<usize>(self.start(), 0);
         }
     }
 
     pub fn store_block_list(&self, block_list: &BlockList) {
-        debug_assert!(!self.0.is_zero());
         let block_list_usize: usize =
             unsafe { std::mem::transmute::<&BlockList, usize>(block_list) };
         unsafe {
-            Block::BLOCK_LIST_TABLE.store::<usize>(self.0, block_list_usize);
+            Block::BLOCK_LIST_TABLE.store::<usize>(self.start(), block_list_usize);
         }
     }
 
     pub fn load_block_list(&self) -> *mut BlockList {
-        debug_assert!(!self.0.is_zero());
-        let block_list = Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst);
+        let block_list =
+            Block::BLOCK_LIST_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst);
         unsafe { std::mem::transmute::<usize, *mut BlockList>(block_list) }
     }
 
     pub fn load_block_cell_size(&self) -> usize {
-        Block::SIZE_TABLE.load_atomic::<usize>(self.0, Ordering::SeqCst)
+        Block::SIZE_TABLE.load_atomic::<usize>(self.start(), Ordering::SeqCst)
     }
 
     pub fn store_block_cell_size(&self, size: usize) {
-        unsafe { Block::SIZE_TABLE.store::<usize>(self.0, size) }
+        unsafe { Block::SIZE_TABLE.store::<usize>(self.start(), size) }
     }
 
     pub fn store_tls(&self, tls: VMThread) {
@@ -201,11 +220,6 @@ impl Block {
     pub fn has_free_cells(&self) -> bool {
         debug_assert!(!self.is_zero());
         !self.load_free_list().is_zero()
-    }
-
-    /// Get block start address
-    pub const fn start(&self) -> Address {
-        self.0
     }
 
     /// Get block mark state.
@@ -387,7 +401,7 @@ impl Block {
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
-        Chunk::from(Chunk::align(self.0))
+        Chunk::from(Chunk::align(self.start()))
     }
 
     /// Initialize a clean block after acquired from page-resource.

@@ -9,8 +9,8 @@ use std::sync::atomic::Ordering;
 #[derive(Debug)]
 #[repr(C)]
 pub struct BlockList {
-    pub first: Block,
-    pub last: Block,
+    pub first: Option<Block>,
+    pub last: Option<Block>,
     pub size: usize,
     pub lock: AtomicBool,
 }
@@ -18,8 +18,8 @@ pub struct BlockList {
 impl BlockList {
     const fn new(size: usize) -> BlockList {
         BlockList {
-            first: ZERO_BLOCK,
-            last: ZERO_BLOCK,
+            first: None,
+            last: None,
             size,
             lock: AtomicBool::new(false),
         }
@@ -27,29 +27,27 @@ impl BlockList {
 
     // List has no blocks
     pub fn is_empty(&self) -> bool {
-        self.first.is_zero()
+        self.first.is_none()
     }
 
     // Remove a block from the list
     pub fn remove(&mut self, block: Block) {
-        let prev = block.load_prev_block();
-        let next = block.load_next_block();
-        #[allow(clippy::collapsible_else_if)]
-        if prev.is_zero() {
-            if next.is_zero() {
-                self.first = ZERO_BLOCK;
-                self.last = ZERO_BLOCK;
-            } else {
-                next.store_prev_block(ZERO_BLOCK);
-                self.first = next;
+        match (block.load_prev_block(), block.load_next_block()) {
+            (None, None) => {
+                self.first = None;
+                self.last = None;
+            }
+            (None, Some(next)) => {
+                next.clear_prev_block();
+                self.first = Some(next);
                 next.store_block_list(self);
             }
-        } else {
-            if next.is_zero() {
-                prev.store_next_block(ZERO_BLOCK);
-                self.last = prev;
+            (Some(prev), None) => {
+                prev.clear_next_block();
+                self.last = Some(prev);
                 prev.store_block_list(self);
-            } else {
+            }
+            (Some(prev), Some(next)) => {
                 prev.store_next_block(next);
                 next.store_prev_block(prev);
             }
@@ -57,78 +55,81 @@ impl BlockList {
     }
 
     // Pop the first block in the list
-    pub fn pop(&mut self) -> Block {
-        let rtn = self.first;
-        if rtn.is_zero() {
-            return rtn;
-        }
-        let next = rtn.load_next_block();
-        if next.is_zero() {
-            self.first = ZERO_BLOCK;
-            self.last = ZERO_BLOCK;
+    pub fn pop(&mut self) -> Option<Block> {
+        if let Some(head) = self.first {
+            if let Some(next) = head.load_next_block() {
+                self.first = Some(next);
+                next.clear_prev_block();
+                next.store_block_list(self);
+            } else {
+                self.first = None;
+                self.last = None;
+            }
+            head.clear_next_block();
+            head.clear_prev_block();
+            Some(head)
         } else {
-            self.first = next;
-            next.store_prev_block(ZERO_BLOCK);
-            self.first.store_block_list(self);
+            None
         }
-        rtn.store_next_block(ZERO_BLOCK);
-        rtn.store_prev_block(ZERO_BLOCK);
-        rtn
     }
 
     // Push block to the front of the list
     pub fn push(&mut self, block: Block) {
         if self.is_empty() {
-            block.store_next_block(ZERO_BLOCK);
-            block.store_prev_block(ZERO_BLOCK);
-            self.first = block;
-            self.last = block;
+            block.clear_next_block();
+            block.clear_prev_block();
+            self.first = Some(block);
+            self.last = Some(block);
         } else {
-            block.store_next_block(self.first);
-            self.first.store_prev_block(block);
-            block.store_prev_block(ZERO_BLOCK);
-            self.first = block;
+            let self_head = self.first.unwrap();
+            block.store_next_block(self_head);
+            self_head.store_prev_block(block);
+            block.clear_prev_block();
+            self.first = Some(block);
         }
         block.store_block_list(self);
     }
 
     // Append one block list to another
     // The second block list left empty
-    pub fn append(&mut self, list: &mut BlockList) {
-        if !list.is_empty() {
+    pub fn append(&mut self, other: &mut BlockList) {
+        debug_assert_eq!(self.size, other.size);
+        if !other.is_empty() {
             debug_assert!(
-                list.first.load_prev_block().is_zero(),
-                "{} -> {}",
-                list.first.load_prev_block().start(),
-                list.first.start()
+                other.first.unwrap().load_prev_block().is_none(),
+                "The other list's head has prev block: prev{} -> head{}",
+                other.first.unwrap().load_prev_block().unwrap().start(),
+                other.first.unwrap().start()
             );
             if self.is_empty() {
-                self.first = list.first;
-                self.last = list.last;
+                self.first = other.first;
+                self.last = other.last;
             } else {
                 debug_assert!(
-                    self.first.load_prev_block().is_zero(),
-                    "{} -> {}",
-                    self.first.load_prev_block().start(),
-                    self.first.start()
+                    self.first.unwrap().load_prev_block().is_none(),
+                    "Current list's head has prev block: prev{} -> head{}",
+                    self.first.unwrap().load_prev_block().unwrap().start(),
+                    self.first.unwrap().start()
                 );
-                self.last.store_next_block(list.first);
-                list.first.store_prev_block(self.last);
-                self.last = list.last;
+                let self_tail = self.last.unwrap();
+                let other_head = other.first.unwrap();
+                self_tail.store_next_block(other_head);
+                other_head.store_prev_block(self_tail);
+                self.last = other.last;
             }
-            let mut block = list.first;
-            while !block.is_zero() {
+            let mut cursor = other.first;
+            while let Some(block) = cursor {
                 block.store_block_list(self);
-                block = block.load_next_block();
+                cursor = block.load_next_block();
             }
-            list.reset();
+            other.reset();
         }
     }
 
     // Remove all blocks
     fn reset(&mut self) {
-        self.first = ZERO_BLOCK;
-        self.last = ZERO_BLOCK;
+        self.first = None;
+        self.last = None;
     }
 
     // Lock list
@@ -158,8 +159,6 @@ const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
 pub(crate) const MI_BIN_FULL: usize = MAX_BIN + 1;
 /// The largest valid bin.
 pub(crate) const MAX_BIN: usize = 48;
-
-const ZERO_BLOCK: Block = Block::ZERO_BLOCK;
 
 /// Largest object size allowed with our mimalloc implementation, in bytes
 pub(crate) const MI_LARGE_OBJ_SIZE_MAX: usize = MAX_BIN_SIZE;
@@ -244,10 +243,10 @@ pub(crate) fn pages_used_by_blocklists(lists: &BlockLists) -> usize {
         let list = &lists[bin];
 
         // walk the blocks
-        let mut block = list.first;
-        while !block.is_zero() {
+        let mut cursor = list.first;
+        while let Some(block) = cursor {
             pages += Block::BYTES >> crate::util::constants::LOG_BYTES_IN_PAGE;
-            block = block.load_next_block();
+            cursor = block.load_next_block();
         }
     }
 

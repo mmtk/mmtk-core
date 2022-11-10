@@ -36,6 +36,7 @@ use std::sync::Mutex;
 /// to allocate from abandoned blocks first. If none found, it will get a new block
 /// from the page resource.
 pub enum BlockAcquireResult {
+    Exhausted,
     /// A new block we just acquired from the page resource
     Fresh(Block),
     /// An available block. The block can be directly used if there is any free cell in it.
@@ -308,7 +309,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             {
                 let abandoned_available = &mut abandoned.available;
                 if !abandoned_available[bin].is_empty() {
-                    let block = Block::from(abandoned_available[bin].pop().start());
+                    let block = Block::from(abandoned_available[bin].pop().unwrap().start());
                     return BlockAcquireResult::AbandonedAvailable(block);
                 }
             }
@@ -316,15 +317,18 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             {
                 let abandoned_unswept = &mut abandoned.unswept;
                 if !abandoned_unswept[bin].is_empty() {
-                    let block = Block::from(abandoned_unswept[bin].pop().start());
+                    let block = Block::from(abandoned_unswept[bin].pop().unwrap().start());
                     return BlockAcquireResult::AbandonedUnswept(block);
                 }
             }
         }
 
-        BlockAcquireResult::Fresh(Block::from(
-            self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE),
-        ))
+        let acquired = self.acquire(tls, Block::BYTES >> LOG_BYTES_IN_PAGE);
+        if acquired.is_zero() {
+            BlockAcquireResult::Exhausted
+        } else {
+            BlockAcquireResult::Fresh(Block::from(acquired))
+        }
     }
 
     pub fn generate_sweep_tasks(&self) -> Vec<Box<dyn GCWork<VM>>> {
