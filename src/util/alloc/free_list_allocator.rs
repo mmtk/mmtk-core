@@ -53,15 +53,26 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align >= VM::MIN_ALIGNMENT);
 
         if let Some(block) = self.find_free_block_local(size, align) {
-            let addr = self.block_alloc(block);
-            if !addr.is_zero() {
+            let cell = self.block_alloc(block);
+            if !cell.is_zero() {
                 // We succeeded in fastpath alloc, this cannot be precise stress test
                 debug_assert!(
                     !(*self.plan.options().precise_stress
                         && self.plan.base().is_stress_test_gc_enabled())
                 );
 
-                return allocator::align_allocation::<VM>(addr, align, offset);
+                let res = allocator::align_allocation::<VM>(cell, align, offset);
+                // Make sure that the allocation region is within the cell
+                #[cfg(debug_assertions)]
+                {
+                    let cell_size = block.load_block_cell_size();
+                    debug_assert!(
+                        res + size <= cell + cell_size,
+                        "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
+                        size, align, offset, cell, cell_size, res + size, cell + cell_size
+                    );
+                }
+                return res;
             }
         }
 
@@ -131,10 +142,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     // Find a free cell within a given block
-    fn block_alloc(
-        &mut self,
-        block: Block,
-    ) -> Address {
+    fn block_alloc(&mut self, block: Block) -> Address {
         if block.is_zero() {
             return unsafe { Address::zero() };
         }
@@ -255,7 +263,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
             // We have swept blocks in the last GC. If we run out of available blocks, there is nothing we can do.
             None
         } else {
-            // Attempt to sweep
+            // Get blocks from unswept_blocks and attempt to sweep
             loop {
                 let bin = mi_bin::<VM>(size, align);
                 debug_assert!(self.available_blocks[bin].is_empty()); // only use this function if there are no blocks available
