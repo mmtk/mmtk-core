@@ -5,7 +5,7 @@ use crate::vm::VMBinding;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
 
-// List of blocks owned by the allocator
+/// List of blocks owned by the allocator
 #[derive(Debug)]
 #[repr(C)]
 pub struct BlockList {
@@ -25,12 +25,12 @@ impl BlockList {
         }
     }
 
-    // List has no blocks
+    /// List has no blocks
     pub fn is_empty(&self) -> bool {
         self.first.is_none()
     }
 
-    // Remove a block from the list
+    /// Remove a block from the list
     pub fn remove(&mut self, block: Block) {
         match (block.load_prev_block(), block.load_next_block()) {
             (None, None) => {
@@ -54,7 +54,7 @@ impl BlockList {
         }
     }
 
-    // Pop the first block in the list
+    /// Pop the first block in the list
     pub fn pop(&mut self) -> Option<Block> {
         if let Some(head) = self.first {
             if let Some(next) = head.load_next_block() {
@@ -73,7 +73,7 @@ impl BlockList {
         }
     }
 
-    // Push block to the front of the list
+    /// Push block to the front of the list
     pub fn push(&mut self, block: Block) {
         if self.is_empty() {
             block.clear_next_block();
@@ -90,8 +90,7 @@ impl BlockList {
         block.store_block_list(self);
     }
 
-    // Append one block list to another
-    // The second block list left empty
+    /// Moves all the blocks of `other` into `self`, leaving `other` empty.
     pub fn append(&mut self, other: &mut BlockList) {
         debug_assert_eq!(self.size, other.size);
         if !other.is_empty() {
@@ -126,13 +125,13 @@ impl BlockList {
         }
     }
 
-    // Remove all blocks
+    /// Remove all blocks
     fn reset(&mut self) {
         self.first = None;
         self.last = None;
     }
 
-    // Lock list
+    /// Lock list
     pub fn lock(&mut self) {
         let mut success = false;
         while !success {
@@ -143,7 +142,7 @@ impl BlockList {
         }
     }
 
-    // Unlock list
+    /// Unlock list
     pub fn unlock(&mut self) {
         self.lock.store(false, Ordering::SeqCst);
     }

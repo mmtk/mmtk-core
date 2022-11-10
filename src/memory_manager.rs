@@ -106,7 +106,7 @@ pub fn bind_mutator<VM: VMBinding>(
     mutator
 }
 
-/// Report to MMTk that a mutator that is no longer needed. A binding should not attempt
+/// Report to MMTk that a mutator is no longer needed. A binding should not attempt
 /// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the
 /// mutator, so a binding should properly reclaim the memory for the mutator after this call.
 ///
