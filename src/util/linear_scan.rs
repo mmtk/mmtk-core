@@ -119,7 +119,7 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     /// Check if the given address is in the region.
     #[inline(always)]
     fn includes_address(&self, addr: Address) -> bool {
-        addr >= self.start() && addr < self.end()
+        Self::align(addr) == self.start()
     }
 }
 

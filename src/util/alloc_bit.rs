@@ -13,7 +13,6 @@ pub(crate) const ALLOC_SIDE_METADATA_SPEC: SideMetadataSpec =
 pub const ALLOC_SIDE_METADATA_ADDR: Address = ALLOC_SIDE_METADATA_SPEC.get_absolute_offset();
 
 pub fn map_meta_space_for_chunk(metadata: &SideMetadataContext, chunk_start: Address) {
-    eprintln!("map meta space for chunk {}", chunk_start);
     let mmap_metadata_result = metadata.try_map_metadata_space(chunk_start, BYTES_IN_CHUNK);
     debug_assert!(
         mmap_metadata_result.is_ok(),

@@ -296,7 +296,7 @@ impl Block {
         while cell + cell_size <= self.start() + Block::BYTES {
             // We know the cell and the object reference is the same.
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .is_set::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
+                .is_marked::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
             {
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]
@@ -346,7 +346,7 @@ impl Block {
                 potential_object_ref
             );
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(
                 unsafe { potential_object_ref.to_object_reference() },
                 Ordering::SeqCst,
             ) {

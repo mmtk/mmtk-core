@@ -83,7 +83,7 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
     }
 
     fn is_live(&self, object: crate::util::ObjectReference) -> bool {
-        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(object, Ordering::SeqCst)
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst)
     }
 
     fn is_movable(&self) -> bool {
@@ -238,8 +238,8 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             "Cannot mark an object {} that was not alloced by free list allocator.",
             object,
         );
-        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_set::<VM>(object, Ordering::SeqCst) {
-            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.set::<VM>(object, Ordering::SeqCst);
+        if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(object, Ordering::SeqCst) {
+            VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.mark::<VM>(object, Ordering::SeqCst);
             let block = Block::containing::<VM>(object);
             block.set_state(BlockState::Marked);
             queue.enqueue(object);
