@@ -7,29 +7,25 @@ use crate::{
 };
 
 /// Data structure to reference a line within an immix block.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Line(Address);
 
-impl From<Address> for Line {
-    #[allow(clippy::assertions_on_constants)]
+impl Region for Line {
+    const LOG_BYTES: usize = 8;
+
     #[inline(always)]
-    fn from(address: Address) -> Line {
+    #[allow(clippy::assertions_on_constants)] // make sure line is not used when BLOCK_ONLY is turned on.
+    fn from_aligned_address(address: Address) -> Self {
         debug_assert!(!super::BLOCK_ONLY);
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
-}
 
-impl From<Line> for Address {
     #[inline(always)]
-    fn from(line: Line) -> Address {
-        line.0
+    fn start(&self) -> Address {
+        self.0
     }
-}
-
-impl Region for Line {
-    const LOG_BYTES: usize = 8;
 }
 
 #[allow(clippy::assertions_on_constants)]
@@ -45,7 +41,7 @@ impl Line {
     #[inline(always)]
     pub fn block(&self) -> Block {
         debug_assert!(!super::BLOCK_ONLY);
-        Block::from(Block::align(self.0))
+        Block::from_unaligned_address(self.0)
     }
 
     /// Get line index within its containing block.
@@ -77,8 +73,8 @@ impl Line {
         debug_assert!(!super::BLOCK_ONLY);
         let start = VM::VMObjectModel::object_start_ref(object);
         let end = start + VM::VMObjectModel::get_current_size(object);
-        let start_line = Line::from(Line::align(start));
-        let mut end_line = Line::from(Line::align(end));
+        let start_line = Line::from_unaligned_address(start);
+        let mut end_line = Line::from_unaligned_address(end);
         if !Line::is_aligned(end) {
             end_line = end_line.next();
         }
