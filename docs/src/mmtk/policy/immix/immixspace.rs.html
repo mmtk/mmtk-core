@@ -1072,7 +1072,7 @@
             <span class="kw">return</span> <span class="prelude-val">None</span>;
         }
         <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">notify_new_clean_block</span>(<span class="ident">copy</span>);
-        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block::from</span>(<span class="ident">block_address</span>);
+        <span class="kw">let</span> <span class="ident">block</span> <span class="op">=</span> <span class="ident">Block::from_aligned_address</span>(<span class="ident">block_address</span>);
         <span class="ident">block</span>.<span class="ident">init</span>(<span class="ident">copy</span>);
         <span class="self">self</span>.<span class="ident">chunk_map</span>.<span class="ident">set</span>(<span class="ident">block</span>.<span class="ident">chunk</span>(), <span class="ident">ChunkState::Allocated</span>);
         <span class="prelude-val">Some</span>(<span class="ident">block</span>)

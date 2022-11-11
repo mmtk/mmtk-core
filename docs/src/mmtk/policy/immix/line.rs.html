@@ -91,10 +91,6 @@
 <span id="89">89</span>
 <span id="90">90</span>
 <span id="91">91</span>
-<span id="92">92</span>
-<span id="93">93</span>
-<span id="94">94</span>
-<span id="95">95</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::block::Block</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan</span>::{<span class="ident">Region</span>, <span class="ident">RegionIterator</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
@@ -104,29 +100,25 @@
 };
 
 <span class="doccomment">/// Data structure to reference a line within an immix block.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>, <span class="ident">Eq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Line</span>(<span class="ident">Address</span>);
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Line</span> {
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
+<span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Line</span> {
+    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
+
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Line</span> {
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span> <span class="comment">// make sure line is not used when BLOCK_ONLY is turned on.</span>
+    <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
         <span class="self">Self</span>(<span class="ident">address</span>)
     }
-}
 
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Line</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">line</span>: <span class="ident">Line</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">line</span>.<span class="number">0</span>
+    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+        <span class="self">self</span>.<span class="number">0</span>
     }
-}
-
-<span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Line</span> {
-    <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">8</span>;
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::assertions_on_constants</span>)]</span>
@@ -142,7 +134,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Block</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="ident">Block::from</span>(<span class="ident">Block::align</span>(<span class="self">self</span>.<span class="number">0</span>))
+        <span class="ident">Block::from_unaligned_address</span>(<span class="self">self</span>.<span class="number">0</span>)
     }
 
     <span class="doccomment">/// Get line index within its containing block.</span>
@@ -174,8 +166,8 @@
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
         <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">object</span>);
-        <span class="kw">let</span> <span class="ident">start_line</span> <span class="op">=</span> <span class="ident">Line::from</span>(<span class="ident">Line::align</span>(<span class="ident">start</span>));
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_line</span> <span class="op">=</span> <span class="ident">Line::from</span>(<span class="ident">Line::align</span>(<span class="ident">end</span>));
+        <span class="kw">let</span> <span class="ident">start_line</span> <span class="op">=</span> <span class="ident">Line::from_unaligned_address</span>(<span class="ident">start</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_line</span> <span class="op">=</span> <span class="ident">Line::from_unaligned_address</span>(<span class="ident">end</span>);
         <span class="kw">if</span> <span class="op">!</span><span class="ident">Line::is_aligned</span>(<span class="ident">end</span>) {
             <span class="ident">end_line</span> <span class="op">=</span> <span class="ident">end_line</span>.<span class="ident">next</span>();
         }

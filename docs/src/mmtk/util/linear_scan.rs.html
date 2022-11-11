@@ -248,6 +248,10 @@
 <span id="246">246</span>
 <span id="247">247</span>
 <span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
@@ -326,9 +330,21 @@
 
 <span class="doccomment">/// Region represents a memory region with a properly aligned address as its start and a fixed size for the region.</span>
 <span class="doccomment">/// Region provides a set of utility methods, along with a RegionIterator that linearly scans at the step of a region.</span>
-<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Region</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">PartialOrd</span> <span class="op">+</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Into</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Region</span>: <span class="ident">Copy</span> <span class="op">+</span> <span class="ident">PartialEq</span> <span class="op">+</span> <span class="ident">PartialOrd</span> {
     <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span>;
     <span class="kw">const</span> <span class="ident">BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>;
+
+    <span class="doccomment">/// Create a region from an address that is aligned to the region boundary. The method should panic if the address</span>
+    <span class="doccomment">/// is not properly aligned to the region. For performance, this method should always be inlined.</span>
+    <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Return the start address of the region. For performance, this method should always be inlined.</span>
+    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span>;
+
+    <span class="doccomment">/// Create a region from an arbitrary address.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">from_unaligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
+        <span class="ident"><span class="self">Self</span>::from_aligned_address</span>(<span class="ident"><span class="self">Self</span>::align</span>(<span class="ident">address</span>))
+    }
 
     <span class="doccomment">/// Align the address to the region.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -340,11 +356,7 @@
     <span class="kw">fn</span> <span class="ident">is_aligned</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>)
     }
-    <span class="doccomment">/// Return the start address of the region.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
-        (<span class="kw-2">*</span><span class="self">self</span>).<span class="ident">into</span>()
-    }
+
     <span class="doccomment">/// Return the end address of the region. Note that the end address is not in the region.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
@@ -359,12 +371,12 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">next_nth</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">n</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
         <span class="macro">debug_assert!</span>(<span class="self">self</span>.<span class="ident">start</span>().<span class="ident">as_usize</span>() <span class="op">&lt;</span> <span class="ident">usize::MAX</span> <span class="op">-</span> (<span class="ident">n</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>));
-        <span class="ident"><span class="self">Self</span>::from</span>(<span class="self">self</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident">n</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
+        <span class="ident"><span class="self">Self</span>::from_aligned_address</span>(<span class="self">self</span>.<span class="ident">start</span>() <span class="op">+</span> (<span class="ident">n</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_BYTES</span>))
     }
     <span class="doccomment">/// Return the region that contains the object (by its cell address).</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">containing</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::from</span>(<span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>).<span class="ident">align_down</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>))
+        <span class="ident"><span class="self">Self</span>::from_unaligned_address</span>(<span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>))
     }
 }
 
@@ -406,23 +418,19 @@
     <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>, <span class="ident">PartialOrd</span>)]</span>
     <span class="kw">struct</span> <span class="ident">Page</span>(<span class="ident">Address</span>);
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Page</span> {
+    <span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Page</span> {
+        <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
+
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Page</span> {
+        <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
             <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
             <span class="self">Self</span>(<span class="ident">address</span>)
         }
-    }
 
-    <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Page</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
         <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-        <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">page</span>: <span class="ident">Page</span>) -&gt; <span class="ident">Address</span> {
-            <span class="ident">page</span>.<span class="number">0</span>
+        <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+            <span class="self">self</span>.<span class="number">0</span>
         }
-    }
-
-    <span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Page</span> {
-        <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_PAGE</span> <span class="kw">as</span> <span class="ident">usize</span>;
     }
 
     <span class="attribute">#[<span class="ident">test</span>]</span>
@@ -436,7 +444,7 @@
         <span class="macro">debug_assert!</span>(<span class="ident">Page::is_aligned</span>(<span class="ident">addr4k</span>));
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">Page::is_aligned</span>(<span class="ident">addr4k1</span>));
 
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from</span>(<span class="ident">addr4k</span>);
+        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from_aligned_address</span>(<span class="ident">addr4k</span>);
         <span class="comment">// start/end</span>
         <span class="macro">debug_assert_eq!</span>(<span class="ident">page</span>.<span class="ident">start</span>(), <span class="ident">addr4k</span>);
         <span class="macro">debug_assert_eq!</span>(<span class="ident">page</span>.<span class="ident">end</span>(), <span class="ident">addr4k</span> <span class="op">+</span> <span class="ident">PAGE_SIZE</span>);
@@ -449,7 +457,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_region_iterator_normal</span>() {
         <span class="kw">let</span> <span class="ident">addr4k</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">PAGE_SIZE</span>) };
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from</span>(<span class="ident">addr4k</span>);
+        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from_aligned_address</span>(<span class="ident">addr4k</span>);
         <span class="kw">let</span> <span class="ident">end_page</span> <span class="op">=</span> <span class="ident">page</span>.<span class="ident">next_nth</span>(<span class="number">5</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">results</span> <span class="op">=</span> <span class="macro">vec!</span>[];
@@ -472,7 +480,7 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_region_iterator_same_start_end</span>() {
         <span class="kw">let</span> <span class="ident">addr4k</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">PAGE_SIZE</span>) };
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from</span>(<span class="ident">addr4k</span>);
+        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from_aligned_address</span>(<span class="ident">addr4k</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">results</span> <span class="op">=</span> <span class="macro">vec!</span>[];
         <span class="kw">let</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">RegionIterator::new</span>(<span class="ident">page</span>, <span class="ident">page</span>);
@@ -485,8 +493,8 @@
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_region_iterator_smaller_end</span>() {
         <span class="kw">let</span> <span class="ident">addr4k</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">Address::from_usize</span>(<span class="ident">PAGE_SIZE</span>) };
-        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from</span>(<span class="ident">addr4k</span>);
-        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">Page::from</span>(<span class="ident">Address::ZERO</span>);
+        <span class="kw">let</span> <span class="ident">page</span> <span class="op">=</span> <span class="ident">Page::from_aligned_address</span>(<span class="ident">addr4k</span>);
+        <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">Page::from_aligned_address</span>(<span class="ident">Address::ZERO</span>);
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">results</span> <span class="op">=</span> <span class="macro">vec!</span>[];
         <span class="kw">let</span> <span class="ident">iter</span> <span class="op">=</span> <span class="ident">RegionIterator::new</span>(<span class="ident">page</span>, <span class="ident">end</span>);

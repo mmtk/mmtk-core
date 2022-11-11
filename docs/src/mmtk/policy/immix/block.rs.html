@@ -309,10 +309,6 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::chunk::Chunk</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
@@ -379,30 +375,26 @@
 }
 
 <span class="doccomment">/// Data structure to reference an immix block.</span>
-<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">C</span>)]</span>
+<span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>, <span class="ident">Clone</span>, <span class="ident">Copy</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">Block</span>(<span class="ident">Address</span>);
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Address</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Block</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Block</span> {
-        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
-        <span class="self">Self</span>(<span class="ident">address</span>)
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Address</span> {
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">block</span>: <span class="ident">Block</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">block</span>.<span class="number">0</span>
-    }
-}
 
 <span class="kw">impl</span> <span class="ident">Region</span> <span class="kw">for</span> <span class="ident">Block</span> {
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_smaller_block&quot;</span>))]</span>
     <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">15</span>;
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_smaller_block&quot;</span>)]</span>
     <span class="kw">const</span> <span class="ident">LOG_BYTES</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">13</span>;
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">from_aligned_address</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="self">Self</span> {
+        <span class="macro">debug_assert!</span>(<span class="ident">address</span>.<span class="ident">is_aligned_to</span>(<span class="ident"><span class="self">Self</span>::BYTES</span>));
+        <span class="self">Self</span>(<span class="ident">address</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">start</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+        <span class="self">self</span>.<span class="number">0</span>
+    }
 }
 
 <span class="kw">impl</span> <span class="ident">Block</span> {
@@ -426,7 +418,7 @@
     <span class="doccomment">/// Get the chunk containing the block.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Chunk</span> {
-        <span class="ident">Chunk::from</span>(<span class="ident">Chunk::align</span>(<span class="self">self</span>.<span class="number">0</span>))
+        <span class="ident">Chunk::from_unaligned_address</span>(<span class="self">self</span>.<span class="number">0</span>)
     }
 
     <span class="doccomment">/// Get the address range of the block&#39;s line mark table.</span>
@@ -505,12 +497,12 @@
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">start_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
-        <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">start</span>())
+        <span class="ident">Line::from_aligned_address</span>(<span class="self">self</span>.<span class="ident">start</span>())
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">end_line</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Line</span> {
-        <span class="ident">Line::from</span>(<span class="self">self</span>.<span class="ident">end</span>())
+        <span class="ident">Line::from_aligned_address</span>(<span class="self">self</span>.<span class="ident">end</span>())
     }
 
     <span class="doccomment">/// Get the range of lines within the block.</span>
