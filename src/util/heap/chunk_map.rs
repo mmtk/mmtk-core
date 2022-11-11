@@ -8,27 +8,23 @@ use spin::Mutex;
 use std::ops::Range;
 
 /// Data structure to reference a MMTk 4 MB chunk.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Chunk(Address);
 
-impl From<Address> for Chunk {
+impl Region for Chunk {
+    const LOG_BYTES: usize = crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+
     #[inline(always)]
-    fn from(address: Address) -> Chunk {
+    fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
-}
 
-impl From<Chunk> for Address {
     #[inline(always)]
-    fn from(chunk: Chunk) -> Address {
-        chunk.0
+    fn start(&self) -> Address {
+        self.0
     }
-}
-
-impl Region for Chunk {
-    const LOG_BYTES: usize = crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 }
 
 impl Chunk {
@@ -45,8 +41,8 @@ impl Chunk {
         debug_assert!(R::is_aligned(self.start()));
         debug_assert!(R::is_aligned(self.end()));
 
-        let start = R::from(self.start());
-        let end = R::from(self.end());
+        let start = R::from_aligned_address(self.start());
+        let end = R::from_aligned_address(self.end());
         RegionIterator::<R>::new(start, end)
     }
 }

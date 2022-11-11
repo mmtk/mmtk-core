@@ -64,30 +64,26 @@ impl BlockState {
 }
 
 /// Data structure to reference an immix block.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
-
-impl From<Address> for Block {
-    #[inline(always)]
-    fn from(address: Address) -> Block {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-}
-
-impl From<Block> for Address {
-    #[inline(always)]
-    fn from(block: Block) -> Address {
-        block.0
-    }
-}
 
 impl Region for Block {
     #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
     #[cfg(feature = "immix_smaller_block")]
     const LOG_BYTES: usize = 13;
+
+    #[inline(always)]
+    fn from_aligned_address(address: Address) -> Self {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
+    }
+
+    #[inline(always)]
+    fn start(&self) -> Address {
+        self.0
+    }
 }
 
 impl Block {
@@ -111,7 +107,7 @@ impl Block {
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
-        Chunk::from(Chunk::align(self.0))
+        Chunk::from_unaligned_address(self.0)
     }
 
     /// Get the address range of the block's line mark table.
@@ -190,12 +186,12 @@ impl Block {
 
     #[inline(always)]
     pub fn start_line(&self) -> Line {
-        Line::from(self.start())
+        Line::from_aligned_address(self.start())
     }
 
     #[inline(always)]
     pub fn end_line(&self) -> Line {
-        Line::from(self.end())
+        Line::from_aligned_address(self.end())
     }
 
     /// Get the range of lines within the block.

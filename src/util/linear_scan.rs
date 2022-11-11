@@ -76,9 +76,21 @@ impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
 
 /// Region represents a memory region with a properly aligned address as its start and a fixed size for the region.
 /// Region provides a set of utility methods, along with a RegionIterator that linearly scans at the step of a region.
-pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> {
+pub trait Region: Copy + PartialEq + PartialOrd {
     const LOG_BYTES: usize;
     const BYTES: usize = 1 << Self::LOG_BYTES;
+
+    /// Create a region from an address that is aligned to the region boundary. The method should panic if the address
+    /// is not properly aligned to the region. For performance, this method should always be inlined.
+    fn from_aligned_address(address: Address) -> Self;
+    /// Return the start address of the region. For performance, this method should always be inlined.
+    fn start(&self) -> Address;
+
+    /// Create a region from an arbitrary address.
+    #[inline(always)]
+    fn from_unaligned_address(address: Address) -> Self {
+        Self::from_aligned_address(Self::align(address))
+    }
 
     /// Align the address to the region.
     #[inline(always)]
@@ -90,11 +102,7 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     fn is_aligned(address: Address) -> bool {
         address.is_aligned_to(Self::BYTES)
     }
-    /// Return the start address of the region.
-    #[inline(always)]
-    fn start(&self) -> Address {
-        (*self).into()
-    }
+
     /// Return the end address of the region. Note that the end address is not in the region.
     #[inline(always)]
     fn end(&self) -> Address {
@@ -109,12 +117,12 @@ pub trait Region: Copy + PartialEq + PartialOrd + From<Address> + Into<Address> 
     #[inline(always)]
     fn next_nth(&self, n: usize) -> Self {
         debug_assert!(self.start().as_usize() < usize::MAX - (n << Self::LOG_BYTES));
-        Self::from(self.start() + (n << Self::LOG_BYTES))
+        Self::from_aligned_address(self.start() + (n << Self::LOG_BYTES))
     }
     /// Return the region that contains the object (by its cell address).
     #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from(VM::VMObjectModel::ref_to_address(object).align_down(Self::BYTES))
+        Self::from_unaligned_address(VM::VMObjectModel::ref_to_address(object))
     }
     /// Check if the given address is in the region.
     #[inline(always)]
@@ -161,23 +169,19 @@ mod tests {
     #[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
     struct Page(Address);
 
-    impl From<Address> for Page {
+    impl Region for Page {
+        const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
+
         #[inline(always)]
-        fn from(address: Address) -> Page {
+        fn from_aligned_address(address: Address) -> Self {
             debug_assert!(address.is_aligned_to(Self::BYTES));
             Self(address)
         }
-    }
 
-    impl From<Page> for Address {
         #[inline(always)]
-        fn from(page: Page) -> Address {
-            page.0
+        fn start(&self) -> Address {
+            self.0
         }
-    }
-
-    impl Region for Page {
-        const LOG_BYTES: usize = LOG_BYTES_IN_PAGE as usize;
     }
 
     #[test]
@@ -191,7 +195,7 @@ mod tests {
         debug_assert!(Page::is_aligned(addr4k));
         debug_assert!(!Page::is_aligned(addr4k1));
 
-        let page = Page::from(addr4k);
+        let page = Page::from_aligned_address(addr4k);
         // start/end
         debug_assert_eq!(page.start(), addr4k);
         debug_assert_eq!(page.end(), addr4k + PAGE_SIZE);
@@ -204,7 +208,7 @@ mod tests {
     #[test]
     fn test_region_iterator_normal() {
         let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
-        let page = Page::from(addr4k);
+        let page = Page::from_aligned_address(addr4k);
         let end_page = page.next_nth(5);
 
         let mut results = vec![];
@@ -227,7 +231,7 @@ mod tests {
     #[test]
     fn test_region_iterator_same_start_end() {
         let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
-        let page = Page::from(addr4k);
+        let page = Page::from_aligned_address(addr4k);
 
         let mut results = vec![];
         let iter = RegionIterator::new(page, page);
@@ -240,8 +244,8 @@ mod tests {
     #[test]
     fn test_region_iterator_smaller_end() {
         let addr4k = unsafe { Address::from_usize(PAGE_SIZE) };
-        let page = Page::from(addr4k);
-        let end = Page::from(Address::ZERO);
+        let page = Page::from_aligned_address(addr4k);
+        let end = Page::from_aligned_address(Address::ZERO);
 
         let mut results = vec![];
         let iter = RegionIterator::new(page, end);

@@ -364,7 +364,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "malloc_native_mimalloc")]
     fn free(&self, addr: Address) {
-        let block = Block::from(Block::align(addr));
+        let block = Block::from_unaligned_address(addr);
         let block_tls = block.load_tls();
 
         if self.tls == block_tls {

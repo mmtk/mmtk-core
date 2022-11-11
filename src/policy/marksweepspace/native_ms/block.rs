@@ -24,24 +24,20 @@ use std::num::NonZeroUsize;
 #[repr(transparent)]
 pub struct Block(NonZeroUsize);
 
-impl From<Address> for Block {
+impl Region for Block {
+    const LOG_BYTES: usize = 16;
+
     #[inline(always)]
-    fn from(address: Address) -> Block {
+    fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         debug_assert!(!address.is_zero());
         Self(unsafe { NonZeroUsize::new_unchecked(address.as_usize()) })
     }
-}
 
-impl From<Block> for Address {
     #[inline(always)]
-    fn from(block: Block) -> Address {
-        unsafe { Address::from_usize(block.0.get()) }
+    fn start(&self) -> Address {
+        unsafe { Address::from_usize(self.0.get()) }
     }
-}
-
-impl Region for Block {
-    const LOG_BYTES: usize = 16;
 }
 
 impl Block {
@@ -391,7 +387,7 @@ impl Block {
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
-        Chunk::from(Chunk::align(self.start()))
+        Chunk::from_unaligned_address(self.start())
     }
 
     /// Initialize a clean block after acquired from page-resource.

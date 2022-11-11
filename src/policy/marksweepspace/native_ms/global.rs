@@ -302,7 +302,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             {
                 let abandoned_available = &mut abandoned.available;
                 if !abandoned_available[bin].is_empty() {
-                    let block = Block::from(abandoned_available[bin].pop().unwrap().start());
+                    let block = abandoned_available[bin].pop().unwrap();
                     return BlockAcquireResult::AbandonedAvailable(block);
                 }
             }
@@ -310,7 +310,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             {
                 let abandoned_unswept = &mut abandoned.unswept;
                 if !abandoned_unswept[bin].is_empty() {
-                    let block = Block::from(abandoned_unswept[bin].pop().unwrap().start());
+                    let block = abandoned_unswept[bin].pop().unwrap();
                     return BlockAcquireResult::AbandonedUnswept(block);
                 }
             }
@@ -320,7 +320,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         if acquired.is_zero() {
             BlockAcquireResult::Exhausted
         } else {
-            BlockAcquireResult::Fresh(Block::from(acquired))
+            BlockAcquireResult::Fresh(Block::from_unaligned_address(acquired))
         }
     }
 
