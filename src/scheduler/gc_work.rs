@@ -245,6 +245,16 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
+struct SimpleProcessWeakRefs<'a, E: ProcessEdgesWork> {
+    process_edges_work: &'a mut E,
+}
+
+impl<'a, E: ProcessEdgesWork> ProcessWeakRefsContext for SimpleProcessWeakRefs<'a, E> {
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        self.process_edges_work.trace_object(object)
+    }
+}
+
 /// Delegate to the VM binding for reference processing.
 ///
 /// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
@@ -260,9 +270,21 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
+        let mut process_edges_work = E::new(vec![], false, mmtk);
+        {
+            let context = SimpleProcessWeakRefs {
+                process_edges_work: &mut process_edges_work,
+            };
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(context);
+        }
+        let newly_enqueued_nodes = process_edges_work.pop_nodes();
+        let mut process_nodes_work =
+            process_edges_work.create_scan_work(newly_enqueued_nodes, false);
+        process_nodes_work.do_work(worker, mmtk);
+
+        // TODO: Should repeat after the transitive closure is done.
     }
 }
 

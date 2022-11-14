@@ -1,6 +1,6 @@
 use crate::plan::MutatorContext;
 use crate::util::alloc::AllocationError;
-use crate::util::opaque_pointer::*;
+use crate::util::{opaque_pointer::*, ObjectReference};
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
 
@@ -8,6 +8,10 @@ use crate::{scheduler::*, Mutator};
 pub enum GCThreadContext<VM: VMBinding> {
     Controller(Box<GCController<VM>>),
     Worker(Box<GCWorker<VM>>),
+}
+
+pub trait ProcessWeakRefsContext {
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
 /// VM-specific methods for garbage collection.
@@ -102,5 +106,5 @@ pub trait Collection<VM: VMBinding> {
     fn vm_release() {}
 
     /// Delegate to the VM binding for reference processing.
-    fn process_weak_refs(_worker: &mut GCWorker<VM>) {} // FIXME: Add an appropriate factory/callback parameter.
+    fn process_weak_refs(_context: impl ProcessWeakRefsContext) {} // FIXME: Add an appropriate factory/callback parameter.
 }
