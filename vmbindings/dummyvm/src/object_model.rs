@@ -56,6 +56,10 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         object.to_raw_address().sub(OBJECT_REF_OFFSET)
     }
 
+    fn ref_to_header(object: ObjectReference) -> Address {
+        object.to_raw_address()
+    }
+
     fn address_to_ref(addr: Address) -> ObjectReference {
         ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET))
     }

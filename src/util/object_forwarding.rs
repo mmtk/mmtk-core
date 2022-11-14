@@ -100,11 +100,6 @@ pub fn forward_object<VM: VMBinding>(
             Ordering::SeqCst,
         );
     }
-    #[cfg(debug_assertions)]
-    {
-        use crate::policy::sft_map::SFTMap;
-        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(new_object);
-    }
     new_object
 }
 

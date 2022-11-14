@@ -300,16 +300,6 @@ impl Address {
         conversions::raw_is_aligned(self.0, align)
     }
 
-    // /// converts the Address into an ObjectReference
-    // /// # Safety
-    // /// We would expect ObjectReferences point to valid objects,
-    // /// but an arbitrary Address may not reside an object. This conversion is unsafe,
-    // /// and it is the user's responsibility to ensure the safety.
-    // #[inline(always)]
-    // pub unsafe fn to_object_reference(self) -> ObjectReference {
-    //     mem::transmute(self.0)
-    // }
-
     /// converts the Address to a pointer
     #[inline(always)]
     pub fn to_ptr<T>(self) -> *const T {
@@ -465,6 +455,14 @@ mod tests {
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
+///
+/// Regardless of how a runtime defines its object reference, we expect they have
+/// a pointer to the object (an address) in their object reference. And that address should be
+/// used for this `ObjectReference` type.
+///
+/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
+/// their layout, value, and semantics. Major refactoring is needed in MMTk to achieve that,
+/// and we haven't seen a use case for now.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
@@ -472,29 +470,24 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    /// Returns the header base address from an object reference. Any object header metadata
-    /// in the [`crate::vm::ObjectModel`] declars a piece of header metadata with an offset
-    /// from this address.
-    #[inline(always)]
-    pub fn to_header_address(self) -> Address {
-        Address(self.0)
-    }
-
-    /// Cast the object reference to an address.
-    // FIXME: This will be removed when we use an opaque type for `ObjectReference`, as
-    // we can no longer assume we can cast between an object reference and an address. If
-    // a binding implements object references as addresses, they can implement such a method
-    // at the binding side.
+    /// Cast the object reference to its raw address. This method is for the convinience of a binding.
+    ///
+    /// MMTk should not use this method to get an address from an `ObjectReference`. MMTk should not
+    /// assume the address returned by this method is in our allocation. MMTk should not assume the actual
+    /// location of the address.
+    ///
+    /// MMTk should instead use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     #[inline(always)]
     pub fn to_raw_address(self) -> Address {
         Address(self.0)
     }
 
-    /// Cast an address to an object reference.
-    // FIXME: This will be removed when we use an opaque type for `ObjectReference`, as
-    // we can no longer assume we can cast between an object reference and an address. If
-    // a binding implements object references as addresses, they can implement such a method
-    // at the binding side.
+    /// Cast a raw address to an object reference. This method is for the convinience of a binding.
+    /// This is how a binidng creates the `ObjectReference` type.
+    ///
+    /// MMTk should not use this method at all. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object
+    /// references.
     #[inline(always)]
     pub fn from_raw_address(addr: Address) -> ObjectReference {
         ObjectReference(addr.0)

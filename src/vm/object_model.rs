@@ -102,7 +102,7 @@ pub trait ObjectModel<VM: VMBinding> {
         object: ObjectReference,
         mask: Option<T>,
     ) -> T {
-        metadata_spec.load::<T>(object, mask)
+        metadata_spec.load::<T>(Self::ref_to_header(object), mask)
     }
 
     /// A function to atomically load the specified per-object metadata's content.
@@ -122,7 +122,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) -> T {
-        metadata_spec.load_atomic::<T>(object, mask, ordering)
+        metadata_spec.load_atomic::<T>(Self::ref_to_header(object), mask, ordering)
     }
 
     /// A function to non-atomically store a value to the specified per-object metadata.
@@ -144,7 +144,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         mask: Option<T>,
     ) {
-        metadata_spec.store::<T>(object, val, mask)
+        metadata_spec.store::<T>(Self::ref_to_header(object), val, mask)
     }
 
     /// A function to atomically store a value to the specified per-object metadata.
@@ -165,7 +165,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) {
-        metadata_spec.store_atomic::<T>(object, val, mask, ordering)
+        metadata_spec.store_atomic::<T>(Self::ref_to_header(object), val, mask, ordering)
     }
 
     /// A function to atomically compare-and-exchange the specified per-object metadata's content.
@@ -192,7 +192,7 @@ pub trait ObjectModel<VM: VMBinding> {
         failure_order: Ordering,
     ) -> std::result::Result<T, T> {
         metadata_spec.compare_exchange::<T>(
-            object,
+            Self::ref_to_header(object),
             old_val,
             new_val,
             mask,
@@ -219,7 +219,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_add::<T>(object, val, order)
+        metadata_spec.fetch_add::<T>(Self::ref_to_header(object), val, order)
     }
 
     /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
@@ -240,7 +240,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_sub::<T>(object, val, order)
+        metadata_spec.fetch_sub::<T>(Self::ref_to_header(object), val, order)
     }
 
     /// A function to atomically perform a bit-and operation on the specified per-object metadata's content.
@@ -260,7 +260,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_and::<T>(object, val, order)
+        metadata_spec.fetch_and::<T>(Self::ref_to_header(object), val, order)
     }
 
     /// A function to atomically perform a bit-or operation on the specified per-object metadata's content.
@@ -280,7 +280,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_or::<T>(object, val, order)
+        metadata_spec.fetch_or::<T>(Self::ref_to_header(object), val, order)
     }
 
     /// A function to atomically perform an update operation on the specified per-object metadata's content.
@@ -303,7 +303,7 @@ pub trait ObjectModel<VM: VMBinding> {
         fetch_order: Ordering,
         f: F,
     ) -> std::result::Result<T, T> {
-        metadata_spec.fetch_update(object, set_order, fetch_order, f)
+        metadata_spec.fetch_update::<T, F>(Self::ref_to_header(object), set_order, fetch_order, f)
     }
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
@@ -379,25 +379,21 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    // /// Return the lowest address of the storage associated with an object.
-    // ///
-    // /// Arguments:
-    // /// * `object`: The object to be queried.
-    // fn ref_to_address(object: ObjectReference) -> Address;
-
-    // /// Get the object reference from the object start. This is the opposite of
-    // /// `ref_to_address()`.
-    // ///
-    // /// Arguments:
-    // /// * `start`: The object start address.
-    // fn get_object_from_start_address(start: Address) -> ObjectReference;
+    /// Return the header base address from an object reference. Any object header metadata
+    /// in the [`crate::vm::ObjectModel`] declares a piece of header metadata with an offset
+    /// from this address. If a binding does not use any header metadata for MMTk, this method
+    /// will not be called, and the binding can simply `unreachable!()` for the method.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried. It should not be null.
+    fn ref_to_header(object: ObjectReference) -> Address;
 
     /// Return an address guaranteed to be inside the storage associated
     /// with an object. The returned address needs to be deterministic
     /// for an given object.
     ///
     /// Arguments:
-    /// * `object`: The object to be queried.
+    /// * `object`: The object to be queried. It should not be null.
     fn ref_to_address(object: ObjectReference) -> Address;
 
     /// Return an object for a given address returned by `ref_to_address()`.
