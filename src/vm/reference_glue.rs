@@ -43,11 +43,11 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// * `referent`: The referent object reference.
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
-     /// Check if the referent has been cleared.
-     ///
-     /// Arguments:
-     /// * `referent`: The referent object reference.
-     fn is_referent_cleared(referent: ObjectReference) -> bool {
+    /// Check if the referent has been cleared.
+    ///
+    /// Arguments:
+    /// * `referent`: The referent object reference.
+    fn is_referent_cleared(referent: ObjectReference) -> bool {
         referent.is_null()
     }
 
