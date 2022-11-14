@@ -344,7 +344,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             return None;
         }
         self.defrag.notify_new_clean_block(copy);
-        let block = Block::from(block_address);
+        let block = Block::from_aligned_address(block_address);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
         Some(block)

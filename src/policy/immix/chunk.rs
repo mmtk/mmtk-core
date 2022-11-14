@@ -13,27 +13,23 @@ use spin::Mutex;
 use std::{ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, Eq)]
 pub struct Chunk(Address);
 
-impl From<Address> for Chunk {
+impl Region for Chunk {
+    const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
+
     #[inline(always)]
-    fn from(address: Address) -> Chunk {
+    fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
-}
 
-impl From<Chunk> for Address {
     #[inline(always)]
-    fn from(chunk: Chunk) -> Address {
-        chunk.0
+    fn start(&self) -> Address {
+        self.0
     }
-}
-
-impl Region for Chunk {
-    const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
 }
 
 impl Chunk {
@@ -47,8 +43,8 @@ impl Chunk {
     /// Get a range of blocks within this chunk.
     #[inline(always)]
     pub fn blocks(&self) -> RegionIterator<Block> {
-        let start = Block::from(Block::align(self.0));
-        let end = Block::from(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
+        let start = Block::from_unaligned_address(self.0);
+        let end = Block::from_aligned_address(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
         RegionIterator::<Block>::new(start, end)
     }
 

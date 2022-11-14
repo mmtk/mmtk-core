@@ -48,7 +48,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
+    crate::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE;
 
 pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
@@ -173,6 +173,15 @@ pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
     VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
 }
 
+/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
+pub(super) fn compare_exchange_set_page_mark(page_addr: Address) -> bool {
+    // The spec has 1 byte per each page. So it won't be the case that other threads may race and access other bits for the spec.
+    // If the compare-exchange fails, we know the byte was set to 1 before this call.
+    ACTIVE_PAGE_METADATA_SPEC
+        .compare_exchange_atomic::<u8>(page_addr, 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+}
+
 #[allow(unused)]
 pub(super) fn is_page_marked(page_addr: Address) -> bool {
     ACTIVE_PAGE_METADATA_SPEC.load_atomic::<u8>(page_addr, Ordering::SeqCst) == 1
@@ -217,6 +226,7 @@ pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
     alloc_bit::unset_alloc_bit::<VM>(object);
 }
 
+#[allow(unused)]
 pub(super) fn set_page_mark(page_addr: Address) {
     ACTIVE_PAGE_METADATA_SPEC.store_atomic::<u8>(page_addr, 1, Ordering::SeqCst);
 }
@@ -246,6 +256,7 @@ pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
     VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
 }
 
+#[allow(unused)]
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
     ACTIVE_PAGE_METADATA_SPEC.store::<u8>(page_addr, 0)
 }

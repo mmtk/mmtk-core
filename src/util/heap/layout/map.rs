@@ -10,14 +10,22 @@ pub trait Map: Sized {
 
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
-    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList>;
+    /// Create a free-list for a discontiguous space. Must only be called at boot time.
+    /// bind_freelist() must be called by the caller after this method.
+    fn create_freelist(&self, start: Address) -> Box<Self::FreeList>;
 
+    /// Create a free-list for a contiguous space. Must only be called at boot time.
+    /// bind_freelist() must be called by the caller after this method.
     fn create_parent_freelist(
         &self,
-        pr: &CommonFreeListPageResource,
+        start: Address,
         units: usize,
         grain: i32,
     ) -> Box<Self::FreeList>;
+
+    /// Bind a created freelist with the page resource.
+    /// This must called after create_freelist() or create_parent_freelist().
+    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource);
 
     fn allocate_contiguous_chunks(
         &self,
@@ -49,8 +57,6 @@ pub trait Map: Sized {
     fn finalize_static_space_map(&self, from: Address, to: Address);
 
     fn is_finalized(&self) -> bool;
-
-    fn get_discontig_freelist_pr_ordinal(&self, pr: &CommonFreeListPageResource) -> usize;
 
     fn get_descriptor_for_address(&self, address: Address) -> SpaceDescriptor;
 
