@@ -379,10 +379,17 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
+    /// Return the lowest address of the storage associated with an object. This should be
+    /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried. It should not be null.
+    fn ref_to_object_start(object: ObjectReference) -> Address;
+
     /// Return the header base address from an object reference. Any object header metadata
     /// in the [`crate::vm::ObjectModel`] declares a piece of header metadata with an offset
     /// from this address. If a binding does not use any header metadata for MMTk, this method
-    /// will not be called, and the binding can simply `unreachable!()` for the method.
+    /// will not be called, and the binding can simply use `unreachable!()` for the method.
     ///
     /// Arguments:
     /// * `object`: The object to be queried. It should not be null.
@@ -391,6 +398,12 @@ pub trait ObjectModel<VM: VMBinding> {
     /// Return an address guaranteed to be inside the storage associated
     /// with an object. The returned address needs to be deterministic
     /// for an given object.
+    ///
+    /// Any implementation that satisfies the requirements of [`crate::vm::ObjectModel::ref_to_object_start`] is a valid
+    /// implementation for this method as well. However, the requirement for this method is
+    /// looser, and a runtime may be able to provide a more efficient implementation for this method.
+    ///
+    /// Generally, MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///
     /// Arguments:
     /// * `object`: The object to be queried. It should not be null.

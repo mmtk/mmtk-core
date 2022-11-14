@@ -74,7 +74,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
 
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(object);
-        let cell = VM::VMObjectModel::ref_to_address(object);
+        let cell = VM::VMObjectModel::ref_to_object_start(object);
         self.treadmill.add_to_treadmill(cell, alloc);
     }
     #[inline(always)]
@@ -213,7 +213,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::ref_to_address(object);
+                let cell = VM::VMObjectModel::ref_to_object_start(object);
                 self.treadmill.copy(cell, nursery_object);
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.

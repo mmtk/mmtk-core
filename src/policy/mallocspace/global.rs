@@ -480,7 +480,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
                 let current_page =
-                    VM::VMObjectModel::ref_to_address(object).align_down(BYTES_IN_MALLOC_PAGE);
+                    VM::VMObjectModel::ref_to_object_start(object).align_down(BYTES_IN_MALLOC_PAGE);
                 if current_page > *empty_page_start {
                     // we are the only GC thread that is accessing this chunk
                     unsafe {
