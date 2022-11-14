@@ -5,6 +5,7 @@ use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
+use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
 use crate::util::rust_util::unlikely;
@@ -81,7 +82,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
             );
-            if size > Line::BYTES {
+            if get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT) > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(size, align, offset)
             } else {
