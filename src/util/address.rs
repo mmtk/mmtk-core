@@ -470,22 +470,20 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    /// Cast the object reference to its raw address. This method is for the convinience of a binding.
+    /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
     ///
-    /// MMTk should not use this method to get an address from an `ObjectReference`. MMTk should not
-    /// assume the address returned by this method is in our allocation. MMTk should not assume the actual
-    /// location of the address.
-    ///
-    /// MMTk should instead use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
+    /// MMTk should not make any assumption on the actual location of the address with the object reference.
+    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
+    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     #[inline(always)]
     pub fn to_raw_address(self) -> Address {
         Address(self.0)
     }
 
-    /// Cast a raw address to an object reference. This method is for the convinience of a binding.
+    /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binidng creates the `ObjectReference` type.
     ///
-    /// MMTk should not use this method at all. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// MMTk should not assume an address can be turned into an object reference. MTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object
     /// references.
     #[inline(always)]
