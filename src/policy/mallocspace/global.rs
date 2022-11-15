@@ -84,7 +84,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc(addr)
+        has_object_alloced_by_malloc::<VM>(addr).is_some()
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {

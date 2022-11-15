@@ -154,15 +154,20 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 
 /// Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
-    has_object_alloced_by_malloc(VM::VMObjectModel::ref_to_address(object))
+    is_meta_space_mapped_for_address(VM::VMObjectModel::ref_to_address(object))
+        && alloc_bit::is_alloced::<VM>(object)
 }
 
 /// Check if there is an object allocated by malloc at the address.
 ///
 /// This function doesn't check if `addr` is aligned.
 /// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
-pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
-    is_meta_space_mapped_for_address(addr) && alloc_bit::is_alloced_object(addr)
+#[cfg(feature = "is_mmtk_object")]
+pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<ObjectReference> {
+    if !is_meta_space_mapped_for_address(addr) {
+        return None;
+    }
+    alloc_bit::is_alloced_object::<VM>(addr)
 }
 
 pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {

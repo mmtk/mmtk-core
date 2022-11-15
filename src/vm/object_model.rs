@@ -397,13 +397,12 @@ pub trait ObjectModel<VM: VMBinding> {
 
     /// Return an address guaranteed to be inside the storage associated
     /// with an object. The returned address needs to be deterministic
-    /// for an given object.
+    /// for an given object. For a given object, the returned address
+    /// should be a constant offset from the object reference address.
+    /// A binding should not check object metadata in the implementation,
+    /// as MMTk may pass an invalid object reference as input.
     ///
-    /// Any implementation that satisfies the requirements of [`crate::vm::ObjectModel::ref_to_object_start`] is a valid
-    /// implementation for this method as well. However, the requirement for this method is
-    /// looser, and a runtime may be able to provide a more efficient implementation for this method.
-    ///
-    /// Generally, MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
+    /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///
     /// Arguments:
     /// * `object`: The object to be queried. It should not be null.

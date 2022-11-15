@@ -72,6 +72,11 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         #[cfg(feature = "global_alloc_bit")]
         crate::util::alloc_bit::set_alloc_bit::<VM>(object);
     }
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_arbitrary_address_an_object::<VM>(addr)
+    }
     #[inline(always)]
     fn sft_trace_object(
         &self,
