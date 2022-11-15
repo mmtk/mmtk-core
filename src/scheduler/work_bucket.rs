@@ -229,4 +229,6 @@ impl WorkBucketStage {
     }
 }
 
-pub const LAST_CLOSURE_BUCKET: WorkBucketStage = WorkBucketStage::PhantomRefClosure;
+/// This constant tracks the first ref closure bucket. We allow bindings to implement their own
+/// weak reference processing before this bucket is opened and before MMTk's weak reference processing.
+pub const FIRST_REF_CLOSURE_BUCKET: WorkBucketStage = WorkBucketStage::SoftRefClosure;

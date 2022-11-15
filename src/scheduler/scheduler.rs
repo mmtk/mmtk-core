@@ -92,12 +92,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                         move |scheduler: &GCWorkScheduler<VM>| {
                             let should_open = scheduler.are_buckets_drained(&cur_stages);
                             // Additional check before the `RefClosure` bucket opens.
-                            if should_open && stage == LAST_CLOSURE_BUCKET {
+                            if should_open && stage == FIRST_REF_CLOSURE_BUCKET {
                                 if let Some(closure_end) =
                                     scheduler.closure_end.lock().unwrap().as_ref()
                                 {
                                     if closure_end() {
-                                        // Don't open `LAST_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.
+                                        // Don't open `FIRST_REF_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.
                                         return false;
                                     }
                                 }
