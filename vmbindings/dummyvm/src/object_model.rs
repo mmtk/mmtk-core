@@ -52,12 +52,17 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn ref_to_address(object: ObjectReference) -> Address {
+    fn ref_to_object_start(object: ObjectReference) -> Address {
         object.to_raw_address().sub(OBJECT_REF_OFFSET)
     }
 
     fn ref_to_header(object: ObjectReference) -> Address {
         object.to_raw_address()
+    }
+
+    fn ref_to_address(object: ObjectReference) -> Address {
+        // Just use object start.
+        Self::ref_to_object_start(object)
     }
 
     fn address_to_ref(addr: Address) -> ObjectReference {
