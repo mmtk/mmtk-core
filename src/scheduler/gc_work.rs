@@ -245,11 +245,11 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
-struct SimpleProcessWeakRefs<'a, E: ProcessEdgesWork> {
+struct SimpleProcessWeakRefsContext<'a, E: ProcessEdgesWork> {
     process_edges_work: &'a mut E,
 }
 
-impl<'a, E: ProcessEdgesWork> ProcessWeakRefsContext for SimpleProcessWeakRefs<'a, E> {
+impl<'a, E: ProcessEdgesWork> ProcessWeakRefsContext for SimpleProcessWeakRefsContext<'a, E> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self.process_edges_work.trace_object(object)
     }
@@ -275,7 +275,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
         let mut process_edges_work = E::new(vec![], false, mmtk);
 
         let need_to_repeat = {
-            let context = SimpleProcessWeakRefs {
+            let context = SimpleProcessWeakRefsContext {
                 process_edges_work: &mut process_edges_work,
             };
             <E::VM as VMBinding>::VMCollection::process_weak_refs(context)
