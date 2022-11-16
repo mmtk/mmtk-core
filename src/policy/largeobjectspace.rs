@@ -79,7 +79,7 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     #[cfg(feature = "is_mmtk_object")]
     #[inline(always)]
     fn is_mmtk_object(&self, addr: Address) -> bool {
-        crate::util::alloc_bit::is_arbitrary_address_an_object::<VM>(addr)
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
     #[inline(always)]
     fn sft_trace_object(

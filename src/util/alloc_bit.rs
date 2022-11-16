@@ -56,11 +56,12 @@ pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
 
 /// Check if an address can be turned directly into an object reference using the alloc bit.
 /// If so, return `Some(object)`. Otherwise return `None`.
+#[inline]
 pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
     let addr = VM::VMObjectModel::ref_to_address(potential_object);
 
-    // If the address is not mapped, this cannot be an object
+    // If we haven't mapped alloc bit for the address, it cannot be an object
     if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
         return None;
     }
@@ -79,11 +80,12 @@ pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectRefere
 /// # Safety
 ///
 /// This is unsafe: check the comment on `side_metadata::load`
+#[inline]
 pub unsafe fn is_alloced_object_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
     let addr = VM::VMObjectModel::ref_to_address(potential_object);
 
-    // If the address is not mapped, this cannot be an object
+    // If we haven't mapped alloc bit for the address, it cannot be an object
     if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
         return None;
     }
@@ -93,13 +95,6 @@ pub unsafe fn is_alloced_object_unsafe<VM: VMBinding>(address: Address) -> Optio
     } else {
         None
     }
-}
-
-/// Check if an address can be turned directly into an object reference using the alloc bit.
-/// If so, return `Some(object)`. Otherwise return `None`. The address could be arbitrary, and may
-/// not have been mapped by us.
-pub(crate) fn is_arbitrary_address_an_object<VM: VMBinding>(addr: Address) -> bool {
-    addr.is_mapped() && crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
 }
 
 /// Bulk zero the alloc bit.
