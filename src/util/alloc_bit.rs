@@ -58,11 +58,14 @@ pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
 /// If so, return `Some(object)`. Otherwise return `None`.
 pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
-    if ALLOC_SIDE_METADATA_SPEC.load_atomic::<u8>(
-        VM::VMObjectModel::ref_to_address(potential_object),
-        Ordering::SeqCst,
-    ) == 1
-    {
+    let addr = VM::VMObjectModel::ref_to_address(potential_object);
+
+    // If the address is not mapped, this cannot be an object
+    if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
+        return None;
+    }
+
+    if ALLOC_SIDE_METADATA_SPEC.load_atomic::<u8>(addr, Ordering::SeqCst) == 1 {
         Some(potential_object)
     } else {
         None
@@ -78,8 +81,14 @@ pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectRefere
 /// This is unsafe: check the comment on `side_metadata::load`
 pub unsafe fn is_alloced_object_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
-    if ALLOC_SIDE_METADATA_SPEC.load::<u8>(VM::VMObjectModel::ref_to_address(potential_object)) == 1
-    {
+    let addr = VM::VMObjectModel::ref_to_address(potential_object);
+
+    // If the address is not mapped, this cannot be an object
+    if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
+        return None;
+    }
+
+    if ALLOC_SIDE_METADATA_SPEC.load::<u8>(addr) == 1 {
         Some(potential_object)
     } else {
         None
