@@ -184,13 +184,19 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
             // VM-specific weak ref processing
-            self.work_buckets[WorkBucketStage::WeakRefClosure]
-                .add(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new());
+            self.work_buckets[WorkBucketStage::WeakRefClosure].set_boss_work(Box::new(
+                VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(false),
+            ));
 
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
                     .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
+
+                // VM-specific weak ref forwarding
+                self.work_buckets[WorkBucketStage::VMRefForwarding].set_boss_work(Box::new(
+                    VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(true),
+                ));
             }
 
             use crate::util::reference_processor::RefEnqueue;

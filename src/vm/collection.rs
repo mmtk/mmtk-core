@@ -105,10 +105,26 @@ pub trait Collection<VM: VMBinding> {
     /// Inform the VM to do its VM-specific release work at the end of a GC.
     fn vm_release() {}
 
-    /// Delegate to the VM binding for reference processing.
+    /// Process weak references.
+    ///
+    /// The VM binding can do the following in this method:
+    ///
+    /// 1.  Query if an object is already reached.
+    /// 2.  Keep certain objects alive.
+    /// 3.  Clear some weak references.
+    /// 4.  Enqueue objects for further processing, such as finalization.
+    /// 5.  Other operations relevant to the VM.
+    ///
+    /// And the VM binding has the responsibility of:
+    ///
+    /// 1.  Update weak references so that they point to new addresses if the referents are moved.
+    ///     This is for supporting copying GC.
+    ///
+    /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
+    /// currently reached.
     ///
     /// The VM binding can call `context.trace_object(object)` to keep `object` and its decendents
-    /// alive.  Typical uses include:
+    /// alive, and get its new address as return value.  For examles:
     ///
     /// -   In Java, when the VM decides to keep the referent of `SoftReference`, it can call
     ///     `context.trace_object` on the referent.
@@ -118,13 +134,31 @@ pub trait Collection<VM: VMBinding> {
     ///     `context.trace_object` on the value, and return `true` so that MMTk core will call
     ///     `process_weak_refs` again, which will give the VM a chance to handle transitively
     ///     reachable ephemerons.
+    /// -   In all cases, if the referent is still alive, the VM binding still needs to call
+    ///     `context.trace_object` on the referent to get its new address, because the referent
+    ///     may have been moved.
+    ///
+    /// GC algorithms other than mark-compact compute transitive closure only once, and the
+    /// `forwarding` argument is `false`.
+    ///
+    /// Mark-compact GC will compute transive closure twice during each GC.  It will mark objects
+    /// in the first transitive closure, and forward references in the second transitive closure.
+    /// During the second transitive closure, the `forwarding` argument will be `true`, and the VM
+    /// binding is only responsible for updating weak references.  Other things, such as enqueuing
+    /// references for finalizing, should not be repeated.  However, if a reference was put into
+    /// other data structures (such as the finalization queue or a `java.lang.ref.ReferenceQueue`
+    /// in the case of Java) during the first transitive closure, the VM binding needs to update
+    /// the fields of those data structure as well, so that they point to the new locations of
+    /// finalizable objects.
     ///
     /// Arguments:
     /// * `context`: Provides some callback functions for the VM to process weak references.
+    /// * `forwarding`: `true` if this method is called by mark-compact GC during the forwarding
+    ///   stage.
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(_context: impl ProcessWeakRefsContext) -> bool {
+    fn process_weak_refs(_context: impl ProcessWeakRefsContext, _forwarding: bool) -> bool {
         false
     }
 }

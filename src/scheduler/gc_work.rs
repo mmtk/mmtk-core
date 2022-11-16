@@ -260,12 +260,20 @@ impl<'a, E: ProcessEdgesWork> ProcessWeakRefsContext for SimpleProcessWeakRefsCo
 /// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
 /// processing of those weakrefs may be more complex. For such case, we delegate to the
 /// VM binding to process weak references.
-#[derive(Default)]
-pub struct VMProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+///
+/// NOTE: This will replace `{Soft,Weak,Phantom}RefProcessing`, `RefForwarding`,
+/// `Finalization` and `ForwardFinalization` in the future.
+pub struct VMProcessWeakRefs<E: ProcessEdgesWork> {
+    forwarding: bool,
+    phantom_data: PhantomData<E>,
+}
 
 impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
-    pub fn new() -> Self {
-        Self(PhantomData)
+    pub fn new(forwarding: bool) -> Self {
+        Self {
+            forwarding,
+            phantom_data: PhantomData,
+        }
     }
 }
 
@@ -278,13 +286,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
             let context = SimpleProcessWeakRefsContext {
                 process_edges_work: &mut process_edges_work,
             };
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(context)
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(context, false)
         };
 
         if need_to_repeat {
             // Schedule Self as the new "boss" so we'll call `process_weak_refs` again after the
             // current transitive closure.
-            let new_self = Box::new(Self::new());
+            let new_self = Box::new(Self::new(self.forwarding));
             worker.scheduler().work_buckets[WorkBucketStage::VMRefClosure].set_boss_work(new_self);
         }
 
