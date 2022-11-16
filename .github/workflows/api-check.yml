@@ -23,6 +23,7 @@ jobs:
         with:
           toolchain: nightly
           profile: minimal
+          override: true
 
       # Install cargo-public-api
       - run: cargo --version
