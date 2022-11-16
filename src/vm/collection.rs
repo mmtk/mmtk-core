@@ -106,5 +106,25 @@ pub trait Collection<VM: VMBinding> {
     fn vm_release() {}
 
     /// Delegate to the VM binding for reference processing.
-    fn process_weak_refs(_context: impl ProcessWeakRefsContext) {} // FIXME: Add an appropriate factory/callback parameter.
+    ///
+    /// The VM binding can call `context.trace_object(object)` to keep `object` and its decendents
+    /// alive.  Typical uses include:
+    ///
+    /// -   In Java, when the VM decides to keep the referent of `SoftReference`, it can call
+    ///     `context.trace_object` on the referent.
+    /// -   In Java, when a finalizable object is unreachable, it can call `context.trace_object`
+    ///     to resurrect that object and pass it to the finalizer thread.
+    /// -   When implementing ephemerons, if the key is alive, the VM shall call
+    ///     `context.trace_object` on the value, and return `true` so that MMTk core will call
+    ///     `process_weak_refs` again, which will give the VM a chance to handle transitively
+    ///     reachable ephemerons.
+    ///
+    /// Arguments:
+    /// * `context`: Provides some callback functions for the VM to process weak references.
+    ///
+    /// This function shall return true if this function needs to be called again after the GC
+    /// finishes expanding the transitive closure from the objects kept alive.
+    fn process_weak_refs(_context: impl ProcessWeakRefsContext) -> bool {
+        false
+    }
 }

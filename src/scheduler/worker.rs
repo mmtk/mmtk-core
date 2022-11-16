@@ -281,3 +281,29 @@ impl<VM: VMBinding> WorkerGroup<VM> {
             .any(|w| !w.designated_work.is_empty())
     }
 }
+
+/// This ensures the worker always decrements the parked worker count on all control flow paths.
+pub(crate) struct ParkingGuard<'a, VM: VMBinding> {
+    worker_group: &'a WorkerGroup<VM>,
+    all_parked: bool,
+}
+
+impl<'a, VM: VMBinding> ParkingGuard<'a, VM> {
+    pub fn new(worker_group: &'a WorkerGroup<VM>) -> Self {
+        let all_parked = worker_group.inc_parked_workers();
+        ParkingGuard {
+            worker_group,
+            all_parked,
+        }
+    }
+
+    pub fn all_parked(&self) -> bool {
+        self.all_parked
+    }
+}
+
+impl<'a, VM: VMBinding> Drop for ParkingGuard<'a, VM> {
+    fn drop(&mut self) {
+        self.worker_group.dec_parked_workers();
+    }
+}

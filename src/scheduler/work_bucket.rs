@@ -49,6 +49,21 @@ pub struct WorkBucket<VM: VMBinding> {
     prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
     can_open: Option<Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>>,
+    /// After this bucket is activated and all pending work packets (including the packets in this
+    /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
+    /// happens, it will prevent opening subsequent work packets.
+    ///
+    /// The "boss" work packet may set another work packet as the new "boss" which will be added
+    /// to this bucket again after all pending work packets are drained.  This may happend again
+    /// and again, causing the GC to stay at the same stage and drain work packets in a loop.
+    ///
+    /// This is useful for handling weak references that may expand the transitive closure
+    /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  "Boss" work
+    /// can be used repeatedly to discover and process more such objects.
+    ///
+    /// NOTE: In video games, you can't proceed to the next stage until you beat the
+    /// [boss](https://en.wikipedia.org/wiki/Boss_(video_games)) at the end of a stage.
+    boss_work: Mutex<Option<Box<dyn GCWork<VM>>>>,
     group: Arc<WorkerGroup<VM>>,
 }
 
@@ -64,6 +79,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             prioritized_queue: None,
             monitor,
             can_open: None,
+            boss_work: Mutex::new(None),
             group,
         }
     }
@@ -192,6 +208,11 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.can_open = Some(Box::new(pred));
     }
 
+    pub fn set_boss_work(&self, new_boss: Box<dyn GCWork<VM>>) {
+        let mut boss_work = self.boss_work.lock().unwrap();
+        *boss_work = Some(new_boss);
+    }
+
     #[inline(always)]
     pub fn update(&self, scheduler: &GCWorkScheduler<VM>) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
@@ -201,6 +222,20 @@ impl<VM: VMBinding> WorkBucket<VM> {
             }
         }
         false
+    }
+
+    pub fn maybe_schedule_boss(&self) -> bool {
+        debug_assert!(self.is_activated(), "Attempted to schedule boss work while bucket is not open");
+        let maybe_boss_work = {
+            let mut boss_work = self.boss_work.lock().unwrap();
+            boss_work.take()
+        };
+        if let Some(work) = maybe_boss_work {
+            self.add_boxed(work);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -262,5 +297,3 @@ impl WorkBucketStage {
         WorkBucketStage::from_usize(1)
     }
 }
-
-pub const LAST_CLOSURE_BUCKET: WorkBucketStage = WorkBucketStage::PhantomRefClosure;

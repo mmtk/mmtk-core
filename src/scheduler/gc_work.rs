@@ -273,18 +273,28 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
         let mut process_edges_work = E::new(vec![], false, mmtk);
-        {
+
+        let need_to_repeat = {
             let context = SimpleProcessWeakRefs {
                 process_edges_work: &mut process_edges_work,
             };
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(context);
-        }
-        let newly_enqueued_nodes = process_edges_work.pop_nodes();
-        let mut process_nodes_work =
-            process_edges_work.create_scan_work(newly_enqueued_nodes, false);
-        process_nodes_work.do_work(worker, mmtk);
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(context)
+        };
 
-        // TODO: Should repeat after the transitive closure is done.
+        if need_to_repeat {
+            // Schedule Self as the new "boss" so we'll call `process_weak_refs` again after the
+            // current transitive closure.
+            let new_self = Box::new(Self::new());
+            worker.scheduler().work_buckets[WorkBucketStage::VMRefClosure].set_boss_work(new_self);
+        }
+
+        let newly_enqueued_nodes = process_edges_work.pop_nodes();
+
+        if !newly_enqueued_nodes.is_empty() {
+            let mut process_nodes_work =
+                process_edges_work.create_scan_work(newly_enqueued_nodes, false);
+            process_nodes_work.do_work(worker, mmtk);
+        }
     }
 }
 
