@@ -25,6 +25,7 @@ jobs:
           profile: minimal
 
       # Install cargo-public-api
+      - run: cargo --version
       - name: Install cargo-public-api
         run: cargo install cargo-public-api
       - name: API Diff
