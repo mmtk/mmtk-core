@@ -43,6 +43,14 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// * `referent`: The referent object reference.
     fn set_referent(reff: ObjectReference, referent: ObjectReference);
 
+    /// Check if the referent has been cleared.
+    ///
+    /// Arguments:
+    /// * `referent`: The referent object reference.
+    fn is_referent_cleared(referent: ObjectReference) -> bool {
+        referent.is_null()
+    }
+
     /// For weak reference types, if the referent is cleared during GC, the reference
     /// will be added to a queue, and MMTk will call this method to inform
     /// the VM about the changes for those references. This method is used
