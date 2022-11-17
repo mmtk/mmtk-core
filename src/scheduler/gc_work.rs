@@ -286,7 +286,8 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
             let context = SimpleProcessWeakRefsContext {
                 process_edges_work: &mut process_edges_work,
             };
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(context, false)
+            let is_nursery = mmtk.plan.is_current_gc_nursery();
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(context, self.forwarding, is_nursery)
         };
 
         if need_to_repeat {

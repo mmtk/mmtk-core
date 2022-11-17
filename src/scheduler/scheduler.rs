@@ -232,7 +232,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     /// Schedule "boss" work packets for all activated buckets.
     fn schedule_bosses(&self) -> bool {
         let mut new_packets = false;
-        for work_bucket in self.work_buckets.values() {
+        for (id, work_bucket) in self.work_buckets.iter() {
+            trace!("Stage: {:?}: Has boss? {}", id, work_bucket.has_boss_work());
             if work_bucket.is_activated() && work_bucket.maybe_schedule_boss() {
                 new_packets = true;
             }

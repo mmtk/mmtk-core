@@ -213,6 +213,11 @@ impl<VM: VMBinding> WorkBucket<VM> {
         *boss_work = Some(new_boss);
     }
 
+    pub fn has_boss_work(&self) -> bool {
+        let boss_work = self.boss_work.lock().unwrap();
+        boss_work.is_some()
+    }
+
     #[inline(always)]
     pub fn update(&self, scheduler: &GCWorkScheduler<VM>) -> bool {
         if let Some(can_open) = self.can_open.as_ref() {
@@ -231,7 +236,14 @@ impl<VM: VMBinding> WorkBucket<VM> {
             boss_work.take()
         };
         if let Some(work) = maybe_boss_work {
-            self.add_boxed(work);
+            // We cannot call `self.add` now, because:
+            // 1.  The current function is called only when all workers parked, and we are holding
+            //     the monitor lock.  `self.add` also needs that lock to notify other workers.
+            //     Trying to lock it again will result in deadlock.
+            // 2.  After this function returns, the current worker will check if there is pending
+            //     work immediately, and notify other workers.
+            // So we can just "sneak" the boss work packet into the current bucket now.
+            self.queue.push(work);
             true
         } else {
             false

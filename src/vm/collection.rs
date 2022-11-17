@@ -10,7 +10,16 @@ pub enum GCThreadContext<VM: VMBinding> {
     Worker(Box<GCWorker<VM>>),
 }
 
+/// This trait is implemented by the `context` parameter of `Collection::process_weak_refs`.
 pub trait ProcessWeakRefsContext {
+    /// Add `object` to the transitive closure, and return its new address.
+    ///
+    /// During `process_weak_refs`, calling this on an `object` will add it to the transitive
+    /// closure.  MMTk core will continue computing the transitive closure with `object` added to
+    /// the object graph, therefore it will keep `object` and its children alive in this GC.
+    ///
+    /// The return value is the new location of `object`, which may be different when using copying
+    /// GC.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
@@ -134,9 +143,10 @@ pub trait Collection<VM: VMBinding> {
     ///     `context.trace_object` on the value, and return `true` so that MMTk core will call
     ///     `process_weak_refs` again, which will give the VM a chance to handle transitively
     ///     reachable ephemerons.
-    /// -   In all cases, if the referent is still alive, the VM binding still needs to call
-    ///     `context.trace_object` on the referent to get its new address, because the referent
-    ///     may have been moved.
+    ///
+    /// The VM binding also needs to use `context.trace_object` to update weak reference fields,
+    /// even when the referent is still alive, because the referent may be moved to a different
+    /// address.  Things like `*field = context.trace_object(*field)` should work.
     ///
     /// GC algorithms other than mark-compact compute transitive closure only once, and the
     /// `forwarding` argument is `false`.
@@ -155,10 +165,12 @@ pub trait Collection<VM: VMBinding> {
     /// * `context`: Provides some callback functions for the VM to process weak references.
     /// * `forwarding`: `true` if this method is called by mark-compact GC during the forwarding
     ///   stage.
+    /// * `nursery`: `true` if the current GC is a nursery GC.  If the GC is not generational, its
+    ///   value is always `false`.
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(_context: impl ProcessWeakRefsContext, _forwarding: bool) -> bool {
+    fn process_weak_refs(_context: impl ProcessWeakRefsContext, _forwarding: bool, _nursery: bool) -> bool {
         false
     }
 }
