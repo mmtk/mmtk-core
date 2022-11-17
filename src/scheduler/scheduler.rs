@@ -233,8 +233,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
     fn schedule_bosses(&self) -> bool {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
-            trace!("Stage: {:?}: Has boss? {}", id, work_bucket.has_boss_work());
             if work_bucket.is_activated() && work_bucket.maybe_schedule_boss() {
+                trace!("Scheduled boss packet into {:?}", id);
                 new_packets = true;
             }
         }
