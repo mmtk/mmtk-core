@@ -240,14 +240,17 @@ pub(super) fn set_chunk_mark(chunk_start: Address) {
     ACTIVE_CHUNK_METADATA_SPEC.store_atomic::<u8>(chunk_start, 1, Ordering::SeqCst);
 }
 
+/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)
 pub(super) fn is_offset_malloc(address: Address) -> bool {
     unsafe { OFFSET_MALLOC_METADATA_SPEC.load::<u8>(address) == 1 }
 }
 
+/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) fn set_offset_malloc_bit(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store_atomic::<u8>(address, 1, Ordering::SeqCst);
 }
 
+/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
     OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
 }

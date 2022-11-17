@@ -135,7 +135,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
-            let addr = VM::VMObjectModel::ref_to_address(object);
+            let addr = VM::VMObjectModel::ref_to_object_start(object);
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
@@ -372,7 +372,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
             let chunk_start =
-                conversions::chunk_align_down(VM::VMObjectModel::ref_to_address(object));
+                conversions::chunk_align_down(VM::VMObjectModel::ref_to_object_start(object));
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
@@ -440,7 +440,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
     #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
-        let obj_start = VM::VMObjectModel::ref_to_address(object);
+        let obj_start = VM::VMObjectModel::ref_to_object_start(object);
         let offset_malloc_bit = is_offset_malloc(obj_start);
         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
         (obj_start, offset_malloc_bit, bytes)

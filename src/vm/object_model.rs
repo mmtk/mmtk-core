@@ -399,8 +399,11 @@ pub trait ObjectModel<VM: VMBinding> {
     /// with an object. The returned address needs to be deterministic
     /// for an given object. For a given object, the returned address
     /// should be a constant offset from the object reference address.
-    /// A binding should not check object metadata in the implementation,
-    /// as MMTk may pass an invalid object reference as input.
+    ///
+    /// If a binding enables the `is_mmtk_object` feature, MMTk may forge the queried address
+    /// directly into a potential object reference, and call this method on the 'object reference'.
+    /// In that case, the argument `object` may not be a valid object reference,
+    /// and the implementation of this method should not use any object metadata.
     ///
     /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///

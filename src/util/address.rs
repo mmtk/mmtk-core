@@ -461,8 +461,9 @@ mod tests {
 /// used for this `ObjectReference` type.
 ///
 /// We currently do not allow an opaque `ObjectReference` type for which a binding can define
-/// their layout, value, and semantics. Major refactoring is needed in MMTk to achieve that,
-/// and we haven't seen a use case for now.
+/// their layout. We now only allow a binding to define their semantics through a set of
+/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
+/// the opaque `ObjectReference` type, and we haven't seen a use case for now.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
@@ -483,7 +484,7 @@ impl ObjectReference {
     /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
     /// This is how a binidng creates the `ObjectReference` type.
     ///
-    /// MMTk should not assume an address can be turned into an object reference. MTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MTk can use [`crate::vm::ObjectModel::address_to_ref()`]
     /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object
     /// references.
     #[inline(always)]
