@@ -127,16 +127,18 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
                 .add(PhantomRefProcessing::<MarkingProcessEdges<VM>>::new());
 
             // VM-specific weak ref processing
-            scheduler.work_buckets[WorkBucketStage::WeakRefClosure]
-                .set_boss_work(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new(false)));
+            scheduler.work_buckets[WorkBucketStage::WeakRefClosure].set_boss_work(Box::new(
+                VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new(false),
+            ));
 
             use crate::util::reference_processor::RefForwarding;
             scheduler.work_buckets[WorkBucketStage::RefForwarding]
                 .add(RefForwarding::<ForwardingProcessEdges<VM>>::new());
 
             // VM-specific weak ref forwarding
-            scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
-                .set_boss_work(Box::new(VMProcessWeakRefs::<ForwardingProcessEdges<VM>>::new(true)));
+            scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_boss_work(Box::new(
+                VMProcessWeakRefs::<ForwardingProcessEdges<VM>>::new(true),
+            ));
 
             use crate::util::reference_processor::RefEnqueue;
             scheduler.work_buckets[WorkBucketStage::Release].add(RefEnqueue::<VM>::new());

@@ -440,7 +440,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.worker_monitor.1.notify_all();
         }
         // Return this packet and execute it.
-        return work;
+        work
     }
 
     pub fn enable_stat(&self) {

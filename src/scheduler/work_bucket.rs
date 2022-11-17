@@ -230,7 +230,10 @@ impl<VM: VMBinding> WorkBucket<VM> {
     }
 
     pub fn maybe_schedule_boss(&self) -> bool {
-        debug_assert!(self.is_activated(), "Attempted to schedule boss work while bucket is not open");
+        debug_assert!(
+            self.is_activated(),
+            "Attempted to schedule boss work while bucket is not open"
+        );
         let maybe_boss_work = {
             let mut boss_work = self.boss_work.lock().unwrap();
             boss_work.take()
