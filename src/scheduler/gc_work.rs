@@ -108,7 +108,9 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        <C::VM as VMBinding>::VMCollection::vm_release();
+        trace!("VM release start");
+        <C::VM as VMBinding>::VMCollection::vm_release(worker.tls);
+        trace!("VM release end");
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -186,6 +188,11 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
+
+        trace!("VM prepare start");
+        <E::VM as VMBinding>::VMCollection::vm_prepare(worker.tls);
+        trace!("VM prepare end");
+
         mmtk.scheduler.notify_mutators_paused(mmtk);
         if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
             // Prepare mutators if necessary
@@ -287,7 +294,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
                 process_edges_work: &mut process_edges_work,
             };
             let is_nursery = mmtk.plan.is_current_gc_nursery();
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(context, self.forwarding, is_nursery)
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(
+                worker.tls,
+                context,
+                self.forwarding,
+                is_nursery,
+            )
         };
 
         if need_to_repeat {

@@ -260,8 +260,15 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             buckets_updated = buckets_updated || bucket_opened;
             if bucket_opened {
                 new_packets = new_packets || !bucket.is_drained();
-                // Quit the loop. There'are already new packets in the newly opened buckets.
                 if new_packets {
+                    // Quit the loop. There are already new packets in the newly opened buckets.
+                    trace!("Found new packets at stage {:?}.  Break.", id);
+                    break;
+                }
+                new_packets = new_packets || bucket.maybe_schedule_boss();
+                if new_packets {
+                    // Quit the loop. A "boss" packet is added to the newly opened buckets.
+                    trace!("Boss is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }

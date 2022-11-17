@@ -76,6 +76,13 @@ pub trait Collection<VM: VMBinding> {
     ///   In either case, the `Box` inside should be passed back to the called function.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
+    /// Allow VM-specific behaviors after all the mutators are stopped and before any actual GC
+    /// work (including root scanning) starts.
+    ///
+    /// Arguments:
+    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+    fn vm_prepare(_tls: VMWorkerThread) {}
+
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
     /// Arguments:
@@ -112,7 +119,10 @@ pub trait Collection<VM: VMBinding> {
     fn schedule_finalization(_tls: VMWorkerThread) {}
 
     /// Inform the VM to do its VM-specific release work at the end of a GC.
-    fn vm_release() {}
+    ///
+    /// Arguments:
+    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
+    fn vm_release(_tls: VMWorkerThread) {}
 
     /// Process weak references.
     ///
@@ -170,7 +180,12 @@ pub trait Collection<VM: VMBinding> {
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(_context: impl ProcessWeakRefsContext, _forwarding: bool, _nursery: bool) -> bool {
+    fn process_weak_refs(
+        _tls: VMWorkerThread,
+        _context: impl ProcessWeakRefsContext,
+        _forwarding: bool,
+        _nursery: bool,
+    ) -> bool {
         false
     }
 }
