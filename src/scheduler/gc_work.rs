@@ -306,7 +306,13 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
             // Schedule Self as the new "boss" so we'll call `process_weak_refs` again after the
             // current transitive closure.
             let new_self = Box::new(Self::new(self.forwarding));
-            worker.scheduler().work_buckets[WorkBucketStage::VMRefClosure].set_boss_work(new_self);
+
+            let stage = if self.forwarding {
+                WorkBucketStage::VMRefForwarding
+            } else {
+                WorkBucketStage::VMRefClosure
+            };
+            worker.scheduler().work_buckets[stage].set_boss_work(new_self);
         }
 
         let newly_enqueued_nodes = process_edges_work.pop_nodes();

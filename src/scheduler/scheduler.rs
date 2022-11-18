@@ -183,20 +183,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::PhantomRefClosure]
                 .add(PhantomRefProcessing::<C::ProcessEdgesWorkType>::new());
 
-            // VM-specific weak ref processing
-            self.work_buckets[WorkBucketStage::WeakRefClosure].set_boss_work(Box::new(
-                VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(false),
-            ));
-
             use crate::util::reference_processor::RefForwarding;
             if plan.constraints().needs_forward_after_liveness {
                 self.work_buckets[WorkBucketStage::RefForwarding]
                     .add(RefForwarding::<C::ProcessEdgesWorkType>::new());
-
-                // VM-specific weak ref forwarding
-                self.work_buckets[WorkBucketStage::VMRefForwarding].set_boss_work(Box::new(
-                    VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(true),
-                ));
             }
 
             use crate::util::reference_processor::RefEnqueue;
@@ -214,6 +204,31 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                 self.work_buckets[WorkBucketStage::FinalizableForwarding]
                     .add(ForwardFinalization::<C::ProcessEdgesWorkType>::new());
             }
+        }
+
+        // We add the VM-specific weak ref processing work regardless of MMTK-side options,
+        // including Options::no_finalizer and Options::no_reference_types.
+        //
+        // VMs need weak reference handling to function properly.  The VM may treat weak references
+        // as strong references, but it is not appropriate to simply disable weak reference
+        // handling from MMTk's side.  The VM, however, may choose to do nothing in
+        // `Collection::process_weak_refs` if appropriate.
+        //
+        // It is also not sound for MMTk core to turn off weak
+        // reference processing or finalization alone, because (1) not all VMs have the notion of
+        // weak references or finalizers, so it may not make sence, and (2) the VM may
+        // processing them together.
+
+        // VM-specific weak ref processing
+        self.work_buckets[WorkBucketStage::VMRefClosure].set_boss_work(Box::new(
+            VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(false),
+        ));
+
+        if plan.constraints().needs_forward_after_liveness {
+            // VM-specific weak ref forwarding
+            self.work_buckets[WorkBucketStage::VMRefForwarding].set_boss_work(Box::new(
+                VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(true),
+            ));
         }
     }
 
