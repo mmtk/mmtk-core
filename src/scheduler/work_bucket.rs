@@ -53,17 +53,14 @@ pub struct WorkBucket<VM: VMBinding> {
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
     /// happens, it will prevent opening subsequent work packets.
     ///
-    /// The "boss" work packet may set another work packet as the new "boss" which will be added
-    /// to this bucket again after all pending work packets are drained.  This may happend again
-    /// and again, causing the GC to stay at the same stage and drain work packets in a loop.
+    /// The sentinel work packet may set another work packet as the new sentinel which will be
+    /// added to this bucket again after all pending work packets are drained.  This may happend
+    /// again and again, causing the GC to stay at the same stage and drain work packets in a loop.
     ///
     /// This is useful for handling weak references that may expand the transitive closure
-    /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  "Boss" work
+    /// recursively, such as ephemerons and Java-style SoftReference and finalizers.  Sentinels
     /// can be used repeatedly to discover and process more such objects.
-    ///
-    /// NOTE: In video games, you can't proceed to the next stage until you beat the
-    /// [boss](https://en.wikipedia.org/wiki/Boss_(video_games)) at the end of a stage.
-    boss_work: Mutex<Option<Box<dyn GCWork<VM>>>>,
+    sentinel: Mutex<Option<Box<dyn GCWork<VM>>>>,
     group: Arc<WorkerGroup<VM>>,
 }
 
@@ -79,7 +76,7 @@ impl<VM: VMBinding> WorkBucket<VM> {
             prioritized_queue: None,
             monitor,
             can_open: None,
-            boss_work: Mutex::new(None),
+            sentinel: Mutex::new(None),
             group,
         }
     }
@@ -208,14 +205,14 @@ impl<VM: VMBinding> WorkBucket<VM> {
         self.can_open = Some(Box::new(pred));
     }
 
-    pub fn set_boss_work(&self, new_boss: Box<dyn GCWork<VM>>) {
-        let mut boss_work = self.boss_work.lock().unwrap();
-        *boss_work = Some(new_boss);
+    pub fn set_sentinel(&self, new_sentinel: Box<dyn GCWork<VM>>) {
+        let mut sentinel = self.sentinel.lock().unwrap();
+        *sentinel = Some(new_sentinel);
     }
 
-    pub fn has_boss_work(&self) -> bool {
-        let boss_work = self.boss_work.lock().unwrap();
-        boss_work.is_some()
+    pub fn has_sentinel(&self) -> bool {
+        let sentinel = self.sentinel.lock().unwrap();
+        sentinel.is_some()
     }
 
     #[inline(always)]
@@ -229,23 +226,23 @@ impl<VM: VMBinding> WorkBucket<VM> {
         false
     }
 
-    pub fn maybe_schedule_boss(&self) -> bool {
+    pub fn maybe_schedule_sentinel(&self) -> bool {
         debug_assert!(
             self.is_activated(),
-            "Attempted to schedule boss work while bucket is not open"
+            "Attempted to schedule sentinel work while bucket is not open"
         );
-        let maybe_boss_work = {
-            let mut boss_work = self.boss_work.lock().unwrap();
-            boss_work.take()
+        let maybe_sentinel = {
+            let mut sentinel = self.sentinel.lock().unwrap();
+            sentinel.take()
         };
-        if let Some(work) = maybe_boss_work {
+        if let Some(work) = maybe_sentinel {
             // We cannot call `self.add` now, because:
             // 1.  The current function is called only when all workers parked, and we are holding
             //     the monitor lock.  `self.add` also needs that lock to notify other workers.
             //     Trying to lock it again will result in deadlock.
             // 2.  After this function returns, the current worker will check if there is pending
             //     work immediately, and notify other workers.
-            // So we can just "sneak" the boss work packet into the current bucket now.
+            // So we can just "sneak" the sentinel work packet into the current bucket now.
             self.queue.push(work);
             true
         } else {

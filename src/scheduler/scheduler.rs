@@ -220,13 +220,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // processing them together.
 
         // VM-specific weak ref processing
-        self.work_buckets[WorkBucketStage::VMRefClosure].set_boss_work(Box::new(
+        self.work_buckets[WorkBucketStage::VMRefClosure].set_sentinel(Box::new(
             VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(false),
         ));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
-            self.work_buckets[WorkBucketStage::VMRefForwarding].set_boss_work(Box::new(
+            self.work_buckets[WorkBucketStage::VMRefForwarding].set_sentinel(Box::new(
                 VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(true),
             ));
         }
@@ -244,12 +244,12 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         self.work_buckets.values().all(|bucket| bucket.is_empty())
     }
 
-    /// Schedule "boss" work packets for all activated buckets.
-    fn schedule_bosses(&self) -> bool {
+    /// Schedule "sentinel" work packets for all activated buckets.
+    fn schedule_sentinels(&self) -> bool {
         let mut new_packets = false;
         for (id, work_bucket) in self.work_buckets.iter() {
-            if work_bucket.is_activated() && work_bucket.maybe_schedule_boss() {
-                trace!("Scheduled boss packet into {:?}", id);
+            if work_bucket.is_activated() && work_bucket.maybe_schedule_sentinel() {
+                trace!("Scheduled sentinel packet into {:?}", id);
                 new_packets = true;
             }
         }
@@ -280,10 +280,10 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     trace!("Found new packets at stage {:?}.  Break.", id);
                     break;
                 }
-                new_packets = new_packets || bucket.maybe_schedule_boss();
+                new_packets = new_packets || bucket.maybe_schedule_sentinel();
                 if new_packets {
-                    // Quit the loop. A "boss" packet is added to the newly opened buckets.
-                    trace!("Boss is scheduled at stage {:?}.  Break.", id);
+                    // Quit the loop. A sentinel packet is added to the newly opened buckets.
+                    trace!("Sentinel is scheduled at stage {:?}.  Break.", id);
                     break;
                 }
             }
@@ -422,8 +422,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
                     self.worker_monitor.1.notify_all();
                     // The current worker is going to wait, because the designated work is not for it.
                 } else if self.pending_coordinator_packets.load(Ordering::SeqCst) == 0 {
-                    // See if any bucket has a "boss".
-                    if self.schedule_bosses() {
+                    // See if any bucket has a sentinel.
+                    if self.schedule_sentinels() {
                         // We're not going to sleep since new work packets are just scheduled.
                         break 'polling_loop;
                     }
