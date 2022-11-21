@@ -745,6 +745,45 @@ pub fn add_finalizer<VM: VMBinding>(
     mmtk.finalizable_processor.lock().unwrap().add(object);
 }
 
+/// Pin an object. MMTk will make sure that the object does not move
+/// during GC. Note that action cannot happen in some plans, eg, semispace.
+/// It returns true if the pinning operation has been performed, i.e.,
+/// the object status changed from non-pinned to pinned
+///
+/// Arguments:
+/// * `object`: The object to be pinned
+pub fn pin_object(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    use crate::policy::sft_map::SFTMap;
+    SFT_MAP.get_checked(object.to_address()).pin_object(object)
+}
+
+/// Unpin an object.
+/// Returns true if the unpinning operation has been performed, i.e.,
+/// the object status changed from pinned to non-pinned
+///
+/// Arguments:
+/// * `object`: The object to be pinned
+pub fn unpin_object(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    use crate::policy::sft_map::SFTMap;
+    SFT_MAP
+        .get_checked(object.to_address())
+        .unpin_object(object)
+}
+
+/// Check whether an object is currently pinned
+///
+/// Arguments:
+/// * `object`: The object to be checked
+pub fn is_pinned(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    use crate::policy::sft_map::SFTMap;
+    SFT_MAP
+        .get_checked(object.to_address())
+        .is_object_pinned(object)
+}
+
 /// Get an object that is ready for finalization. After each GC, if any registered object is not
 /// alive, this call will return one of the objects. MMTk will retain the liveness of those objects
 /// until they are popped through this call. Once an object is popped, it is the responsibility of

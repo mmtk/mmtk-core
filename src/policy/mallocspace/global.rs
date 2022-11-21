@@ -63,6 +63,18 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         is_marked::<VM>(object, Ordering::SeqCst)
     }
 
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        false
+    }
+
     fn is_movable(&self) -> bool {
         false
     }

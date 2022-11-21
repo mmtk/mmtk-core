@@ -68,9 +68,57 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
         }
     }
+    fn pin_object(&self, object: ObjectReference) -> bool {
+        debug_assert!(
+            !crate::util::object_forwarding::is_forwarded_or_being_forwarded::<VM>(object),
+            "Object to be unpinned should not be forwarded or being forwarded."
+        );
+
+        let res = VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
+            object,
+            0,
+            1,
+            None,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
+
+        match res {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+    fn unpin_object(&self, object: ObjectReference) -> bool {
+        debug_assert!(
+            !crate::util::object_forwarding::is_forwarded_or_being_forwarded::<VM>(object),
+            "Object to be unpinned should not be forwarded or being forwarded."
+        );
+
+        let res = VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.compare_exchange_metadata::<VM, u8>(
+            object,
+            1,
+            0,
+            None,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
+
+        match res {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
+    fn is_object_pinned(&self, object: ObjectReference) -> bool {
+        if unsafe { VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.load::<VM, u8>(object, None) == 1 } {
+            return true;
+        }
+
+        return false;
+    }
     fn is_movable(&self) -> bool {
         super::DEFRAG
     }
+
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
         true
@@ -436,7 +484,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
-        let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
+        let forwarding_status = if Self::is_pinned(object) {
+            0
+        } else {
+            ForwardingWord::attempt_to_forward::<VM>(object)
+        };
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
             // until the object has been forwarded by the winner. Note that the object may not
@@ -471,14 +523,18 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 "Forwarded object is the same as original object {} even though it should have been copied",
                 object,
             );
-            ForwardingWord::clear_forwarding_bits::<VM>(object);
+            if !Self::is_pinned(object) {
+                ForwardingWord::clear_forwarding_bits::<VM>(object);
+            }
             object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
             let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
                 self.attempt_mark(object, self.mark_state);
-                ForwardingWord::clear_forwarding_bits::<VM>(object);
+                if !Self::is_pinned(object) {
+                    ForwardingWord::clear_forwarding_bits::<VM>(object);
+                }
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
@@ -547,9 +603,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Check if an object is pinned.
     #[inline(always)]
-    fn is_pinned(_object: ObjectReference) -> bool {
-        // TODO(wenyuzhao): Object pinning not supported yet.
-        false
+    fn is_pinned(object: ObjectReference) -> bool {
+        use crate::mmtk::SFT_MAP;
+        use crate::policy::sft_map::SFTMap;
+        SFT_MAP
+            .get_checked(object.to_address())
+            .is_object_pinned(object)
     }
 
     /// Hole searching.

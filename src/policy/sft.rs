@@ -45,6 +45,15 @@ pub trait SFT {
         self.is_live(object)
     }
 
+    // Returns true if object status unpinned => pinned
+    fn pin_object(&self, object: ObjectReference) -> bool;
+
+    // Returns true if object status pinned => unpinned
+    fn unpin_object(&self, object: ObjectReference) -> bool;
+
+    // Returns true if object status is currently pinned
+    fn is_object_pinned(&self, object: ObjectReference) -> bool;
+
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
     /// or the object is pinned.
     fn is_movable(&self) -> bool;
@@ -128,6 +137,15 @@ impl SFT for EmptySpaceSFT {
     #[cfg(feature = "sanity")]
     fn is_sane(&self) -> bool {
         warn!("Object in empty space!");
+        false
+    }
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false
     }
     fn is_movable(&self) -> bool {
