@@ -563,7 +563,7 @@ impl<E: ProcessEdgesWork> RootsWorkFactory<EdgeOf<E>> for ProcessEdgesWorkRootsW
         // Note: Node roots cannot be moved.  Currently, this implies that the plan must never
         // move objects.  However, in the future, if we start to support object pinning, then
         // moving plans that support object pinning (such as Immix) can still use node roots.
-        assert!(
+        debug_assert!(
             !self.mmtk.plan.constraints().moves_objects,
             "Attempted to add node roots when using a plan that moves objects.  Plan: {:?}",
             *self.mmtk.options.plan
