@@ -404,6 +404,8 @@ pub trait ObjectModel<VM: VMBinding> {
     /// directly into a potential object reference, and call this method on the 'object reference'.
     /// In that case, the argument `object` may not be a valid object reference,
     /// and the implementation of this method should not use any object metadata.
+    /// However, if a binding, does not use the`is_mmtk_object` feature, they can expect
+    /// the `object` to be valid.
     ///
     /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///

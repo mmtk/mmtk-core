@@ -456,9 +456,11 @@ mod tests {
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
 ///
-/// Regardless of how a runtime defines its object reference, we expect they have
-/// a pointer to the object (an address) in their object reference. And that address should be
-/// used for this `ObjectReference` type.
+/// A runtime may define its "object references" differently. It may define an object reference as
+/// the address of an object, a handle that points to an indirection table entry where a pointer to
+/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
+/// pointer to the object (an address) in each object reference, and that address should be used
+/// for this `ObjectReference` type.
 ///
 /// We currently do not allow an opaque `ObjectReference` type for which a binding can define
 /// their layout. We now only allow a binding to define their semantics through a set of
@@ -482,11 +484,10 @@ impl ObjectReference {
     }
 
     /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
-    /// This is how a binidng creates the `ObjectReference` type.
+    /// This is how a binding creates `ObjectReference` instances.
     ///
-    /// MMTk should not assume an arbitrary address can be turned into an object reference. MTk can use [`crate::vm::ObjectModel::address_to_ref()`]
-    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object
-    /// references.
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
     #[inline(always)]
     pub fn from_raw_address(addr: Address) -> ObjectReference {
         ObjectReference(addr.0)
