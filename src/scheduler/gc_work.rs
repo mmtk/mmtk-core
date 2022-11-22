@@ -254,11 +254,21 @@ impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
 struct SimpleProcessWeakRefsContext<'a, E: ProcessEdgesWork> {
     process_edges_work: &'a mut E,
+    forwarding: bool,
+    nursery: bool,
 }
 
 impl<'a, E: ProcessEdgesWork> ProcessWeakRefsContext for SimpleProcessWeakRefsContext<'a, E> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self.process_edges_work.trace_object(object)
+    }
+
+    fn forwarding(&self) -> bool {
+        self.forwarding
+    }
+
+    fn nursery(&self) -> bool {
+        self.nursery
     }
 }
 
@@ -292,14 +302,10 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
         let need_to_repeat = {
             let context = SimpleProcessWeakRefsContext {
                 process_edges_work: &mut process_edges_work,
+                forwarding: self.forwarding,
+                nursery: mmtk.plan.is_current_gc_nursery(),
             };
-            let is_nursery = mmtk.plan.is_current_gc_nursery();
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(
-                worker.tls,
-                context,
-                self.forwarding,
-                is_nursery,
-            )
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(worker.tls, context)
         };
 
         if need_to_repeat {

@@ -21,6 +21,14 @@ pub trait ProcessWeakRefsContext {
     /// The return value is the new location of `object`, which may be different when using copying
     /// GC.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
+
+    /// Returns `true` if `process_weak_refs` is called during the forwarding phase in MarkCompact.
+    /// Always returns `false` if the GC is not MarkCompact.
+    fn forwarding(&self) -> bool;
+
+    /// Retruns `true` if the current GC is a nursery GC.
+    /// Always returns `false` if not using a generationl GC algorithm.
+    fn nursery(&self) -> bool;
 }
 
 /// VM-specific methods for garbage collection.
@@ -158,12 +166,11 @@ pub trait Collection<VM: VMBinding> {
     /// even when the referent is still alive, because the referent may be moved to a different
     /// address.  Things like `*field = context.trace_object(*field)` should work.
     ///
-    /// GC algorithms other than mark-compact compute transitive closure only once, and the
-    /// `forwarding` argument is `false`.
+    /// GC algorithms other than mark-compact compute transitive closure only once.
     ///
     /// Mark-compact GC will compute transive closure twice during each GC.  It will mark objects
     /// in the first transitive closure, and forward references in the second transitive closure.
-    /// During the second transitive closure, the `forwarding` argument will be `true`, and the VM
+    /// During the second transitive closure, `context.forwarding()` will return `true`, and the VM
     /// binding is only responsible for updating weak references.  Other things, such as enqueuing
     /// references for finalizing, should not be repeated.  However, if a reference was put into
     /// other data structures (such as the finalization queue or a `java.lang.ref.ReferenceQueue`
@@ -172,20 +179,11 @@ pub trait Collection<VM: VMBinding> {
     /// finalizable objects.
     ///
     /// Arguments:
-    /// * `context`: Provides some callback functions for the VM to process weak references.
-    /// * `forwarding`: `true` if this method is called by mark-compact GC during the forwarding
-    ///   stage.
-    /// * `nursery`: `true` if the current GC is a nursery GC.  If the GC is not generational, its
-    ///   value is always `false`.
+    /// * `context`: Provides some methods to query the GC status and process weak references.
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(
-        _tls: VMWorkerThread,
-        _context: impl ProcessWeakRefsContext,
-        _forwarding: bool,
-        _nursery: bool,
-    ) -> bool {
+    fn process_weak_refs(_tls: VMWorkerThread, _context: impl ProcessWeakRefsContext) -> bool {
         false
     }
 }
