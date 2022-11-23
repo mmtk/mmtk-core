@@ -140,10 +140,10 @@ impl SFT for EmptySpaceSFT {
         false
     }
     fn pin_object(&self, _object: ObjectReference) -> bool {
-        false
+        panic!("Cannot pin/unpin objects of EmptySpace.")
     }
     fn unpin_object(&self, _object: ObjectReference) -> bool {
-        false
+        panic!("Cannot pin/unpin objects of EmptySpace.")
     }
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false

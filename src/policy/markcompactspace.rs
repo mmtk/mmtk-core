@@ -53,15 +53,15 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
     }
 
     fn pin_object(&self, _object: ObjectReference) -> bool {
-        unimplemented!()
+        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
     }
 
     fn unpin_object(&self, _object: ObjectReference) -> bool {
-        unimplemented!()
+        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
     }
 
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
-        unimplemented!()
+        false
     }
 
     fn is_movable(&self) -> bool {

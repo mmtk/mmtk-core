@@ -37,15 +37,15 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
     }
 
     fn pin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Pinning and unpinning objects is not supported for CopySpace")
+        panic!("Cannot pin/unpin objects of CopySpace.")
     }
 
     fn unpin_object(&self, _object: ObjectReference) -> bool {
-        panic!("Pinning and unpinning objects is not supported for CopySpace")
+        panic!("Cannot pin/unpin objects of CopySpace.")
     }
 
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
-        panic!("Pinning and unpinning objects is not supported for CopySpace")
+        false
     }
 
     fn is_movable(&self) -> bool {
