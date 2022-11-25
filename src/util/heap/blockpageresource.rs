@@ -334,6 +334,9 @@ impl<B: Region> BlockPool<B> {
     /// Pop a block from the global pool
     #[inline(always)]
     pub fn pop(&self) -> Option<B> {
+        if self.len() == 0 {
+            return None;
+        }
         let head_global_freed_blocks = self.head_global_freed_blocks.upgradeable_read();
         if let Some(block) = head_global_freed_blocks.as_ref().and_then(|q| q.pop()) {
             self.count.fetch_sub(1, Ordering::SeqCst);
