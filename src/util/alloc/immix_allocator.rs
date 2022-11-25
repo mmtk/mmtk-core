@@ -4,6 +4,7 @@ use crate::plan::Plan;
 use crate::policy::immix::line::*;
 use crate::policy::immix::ImmixSpace;
 use crate::policy::space::Space;
+use crate::util::alloc::allocator::get_maximum_aligned_size;
 use crate::util::alloc::Allocator;
 use crate::util::linear_scan::Region;
 use crate::util::opaque_pointer::VMThread;
@@ -81,7 +82,7 @@ impl<VM: VMBinding> Allocator<VM> for ImmixAllocator<VM> {
                 "{:?}: Thread local buffer used up, go to alloc slow path",
                 self.tls
             );
-            if size > Line::BYTES {
+            if get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT) > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(size, align, offset)
             } else {
@@ -328,7 +329,9 @@ impl<VM: VMBinding> ImmixAllocator<VM> {
         // size check and then return the conditions where `alloc_slow_inline()` would be called
         // in an `alloc()` call, namely when both `overflow_alloc()` and `alloc_slow_hot()` fail
         // to service the allocation request
-        if insufficient_space && size > Line::BYTES {
+        if insufficient_space
+            && get_maximum_aligned_size::<VM>(size, align, VM::MIN_ALIGNMENT) > Line::BYTES
+        {
             let start = align_allocation_no_fill::<VM>(self.large_cursor, align, offset);
             let end = start + size;
             end > self.large_limit

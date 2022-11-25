@@ -117,7 +117,7 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         let array = BlockQueue::new();
         let mut cursor = start + B::BYTES;
         while cursor < last_block {
-            unsafe { array.push_relaxed(B::from(cursor)).unwrap() };
+            unsafe { array.push_relaxed(B::from_aligned_address(cursor)).unwrap() };
             cursor += B::BYTES;
         }
         // 4. Push the block list to the global pool
@@ -180,7 +180,7 @@ impl<B: Region> BlockQueue<B> {
     /// Create an array
     #[inline(always)]
     fn new() -> Self {
-        let default_block = B::from(Address::ZERO);
+        let default_block = B::from_aligned_address(Address::ZERO);
         Self {
             cursor: AtomicUsize::new(0),
             data: UnsafeCell::new(vec![default_block; Self::CAPACITY]),
