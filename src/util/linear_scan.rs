@@ -121,7 +121,7 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     /// Return the region that contains the object (by its cell address).
     #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from_unaligned_address(VM::VMObjectModel::ref_to_address(object))
+        Self::from_unaligned_address(object.to_address::<VM>())
     }
 }
 

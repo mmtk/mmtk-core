@@ -451,6 +451,8 @@ mod tests {
     }
 }
 
+use crate::vm::VMBinding;
+
 /// ObjectReference represents address for an object. Compared with Address,
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper
@@ -491,6 +493,33 @@ impl ObjectReference {
     #[inline(always)]
     pub fn from_raw_address(addr: Address) -> ObjectReference {
         ObjectReference(addr.0)
+    }
+
+    /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
+    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
+    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    #[inline(always)]
+    pub fn to_address<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_address(self)
+    }
+
+    /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
+    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
+    /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
+    #[inline(always)]
+    pub fn to_header<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_header(self)
+    }
+
+    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
+    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
+    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    #[inline(always)]
+    pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::address_to_ref(addr)
     }
 
     /// is this object reference null reference?

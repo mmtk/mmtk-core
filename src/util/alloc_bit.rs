@@ -3,7 +3,6 @@ use atomic::Ordering;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
 use crate::util::ObjectReference;
-use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 
 /// An alloc-bit is required per min-object-size aligned address , rather than per object, and can only exist as side metadata.
@@ -19,21 +18,13 @@ pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
         "{:x}: alloc bit already set",
         object
     );
-    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
-        VM::VMObjectModel::ref_to_address(object),
-        1,
-        Ordering::SeqCst,
-    );
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address::<VM>(), 1, Ordering::SeqCst);
 }
 
 /// Atomically unset the alloc bit for an object.
 pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
     debug_assert!(is_alloced::<VM>(object), "{:x}: alloc bit not set", object);
-    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
-        VM::VMObjectModel::ref_to_address(object),
-        0,
-        Ordering::SeqCst,
-    );
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address::<VM>(), 0, Ordering::SeqCst);
 }
 
 /// Non-atomically unset the alloc bit for an object. The caller needs to ensure the side
@@ -44,14 +35,12 @@ pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
 /// This is unsafe: check the comment on `side_metadata::store`
 pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
     debug_assert!(is_alloced::<VM>(object), "{:x}: alloc bit not set", object);
-    ALLOC_SIDE_METADATA_SPEC.store::<u8>(VM::VMObjectModel::ref_to_address(object), 0);
+    ALLOC_SIDE_METADATA_SPEC.store::<u8>(object.to_address::<VM>(), 0);
 }
 
 /// Check if the alloc bit is set for an object.
 pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
-    ALLOC_SIDE_METADATA_SPEC
-        .load_atomic::<u8>(VM::VMObjectModel::ref_to_address(object), Ordering::SeqCst)
-        == 1
+    ALLOC_SIDE_METADATA_SPEC.load_atomic::<u8>(object.to_address::<VM>(), Ordering::SeqCst) == 1
 }
 
 /// Check if an address can be turned directly into an object reference using the alloc bit.
@@ -59,7 +48,7 @@ pub fn is_alloced<VM: VMBinding>(object: ObjectReference) -> bool {
 #[inline]
 pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
-    let addr = VM::VMObjectModel::ref_to_address(potential_object);
+    let addr = potential_object.to_address::<VM>();
 
     // If we haven't mapped alloc bit for the address, it cannot be an object
     if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {
@@ -83,7 +72,7 @@ pub fn is_alloced_object<VM: VMBinding>(address: Address) -> Option<ObjectRefere
 #[inline]
 pub unsafe fn is_alloced_object_unsafe<VM: VMBinding>(address: Address) -> Option<ObjectReference> {
     let potential_object = ObjectReference::from_raw_address(address);
-    let addr = VM::VMObjectModel::ref_to_address(potential_object);
+    let addr = potential_object.to_address::<VM>();
 
     // If we haven't mapped alloc bit for the address, it cannot be an object
     if !ALLOC_SIDE_METADATA_SPEC.is_mapped(addr) {

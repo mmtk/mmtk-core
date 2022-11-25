@@ -154,7 +154,7 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 
 /// Check if a given object was allocated by malloc
 pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
-    is_meta_space_mapped_for_address(VM::VMObjectModel::ref_to_address(object))
+    is_meta_space_mapped_for_address(object.to_address::<VM>())
         && alloc_bit::is_alloced::<VM>(object)
 }
 

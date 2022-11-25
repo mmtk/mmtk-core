@@ -102,7 +102,7 @@ pub trait ObjectModel<VM: VMBinding> {
         object: ObjectReference,
         mask: Option<T>,
     ) -> T {
-        metadata_spec.load::<T>(Self::ref_to_header(object), mask)
+        metadata_spec.load::<T>(object.to_header::<VM>(), mask)
     }
 
     /// A function to atomically load the specified per-object metadata's content.
@@ -122,7 +122,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) -> T {
-        metadata_spec.load_atomic::<T>(Self::ref_to_header(object), mask, ordering)
+        metadata_spec.load_atomic::<T>(object.to_header::<VM>(), mask, ordering)
     }
 
     /// A function to non-atomically store a value to the specified per-object metadata.
@@ -144,7 +144,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         mask: Option<T>,
     ) {
-        metadata_spec.store::<T>(Self::ref_to_header(object), val, mask)
+        metadata_spec.store::<T>(object.to_header::<VM>(), val, mask)
     }
 
     /// A function to atomically store a value to the specified per-object metadata.
@@ -165,7 +165,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) {
-        metadata_spec.store_atomic::<T>(Self::ref_to_header(object), val, mask, ordering)
+        metadata_spec.store_atomic::<T>(object.to_header::<VM>(), val, mask, ordering)
     }
 
     /// A function to atomically compare-and-exchange the specified per-object metadata's content.
@@ -192,7 +192,7 @@ pub trait ObjectModel<VM: VMBinding> {
         failure_order: Ordering,
     ) -> std::result::Result<T, T> {
         metadata_spec.compare_exchange::<T>(
-            Self::ref_to_header(object),
+            object.to_header::<VM>(),
             old_val,
             new_val,
             mask,
@@ -219,7 +219,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_add::<T>(Self::ref_to_header(object), val, order)
+        metadata_spec.fetch_add::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
@@ -240,7 +240,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_sub::<T>(Self::ref_to_header(object), val, order)
+        metadata_spec.fetch_sub::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a bit-and operation on the specified per-object metadata's content.
@@ -260,7 +260,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_and::<T>(Self::ref_to_header(object), val, order)
+        metadata_spec.fetch_and::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a bit-or operation on the specified per-object metadata's content.
@@ -280,7 +280,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_or::<T>(Self::ref_to_header(object), val, order)
+        metadata_spec.fetch_or::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform an update operation on the specified per-object metadata's content.
@@ -303,7 +303,7 @@ pub trait ObjectModel<VM: VMBinding> {
         fetch_order: Ordering,
         f: F,
     ) -> std::result::Result<T, T> {
-        metadata_spec.fetch_update::<T, F>(Self::ref_to_header(object), set_order, fetch_order, f)
+        metadata_spec.fetch_update::<T, F>(object.to_header::<VM>(), set_order, fetch_order, f)
     }
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
@@ -414,7 +414,9 @@ pub trait ObjectModel<VM: VMBinding> {
     fn ref_to_address(object: ObjectReference) -> Address;
 
     /// Return an object for a given address returned by `ref_to_address()`.
-    /// This does exactly the opposite of `ref_to_address()`.
+    /// This does exactly the opposite of `ref_to_address()`. The argument `addr` has
+    /// to be an address that is previously returned from `ref_to_address()`. Invoking this method
+    /// with an unexpected address is undefined behavior.
     ///
     /// Arguments:
     /// * `addr`: An address that is returned from `ref_to_address()`
