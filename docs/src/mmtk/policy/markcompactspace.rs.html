@@ -413,6 +413,12 @@
 <span id="411">411</span>
 <span id="412">412</span>
 <span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::sft::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SpaceOptions</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
@@ -472,12 +478,18 @@
     }
 
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
-        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">object</span>);
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
     }
 
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">addr</span>).<span class="ident">is_some</span>()
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -568,7 +580,7 @@
     <span class="doccomment">/// Get the address for header forwarding pointer</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">header_forwarding_pointer_address</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>) <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>
+        <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>) <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>
     }
 
     <span class="doccomment">/// Get header forwarding pointer for an object</span>
@@ -646,7 +658,7 @@
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="macro">debug_assert!</span>(
-            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
             <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
             <span class="ident">object</span>
         );
@@ -662,7 +674,7 @@
         <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="macro">debug_assert!</span>(
-            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
             <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
             <span class="ident">object</span>
         );
@@ -792,7 +804,7 @@
             );
         <span class="kw">for</span> <span class="ident">obj</span> <span class="kw">in</span> <span class="ident">linear_scan</span> {
             <span class="comment">// clear the alloc bit</span>
-            <span class="ident">alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">obj</span>.<span class="ident">to_address</span>());
+            <span class="ident">alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">obj</span>);
 
             <span class="kw">let</span> <span class="ident">forwarding_pointer</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::get_header_forwarding_pointer</span>(<span class="ident">obj</span>);
 
@@ -806,8 +818,8 @@
                 <span class="macro">trace!</span>(<span class="string">&quot; copy from {} to {}&quot;</span>, <span class="ident">obj</span>, <span class="ident">new_object</span>);
                 <span class="kw">let</span> <span class="ident">end_of_new_object</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">new_object</span>, <span class="ident">Address::ZERO</span>);
                 <span class="comment">// update alloc_bit,</span>
-                <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">new_object</span>);
-                <span class="ident">to</span> <span class="op">=</span> <span class="ident">new_object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="ident">copied_size</span>;
+                <span class="ident">alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>);
+                <span class="ident">to</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">new_object</span>) <span class="op">+</span> <span class="ident">copied_size</span>;
                 <span class="macro">debug_assert_eq!</span>(<span class="ident">end_of_new_object</span>, <span class="ident">to</span>);
             }
         }

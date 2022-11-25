@@ -159,26 +159,8 @@
 <span id="157">157</span>
 <span id="158">158</span>
 <span id="159">159</span>
-<span id="160">160</span>
-<span id="161">161</span>
-<span id="162">162</span>
-<span id="163">163</span>
-<span id="164">164</span>
-<span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
-<span id="168">168</span>
-<span id="169">169</span>
-<span id="170">170</span>
-<span id="171">171</span>
-<span id="172">172</span>
-<span id="173">173</span>
-<span id="174">174</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::marker::PhantomData</span>;
@@ -244,18 +226,7 @@
     <span class="doccomment">/// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.</span>
     <span class="doccomment">/// Such spaces needs to override this method.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// Having found the SFT means the `addr` is in one of our spaces.</span>
-        <span class="comment">// Although the SFT map is allocated eagerly when the space is contiguous,</span>
-        <span class="comment">// the pages of the space itself are acquired on demand.</span>
-        <span class="comment">// Therefore, the page of `addr` may not have been mapped, yet.</span>
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_mapped</span>() {
-            <span class="kw">return</span> <span class="bool-val">false</span>;
-        }
-        <span class="comment">// The `addr` is mapped. We use the global alloc bit to get the exact answer.</span>
-        <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">addr</span>)
-    }
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span>;
 
     <span class="doccomment">/// Initialize object metadata (in the header, or in the side metadata).</span>
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">alloc</span>: <span class="ident">bool</span>);
@@ -342,9 +313,8 @@
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="comment">// We do not have the `VM` type parameter here, so we cannot forward the call to the VM.</span>
         <span class="macro">panic!</span>(
-            <span class="string">&quot;Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().&quot;</span>,
+            <span class="string">&quot;Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().&quot;</span>,
             <span class="ident">object</span>,
-            <span class="ident">conversions::chunk_align_down</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()),
         )
     }
 }

@@ -970,7 +970,7 @@
             <span class="kw">if</span> <span class="op">!</span><span class="op">&lt;</span><span class="ident">E::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMReferenceGlue::is_referent_cleared</span>(<span class="ident">referent</span>) {
                 <span class="ident"><span class="self">Self</span>::keep_referent_alive</span>(<span class="ident">trace</span>, <span class="ident">referent</span>);
             }
-            <span class="macro">trace!</span>(<span class="string">&quot; ~&gt; {:?} (retained)&quot;</span>, <span class="ident">referent</span>.<span class="ident">to_address</span>());
+            <span class="macro">trace!</span>(<span class="string">&quot; ~&gt; {:?} (retained)&quot;</span>, <span class="ident">referent</span>);
         }
 
         <span class="macro">debug!</span>(<span class="string">&quot;Ending ReferenceProcessor.retain({:?})&quot;</span>, <span class="self">self</span>.<span class="ident">semantics</span>);

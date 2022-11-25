@@ -22,7 +22,7 @@ are used as pointer.</li>
 or some arbitrary offset) for some reasons.</li>
 </ul>
 <p>When loading, <code>Edge::load</code> shall decode its internal representation to a “regular”
-<code>ObjectReference</code> which is applicable to <code>ObjectModel::object_start_ref</code>.  The implementation
+<code>ObjectReference</code>.  The implementation
 can do this with any appropriate operations, usually shifting and masking bits or subtracting
 offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a
 VM-neutral way, knowing only <code>ObjectReference</code>.</p>

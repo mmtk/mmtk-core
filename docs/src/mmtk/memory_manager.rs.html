@@ -853,6 +853,11 @@
 <span id="851">851</span>
 <span id="852">852</span>
 <span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -1501,10 +1506,15 @@
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `object`: The object reference to query.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_mmtk_spaces</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_in_mmtk_spaces</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>;
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
-    <span class="ident">SFT_MAP</span>.<span class="ident">get_checked</span>(<span class="ident">object</span>.<span class="ident">to_address</span>()).<span class="ident">is_in_space</span>(<span class="ident">object</span>)
+    <span class="kw">if</span> <span class="ident">object</span>.<span class="ident">is_null</span>() {
+        <span class="kw">return</span> <span class="bool-val">false</span>;
+    }
+    <span class="ident">SFT_MAP</span>
+        .<span class="ident">get_checked</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>())
+        .<span class="ident">is_in_space</span>(<span class="ident">object</span>)
 }
 
 <span class="doccomment">/// Is the address in the mapped memory? The runtime can use this function to check</span>

@@ -34,9 +34,6 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
-<span id="35">35</span>
-<span id="36">36</span>
-<span id="37">37</span>
 </pre><pre class="rust"><code><span class="doccomment">///! Various allocators implementation.</span>
 
 <span class="doccomment">/// The allocator trait and allocation-related functions.</span>
@@ -44,9 +41,6 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::fill_alignment_gap</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::AllocationError</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">allocator::Allocator</span>;
-
-<span class="doccomment">/// Functions to ensure an object reference for an allocation has valid metadata.</span>
-<span class="kw">mod</span> <span class="ident">object_ref_guard</span>;
 
 <span class="doccomment">/// A list of all the allocators, embedded in Mutator</span>
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">allocators</span>;

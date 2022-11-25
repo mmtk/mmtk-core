@@ -336,6 +336,8 @@
 <span id="334">334</span>
 <span id="335">335</span>
 <span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
@@ -411,9 +413,13 @@
         }
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">object</span>);
-        <span class="kw">let</span> <span class="ident">cell</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
-        <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">add_to_treadmill</span>(<span class="ident">cell</span>, <span class="ident">alloc</span>);
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+        <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">add_to_treadmill</span>(<span class="ident">object</span>, <span class="ident">alloc</span>);
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_mmtk_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">addr</span>).<span class="ident">is_some</span>()
     }
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">sft_trace_object</span>(
@@ -543,7 +549,7 @@
     ) -&gt; <span class="ident">ObjectReference</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="macro">debug_assert!</span>(
-            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>(<span class="ident">object</span>),
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>),
             <span class="string">&quot;{:x}: alloc bit not set&quot;</span>,
             <span class="ident">object</span>
         );
@@ -551,8 +557,7 @@
         <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">in_nursery_gc</span> <span class="op">|</span><span class="op">|</span> <span class="ident">nursery_object</span> {
             <span class="comment">// Note that test_and_mark() has side effects</span>
             <span class="kw">if</span> <span class="self">self</span>.<span class="ident">test_and_mark</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) {
-                <span class="kw">let</span> <span class="ident">cell</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
-                <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">copy</span>(<span class="ident">cell</span>, <span class="ident">nursery_object</span>);
+                <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">copy</span>(<span class="ident">object</span>, <span class="ident">nursery_object</span>);
                 <span class="self">self</span>.<span class="ident">clear_nursery</span>(<span class="ident">object</span>);
                 <span class="comment">// We just moved the object out of the logical nursery, mark it as unlogged.</span>
                 <span class="kw">if</span> <span class="ident">nursery_object</span> <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">needs_log_bit</span> {
@@ -566,22 +571,21 @@
     }
 
     <span class="kw">fn</span> <span class="ident">sweep_large_pages</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">sweep_nursery</span>: <span class="ident">bool</span>) {
-        <span class="comment">// FIXME: borrow checker fighting</span>
-        <span class="comment">// didn&#39;t call self.release_multiple_pages</span>
-        <span class="comment">// so the compiler knows I&#39;m borrowing two different fields</span>
+        <span class="kw">let</span> <span class="ident">sweep</span> <span class="op">=</span> <span class="op">|</span><span class="ident">object</span>: <span class="ident">ObjectReference</span><span class="op">|</span> {
+            <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
+            <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
+            <span class="self">self</span>.<span class="ident">pr</span>
+                .<span class="ident">release_pages</span>(<span class="ident">get_super_page</span>(<span class="ident">VM::VMObjectModel::ref_to_object_start</span>(
+                    <span class="ident">object</span>,
+                )));
+        };
         <span class="kw">if</span> <span class="ident">sweep_nursery</span> {
-            <span class="kw">for</span> <span class="ident">cell</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">collect_nursery</span>() {
-                <span class="comment">// println!(&quot;- cn {}&quot;, cell);</span>
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">cell</span>);
-                <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">release_pages</span>(<span class="ident">get_super_page</span>(<span class="ident">cell</span>));
+            <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">collect_nursery</span>() {
+                <span class="ident">sweep</span>(<span class="ident">object</span>);
             }
         } <span class="kw">else</span> {
-            <span class="kw">for</span> <span class="ident">cell</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">collect</span>() {
-                <span class="comment">// println!(&quot;- ts {}&quot;, cell);</span>
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_addr_alloc_bit</span>(<span class="ident">cell</span>);
-                <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">release_pages</span>(<span class="ident">get_super_page</span>(<span class="ident">cell</span>));
+            <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">collect</span>() {
+                <span class="ident">sweep</span>(<span class="ident">object</span>)
             }
         }
     }

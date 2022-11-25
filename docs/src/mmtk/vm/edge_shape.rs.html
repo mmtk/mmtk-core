@@ -296,7 +296,7 @@
 <span class="doccomment">///     or some arbitrary offset) for some reasons.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// When loading, `Edge::load` shall decode its internal representation to a &quot;regular&quot;</span>
-<span class="doccomment">/// `ObjectReference` which is applicable to `ObjectModel::object_start_ref`.  The implementation</span>
+<span class="doccomment">/// `ObjectReference`.  The implementation</span>
 <span class="doccomment">/// can do this with any appropriate operations, usually shifting and masking bits or subtracting</span>
 <span class="doccomment">/// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a</span>
 <span class="doccomment">/// VM-neutral way, knowing only `ObjectReference`.</span>

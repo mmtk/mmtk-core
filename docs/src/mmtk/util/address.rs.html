@@ -558,6 +558,50 @@
 <span id="556">556</span>
 <span id="557">557</span>
 <span id="558">558</span>
+<span id="559">559</span>
+<span id="560">560</span>
+<span id="561">561</span>
+<span id="562">562</span>
+<span id="563">563</span>
+<span id="564">564</span>
+<span id="565">565</span>
+<span id="566">566</span>
+<span id="567">567</span>
+<span id="568">568</span>
+<span id="569">569</span>
+<span id="570">570</span>
+<span id="571">571</span>
+<span id="572">572</span>
+<span id="573">573</span>
+<span id="574">574</span>
+<span id="575">575</span>
+<span id="576">576</span>
+<span id="577">577</span>
+<span id="578">578</span>
+<span id="579">579</span>
+<span id="580">580</span>
+<span id="581">581</span>
+<span id="582">582</span>
+<span id="583">583</span>
+<span id="584">584</span>
+<span id="585">585</span>
+<span id="586">586</span>
+<span id="587">587</span>
+<span id="588">588</span>
+<span id="589">589</span>
+<span id="590">590</span>
+<span id="591">591</span>
+<span id="592">592</span>
+<span id="593">593</span>
+<span id="594">594</span>
+<span id="595">595</span>
+<span id="596">596</span>
+<span id="597">597</span>
+<span id="598">598</span>
+<span id="599">599</span>
+<span id="600">600</span>
+<span id="601">601</span>
+<span id="602">602</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
@@ -860,16 +904,6 @@
         <span class="ident">conversions::raw_is_aligned</span>(<span class="self">self</span>.<span class="number">0</span>, <span class="ident">align</span>)
     }
 
-    <span class="doccomment">/// converts the Address into an ObjectReference</span>
-    <span class="doccomment">/// # Safety</span>
-    <span class="doccomment">/// We would expect ObjectReferences point to valid objects,</span>
-    <span class="doccomment">/// but an arbitrary Address may not reside an object. This conversion is unsafe,</span>
-    <span class="doccomment">/// and it is the user&#39;s responsibility to ensure the safety.</span>
-    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">to_object_reference</span>(<span class="self">self</span>) -&gt; <span class="ident">ObjectReference</span> {
-        <span class="ident">mem::transmute</span>(<span class="self">self</span>.<span class="number">0</span>)
-    }
-
     <span class="doccomment">/// converts the Address to a pointer</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_ptr</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="kw-2">*const</span> <span class="ident">T</span> {
@@ -1021,10 +1055,23 @@
     }
 }
 
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+
 <span class="doccomment">/// ObjectReference represents address for an object. Compared with Address,</span>
 <span class="doccomment">/// operations allowed on ObjectReference are very limited. No address arithmetics</span>
 <span class="doccomment">/// are allowed for ObjectReference. The idea is from the paper</span>
 <span class="doccomment">/// High-level Low-level Programming (VEE09) and JikesRVM.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// A runtime may define its &quot;object references&quot; differently. It may define an object reference as</span>
+<span class="doccomment">/// the address of an object, a handle that points to an indirection table entry where a pointer to</span>
+<span class="doccomment">/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a</span>
+<span class="doccomment">/// pointer to the object (an address) in each object reference, and that address should be used</span>
+<span class="doccomment">/// for this `ObjectReference` type.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// We currently do not allow an opaque `ObjectReference` type for which a binding can define</span>
+<span class="doccomment">/// their layout. We now only allow a binding to define their semantics through a set of</span>
+<span class="doccomment">/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow</span>
+<span class="doccomment">/// the opaque `ObjectReference` type, and we haven&#39;t seen a use case for now.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Eq</span>, <span class="ident">Hash</span>, <span class="ident">PartialOrd</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ObjectReference</span>(<span class="ident">usize</span>);
@@ -1032,10 +1079,51 @@
 <span class="kw">impl</span> <span class="ident">ObjectReference</span> {
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">NULL</span>: <span class="ident">ObjectReference</span> <span class="op">=</span> <span class="ident">ObjectReference</span>(<span class="number">0</span>);
 
-    <span class="doccomment">/// converts the ObjectReference to an Address</span>
+    <span class="doccomment">/// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// MMTk should not make any assumption on the actual location of the address with the object reference.</span>
+    <span class="doccomment">/// MMTk should not assume the address returned by this method is in our allocation. For the purposes of</span>
+    <span class="doccomment">/// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_address</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_raw_address</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
         <span class="ident">Address</span>(<span class="self">self</span>.<span class="number">0</span>)
+    }
+
+    <span class="doccomment">/// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.</span>
+    <span class="doccomment">/// This is how a binding creates `ObjectReference` instances.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]</span>
+    <span class="doccomment">/// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_raw_address</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="ident">ObjectReference</span>(<span class="ident">addr</span>.<span class="number">0</span>)
+    }
+
+    <span class="doccomment">/// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address</span>
+    <span class="doccomment">/// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the</span>
+    <span class="doccomment">/// comments on [`crate::vm::ObjectModel::ref_to_address`].</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_address</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
+        <span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Get the header base address from an object reference. This method is used by MMTk to get a base address for the</span>
+    <span class="doccomment">/// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].</span>
+    <span class="doccomment">/// See the comments on [`crate::vm::ObjectModel::ref_to_header`].</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_header</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="self">self</span>) -&gt; <span class="ident">Address</span> {
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
+        <span class="ident">VM::VMObjectModel::ref_to_header</span>(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]</span>
+    <span class="doccomment">/// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].</span>
+    <span class="doccomment">/// See the comments on [`crate::vm::ObjectModel::address_to_ref`].</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">from_address</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">ObjectReference</span> {
+        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
+        <span class="ident">VM::VMObjectModel::address_to_ref</span>(<span class="ident">addr</span>)
     }
 
     <span class="doccomment">/// is this object reference null reference?</span>

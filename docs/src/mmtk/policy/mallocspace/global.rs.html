@@ -730,6 +730,7 @@
 <span id="728">728</span>
 <span id="729">729</span>
 <span id="730">730</span>
+<span id="731">731</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
@@ -806,7 +807,7 @@
 
     <span class="comment">// For malloc space, we need to further check the alloc bit.</span>
     <span class="kw">fn</span> <span class="ident">is_in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>)
+        <span class="ident">is_alloced_by_malloc</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
     }
 
     <span class="doccomment">/// For malloc space, we just use the side metadata.</span>
@@ -816,12 +817,12 @@
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_zero</span>());
         <span class="comment">// `addr` cannot be mapped by us. It should be mapped by the malloc library.</span>
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">addr</span>.<span class="ident">is_mapped</span>());
-        <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">addr</span>)
+        <span class="ident">has_object_alloced_by_malloc</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">addr</span>).<span class="ident">is_some</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">initialize_object_metadata</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">_alloc</span>: <span class="ident">bool</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;initialize_object_metadata for object {}&quot;</span>, <span class="ident">object</span>);
-        <span class="ident">set_alloc_bit</span>(<span class="ident">object</span>);
+        <span class="ident">set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
@@ -863,11 +864,11 @@
     <span class="comment">// We have assertions in a debug build. We allow this pattern for the release build.</span>
     <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span>
     <span class="kw">fn</span> <span class="ident">in_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">is_alloced_by_malloc</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
 
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="kw">if</span> <span class="ident">ASSERT_ALLOCATION</span> {
-            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>);
             <span class="kw">let</span> <span class="ident">active_mem</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">active_mem</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
             <span class="kw">if</span> <span class="ident">ret</span> {
                 <span class="comment">// The alloc bit tells that the object is in space.</span>
@@ -1096,15 +1097,15 @@
             <span class="kw">return</span> <span class="ident">object</span>;
         }
 
-        <span class="kw">let</span> <span class="ident">address</span> <span class="op">=</span> <span class="ident">object</span>.<span class="ident">to_address</span>();
         <span class="macro">assert!</span>(
             <span class="self">self</span>.<span class="ident">in_space</span>(<span class="ident">object</span>),
             <span class="string">&quot;Cannot mark an object {} that was not alloced by malloc.&quot;</span>,
-            <span class="ident">address</span>,
+            <span class="ident">object</span>,
         );
 
         <span class="kw">if</span> <span class="op">!</span><span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::Relaxed</span>) {
-            <span class="kw">let</span> <span class="ident">chunk_start</span> <span class="op">=</span> <span class="ident">conversions::chunk_align_down</span>(<span class="ident">address</span>);
+            <span class="kw">let</span> <span class="ident">chunk_start</span> <span class="op">=</span>
+                <span class="ident">conversions::chunk_align_down</span>(<span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>));
             <span class="ident">set_mark_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>);
             <span class="ident">set_chunk_mark</span>(<span class="ident">chunk_start</span>);
             <span class="ident">queue</span>.<span class="ident">enqueue</span>(<span class="ident">object</span>);
@@ -1172,7 +1173,7 @@
     <span class="doccomment">/// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">get_malloc_addr_size</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; (<span class="ident">Address</span>, <span class="ident">bool</span>, <span class="ident">usize</span>) {
-        <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::object_start_ref</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">obj_start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>);
         <span class="kw">let</span> <span class="ident">offset_malloc_bit</span> <span class="op">=</span> <span class="ident">is_offset_malloc</span>(<span class="ident">obj_start</span>);
         <span class="kw">let</span> <span class="ident">bytes</span> <span class="op">=</span> <span class="ident">get_malloc_usable_size</span>(<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>);
         (<span class="ident">obj_start</span>, <span class="ident">offset_malloc_bit</span>, <span class="ident">bytes</span>)
@@ -1202,7 +1203,7 @@
             <span class="comment">// Free object</span>
             <span class="self">self</span>.<span class="ident">free_internal</span>(<span class="ident">obj_start</span>, <span class="ident">bytes</span>, <span class="ident">offset_malloc</span>);
             <span class="macro">trace!</span>(<span class="string">&quot;free object {}&quot;</span>, <span class="ident">object</span>);
-            <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>) };
+            <span class="kw">unsafe</span> { <span class="ident">unset_alloc_bit_unsafe</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>) };
 
             <span class="bool-val">true</span>
         } <span class="kw">else</span> {
@@ -1211,7 +1212,8 @@
             <span class="comment">// Unset marks for free pages and update last_object_end</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident">empty_page_start</span>.<span class="ident">is_zero</span>() {
                 <span class="comment">// unset marks for pages since last object</span>
-                <span class="kw">let</span> <span class="ident">current_page</span> <span class="op">=</span> <span class="ident">object</span>.<span class="ident">to_address</span>().<span class="ident">align_down</span>(<span class="ident">BYTES_IN_MALLOC_PAGE</span>);
+                <span class="kw">let</span> <span class="ident">current_page</span> <span class="op">=</span>
+                    <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>).<span class="ident">align_down</span>(<span class="ident">BYTES_IN_MALLOC_PAGE</span>);
                 <span class="kw">if</span> <span class="ident">current_page</span> <span class="op">&gt;</span> <span class="kw-2">*</span><span class="ident">empty_page_start</span> {
                     <span class="comment">// we are the only GC thread that is accessing this chunk</span>
                     <span class="kw">unsafe</span> {

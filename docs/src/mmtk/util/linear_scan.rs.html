@@ -251,7 +251,6 @@
 <span id="249">249</span>
 <span id="250">250</span>
 <span id="251">251</span>
-<span id="252">252</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
@@ -295,13 +294,12 @@
     <span class="kw">fn</span> <span class="ident">next</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="op">&lt;</span><span class="self">Self</span> <span class="kw">as</span> <span class="ident">Iterator</span><span class="op">&gt;</span><span class="ident">::Item</span><span class="op">&gt;</span> {
         <span class="kw">while</span> <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">&lt;</span> <span class="self">self</span>.<span class="ident">end</span> {
             <span class="kw">let</span> <span class="ident">is_object</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">ATOMIC_LOAD_ALLOC_BIT</span> {
-                <span class="ident">alloc_bit::is_alloced_object</span>(<span class="self">self</span>.<span class="ident">cursor</span>)
+                <span class="ident">alloc_bit::is_alloced_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>)
             } <span class="kw">else</span> {
-                <span class="kw">unsafe</span> { <span class="ident">alloc_bit::is_alloced_object_unsafe</span>(<span class="self">self</span>.<span class="ident">cursor</span>) }
+                <span class="kw">unsafe</span> { <span class="ident">alloc_bit::is_alloced_object_unsafe</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="self">self</span>.<span class="ident">cursor</span>) }
             };
 
-            <span class="kw">if</span> <span class="ident">is_object</span> {
-                <span class="kw">let</span> <span class="ident">object</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="self">self</span>.<span class="ident">cursor</span>.<span class="ident">to_object_reference</span>() };
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">object</span>) <span class="op">=</span> <span class="ident">is_object</span> {
                 <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="ident">S::size</span>(<span class="ident">object</span>);
                 <span class="kw">return</span> <span class="prelude-val">Some</span>(<span class="ident">object</span>);
             } <span class="kw">else</span> {
@@ -376,7 +374,7 @@
     <span class="doccomment">/// Return the region that contains the object (by its cell address).</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">containing</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="self">Self</span> {
-        <span class="ident"><span class="self">Self</span>::from_unaligned_address</span>(<span class="ident">VM::VMObjectModel::ref_to_address</span>(<span class="ident">object</span>))
+        <span class="ident"><span class="self">Self</span>::from_unaligned_address</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>())
     }
 }
 

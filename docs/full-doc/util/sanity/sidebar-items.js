@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["memory_scan",""],["sanity_checker",""]]});
+initSidebarItems({"mod":[["sanity_checker",""]]});

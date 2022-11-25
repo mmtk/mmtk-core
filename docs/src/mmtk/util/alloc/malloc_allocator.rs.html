@@ -55,32 +55,8 @@
 <span id="53">53</span>
 <span id="54">54</span>
 <span id="55">55</span>
-<span id="56">56</span>
-<span id="57">57</span>
-<span id="58">58</span>
-<span id="59">59</span>
-<span id="60">60</span>
-<span id="61">61</span>
-<span id="62">62</span>
-<span id="63">63</span>
-<span id="64">64</span>
-<span id="65">65</span>
-<span id="66">66</span>
-<span id="67">67</span>
-<span id="68">68</span>
-<span id="69">69</span>
-<span id="70">70</span>
-<span id="71">71</span>
-<span id="72">72</span>
-<span id="73">73</span>
-<span id="74">74</span>
-<span id="75">75</span>
-<span id="76">76</span>
-<span id="77">77</span>
-<span id="78">78</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::MallocSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::object_ref_guard::object_ref_may_cross_chunk</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::Allocator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -121,29 +97,7 @@
     <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="macro">assert!</span>(<span class="ident">offset</span> <span class="op">&gt;</span><span class="op">=</span> <span class="number">0</span>);
 
-        <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">alloc</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-        <span class="kw">if</span> <span class="op">!</span><span class="ident">object_ref_may_cross_chunk</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">ret</span>) {
-            <span class="ident">ret</span>
-        } <span class="kw">else</span> {
-            <span class="comment">// The address we got does not pass object ref checks. We cache it and free it later.</span>
-            <span class="comment">// We free the results in the end to avoid malloc giving us the free&#39;d address again.</span>
-            <span class="comment">// The creation of the vec is put here so for the common case where we succeed in the first allocation,</span>
-            <span class="comment">// we do not need to create this vec.</span>
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">to_free</span> <span class="op">=</span> <span class="macro">vec!</span>[<span class="ident">ret</span>];
-            <span class="kw">loop</span> {
-                <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">alloc</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
-                <span class="kw">if</span> <span class="ident">object_ref_may_cross_chunk</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">ret</span>) {
-                    <span class="comment">// The result does not pass check. Cache it.</span>
-                    <span class="ident">to_free</span>.<span class="ident">push</span>(<span class="ident">ret</span>);
-                } <span class="kw">else</span> {
-                    <span class="comment">// The result passes the check. We free all the cached results, and return the new result.</span>
-                    <span class="kw">for</span> <span class="ident">addr</span> <span class="kw">in</span> <span class="ident">to_free</span>.<span class="ident">iter</span>() {
-                        <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">free</span>(<span class="kw-2">*</span><span class="ident">addr</span>);
-                    }
-                    <span class="kw">return</span> <span class="ident">ret</span>;
-                }
-            }
-        }
+        <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">alloc</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
     }
 }
 

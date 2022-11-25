@@ -1017,31 +1017,6 @@
 <span id="1015">1015</span>
 <span id="1016">1016</span>
 <span id="1017">1017</span>
-<span id="1018">1018</span>
-<span id="1019">1019</span>
-<span id="1020">1020</span>
-<span id="1021">1021</span>
-<span id="1022">1022</span>
-<span id="1023">1023</span>
-<span id="1024">1024</span>
-<span id="1025">1025</span>
-<span id="1026">1026</span>
-<span id="1027">1027</span>
-<span id="1028">1028</span>
-<span id="1029">1029</span>
-<span id="1030">1030</span>
-<span id="1031">1031</span>
-<span id="1032">1032</span>
-<span id="1033">1033</span>
-<span id="1034">1034</span>
-<span id="1035">1035</span>
-<span id="1036">1036</span>
-<span id="1037">1037</span>
-<span id="1038">1038</span>
-<span id="1039">1039</span>
-<span id="1040">1040</span>
-<span id="1041">1041</span>
-<span id="1042">1042</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This module provides a default implementation of the access functions for in-header metadata.</span>
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -1051,7 +1026,6 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::{<span class="ident">BITS_IN_BYTE</span>, <span class="ident">LOG_BITS_IN_BYTE</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::metadata_val_traits</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident">num_traits::FromPrimitive</span>;
 
 <span class="kw">const</span> <span class="ident">LOG_BITS_IN_U16</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">4</span>;
@@ -1113,8 +1087,8 @@
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">meta_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">object</span>.<span class="ident">to_address</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">byte_offset</span>()
+    <span class="kw">fn</span> <span class="ident">meta_addr</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>) -&gt; <span class="ident">Address</span> {
+        <span class="ident">header</span> <span class="op">+</span> <span class="self">self</span>.<span class="ident">byte_offset</span>()
     }
 
     <span class="comment">// Some common methods for header metadata that is smaller than 1 byte.</span>
@@ -1164,29 +1138,25 @@
     <span class="doccomment">/// # Safety</span>
     <span class="doccomment">/// This is a non-atomic load, thus not thread-safe.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">load_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">None</span>)
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">load</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>, <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>) -&gt; <span class="ident">T</span> {
+        <span class="self">self</span>.<span class="ident">load_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">header</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">None</span>)
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `load_metadata_atomic` method from the `ObjectModel` trait.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">load_atomic</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
     ) -&gt; <span class="ident">T</span> {
-        <span class="self">self</span>.<span class="ident">load_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">Some</span>(<span class="ident">ordering</span>))
+        <span class="self">self</span>.<span class="ident">load_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">header</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">Some</span>(<span class="ident">ordering</span>))
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">load_inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">T</span> {
@@ -1200,9 +1170,9 @@
         <span class="kw">let</span> <span class="ident">res</span>: <span class="ident">T</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
             <span class="kw">let</span> <span class="ident">byte_val</span> <span class="op">=</span> <span class="kw">unsafe</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
-                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>)).<span class="ident">atomic_load</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>(<span class="ident">order</span>)
+                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>)).<span class="ident">atomic_load</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>(<span class="ident">order</span>)
                 } <span class="kw">else</span> {
-                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>)).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>()
+                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>)).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>()
                 }
             };
 
@@ -1210,9 +1180,9 @@
         } <span class="kw">else</span> {
             <span class="kw">unsafe</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
-                    <span class="ident">T::load_atomic</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">order</span>)
+                    <span class="ident">T::load_atomic</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">order</span>)
                 } <span class="kw">else</span> {
-                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>)).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
+                    (<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>)).<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>()
                 }
             }
         };
@@ -1233,11 +1203,11 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">val</span>: <span class="ident">T</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
     ) {
-        <span class="self">self</span>.<span class="ident">store_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">None</span>)
+        <span class="self">self</span>.<span class="ident">store_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">header</span>, <span class="ident">val</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">None</span>)
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `store_metadata_atomic` method from the `ObjectModel` trait.</span>
@@ -1246,18 +1216,18 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">store_atomic</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">val</span>: <span class="ident">T</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">ordering</span>: <span class="ident">Ordering</span>,
     ) {
-        <span class="self">self</span>.<span class="ident">store_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">val</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">Some</span>(<span class="ident">ordering</span>))
+        <span class="self">self</span>.<span class="ident">store_inner</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="ident">header</span>, <span class="ident">val</span>, <span class="ident">optional_mask</span>, <span class="prelude-val">Some</span>(<span class="ident">ordering</span>))
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">store_inner</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">val</span>: <span class="ident">T</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
         <span class="ident">atomic_ordering</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ordering</span><span class="op">&gt;</span>,
@@ -1271,7 +1241,7 @@
         <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask, and compare_exchange is required</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
             <span class="kw">let</span> <span class="ident">val_u8</span> <span class="op">=</span> <span class="ident">val</span>.<span class="ident">to_u8</span>().<span class="ident">unwrap</span>();
-            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
                 <span class="kw">let</span> <span class="kw">_</span> <span class="op">=</span> <span class="kw">unsafe</span> {
                     <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_update</span>(<span class="ident">byte_addr</span>, <span class="ident">order</span>, <span class="ident">order</span>, <span class="op">|</span><span class="ident">old_val</span>: <span class="ident">u8</span><span class="op">|</span> {
@@ -1286,7 +1256,7 @@
                 }
             }
         } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
             <span class="kw">unsafe</span> {
                 <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">order</span>) <span class="op">=</span> <span class="ident">atomic_ordering</span> {
                     <span class="comment">// if the optional mask is provided (e.g. for forwarding pointer), we need to use compare_exchange</span>
@@ -1316,7 +1286,7 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">compare_exchange</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">old_metadata</span>: <span class="ident">T</span>,
         <span class="ident">new_metadata</span>: <span class="ident">T</span>,
         <span class="ident">optional_mask</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>,
@@ -1327,7 +1297,7 @@
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="comment">// metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required</span>
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
-            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
             <span class="kw">unsafe</span> {
                 <span class="kw">let</span> <span class="ident">real_old_byte</span> <span class="op">=</span> <span class="ident">byte_addr</span>.<span class="ident">atomic_load</span>::<span class="op">&lt;</span><span class="ident">AtomicU8</span><span class="op">&gt;</span>(<span class="ident">success_order</span>);
                 <span class="kw">let</span> <span class="ident">expected_old_byte</span> <span class="op">=</span>
@@ -1345,7 +1315,7 @@
                     .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">x</span><span class="op">|</span> <span class="ident">FromPrimitive::from_u8</span>(<span class="ident">x</span>).<span class="ident">unwrap</span>())
             }
         } <span class="kw">else</span> {
-            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
             <span class="kw">let</span> (<span class="ident">old_metadata</span>, <span class="ident">new_metadata</span>) <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">mask</span>) <span class="op">=</span> <span class="ident">optional_mask</span> {
                 <span class="kw">let</span> <span class="ident">old_byte</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">T::load_atomic</span>(<span class="ident">addr</span>, <span class="ident">success_order</span>) };
                 <span class="kw">let</span> <span class="ident">expected_new_byte</span> <span class="op">=</span> <span class="ident">old_byte</span>.<span class="ident">bitand</span>(<span class="ident">mask</span>.<span class="ident">inv</span>()).<span class="ident">bitor</span>(<span class="ident">new_metadata</span>);
@@ -1372,12 +1342,12 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">fetch_ops_on_bits</span><span class="op">&lt;</span><span class="ident">F</span>: <span class="ident">Fn</span>(<span class="ident">u8</span>) -&gt; <span class="ident">u8</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
         <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
         <span class="ident">update</span>: <span class="ident">F</span>,
     ) -&gt; <span class="ident">u8</span> {
-        <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
         <span class="kw">let</span> <span class="ident">old_raw_byte</span> <span class="op">=</span> <span class="kw">unsafe</span> {
             <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_update</span>(
                 <span class="ident">byte_addr</span>,
@@ -1397,52 +1367,37 @@
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">T</span>,
-        <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">T</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_add</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">T</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
-            <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">fetch_ops_on_bits</span>(<span class="ident">object</span>, <span class="ident">order</span>, <span class="ident">order</span>, <span class="op">|</span><span class="ident">x</span>: <span class="ident">u8</span><span class="op">|</span> {
+            <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">fetch_ops_on_bits</span>(<span class="ident">header</span>, <span class="ident">order</span>, <span class="ident">order</span>, <span class="op">|</span><span class="ident">x</span>: <span class="ident">u8</span><span class="op">|</span> {
                 <span class="ident">x</span>.<span class="ident">wrapping_add</span>(<span class="ident">val</span>.<span class="ident">to_u8</span>().<span class="ident">unwrap</span>())
             }))
             .<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">T::fetch_add</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
+            <span class="kw">unsafe</span> { <span class="ident">T::fetch_add</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
         }
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_sub` method from the `ObjectModel` trait.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">T</span>,
-        <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">T</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_sub</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">T</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
-            <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">fetch_ops_on_bits</span>(<span class="ident">object</span>, <span class="ident">order</span>, <span class="ident">order</span>, <span class="op">|</span><span class="ident">x</span>: <span class="ident">u8</span><span class="op">|</span> {
+            <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">fetch_ops_on_bits</span>(<span class="ident">header</span>, <span class="ident">order</span>, <span class="ident">order</span>, <span class="op">|</span><span class="ident">x</span>: <span class="ident">u8</span><span class="op">|</span> {
                 <span class="ident">x</span>.<span class="ident">wrapping_sub</span>(<span class="ident">val</span>.<span class="ident">to_u8</span>().<span class="ident">unwrap</span>())
             }))
             .<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">T::fetch_sub</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
+            <span class="kw">unsafe</span> { <span class="ident">T::fetch_sub</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
         }
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_and` method from the `ObjectModel` trait.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_and</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">T</span>,
-        <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">T</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_and</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">T</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
@@ -1450,22 +1405,17 @@
             <span class="kw">let</span> <span class="ident">new_val</span> <span class="op">=</span> (<span class="ident">val</span>.<span class="ident">to_u8</span>().<span class="ident">unwrap</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>) <span class="op">|</span> <span class="op">!</span><span class="ident">mask</span>;
             <span class="comment">// We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and</span>
             <span class="kw">let</span> <span class="ident">old_raw_byte</span> <span class="op">=</span>
-                <span class="kw">unsafe</span> { <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_and</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">new_val</span>, <span class="ident">order</span>) };
+                <span class="kw">unsafe</span> { <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_and</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">new_val</span>, <span class="ident">order</span>) };
             <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_bits_from_u8</span>(<span class="ident">old_raw_byte</span>);
             <span class="ident">FromPrimitive::from_u8</span>(<span class="ident">old_val</span>).<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">T::fetch_and</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
+            <span class="kw">unsafe</span> { <span class="ident">T::fetch_and</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
         }
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_or` method from the `ObjectModel` trait.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_or</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
-        <span class="ident">val</span>: <span class="ident">T</span>,
-        <span class="ident">order</span>: <span class="ident">Ordering</span>,
-    ) -&gt; <span class="ident">T</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_or</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">header</span>: <span class="ident">Address</span>, <span class="ident">val</span>: <span class="ident">T</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">T</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
@@ -1473,28 +1423,28 @@
             <span class="kw">let</span> <span class="ident">new_val</span> <span class="op">=</span> (<span class="ident">val</span>.<span class="ident">to_u8</span>().<span class="ident">unwrap</span>() <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">lshift</span>) <span class="op">&amp;</span> <span class="ident">mask</span>;
             <span class="comment">// We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 0, and do fetch_or</span>
             <span class="kw">let</span> <span class="ident">old_raw_byte</span> <span class="op">=</span>
-                <span class="kw">unsafe</span> { <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_or</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">new_val</span>, <span class="ident">order</span>) };
+                <span class="kw">unsafe</span> { <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_or</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">new_val</span>, <span class="ident">order</span>) };
             <span class="kw">let</span> <span class="ident">old_val</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">get_bits_from_u8</span>(<span class="ident">old_raw_byte</span>);
             <span class="ident">FromPrimitive::from_u8</span>(<span class="ident">old_val</span>).<span class="ident">unwrap</span>()
         } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">T::fetch_or</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
+            <span class="kw">unsafe</span> { <span class="ident">T::fetch_or</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">val</span>, <span class="ident">order</span>) }
         }
     }
 
     <span class="doccomment">/// This function provides a default implementation for the `fetch_update` method from the `ObjectModel` trait.</span>
     <span class="doccomment">/// The semantics is the same as Rust&#39;s `fetch_update` on atomic types.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_update</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span><span class="op">&gt;</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">fetch_update</span><span class="op">&lt;</span><span class="ident">T</span>: <span class="ident">MetadataValue</span>, <span class="ident">F</span>: <span class="ident">FnMut</span>(<span class="ident">T</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Copy</span><span class="op">&gt;</span>(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        <span class="ident">object</span>: <span class="ident">ObjectReference</span>,
+        <span class="ident">header</span>: <span class="ident">Address</span>,
         <span class="ident">set_order</span>: <span class="ident">Ordering</span>,
         <span class="ident">fetch_order</span>: <span class="ident">Ordering</span>,
-        <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">T</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">+</span> <span class="ident">Copy</span>,
+        <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="ident">F</span>,
     ) -&gt; <span class="ident">std::result::Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">T</span><span class="op">&gt;</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
         <span class="self">self</span>.<span class="ident">assert_spec</span>::<span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>();
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">num_of_bits</span> <span class="op">&lt;</span> <span class="number">8</span> {
-            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>);
+            <span class="kw">let</span> <span class="ident">byte_addr</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>);
             <span class="kw">unsafe</span> {
                 <span class="op">&lt;</span><span class="ident">u8</span> <span class="kw">as</span> <span class="ident">MetadataValue</span><span class="op">&gt;</span><span class="ident">::fetch_update</span>(
                     <span class="ident">byte_addr</span>,
@@ -1512,7 +1462,7 @@
             .<span class="ident">map</span>(<span class="op">|</span><span class="ident">raw_byte</span><span class="op">|</span> <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">get_bits_from_u8</span>(<span class="ident">raw_byte</span>)).<span class="ident">unwrap</span>())
             .<span class="ident">map_err</span>(<span class="op">|</span><span class="ident">raw_byte</span><span class="op">|</span> <span class="ident">FromPrimitive::from_u8</span>(<span class="self">self</span>.<span class="ident">get_bits_from_u8</span>(<span class="ident">raw_byte</span>)).<span class="ident">unwrap</span>())
         } <span class="kw">else</span> {
-            <span class="kw">unsafe</span> { <span class="ident">T::fetch_update</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">object</span>), <span class="ident">set_order</span>, <span class="ident">fetch_order</span>, <span class="ident">f</span>) }
+            <span class="kw">unsafe</span> { <span class="ident">T::fetch_update</span>(<span class="self">self</span>.<span class="ident">meta_addr</span>(<span class="ident">header</span>), <span class="ident">set_order</span>, <span class="ident">fetch_order</span>, <span class="ident">f</span>) }
         }
     }
 }
@@ -1700,7 +1650,7 @@
     <span class="macro">macro_rules!</span> <span class="ident">impl_with_object</span> {
         (<span class="macro-nonterminal">$</span><span class="kw">type</span>: <span class="macro-nonterminal">ty</span>) =&gt; {
             <span class="macro">paste!</span>{
-                <span class="kw">fn</span> [<span class="op">&lt;</span><span class="ident">with_</span> <span class="macro-nonterminal">$</span><span class="kw">type</span> <span class="macro-nonterminal">_obj</span><span class="op">&gt;</span>]<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>) <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">ObjectReference</span>, <span class="kw-2">*mut</span> <span class="macro-nonterminal">$</span><span class="kw">type</span>) <span class="op">+</span> <span class="macro-nonterminal">std::panic::UnwindSafe</span> {
+                <span class="kw">fn</span> [<span class="op">&lt;</span><span class="ident">with_</span> <span class="macro-nonterminal">$</span><span class="kw">type</span> <span class="macro-nonterminal">_obj</span><span class="op">&gt;</span>]<span class="op">&lt;</span><span class="ident">F</span><span class="op">&gt;</span>(<span class="ident">f</span>: <span class="ident">F</span>) <span class="kw">where</span> <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="ident">Address</span>, <span class="kw-2">*mut</span> <span class="macro-nonterminal">$</span><span class="kw">type</span>) <span class="op">+</span> <span class="macro-nonterminal">std::panic::UnwindSafe</span> {
                     <span class="comment">// Allocate a tuple that can hold 3 integers</span>
                     <span class="kw">let</span> <span class="ident">ty_size</span> <span class="op">=</span> (<span class="macro-nonterminal">$</span><span class="kw">type</span><span class="macro-nonterminal">::BITS</span> <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BITS_IN_BYTE</span>) <span class="kw">as</span> <span class="ident">usize</span>;
                     <span class="kw">let</span> <span class="ident">layout</span> <span class="op">=</span> <span class="ident">std::alloc::Layout::from_size_align</span>(<span class="ident">ty_size</span> <span class="op">*</span> <span class="number">3</span>, <span class="ident">ty_size</span>).<span class="ident">unwrap</span>();
@@ -1712,7 +1662,7 @@
                         <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">ptr_mid</span>.<span class="ident">offset</span>(<span class="op">-</span><span class="number">1</span>)) }, <span class="number">0</span>, <span class="string">&quot;memory at offset -1 is not zero&quot;</span>);
                         <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="kw-2">*</span><span class="ident">ptr_mid</span> }, <span class="number">0</span>, <span class="string">&quot;memory at offset 0 is not zero&quot;</span>);
                         <span class="macro">assert_eq!</span>(<span class="kw">unsafe</span> { <span class="kw-2">*</span>(<span class="ident">ptr_mid</span>.<span class="ident">offset</span>(<span class="number">1</span>)) }, <span class="number">0</span>, <span class="string">&quot;memory at offset 1 is not zero&quot;</span>);
-                        (<span class="kw">unsafe</span> { <span class="ident">Address::from_ptr</span>(<span class="ident">ptr_mid</span>).<span class="ident">to_object_reference</span>() }, <span class="ident">ptr_mid</span>)
+                        (<span class="ident">Address::from_ptr</span>(<span class="ident">ptr_mid</span>), <span class="ident">ptr_mid</span>)
                     };
                     <span class="ident"><span class="kw">crate</span>::util::test_util::with_cleanup</span>(
                         <span class="op">|</span><span class="op">|</span> <span class="ident">f</span>(<span class="ident">obj</span>, <span class="ident">ptr</span>),

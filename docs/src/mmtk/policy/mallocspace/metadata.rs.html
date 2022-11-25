@@ -279,6 +279,14 @@
 <span id="277">277</span>
 <span id="278">278</span>
 <span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
@@ -434,16 +442,21 @@
 }
 
 <span class="doccomment">/// Check if a given object was allocated by malloc</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced_by_malloc</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">object</span>.<span class="ident">to_address</span>())
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_alloced_by_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+    <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>())
+        <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
 }
 
 <span class="doccomment">/// Check if there is an object allocated by malloc at the address.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// This function doesn&#39;t check if `addr` is aligned.</span>
 <span class="doccomment">/// If not, it will try to load the alloc bit for the address rounded down to the metadata&#39;s granularity.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_object_alloced_by_malloc</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
-    <span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">addr</span>) <span class="op">&amp;&amp;</span> <span class="ident">alloc_bit::is_alloced_object</span>(<span class="ident">addr</span>)
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;is_mmtk_object&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">has_object_alloced_by_malloc</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">addr</span>: <span class="ident">Address</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span> {
+    <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped_for_address</span>(<span class="ident">addr</span>) {
+        <span class="kw">return</span> <span class="prelude-val">None</span>;
+    }
+    <span class="ident">alloc_bit::is_alloced_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">addr</span>)
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">is_marked</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) -&gt; <span class="ident">bool</span> {
@@ -494,8 +507,8 @@
     <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>) <span class="op">==</span> <span class="number">1</span>
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_alloc_bit</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::set_alloc_bit</span>(<span class="ident">object</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_mark_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">ordering</span>: <span class="ident">Ordering</span>) {
@@ -503,8 +516,8 @@
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::unset_alloc_bit</span>(<span class="ident">object</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>
@@ -516,20 +529,23 @@
     <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">chunk_start</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
+<span class="doccomment">/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">is_offset_malloc</span>(<span class="ident">address</span>: <span class="ident">Address</span>) -&gt; <span class="ident">bool</span> {
     <span class="kw">unsafe</span> { <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">load</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>) <span class="op">==</span> <span class="number">1</span> }
 }
 
+<span class="doccomment">/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn</span> <span class="ident">set_offset_malloc_bit</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
     <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 
+<span class="doccomment">/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)</span>
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_offset_malloc_bit_unsafe</span>(<span class="ident">address</span>: <span class="ident">Address</span>) {
     <span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>.<span class="ident">store</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">address</span>, <span class="number">0</span>);
 }
 
-<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_unsafe</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
-    <span class="ident">alloc_bit::unset_alloc_bit_unsafe</span>(<span class="ident">object</span>);
+<span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_unsafe</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
+    <span class="ident">alloc_bit::unset_alloc_bit_unsafe</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
 }
 
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused</span>)]</span>

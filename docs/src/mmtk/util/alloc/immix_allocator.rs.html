@@ -405,9 +405,7 @@
 <span id="403">403</span>
 <span id="404">404</span>
 <span id="405">405</span>
-<span id="406">406</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::allocator</span>::{<span class="ident">align_allocation_no_fill</span>, <span class="ident">fill_alignment_gap</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::object_ref_guard::adjust_thread_local_buffer_limit</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immix::ImmixSpace</span>;
@@ -657,7 +655,7 @@
             {
                 <span class="comment">// Find recyclable lines. Update the bump allocation cursor and limit.</span>
                 <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">start_line</span>.<span class="ident">start</span>();
-                <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">adjust_thread_local_buffer_limit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">end_line</span>.<span class="ident">start</span>());
+                <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">end_line</span>.<span class="ident">start</span>();
                 <span class="macro">trace!</span>(
                     <span class="string">&quot;{:?}: acquire_recyclable_lines -&gt; {:?} [{:?}, {:?}) {:?}&quot;</span>,
                     <span class="self">self</span>.<span class="ident">tls</span>,
@@ -715,10 +713,10 @@
                 );
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">request_for_large</span> {
                     <span class="self">self</span>.<span class="ident">large_cursor</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">start</span>();
-                    <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">=</span> <span class="ident">adjust_thread_local_buffer_limit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">block</span>.<span class="ident">end</span>());
+                    <span class="self">self</span>.<span class="ident">large_limit</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">end</span>();
                 } <span class="kw">else</span> {
                     <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">start</span>();
-                    <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">adjust_thread_local_buffer_limit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">block</span>.<span class="ident">end</span>());
+                    <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">end</span>();
                 }
                 <span class="self">self</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
             }

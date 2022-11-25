@@ -219,15 +219,10 @@
 <span id="217">217</span>
 <span id="218">218</span>
 <span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::MetadataSpec</span>;
 <span class="doccomment">/// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">constants</span>, <span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">constants</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::ObjectModel</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
@@ -308,11 +303,11 @@
 ) -&gt; <span class="ident">ObjectReference</span> {
     <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::copy</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>);
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-    <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>(<span class="ident">new_object</span>);
+    <span class="ident"><span class="kw">crate</span>::util::alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>);
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">shift</span>) <span class="op">=</span> <span class="ident">forwarding_bits_offset_in_forwarding_pointer</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>() {
         <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
             <span class="ident">object</span>,
-            <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>() <span class="op">|</span> ((<span class="ident">FORWARDED</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>),
+            <span class="ident">new_object</span>.<span class="ident">to_raw_address</span>().<span class="ident">as_usize</span>() <span class="op">|</span> ((<span class="ident">FORWARDED</span> <span class="kw">as</span> <span class="ident">usize</span>) <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">shift</span>),
             <span class="prelude-val">None</span>,
             <span class="ident">Ordering::SeqCst</span>,
         )
@@ -324,11 +319,6 @@
             <span class="prelude-val">None</span>,
             <span class="ident">Ordering::SeqCst</span>,
         );
-    }
-    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
-    {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
-        <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">assert_valid_entries_for_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>);
     }
     <span class="ident">new_object</span>
 }
@@ -383,15 +373,15 @@
         <span class="ident">object</span>,
     );
 
+    <span class="comment">// We write the forwarding poiner. We know it is an object reference.</span>
     <span class="kw">unsafe</span> {
-        <span class="ident">Address::from_usize</span>(
+        <span class="ident">ObjectReference::from_raw_address</span>(<span class="ident"><span class="kw">crate</span>::util::Address::from_usize</span>(
             <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">load_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
                 <span class="ident">object</span>,
                 <span class="prelude-val">Some</span>(<span class="ident">FORWARDING_POINTER_MASK</span>),
                 <span class="ident">Ordering::SeqCst</span>,
             ),
-        )
-        .<span class="ident">to_object_reference</span>()
+        ))
     }
 }
 
@@ -411,7 +401,7 @@
     <span class="macro">trace!</span>(<span class="string">&quot;GCForwardingWord::write({:#?}, {:x})\n&quot;</span>, <span class="ident">object</span>, <span class="ident">new_object</span>);
     <span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">usize</span><span class="op">&gt;</span>(
         <span class="ident">object</span>,
-        <span class="ident">new_object</span>.<span class="ident">to_address</span>().<span class="ident">as_usize</span>(),
+        <span class="ident">new_object</span>.<span class="ident">to_raw_address</span>().<span class="ident">as_usize</span>(),
         <span class="prelude-val">Some</span>(<span class="ident">FORWARDING_POINTER_MASK</span>),
         <span class="ident">Ordering::SeqCst</span>,
     )

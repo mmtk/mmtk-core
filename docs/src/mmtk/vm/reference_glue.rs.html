@@ -95,11 +95,7 @@
 <span id="93">93</span>
 <span id="94">94</span>
 <span id="95">95</span>
-<span id="96">96</span>
-<span id="97">97</span>
-<span id="98">98</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
+</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
@@ -125,9 +121,7 @@
     <span class="doccomment">/// Arguments:</span>
     <span class="doccomment">/// * `new_reference`: The reference whose referent is to be cleared.</span>
     <span class="kw">fn</span> <span class="ident">clear_referent</span>(<span class="ident">new_reference</span>: <span class="ident">ObjectReference</span>) {
-        <span class="ident"><span class="self">Self</span>::set_referent</span>(<span class="ident">new_reference</span>, <span class="kw">unsafe</span> {
-            <span class="ident">Address::zero</span>().<span class="ident">to_object_reference</span>()
-        });
+        <span class="ident"><span class="self">Self</span>::set_referent</span>(<span class="ident">new_reference</span>, <span class="ident">ObjectReference::NULL</span>);
     }
 
     <span class="doccomment">/// Get the referent from a weak reference object.</span>
