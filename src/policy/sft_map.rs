@@ -1,10 +1,6 @@
 use super::sft::*;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::Address;
-#[cfg(debug_assertions)]
-use crate::util::ObjectReference;
-#[cfg(debug_assertions)]
-use crate::vm::VMBinding;
 
 /// SFTMap manages the SFT table, and mapping between addresses with indices in the table. The trait allows
 /// us to have multiple implementations of the SFT table.
@@ -62,28 +58,6 @@ pub trait SFTMap {
     /// The address must have a valid SFT entry in the map. Usually we know this if the address is from an object reference, or from our space address range.
     /// Otherwise, the caller should check with `has_sft_entry()` before calling this method.
     unsafe fn clear(&self, address: Address);
-
-    /// Make sure we have valid SFT entries for the object reference.
-    #[cfg(debug_assertions)]
-    fn assert_valid_entries_for_object<VM: VMBinding>(&self, object: ObjectReference) {
-        use crate::vm::ObjectModel;
-        let object_sft = self.get_checked(object.to_address());
-        let object_start_sft = self.get_checked(VM::VMObjectModel::object_start_ref(object));
-
-        debug_assert!(
-            object_sft.name() != EMPTY_SFT_NAME,
-            "Object {} has empty SFT",
-            object
-        );
-        debug_assert_eq!(
-            object_sft.name(),
-            object_start_sft.name(),
-            "Object {} has incorrect SFT entries (object start = {}, object = {}).",
-            object,
-            object_start_sft.name(),
-            object_sft.name()
-        );
-    }
 }
 
 cfg_if::cfg_if! {

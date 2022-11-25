@@ -1,7 +1,7 @@
 use crate::util::copy::*;
 use crate::util::metadata::MetadataSpec;
 /// https://github.com/JikesRVM/JikesRVM/blob/master/MMTk/src/org/mmtk/utility/ForwardingWord.java
-use crate::util::{constants, Address, ObjectReference};
+use crate::util::{constants, ObjectReference};
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
@@ -82,11 +82,11 @@ pub fn forward_object<VM: VMBinding>(
 ) -> ObjectReference {
     let new_object = VM::VMObjectModel::copy(object, semantics, copy_context);
     #[cfg(feature = "global_alloc_bit")]
-    crate::util::alloc_bit::set_alloc_bit(new_object);
+    crate::util::alloc_bit::set_alloc_bit::<VM>(new_object);
     if let Some(shift) = forwarding_bits_offset_in_forwarding_pointer::<VM>() {
         VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
             object,
-            new_object.to_address().as_usize() | ((FORWARDED as usize) << shift),
+            new_object.to_raw_address().as_usize() | ((FORWARDED as usize) << shift),
             None,
             Ordering::SeqCst,
         )
@@ -98,11 +98,6 @@ pub fn forward_object<VM: VMBinding>(
             None,
             Ordering::SeqCst,
         );
-    }
-    #[cfg(debug_assertions)]
-    {
-        use crate::policy::sft_map::SFTMap;
-        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(new_object);
     }
     new_object
 }
@@ -157,15 +152,15 @@ pub fn read_forwarding_pointer<VM: VMBinding>(object: ObjectReference) -> Object
         object,
     );
 
+    // We write the forwarding poiner. We know it is an object reference.
     unsafe {
-        Address::from_usize(
+        ObjectReference::from_raw_address(crate::util::Address::from_usize(
             VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.load_atomic::<VM, usize>(
                 object,
                 Some(FORWARDING_POINTER_MASK),
                 Ordering::SeqCst,
             ),
-        )
-        .to_object_reference()
+        ))
     }
 }
 
@@ -185,7 +180,7 @@ pub fn write_forwarding_pointer<VM: VMBinding>(
     trace!("GCForwardingWord::write({:#?}, {:x})\n", object, new_object);
     VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC.store_atomic::<VM, usize>(
         object,
-        new_object.to_address().as_usize(),
+        new_object.to_raw_address().as_usize(),
         Some(FORWARDING_POINTER_MASK),
         Ordering::SeqCst,
     )

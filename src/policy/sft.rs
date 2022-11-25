@@ -1,8 +1,5 @@
 use crate::plan::VectorObjectQueue;
 use crate::scheduler::GCWorker;
-#[cfg(feature = "is_mmtk_object")]
-use crate::util::alloc_bit;
-use crate::util::conversions;
 use crate::util::*;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -68,18 +65,7 @@ pub trait SFT {
     /// Some spaces, like `MallocSpace`, use third-party libraries to allocate memory.
     /// Such spaces needs to override this method.
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
-    fn is_mmtk_object(&self, addr: Address) -> bool {
-        // Having found the SFT means the `addr` is in one of our spaces.
-        // Although the SFT map is allocated eagerly when the space is contiguous,
-        // the pages of the space itself are acquired on demand.
-        // Therefore, the page of `addr` may not have been mapped, yet.
-        if !addr.is_mapped() {
-            return false;
-        }
-        // The `addr` is mapped. We use the global alloc bit to get the exact answer.
-        alloc_bit::is_alloced_object(addr)
-    }
+    fn is_mmtk_object(&self, addr: Address) -> bool;
 
     /// Initialize object metadata (in the header, or in the side metadata).
     fn initialize_object_metadata(&self, object: ObjectReference, alloc: bool);
@@ -166,9 +152,8 @@ impl SFT for EmptySpaceSFT {
     ) -> ObjectReference {
         // We do not have the `VM` type parameter here, so we cannot forward the call to the VM.
         panic!(
-            "Call trace_object() on {} (chunk {}), which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
+            "Call trace_object() on {}, which maps to an empty space. SFTProcessEdges does not support the fallback to vm_trace_object().",
             object,
-            conversions::chunk_align_down(object.to_address()),
         )
     }
 }

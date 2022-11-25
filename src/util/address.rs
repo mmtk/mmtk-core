@@ -300,16 +300,6 @@ impl Address {
         conversions::raw_is_aligned(self.0, align)
     }
 
-    /// converts the Address into an ObjectReference
-    /// # Safety
-    /// We would expect ObjectReferences point to valid objects,
-    /// but an arbitrary Address may not reside an object. This conversion is unsafe,
-    /// and it is the user's responsibility to ensure the safety.
-    #[inline(always)]
-    pub unsafe fn to_object_reference(self) -> ObjectReference {
-        mem::transmute(self.0)
-    }
-
     /// converts the Address to a pointer
     #[inline(always)]
     pub fn to_ptr<T>(self) -> *const T {
@@ -461,10 +451,23 @@ mod tests {
     }
 }
 
+use crate::vm::VMBinding;
+
 /// ObjectReference represents address for an object. Compared with Address,
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
+///
+/// A runtime may define its "object references" differently. It may define an object reference as
+/// the address of an object, a handle that points to an indirection table entry where a pointer to
+/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
+/// pointer to the object (an address) in each object reference, and that address should be used
+/// for this `ObjectReference` type.
+///
+/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
+/// their layout. We now only allow a binding to define their semantics through a set of
+/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
+/// the opaque `ObjectReference` type, and we haven't seen a use case for now.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
@@ -472,10 +475,51 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    /// converts the ObjectReference to an Address
+    /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
+    ///
+    /// MMTk should not make any assumption on the actual location of the address with the object reference.
+    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
+    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     #[inline(always)]
-    pub fn to_address(self) -> Address {
+    pub fn to_raw_address(self) -> Address {
         Address(self.0)
+    }
+
+    /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
+    /// This is how a binding creates `ObjectReference` instances.
+    ///
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    #[inline(always)]
+    pub fn from_raw_address(addr: Address) -> ObjectReference {
+        ObjectReference(addr.0)
+    }
+
+    /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
+    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
+    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    #[inline(always)]
+    pub fn to_address<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_address(self)
+    }
+
+    /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
+    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
+    /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
+    #[inline(always)]
+    pub fn to_header<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_header(self)
+    }
+
+    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
+    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
+    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    #[inline(always)]
+    pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::address_to_ref(addr)
     }
 
     /// is this object reference null reference?

@@ -2,13 +2,13 @@ use std::collections::HashSet;
 use std::mem::swap;
 use std::sync::Mutex;
 
-use crate::util::Address;
+use crate::util::ObjectReference;
 
 pub struct TreadMill {
-    from_space: Mutex<HashSet<Address>>,
-    to_space: Mutex<HashSet<Address>>,
-    collect_nursery: Mutex<HashSet<Address>>,
-    alloc_nursery: Mutex<HashSet<Address>>,
+    from_space: Mutex<HashSet<ObjectReference>>,
+    to_space: Mutex<HashSet<ObjectReference>>,
+    collect_nursery: Mutex<HashSet<ObjectReference>>,
+    alloc_nursery: Mutex<HashSet<ObjectReference>>,
 }
 
 impl std::fmt::Debug for TreadMill {
@@ -32,17 +32,17 @@ impl TreadMill {
         }
     }
 
-    pub fn add_to_treadmill(&self, cell: Address, nursery: bool) {
+    pub fn add_to_treadmill(&self, object: ObjectReference, nursery: bool) {
         if nursery {
             // println!("+ an {}", cell);
-            self.alloc_nursery.lock().unwrap().insert(cell);
+            self.alloc_nursery.lock().unwrap().insert(object);
         } else {
             // println!("+ ts {}", cell);
-            self.to_space.lock().unwrap().insert(cell);
+            self.to_space.lock().unwrap().insert(object);
         }
     }
 
-    pub fn collect_nursery(&self) -> Vec<Address> {
+    pub fn collect_nursery(&self) -> Vec<ObjectReference> {
         let mut guard = self.collect_nursery.lock().unwrap();
         let vals = guard.iter().copied().collect();
         guard.clear();
@@ -50,7 +50,7 @@ impl TreadMill {
         vals
     }
 
-    pub fn collect(&self) -> Vec<Address> {
+    pub fn collect(&self) -> Vec<ObjectReference> {
         let mut guard = self.from_space.lock().unwrap();
         let vals = guard.iter().copied().collect();
         guard.clear();
@@ -58,27 +58,25 @@ impl TreadMill {
         vals
     }
 
-    pub fn copy(&self, cell: Address, is_in_nursery: bool) {
+    pub fn copy(&self, object: ObjectReference, is_in_nursery: bool) {
         if is_in_nursery {
             let mut guard = self.collect_nursery.lock().unwrap();
             debug_assert!(
-                guard.contains(&cell),
-                "copy source cell ({}) must be in collect_nursery",
-                cell
+                guard.contains(&object),
+                "copy source object ({}) must be in collect_nursery",
+                object
             );
-            guard.remove(&cell);
-            // println!("cn -> ts {}", cell);
+            guard.remove(&object);
         } else {
             let mut guard = self.from_space.lock().unwrap();
             debug_assert!(
-                guard.contains(&cell),
-                "copy source cell ({}) must be in from_space",
-                cell
+                guard.contains(&object),
+                "copy source object ({}) must be in from_space",
+                object
             );
-            guard.remove(&cell);
-            // println!("fs -> ts {}", cell);
+            guard.remove(&object);
         }
-        self.to_space.lock().unwrap().insert(cell);
+        self.to_space.lock().unwrap().insert(object);
     }
 
     pub fn is_to_space_empty(&self) -> bool {

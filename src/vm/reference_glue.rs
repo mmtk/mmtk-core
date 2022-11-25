@@ -1,4 +1,3 @@
-use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
@@ -25,9 +24,7 @@ pub trait ReferenceGlue<VM: VMBinding> {
     /// Arguments:
     /// * `new_reference`: The reference whose referent is to be cleared.
     fn clear_referent(new_reference: ObjectReference) {
-        Self::set_referent(new_reference, unsafe {
-            Address::zero().to_object_reference()
-        });
+        Self::set_referent(new_reference, ObjectReference::NULL);
     }
 
     /// Get the referent from a weak reference object.

@@ -86,7 +86,7 @@ impl FixtureContent for SingleObject {
         let addr = mmtk_alloc(handle, size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
-        let objref = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        let objref = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
         mmtk_post_alloc(handle, objref, size, semantics);
 
         SingleObject { objref }
@@ -131,10 +131,10 @@ impl FixtureContent for TwoObjects {
         let addr = mmtk_alloc(handle, size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
-        let objref1 = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        let objref1 = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
         mmtk_post_alloc(handle, objref1, size, semantics);
 
-        let objref2 = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        let objref2 = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
         mmtk_post_alloc(handle, objref2, size, semantics);
 
         TwoObjects { objref1, objref2 }
