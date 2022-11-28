@@ -21,8 +21,14 @@ jobs:
       # Install nightly
       - uses: actions-rs/toolchain@v1
         with:
+          # We need nightly for cargo-public-api to get the API output.
           toolchain: nightly
           profile: minimal
+          # It is not necessary to use nightly as default (which is used to install cargo-public-api and compile our code).
+          # However, our current toolchain is 1.59.0, and cargo-public-api requires 1.60 at least. To make it simple,
+          # we just use the latest nightly toolchain.
+          override: true
+      - run: cargo --version
 
       # Install cargo-public-api
       - name: Install cargo-public-api

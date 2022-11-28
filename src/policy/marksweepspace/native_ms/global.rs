@@ -21,6 +21,9 @@ use crate::{
     vm::VMBinding,
 };
 
+#[cfg(feature = "is_mmtk_object")]
+use crate::util::Address;
+
 use crate::plan::ObjectQueue;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::SFT;
@@ -97,7 +100,13 @@ impl<VM: VMBinding> SFT for MarkSweepSpace<VM> {
 
     fn initialize_object_metadata(&self, _object: crate::util::ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
     fn sft_trace_object(

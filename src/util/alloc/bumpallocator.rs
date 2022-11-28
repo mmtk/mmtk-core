@@ -1,5 +1,4 @@
 use super::allocator::{align_allocation_no_fill, fill_alignment_gap};
-use super::object_ref_guard::adjust_thread_local_buffer_range;
 use crate::util::Address;
 
 use crate::util::alloc::Allocator;
@@ -30,8 +29,7 @@ pub struct BumpAllocator<VM: VMBinding> {
 
 impl<VM: VMBinding> BumpAllocator<VM> {
     pub fn set_limit(&mut self, start: Address, limit: Address) {
-        let (cursor, limit) = adjust_thread_local_buffer_range::<VM>(start, limit);
-        self.cursor = cursor;
+        self.cursor = start;
         self.limit = limit;
     }
 

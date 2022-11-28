@@ -8,7 +8,10 @@ use crate::util::heap::chunk_map::*;
 use crate::util::linear_scan::Region;
 use crate::vm::ObjectModel;
 use crate::{
-    util::{metadata::side_metadata::SideMetadataSpec, Address, OpaquePointer, VMThread},
+    util::{
+        metadata::side_metadata::SideMetadataSpec, Address, ObjectReference, OpaquePointer,
+        VMThread,
+    },
     vm::VMBinding,
 };
 
@@ -271,8 +274,7 @@ impl Block {
                 self.load_block_cell_size(),
                 VM::MAX_ALIGNMENT,
             )
-            && VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND == 0
-            && VM::VMObjectModel::OBJECT_REF_OFFSET_UPPER_BOUND == 0
+            && VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS
         {
             // In this case, we can use the simplest and the most efficicent sweep.
             self.simple_sweep::<VM>()
@@ -292,7 +294,7 @@ impl Block {
         while cell + cell_size <= self.start() + Block::BYTES {
             // We know the cell and the object reference is the same.
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .is_marked::<VM>(unsafe { cell.to_object_reference() }, Ordering::SeqCst)
+                .is_marked::<VM>(ObjectReference::from_raw_address(cell), Ordering::SeqCst)
             {
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]
@@ -332,7 +334,9 @@ impl Block {
 
         while cell + cell_size <= self.end() {
             // possible object ref
-            let potential_object_ref = cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND;
+            let potential_object_ref = ObjectReference::from_raw_address(
+                cursor + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
+            );
             trace!(
                 "{:?}: cell = {}, last cell in free list = {}, cursor = {}, potential object = {}",
                 self,
@@ -342,10 +346,9 @@ impl Block {
                 potential_object_ref
             );
 
-            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_marked::<VM>(
-                unsafe { potential_object_ref.to_object_reference() },
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .is_marked::<VM>(potential_object_ref, Ordering::SeqCst)
+            {
                 debug!("{:?} Live cell: {}", self, cell);
                 // If the mark bit is set, the cell is alive.
                 // We directly jump to the end of the cell.

@@ -6,9 +6,6 @@ pub use allocator::fill_alignment_gap;
 pub use allocator::AllocationError;
 pub use allocator::Allocator;
 
-/// Functions to ensure an object reference for an allocation has valid metadata.
-mod object_ref_guard;
-
 /// A list of all the allocators, embedded in Mutator
 pub(crate) mod allocators;
 pub use allocators::AllocatorSelector;

@@ -16,9 +16,7 @@ impl ObjectModel<DummyVM> for VMObjectModel {
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec = VMLocalMarkBitSpec::in_header(0);
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec = VMLocalLOSMarkNurserySpec::in_header(0);
 
-    const OBJECT_REF_MAYBE_OUTSIDE_ALLOCATION: bool = true;
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize = OBJECT_REF_OFFSET as isize;
-    const OBJECT_REF_OFFSET_UPPER_BOUND: isize = OBJECT_REF_OFFSET as isize;
 
     fn copy(
         _from: ObjectReference,
@@ -56,12 +54,21 @@ impl ObjectModel<DummyVM> for VMObjectModel {
         unimplemented!()
     }
 
-    fn object_start_ref(object: ObjectReference) -> Address {
-        object.to_address().sub(OBJECT_REF_OFFSET)
+    fn ref_to_object_start(object: ObjectReference) -> Address {
+        object.to_raw_address().sub(OBJECT_REF_OFFSET)
     }
 
-    fn ref_to_address(_object: ObjectReference) -> Address {
-        unimplemented!()
+    fn ref_to_header(object: ObjectReference) -> Address {
+        object.to_raw_address()
+    }
+
+    fn ref_to_address(object: ObjectReference) -> Address {
+        // Just use object start.
+        Self::ref_to_object_start(object)
+    }
+
+    fn address_to_ref(addr: Address) -> ObjectReference {
+        ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET))
     }
 
     fn dump_object(_object: ObjectReference) {

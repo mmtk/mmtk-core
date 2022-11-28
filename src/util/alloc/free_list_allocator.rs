@@ -364,6 +364,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     #[cfg(feature = "malloc_native_mimalloc")]
     fn free(&self, addr: Address) {
+        use crate::util::ObjectReference;
         let block = Block::from_unaligned_address(addr);
         let block_tls = block.load_tls();
 
@@ -395,7 +396,11 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
         }
 
         // unset allocation bit
-        unsafe { crate::util::alloc_bit::unset_alloc_bit_unsafe(addr.to_object_reference()) };
+        unsafe {
+            crate::util::alloc_bit::unset_alloc_bit_unsafe::<VM>(ObjectReference::from_raw_address(
+                addr,
+            ))
+        };
     }
 
     fn store_block_tls(&self, block: Block) {

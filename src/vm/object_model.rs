@@ -102,7 +102,7 @@ pub trait ObjectModel<VM: VMBinding> {
         object: ObjectReference,
         mask: Option<T>,
     ) -> T {
-        metadata_spec.load::<T>(object, mask)
+        metadata_spec.load::<T>(object.to_header::<VM>(), mask)
     }
 
     /// A function to atomically load the specified per-object metadata's content.
@@ -122,7 +122,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) -> T {
-        metadata_spec.load_atomic::<T>(object, mask, ordering)
+        metadata_spec.load_atomic::<T>(object.to_header::<VM>(), mask, ordering)
     }
 
     /// A function to non-atomically store a value to the specified per-object metadata.
@@ -144,7 +144,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         mask: Option<T>,
     ) {
-        metadata_spec.store::<T>(object, val, mask)
+        metadata_spec.store::<T>(object.to_header::<VM>(), val, mask)
     }
 
     /// A function to atomically store a value to the specified per-object metadata.
@@ -165,7 +165,7 @@ pub trait ObjectModel<VM: VMBinding> {
         mask: Option<T>,
         ordering: Ordering,
     ) {
-        metadata_spec.store_atomic::<T>(object, val, mask, ordering)
+        metadata_spec.store_atomic::<T>(object.to_header::<VM>(), val, mask, ordering)
     }
 
     /// A function to atomically compare-and-exchange the specified per-object metadata's content.
@@ -192,7 +192,7 @@ pub trait ObjectModel<VM: VMBinding> {
         failure_order: Ordering,
     ) -> std::result::Result<T, T> {
         metadata_spec.compare_exchange::<T>(
-            object,
+            object.to_header::<VM>(),
             old_val,
             new_val,
             mask,
@@ -219,7 +219,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_add::<T>(object, val, order)
+        metadata_spec.fetch_add::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a subtract operation on the specified per-object metadata's content.
@@ -240,7 +240,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_sub::<T>(object, val, order)
+        metadata_spec.fetch_sub::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a bit-and operation on the specified per-object metadata's content.
@@ -260,7 +260,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_and::<T>(object, val, order)
+        metadata_spec.fetch_and::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform a bit-or operation on the specified per-object metadata's content.
@@ -280,7 +280,7 @@ pub trait ObjectModel<VM: VMBinding> {
         val: T,
         order: Ordering,
     ) -> T {
-        metadata_spec.fetch_or::<T>(object, val, order)
+        metadata_spec.fetch_or::<T>(object.to_header::<VM>(), val, order)
     }
 
     /// A function to atomically perform an update operation on the specified per-object metadata's content.
@@ -303,7 +303,7 @@ pub trait ObjectModel<VM: VMBinding> {
         fetch_order: Ordering,
         f: F,
     ) -> std::result::Result<T, T> {
-        metadata_spec.fetch_update(object, set_order, fetch_order, f)
+        metadata_spec.fetch_update::<T, F>(object.to_header::<VM>(), set_order, fetch_order, f)
     }
 
     /// Copy an object and return the address of the new object. Usually in the implementation of this method,
@@ -379,46 +379,64 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// For our allocation result `[alloc, alloc + bytes)`, if a binding's
-    /// definition of `ObjectReference` may point outside the allocation region, including pointing
-    /// to the end of the region (i.e. `object_ref >= alloc + bytes`, or
-    /// `object_ref < alloc`), the binding needs to set this constant to `true`. Otherwise, a binding can leave this field as `false`.
-    /// MMTk allocators use this value to make sure that the metadata for object reference is properly set.
-    const OBJECT_REF_MAYBE_OUTSIDE_ALLOCATION: bool;
+    /// If this is true, the binding guarantees that an object reference's raw address equals to the return value of the ref_to_address method,
+    /// and equals to the return value of the ref_to_object_start method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// make some assumptions and optimize for this case.
+    /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
+    /// if any assertion catches this error, but may also fail silently.
+    const UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = false;
 
-    /// For our allocation result, we expect the binding to have an offset between the allocation result
-    /// and their object reference, i.e. object ref = alloc + offset. The offset is not necessary to be a
+    /// For our allocation result (object_start), the binding may have an offset between the allocation result
+    /// and the raw address of their object reference, i.e. object ref's raw address = object_start + offset.
+    /// The offset could be zero. The offset is not necessary to be
     /// constant for all the objects. This constant defines the smallest possible offset.
     ///
-    /// We should have the invariants:
-    /// * OBJECT_REF_OFFSET_LOWER_BOUND <= possible offset <= OBJECT_REF_OFFSET_UPPER_BOUND
-    /// * object ref >= alloc + OBJECT_REF_OFFSET_LOWER_BOUND
-    /// * object ref <= alloc + OBJECT_REF_OFFSET_UPPER_BOUND
+    /// This is used as an indication for MMTk to predict where object references may point to in some algorithms.
+    ///
+    /// We should have the invariant:
+    /// * object ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND
     const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
 
-    /// For our allocation result, we expect the binding to have an offset between the allocation result
-    /// and their object reference, i.e. object ref = alloc + offset. The offset is not necessary to be a
-    /// constant for all the objects. This constant defines the biggest possible offset.
-    ///
-    /// We should have the invariants:
-    /// * OBJECT_REF_OFFSET_LOWER_BOUND <= possible offset <= OBJECT_REF_OFFSET_UPPER_BOUND
-    /// * object ref >= alloc + OBJECT_REF_OFFSET_LOWER_BOUND
-    /// * object ref <= alloc + OBJECT_REF_OFFSET_UPPER_BOUND
-    const OBJECT_REF_OFFSET_UPPER_BOUND: isize;
-
-    /// Return the lowest address of the storage associated with an object.
+    /// Return the lowest address of the storage associated with an object. This should be
+    /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
     /// Arguments:
-    /// * `object`: The object to be queried.
-    fn object_start_ref(object: ObjectReference) -> Address;
+    /// * `object`: The object to be queried. It should not be null.
+    fn ref_to_object_start(object: ObjectReference) -> Address;
+
+    /// Return the header base address from an object reference. Any object header metadata
+    /// in the [`crate::vm::ObjectModel`] declares a piece of header metadata with an offset
+    /// from this address. If a binding does not use any header metadata for MMTk, this method
+    /// will not be called, and the binding can simply use `unreachable!()` for the method.
+    ///
+    /// Arguments:
+    /// * `object`: The object to be queried. It should not be null.
+    fn ref_to_header(object: ObjectReference) -> Address;
 
     /// Return an address guaranteed to be inside the storage associated
-    /// with an object.
+    /// with an object. The returned address needs to be deterministic
+    /// for an given object. For a given object, the returned address
+    /// should be a constant offset from the object reference address.
+    ///
+    /// Note that MMTk may forge an arbitrary address
+    /// directly into a potential object reference, and call this method on the 'object reference'.
+    /// In that case, the argument `object` may not be a valid object reference,
+    /// and the implementation of this method should not use any object metadata.
+    ///
+    /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///
     /// Arguments:
-    /// * `object`: The object to be queried.
-    // FIXME: this doesn't seem essential. E.g. `get_object_end_address` or `object_start_ref` can cover its functionality.
+    /// * `object`: The object to be queried. It should not be null.
     fn ref_to_address(object: ObjectReference) -> Address;
+
+    /// Return an object for a given address returned by `ref_to_address()`.
+    /// This does exactly the opposite of `ref_to_address()`. The argument `addr` has
+    /// to be an address that is previously returned from `ref_to_address()`. Invoking this method
+    /// with an unexpected address is undefined behavior.
+    ///
+    /// Arguments:
+    /// * `addr`: An address that is returned from `ref_to_address()`
+    fn address_to_ref(addr: Address) -> ObjectReference;
 
     /// Dump debugging information for an object.
     ///

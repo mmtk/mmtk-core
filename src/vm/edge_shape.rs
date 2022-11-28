@@ -24,7 +24,7 @@ use crate::util::{Address, ObjectReference};
 ///     or some arbitrary offset) for some reasons.
 ///
 /// When loading, `Edge::load` shall decode its internal representation to a "regular"
-/// `ObjectReference` which is applicable to `ObjectModel::object_start_ref`.  The implementation
+/// `ObjectReference`.  The implementation
 /// can do this with any appropriate operations, usually shifting and masking bits or subtracting
 /// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a
 /// VM-neutral way, knowing only `ObjectReference`.
