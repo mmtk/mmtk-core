@@ -34,7 +34,7 @@ pub struct Immix<VM: VMBinding> {
     pub immix_space: ImmixSpace<VM>,
     #[fallback_trace]
     pub common: CommonPlan<VM>,
-    last_gc_was_defrag: AtomicBool,
+    pub(in crate::plan) last_gc_was_defrag: AtomicBool,
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {

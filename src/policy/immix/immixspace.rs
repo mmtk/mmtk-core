@@ -9,6 +9,7 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
+use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 use crate::util::heap::HeapMeta;
@@ -30,6 +31,7 @@ use crate::{
     MMTK,
 };
 use atomic::Ordering;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
@@ -48,6 +50,8 @@ pub struct ImmixSpace<VM: VMBinding> {
     pub reusable_blocks: BlockList,
     /// Defrag utilities
     pub(super) defrag: Defrag,
+    /// How many lines have been consumed since last GC?
+    lines_consumed: AtomicUsize,
     /// Object mark state
     mark_state: u8,
     /// Work packet scheduler
@@ -224,6 +228,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
+            lines_consumed: AtomicUsize::new(0),
             reusable_blocks: BlockList::default(),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
@@ -333,6 +338,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if super::DEFRAG {
             self.defrag.release(self);
         }
+
+        self.lines_consumed.store(0, Ordering::Relaxed);
+
         did_defrag
     }
 
@@ -352,6 +360,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let block = Block::from_aligned_address(block_address);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
+        self.lines_consumed.fetch_add(Block::LINES, Ordering::SeqCst);
         Some(block)
     }
 
@@ -365,6 +374,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // Skip blocks that should be evacuated.
                 if copy && block.is_defrag_source() {
                     continue;
+                }
+                // Get available lines. Do this before block.init which will reset block state.
+                if let BlockState::Reusable { unavailable_lines } = block.get_state() {
+                    self.lines_consumed.fetch_add(Block::LINES - unavailable_lines as usize, Ordering::SeqCst);
+                } else {
+                    unreachable!();
                 }
                 block.init(copy);
                 return Some(block);
@@ -606,6 +621,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // If defrag is disabled, every GC is exhaustive.
             true
         }
+    }
+
+    pub(crate) fn get_pages_allocated(&self) -> usize {
+        self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
     }
 }
 

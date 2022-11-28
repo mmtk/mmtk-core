@@ -45,11 +45,13 @@ mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
+mod sticky;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.
 
 pub use generational::copying::GENCOPY_CONSTRAINTS;
+pub use generational::immix::GENIMMIX_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
 pub use markcompact::MARKCOMPACT_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
