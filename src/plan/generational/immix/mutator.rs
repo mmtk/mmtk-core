@@ -11,6 +11,7 @@ use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::plan::generational::global::GenerationalPlan;
 
 pub fn genimmix_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {}
 
@@ -42,7 +43,7 @@ pub fn create_genimmix_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk,
-            &genimmix.gen,
+            genimmix,
         ))),
         mutator_tls,
         config,

@@ -14,23 +14,24 @@ use super::gc_work::GenNurseryProcessEdges;
 use super::gc_work::ProcessModBuf;
 use super::gc_work::ProcessRegionModBuf;
 use super::global::Gen;
+use super::global::GenerationalPlan;
 
-pub struct GenObjectBarrierSemantics<VM: VMBinding> {
+pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM>> {
     /// MMTk instance
     mmtk: &'static MMTK<VM>,
     /// Generational plan
-    gen: &'static Gen<VM>,
+    plan: &'static P,
     /// Object modbuf. Contains a list of objects that may contain pointers to the nursery space.
     modbuf: VectorQueue<ObjectReference>,
     /// Array-copy modbuf. Contains a list of sub-arrays or array slices that may contain pointers to the nursery space.
     region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
-impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
-    pub fn new(mmtk: &'static MMTK<VM>, gen: &'static Gen<VM>) -> Self {
+impl<VM: VMBinding, P: GenerationalPlan<VM>> GenObjectBarrierSemantics<VM, P> {
+    pub fn new(mmtk: &'static MMTK<VM>, plan: &'static P) -> Self {
         Self {
             mmtk,
-            gen,
+            plan,
             modbuf: VectorQueue::new(),
             region_modbuf: VectorQueue::new(),
         }
@@ -41,7 +42,7 @@ impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
         let buf = self.modbuf.take();
         if !buf.is_empty() {
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessModBuf::<GenNurseryProcessEdges<VM>>::new(buf));
+                .add(ProcessModBuf::<GenNurseryProcessEdges<VM, P>>::new(buf));
         }
     }
 
@@ -51,12 +52,12 @@ impl<VM: VMBinding> GenObjectBarrierSemantics<VM> {
         if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
             self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessRegionModBuf::<GenNurseryProcessEdges<VM>>::new(buf));
+                .add(ProcessRegionModBuf::<GenNurseryProcessEdges<VM, P>>::new(buf));
         }
     }
 }
 
-impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
+impl<VM: VMBinding, P: GenerationalPlan<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
     type VM = VM;
 
     #[cold]
@@ -78,7 +79,7 @@ impl<VM: VMBinding> BarrierSemantics for GenObjectBarrierSemantics<VM> {
 
     fn memory_region_copy_slow(&mut self, _src: VM::VMMemorySlice, dst: VM::VMMemorySlice) {
         // Only enqueue array slices in mature spaces
-        if !self.gen.nursery.address_in_space(dst.start()) {
+        if !self.plan.is_address_in_nursery(dst.start()) {
             // enqueue
             debug_assert_eq!(
                 dst.bytes() & (BYTES_IN_ADDRESS - 1),

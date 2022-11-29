@@ -5,6 +5,7 @@ use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
+use crate::util::Address;
 use crate::util::conversions;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -23,6 +24,17 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use mmtk_macros::PlanTraceObject;
+
+pub trait GenerationalPlan<VM: VMBinding>: Plan<VM = VM> {
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+    fn is_address_in_nursery(&self, addr: Address) -> bool;
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
+}
 
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.

@@ -11,6 +11,7 @@ use crate::util::alloc::BumpAllocator;
 use crate::util::{VMMutatorThread, VMWorkerThread};
 use crate::vm::VMBinding;
 use crate::MMTK;
+use crate::plan::generational::global::GenerationalPlan;
 
 pub fn gencopy_mutator_prepare<VM: VMBinding>(_mutator: &mut Mutator<VM>, _tls: VMWorkerThread) {
     // Do nothing
@@ -44,7 +45,7 @@ pub fn create_gencopy_mutator<VM: VMBinding>(
         allocators: Allocators::<VM>::new(mutator_tls, &*mmtk.plan, &config.space_mapping),
         barrier: Box::new(ObjectBarrier::new(GenObjectBarrierSemantics::new(
             mmtk,
-            &gencopy.gen,
+            gencopy,
         ))),
         mutator_tls,
         config,

@@ -22,6 +22,9 @@ pub const DEFRAG: bool = !cfg!(feature = "immix_no_defrag");
 /// Otherwise, do it at mark time.
 pub const MARK_LINE_AT_SCAN_TIME: bool = true;
 
+/// If Immix is used as a nursery space, do we prefer copy?
+pub const PREFER_COPY_ON_NURSERY_GC: bool = true;
+
 macro_rules! validate {
     ($x: expr) => { assert!($x, stringify!($x)) };
     ($x: expr => $y: expr) => { if $x { assert!($y, stringify!($x implies $y)) } };

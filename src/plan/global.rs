@@ -58,6 +58,7 @@ pub fn create_mutator<VM: VMBinding>(
         PlanSelector::MarkCompact => {
             crate::plan::markcompact::mutator::create_markcompact_mutator(tls, &*mmtk.plan)
         }
+        PlanSelector::StickyImmix => crate::plan::sticky::immix::mutator::create_stickyimmix_mutator(tls, mmtk)
     })
 }
 
@@ -92,6 +93,9 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
             vm_map, mmapper, options,
         )) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::StickyImmix => Box::new(crate::plan::sticky::immix::StickyImmix::new(
+            vm_map, mmapper, options, scheduler,
+        ))
     };
 
     // We have created Plan in the heap, and we won't explicitly move it. So each space
