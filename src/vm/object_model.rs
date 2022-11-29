@@ -379,8 +379,8 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
-    /// If this is true, the binding guarantees that an object reference's raw address equals to the return value of the ref_to_address method,
-    /// and equals to the return value of the ref_to_object_start method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// If this is true, the binding guarantees that an object reference's raw address is always equal to the return value of the `ref_to_address` method
+    /// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to
     /// make some assumptions and optimize for this case.
     /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
     /// if any assertion catches this error, but may also fail silently.
