@@ -68,13 +68,6 @@ impl BlockState {
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
-impl Default for Block {
-    #[inline(always)]
-    fn default() -> Self {
-        Self(Address::ZERO)
-    }
-}
-
 impl Region for Block {
     #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
