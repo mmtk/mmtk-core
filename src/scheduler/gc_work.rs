@@ -522,15 +522,11 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
             return object;
         }
 
-        // Make sure we have valid SFT entries for the object.
-        #[cfg(debug_assertions)]
-        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(object);
-
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
 
         // Invoke trace object on sft
-        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_address()) };
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_address::<VM>()) };
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 

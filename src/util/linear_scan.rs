@@ -41,13 +41,12 @@ impl<VM: VMBinding, S: LinearScanObjectSize, const ATOMIC_LOAD_ALLOC_BIT: bool> 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         while self.cursor < self.end {
             let is_object = if ATOMIC_LOAD_ALLOC_BIT {
-                alloc_bit::is_alloced_object(self.cursor)
+                alloc_bit::is_alloced_object::<VM>(self.cursor)
             } else {
-                unsafe { alloc_bit::is_alloced_object_unsafe(self.cursor) }
+                unsafe { alloc_bit::is_alloced_object_unsafe::<VM>(self.cursor) }
             };
 
-            if is_object {
-                let object = unsafe { self.cursor.to_object_reference() };
+            if let Some(object) = is_object {
                 self.cursor += S::size(object);
                 return Some(object);
             } else {
@@ -122,7 +121,7 @@ pub trait Region: Copy + PartialEq + PartialOrd {
     /// Return the region that contains the object (by its cell address).
     #[inline(always)]
     fn containing<VM: VMBinding>(object: ObjectReference) -> Self {
-        Self::from_unaligned_address(VM::VMObjectModel::ref_to_address(object))
+        Self::from_unaligned_address(object.to_address::<VM>())
     }
 }
 

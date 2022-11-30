@@ -86,7 +86,7 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
 
     // For malloc space, we need to further check the alloc bit.
     fn is_in_space(&self, object: ObjectReference) -> bool {
-        is_alloced_by_malloc(object)
+        is_alloced_by_malloc::<VM>(object)
     }
 
     /// For malloc space, we just use the side metadata.
@@ -96,12 +96,12 @@ impl<VM: VMBinding> SFT for MallocSpace<VM> {
         debug_assert!(!addr.is_zero());
         // `addr` cannot be mapped by us. It should be mapped by the malloc library.
         debug_assert!(!addr.is_mapped());
-        has_object_alloced_by_malloc(addr)
+        has_object_alloced_by_malloc::<VM>(addr).is_some()
     }
 
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
         trace!("initialize_object_metadata for object {}", object);
-        set_alloc_bit(object);
+        set_alloc_bit::<VM>(object);
     }
 
     #[inline(always)]
@@ -143,11 +143,11 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
     // We have assertions in a debug build. We allow this pattern for the release build.
     #[allow(clippy::let_and_return)]
     fn in_space(&self, object: ObjectReference) -> bool {
-        let ret = is_alloced_by_malloc(object);
+        let ret = is_alloced_by_malloc::<VM>(object);
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
-            let addr = VM::VMObjectModel::object_start_ref(object);
+            let addr = VM::VMObjectModel::ref_to_object_start(object);
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
@@ -376,15 +376,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
             return object;
         }
 
-        let address = object.to_address();
         assert!(
             self.in_space(object),
             "Cannot mark an object {} that was not alloced by malloc.",
-            address,
+            object,
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
-            let chunk_start = conversions::chunk_align_down(address);
+            let chunk_start =
+                conversions::chunk_align_down(VM::VMObjectModel::ref_to_object_start(object));
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
@@ -452,7 +452,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
     #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
-        let obj_start = VM::VMObjectModel::object_start_ref(object);
+        let obj_start = VM::VMObjectModel::ref_to_object_start(object);
         let offset_malloc_bit = is_offset_malloc(obj_start);
         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
         (obj_start, offset_malloc_bit, bytes)
@@ -482,7 +482,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Free object
             self.free_internal(obj_start, bytes, offset_malloc);
             trace!("free object {}", object);
-            unsafe { unset_alloc_bit_unsafe(object) };
+            unsafe { unset_alloc_bit_unsafe::<VM>(object) };
 
             true
         } else {
@@ -491,7 +491,8 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page = object.to_address().align_down(BYTES_IN_MALLOC_PAGE);
+                let current_page =
+                    VM::VMObjectModel::ref_to_object_start(object).align_down(BYTES_IN_MALLOC_PAGE);
                 if current_page > *empty_page_start {
                     // we are the only GC thread that is accessing this chunk
                     unsafe {

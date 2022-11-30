@@ -405,7 +405,7 @@ impl ReferenceProcessor {
             if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(referent) {
                 Self::keep_referent_alive(trace, referent);
             }
-            trace!(" ~> {:?} (retained)", referent.to_address());
+            trace!(" ~> {:?} (retained)", referent);
         }
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);

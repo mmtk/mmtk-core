@@ -115,7 +115,7 @@ pub extern "C" fn mmtk_is_mmtk_object(addr: Address) -> bool {
 
 #[no_mangle]
 pub extern "C" fn mmtk_is_in_mmtk_spaces(object: ObjectReference) -> bool {
-    memory_manager::is_in_mmtk_spaces(object)
+    memory_manager::is_in_mmtk_spaces::<DummyVM>(object)
 }
 
 #[no_mangle]

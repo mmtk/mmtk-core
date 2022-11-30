@@ -57,7 +57,7 @@ mod only_64_bit {
         // Note: We cannot guarantee GC will allocate an object in the low address region.
         // So we make up addresses just for testing the bit operations of compressed OOP edges.
         let compressed1 = (COMPRESSABLE_ADDR1 >> 3) as u32;
-        let objref1 = unsafe { Address::from_usize(COMPRESSABLE_ADDR1).to_object_reference() };
+        let objref1 = ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR1) });
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
@@ -73,7 +73,7 @@ mod only_64_bit {
         // So we make up addresses just for testing the bit operations of compressed OOP edges.
         let compressed1 = (COMPRESSABLE_ADDR1 >> 3) as u32;
         let compressed2 = (COMPRESSABLE_ADDR2 >> 3) as u32;
-        let objref2 = unsafe { Address::from_usize(COMPRESSABLE_ADDR2).to_object_reference() };
+        let objref2 = ObjectReference::from_raw_address(unsafe { Address::from_usize(COMPRESSABLE_ADDR2) });
 
         let mut slot: Atomic<u32> = Atomic::new(compressed1);
 
@@ -90,7 +90,7 @@ mod only_64_bit {
 pub fn load_offset() {
     const OFFSET: usize = 48;
     FIXTURE.with_fixture(|fixture| {
-        let addr1 = fixture.objref1.to_address();
+        let addr1 = fixture.objref1.to_raw_address();
         let mut slot: Atomic<Address> = Atomic::new(addr1 + OFFSET);
 
         let edge = OffsetEdge::new_with_offset(Address::from_ref(&mut slot), OFFSET);
@@ -104,8 +104,8 @@ pub fn load_offset() {
 pub fn store_offset() {
     const OFFSET: usize = 48;
     FIXTURE.with_fixture(|fixture| {
-        let addr1 = fixture.objref1.to_address();
-        let addr2 = fixture.objref2.to_address();
+        let addr1 = fixture.objref1.to_raw_address();
+        let addr2 = fixture.objref2.to_raw_address();
         let mut slot: Atomic<Address> = Atomic::new(addr1 + OFFSET);
 
         let edge = OffsetEdge::new_with_offset(Address::from_ref(&mut slot), OFFSET);
@@ -123,8 +123,8 @@ const TAG2: usize = 0b10;
 #[test]
 pub fn load_tagged() {
     FIXTURE.with_fixture(|fixture| {
-        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG1);
-        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG2);
+        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
         let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
         let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
@@ -140,8 +140,8 @@ pub fn load_tagged() {
 #[test]
 pub fn store_tagged() {
     FIXTURE.with_fixture(|fixture| {
-        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG1);
-        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_address().as_usize() | TAG2);
+        let mut slot1: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG1);
+        let mut slot2: Atomic<usize> = Atomic::new(fixture.objref1.to_raw_address().as_usize() | TAG2);
 
         let edge1 = TaggedEdge::new(Address::from_ref(&mut slot1));
         let edge2 = TaggedEdge::new(Address::from_ref(&mut slot2));
@@ -151,11 +151,11 @@ pub fn store_tagged() {
         // Tags should be preserved.
         assert_eq!(
             slot1.load(Ordering::SeqCst),
-            fixture.objref2.to_address().as_usize() | TAG1
+            fixture.objref2.to_raw_address().as_usize() | TAG1
         );
         assert_eq!(
             slot2.load(Ordering::SeqCst),
-            fixture.objref2.to_address().as_usize() | TAG2
+            fixture.objref2.to_raw_address().as_usize() | TAG2
         );
 
         let objref1 = edge1.load();
@@ -172,8 +172,8 @@ pub fn mixed() {
     const OFFSET: usize = 48;
 
     FIXTURE.with_fixture(|fixture| {
-        let addr1 = fixture.objref1.to_address();
-        let addr2 = fixture.objref2.to_address();
+        let addr1 = fixture.objref1.to_raw_address();
+        let addr2 = fixture.objref2.to_raw_address();
 
         let mut slot1: Atomic<ObjectReference> = Atomic::new(fixture.objref1);
         let mut slot3: Atomic<Address> = Atomic::new(addr1 + OFFSET);

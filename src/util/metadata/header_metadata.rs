@@ -7,7 +7,6 @@ use std::sync::atomic::AtomicU8;
 use crate::util::constants::{BITS_IN_BYTE, LOG_BITS_IN_BYTE};
 use crate::util::metadata::metadata_val_traits::*;
 use crate::util::Address;
-use crate::util::ObjectReference;
 use num_traits::FromPrimitive;
 
 const LOG_BITS_IN_U16: usize = 4;
@@ -69,8 +68,8 @@ impl HeaderMetadataSpec {
     }
 
     #[inline(always)]
-    fn meta_addr(&self, object: ObjectReference) -> Address {
-        object.to_address() + self.byte_offset()
+    fn meta_addr(&self, header: Address) -> Address {
+        header + self.byte_offset()
     }
 
     // Some common methods for header metadata that is smaller than 1 byte.
@@ -120,29 +119,25 @@ impl HeaderMetadataSpec {
     /// # Safety
     /// This is a non-atomic load, thus not thread-safe.
     #[inline(always)]
-    pub unsafe fn load<T: MetadataValue>(
-        &self,
-        object: ObjectReference,
-        optional_mask: Option<T>,
-    ) -> T {
-        self.load_inner::<T>(object, optional_mask, None)
+    pub unsafe fn load<T: MetadataValue>(&self, header: Address, optional_mask: Option<T>) -> T {
+        self.load_inner::<T>(header, optional_mask, None)
     }
 
     /// This function provides a default implementation for the `load_metadata_atomic` method from the `ObjectModel` trait.
     #[inline(always)]
     pub fn load_atomic<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         optional_mask: Option<T>,
         ordering: Ordering,
     ) -> T {
-        self.load_inner::<T>(object, optional_mask, Some(ordering))
+        self.load_inner::<T>(header, optional_mask, Some(ordering))
     }
 
     #[inline(always)]
     fn load_inner<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         optional_mask: Option<T>,
         atomic_ordering: Option<Ordering>,
     ) -> T {
@@ -156,9 +151,9 @@ impl HeaderMetadataSpec {
         let res: T = if self.num_of_bits < 8 {
             let byte_val = unsafe {
                 if let Some(order) = atomic_ordering {
-                    (self.meta_addr(object)).atomic_load::<AtomicU8>(order)
+                    (self.meta_addr(header)).atomic_load::<AtomicU8>(order)
                 } else {
-                    (self.meta_addr(object)).load::<u8>()
+                    (self.meta_addr(header)).load::<u8>()
                 }
             };
 
@@ -166,9 +161,9 @@ impl HeaderMetadataSpec {
         } else {
             unsafe {
                 if let Some(order) = atomic_ordering {
-                    T::load_atomic(self.meta_addr(object), order)
+                    T::load_atomic(self.meta_addr(header), order)
                 } else {
-                    (self.meta_addr(object)).load::<T>()
+                    (self.meta_addr(header)).load::<T>()
                 }
             }
         };
@@ -189,11 +184,11 @@ impl HeaderMetadataSpec {
     #[inline(always)]
     pub unsafe fn store<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         val: T,
         optional_mask: Option<T>,
     ) {
-        self.store_inner::<T>(object, val, optional_mask, None)
+        self.store_inner::<T>(header, val, optional_mask, None)
     }
 
     /// This function provides a default implementation for the `store_metadata_atomic` method from the `ObjectModel` trait.
@@ -202,18 +197,18 @@ impl HeaderMetadataSpec {
     #[inline(always)]
     pub fn store_atomic<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         val: T,
         optional_mask: Option<T>,
         ordering: Ordering,
     ) {
-        self.store_inner::<T>(object, val, optional_mask, Some(ordering))
+        self.store_inner::<T>(header, val, optional_mask, Some(ordering))
     }
 
     #[inline(always)]
     fn store_inner<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         val: T,
         optional_mask: Option<T>,
         atomic_ordering: Option<Ordering>,
@@ -227,7 +222,7 @@ impl HeaderMetadataSpec {
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask, and compare_exchange is required
         if self.num_of_bits < 8 {
             let val_u8 = val.to_u8().unwrap();
-            let byte_addr = self.meta_addr(object);
+            let byte_addr = self.meta_addr(header);
             if let Some(order) = atomic_ordering {
                 let _ = unsafe {
                     <u8 as MetadataValue>::fetch_update(byte_addr, order, order, |old_val: u8| {
@@ -242,7 +237,7 @@ impl HeaderMetadataSpec {
                 }
             }
         } else {
-            let addr = self.meta_addr(object);
+            let addr = self.meta_addr(header);
             unsafe {
                 if let Some(order) = atomic_ordering {
                     // if the optional mask is provided (e.g. for forwarding pointer), we need to use compare_exchange
@@ -272,7 +267,7 @@ impl HeaderMetadataSpec {
     #[inline(always)]
     pub fn compare_exchange<T: MetadataValue>(
         &self,
-        object: ObjectReference,
+        header: Address,
         old_metadata: T,
         new_metadata: T,
         optional_mask: Option<T>,
@@ -283,7 +278,7 @@ impl HeaderMetadataSpec {
         self.assert_spec::<T>();
         // metadata smaller than 8-bits is special in that more than one metadata value may be included in one AtomicU8 operation, and extra shift and mask is required
         if self.num_of_bits < 8 {
-            let byte_addr = self.meta_addr(object);
+            let byte_addr = self.meta_addr(header);
             unsafe {
                 let real_old_byte = byte_addr.atomic_load::<AtomicU8>(success_order);
                 let expected_old_byte =
@@ -301,7 +296,7 @@ impl HeaderMetadataSpec {
                     .map_err(|x| FromPrimitive::from_u8(x).unwrap())
             }
         } else {
-            let addr = self.meta_addr(object);
+            let addr = self.meta_addr(header);
             let (old_metadata, new_metadata) = if let Some(mask) = optional_mask {
                 let old_byte = unsafe { T::load_atomic(addr, success_order) };
                 let expected_new_byte = old_byte.bitand(mask.inv()).bitor(new_metadata);
@@ -328,12 +323,12 @@ impl HeaderMetadataSpec {
     #[inline(always)]
     fn fetch_ops_on_bits<F: Fn(u8) -> u8>(
         &self,
-        object: ObjectReference,
+        header: Address,
         set_order: Ordering,
         fetch_order: Ordering,
         update: F,
     ) -> u8 {
-        let byte_addr = self.meta_addr(object);
+        let byte_addr = self.meta_addr(header);
         let old_raw_byte = unsafe {
             <u8 as MetadataValue>::fetch_update(
                 byte_addr,
@@ -353,52 +348,37 @@ impl HeaderMetadataSpec {
 
     /// This function provides a default implementation for the `fetch_add` method from the `ObjectModel` trait.
     #[inline(always)]
-    pub fn fetch_add<T: MetadataValue>(
-        &self,
-        object: ObjectReference,
-        val: T,
-        order: Ordering,
-    ) -> T {
+    pub fn fetch_add<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_ops_on_bits(object, order, order, |x: u8| {
+            FromPrimitive::from_u8(self.fetch_ops_on_bits(header, order, order, |x: u8| {
                 x.wrapping_add(val.to_u8().unwrap())
             }))
             .unwrap()
         } else {
-            unsafe { T::fetch_add(self.meta_addr(object), val, order) }
+            unsafe { T::fetch_add(self.meta_addr(header), val, order) }
         }
     }
 
     /// This function provides a default implementation for the `fetch_sub` method from the `ObjectModel` trait.
     #[inline(always)]
-    pub fn fetch_sub<T: MetadataValue>(
-        &self,
-        object: ObjectReference,
-        val: T,
-        order: Ordering,
-    ) -> T {
+    pub fn fetch_sub<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            FromPrimitive::from_u8(self.fetch_ops_on_bits(object, order, order, |x: u8| {
+            FromPrimitive::from_u8(self.fetch_ops_on_bits(header, order, order, |x: u8| {
                 x.wrapping_sub(val.to_u8().unwrap())
             }))
             .unwrap()
         } else {
-            unsafe { T::fetch_sub(self.meta_addr(object), val, order) }
+            unsafe { T::fetch_sub(self.meta_addr(header), val, order) }
         }
     }
 
     /// This function provides a default implementation for the `fetch_and` method from the `ObjectModel` trait.
     #[inline(always)]
-    pub fn fetch_and<T: MetadataValue>(
-        &self,
-        object: ObjectReference,
-        val: T,
-        order: Ordering,
-    ) -> T {
+    pub fn fetch_and<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
@@ -406,22 +386,17 @@ impl HeaderMetadataSpec {
             let new_val = (val.to_u8().unwrap() << lshift) | !mask;
             // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 1, and do fetch_and
             let old_raw_byte =
-                unsafe { <u8 as MetadataValue>::fetch_and(self.meta_addr(object), new_val, order) };
+                unsafe { <u8 as MetadataValue>::fetch_and(self.meta_addr(header), new_val, order) };
             let old_val = self.get_bits_from_u8(old_raw_byte);
             FromPrimitive::from_u8(old_val).unwrap()
         } else {
-            unsafe { T::fetch_and(self.meta_addr(object), val, order) }
+            unsafe { T::fetch_and(self.meta_addr(header), val, order) }
         }
     }
 
     /// This function provides a default implementation for the `fetch_or` method from the `ObjectModel` trait.
     #[inline(always)]
-    pub fn fetch_or<T: MetadataValue>(
-        &self,
-        object: ObjectReference,
-        val: T,
-        order: Ordering,
-    ) -> T {
+    pub fn fetch_or<T: MetadataValue>(&self, header: Address, val: T, order: Ordering) -> T {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
@@ -429,28 +404,28 @@ impl HeaderMetadataSpec {
             let new_val = (val.to_u8().unwrap() << lshift) & mask;
             // We do not need to use fetch_ops_on_bits(), we can just set irrelavent bits to 0, and do fetch_or
             let old_raw_byte =
-                unsafe { <u8 as MetadataValue>::fetch_or(self.meta_addr(object), new_val, order) };
+                unsafe { <u8 as MetadataValue>::fetch_or(self.meta_addr(header), new_val, order) };
             let old_val = self.get_bits_from_u8(old_raw_byte);
             FromPrimitive::from_u8(old_val).unwrap()
         } else {
-            unsafe { T::fetch_or(self.meta_addr(object), val, order) }
+            unsafe { T::fetch_or(self.meta_addr(header), val, order) }
         }
     }
 
     /// This function provides a default implementation for the `fetch_update` method from the `ObjectModel` trait.
     /// The semantics is the same as Rust's `fetch_update` on atomic types.
     #[inline(always)]
-    pub fn fetch_update<T: MetadataValue>(
+    pub fn fetch_update<T: MetadataValue, F: FnMut(T) -> Option<T> + Copy>(
         &self,
-        object: ObjectReference,
+        header: Address,
         set_order: Ordering,
         fetch_order: Ordering,
-        mut f: impl FnMut(T) -> Option<T> + Copy,
+        mut f: F,
     ) -> std::result::Result<T, T> {
         #[cfg(debug_assertions)]
         self.assert_spec::<T>();
         if self.num_of_bits < 8 {
-            let byte_addr = self.meta_addr(object);
+            let byte_addr = self.meta_addr(header);
             unsafe {
                 <u8 as MetadataValue>::fetch_update(
                     byte_addr,
@@ -468,7 +443,7 @@ impl HeaderMetadataSpec {
             .map(|raw_byte| FromPrimitive::from_u8(self.get_bits_from_u8(raw_byte)).unwrap())
             .map_err(|raw_byte| FromPrimitive::from_u8(self.get_bits_from_u8(raw_byte)).unwrap())
         } else {
-            unsafe { T::fetch_update(self.meta_addr(object), set_order, fetch_order, f) }
+            unsafe { T::fetch_update(self.meta_addr(header), set_order, fetch_order, f) }
         }
     }
 }
@@ -656,7 +631,7 @@ mod tests {
     macro_rules! impl_with_object {
         ($type: ty) => {
             paste!{
-                fn [<with_ $type _obj>]<F>(f: F) where F: FnOnce(ObjectReference, *mut $type) + std::panic::UnwindSafe {
+                fn [<with_ $type _obj>]<F>(f: F) where F: FnOnce(Address, *mut $type) + std::panic::UnwindSafe {
                     // Allocate a tuple that can hold 3 integers
                     let ty_size = ($type::BITS >> LOG_BITS_IN_BYTE) as usize;
                     let layout = std::alloc::Layout::from_size_align(ty_size * 3, ty_size).unwrap();
@@ -668,7 +643,7 @@ mod tests {
                         assert_eq!(unsafe { *(ptr_mid.offset(-1)) }, 0, "memory at offset -1 is not zero");
                         assert_eq!(unsafe { *ptr_mid }, 0, "memory at offset 0 is not zero");
                         assert_eq!(unsafe { *(ptr_mid.offset(1)) }, 0, "memory at offset 1 is not zero");
-                        (unsafe { Address::from_ptr(ptr_mid).to_object_reference() }, ptr_mid)
+                        (Address::from_ptr(ptr_mid), ptr_mid)
                     };
                     crate::util::test_util::with_cleanup(
                         || f(obj, ptr),

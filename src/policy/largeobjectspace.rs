@@ -82,9 +82,13 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
         }
 
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(object);
-        let cell = VM::VMObjectModel::object_start_ref(object);
-        self.treadmill.add_to_treadmill(cell, alloc);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+        self.treadmill.add_to_treadmill(object, alloc);
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
     #[inline(always)]
     fn sft_trace_object(
@@ -214,7 +218,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );
@@ -222,8 +226,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
-                let cell = VM::VMObjectModel::object_start_ref(object);
-                self.treadmill.copy(cell, nursery_object);
+                self.treadmill.copy(object, nursery_object);
                 self.clear_nursery(object);
                 // We just moved the object out of the logical nursery, mark it as unlogged.
                 if nursery_object && self.common.needs_log_bit {
@@ -237,22 +240,21 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     }
 
     fn sweep_large_pages(&mut self, sweep_nursery: bool) {
-        // FIXME: borrow checker fighting
-        // didn't call self.release_multiple_pages
-        // so the compiler knows I'm borrowing two different fields
+        let sweep = |object: ObjectReference| {
+            #[cfg(feature = "global_alloc_bit")]
+            crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
+            self.pr
+                .release_pages(get_super_page(VM::VMObjectModel::ref_to_object_start(
+                    object,
+                )));
+        };
         if sweep_nursery {
-            for cell in self.treadmill.collect_nursery() {
-                // println!("- cn {}", cell);
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
-                self.pr.release_pages(get_super_page(cell));
+            for object in self.treadmill.collect_nursery() {
+                sweep(object);
             }
         } else {
-            for cell in self.treadmill.collect() {
-                // println!("- ts {}", cell);
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_addr_alloc_bit(cell);
-                self.pr.release_pages(get_super_page(cell));
+            for object in self.treadmill.collect() {
+                sweep(object)
             }
         }
     }
