@@ -188,6 +188,40 @@
 <span id="186">186</span>
 <span id="187">187</span>
 <span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::block</span>::{<span class="ident">Block</span>, <span class="ident">BlockState</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::immixspace::ImmixSpace</span>;
@@ -200,6 +234,8 @@
     <span class="ident">MMTK</span>,
 };
 <span class="kw">use</span> <span class="ident">spin::Mutex</span>;
+<span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicUsize</span>;
+<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 <span class="kw">use</span> <span class="ident">std</span>::{<span class="ident">ops::Range</span>, <span class="ident">sync::atomic::Ordering</span>};
 
 <span class="doccomment">/// Data structure to reference a MMTk 4 MB chunk.</span>
@@ -350,7 +386,19 @@
         <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     ) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">mark_histograms</span>.<span class="ident">lock</span>().<span class="ident">clear</span>();
-        <span class="self">self</span>.<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> <span class="ident">Box::new</span>(<span class="ident">SweepChunk</span> { <span class="ident">space</span>, <span class="ident">chunk</span> }))
+        <span class="kw">let</span> <span class="ident">epilogue</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">FlushPageResource</span> {
+            <span class="ident">space</span>,
+            <span class="ident">counter</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
+        });
+        <span class="kw">let</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> {
+            <span class="ident">Box::new</span>(<span class="ident">SweepChunk</span> {
+                <span class="ident">space</span>,
+                <span class="ident">chunk</span>,
+                <span class="ident">epilogue</span>: <span class="ident">epilogue</span>.<span class="ident">clone</span>(),
+            })
+        });
+        <span class="ident">epilogue</span>.<span class="ident">counter</span>.<span class="ident">store</span>(<span class="ident">tasks</span>.<span class="ident">len</span>(), <span class="ident">Ordering::SeqCst</span>);
+        <span class="ident">tasks</span>
     }
 }
 
@@ -364,6 +412,8 @@
 <span class="kw">struct</span> <span class="ident">SweepChunk</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">chunk</span>: <span class="ident">Chunk</span>,
+    <span class="doccomment">/// A destructor invoked when all `SweepChunk` packets are finished.</span>
+    <span class="ident">epilogue</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SweepChunk</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
@@ -374,6 +424,24 @@
             <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">sweep</span>(<span class="self">self</span>.<span class="ident">space</span>, <span class="kw-2">&amp;mut</span> <span class="ident">histogram</span>);
         }
         <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">add_completed_mark_histogram</span>(<span class="ident">histogram</span>);
+        <span class="self">self</span>.<span class="ident">epilogue</span>.<span class="ident">finish_one_work_packet</span>();
+    }
+}
+
+<span class="doccomment">/// Count number of remaining work pacets, and flush page resource if all packets are finished.</span>
+<span class="kw">struct</span> <span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">counter</span>: <span class="ident">AtomicUsize</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Called after a related work packet is finished.</span>
+    <span class="kw">fn</span> <span class="ident">finish_one_work_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">if</span> <span class="number">1</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>) {
+            <span class="comment">// We&#39;ve finished releasing all the dead blocks to the BlockPageResource&#39;s thread-local queues.</span>
+            <span class="comment">// Now flush the BlockPageResource.</span>
+            <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">flush_page_resource</span>()
+        }
     }
 }
 </code></pre></div>

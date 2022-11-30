@@ -8,7 +8,6 @@
 
         <!-- Custom HTML head -->
         
-        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
@@ -34,13 +33,13 @@
     </head>
     <body>
         <!-- Provide site root to javascript -->
-        <script type="text/javascript">
+        <script>
             var path_to_root = "../../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
-        <script type="text/javascript">
+        <script>
             try {
                 var theme = localStorage.getItem('mdbook-theme');
                 var sidebar = localStorage.getItem('mdbook-sidebar');
@@ -56,7 +55,7 @@
         </script>
 
         <!-- Set the theme before any content is loaded, prevents flash -->
-        <script type="text/javascript">
+        <script>
             var theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
@@ -68,7 +67,7 @@
         </script>
 
         <!-- Hide / unhide sidebar before it is displayed -->
-        <script type="text/javascript">
+        <script>
             var html = document.querySelector('html');
             var sidebar = 'hidden';
             if (document.body.clientWidth >= 1080) {
@@ -99,7 +98,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
-                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
@@ -132,7 +131,7 @@
                 </div>
 
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
-                <script type="text/javascript">
+                <script>
                     document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
                     document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
                     Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
@@ -178,8 +177,7 @@ space here.</p>
             constraints: &amp;MYGC_CONSTRAINTS,
         }
     }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <h2 id="introduce-collection-to-mygc-plan"><a class="header" href="#introduce-collection-to-mygc-plan">Introduce collection to MyGC plan</a></h2>
 <p>Add a new method to <code>Plan for MyGC</code>, <code>schedule_collection()</code>. This function 
 runs when a collection is triggered. It schedules GC work for the plan, i.e.,
@@ -205,8 +203,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = SFTProcessEdges&lt;Self::VM&gt;;
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>Then we implement <code>schedule_collection()</code> using <code>MyGCWorkContext</code> and <code>schedule_common_work()</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -215,8 +212,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext&lt
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::&lt;MyGCWorkContext&lt;VM&gt;&gt;(self);
     }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>Delete <code>handle_user_collection_request()</code>. This function was an override of 
 a Common plan function to ignore user requested collection for NoGC. Now we 
 remove it and allow user requested collection.</p>
@@ -242,8 +238,7 @@ call, and add the following code:</p>
             .set_copy_for_sft_trace(Some(CopySemantics::DefaultCopy));
         self.tospace_mut().set_copy_for_sft_trace(None);
     }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>This function is called at the start of a collection. It prepares the two 
 spaces in the common plan, flips the definitions for which space is 'to' 
 and which is 'from', then prepares the copyspaces with the new definition.</p>
@@ -265,8 +260,7 @@ the new <code>tospace</code>.</p>
 </span>    fn prepare_worker(&amp;self, worker: &amp;mut GCWorker&lt;VM&gt;) {
         unsafe { worker.get_copy_context_mut().copy[0].assume_init_mut() }.rebind(self.tospace());
     }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <h3 id="prepare-mutator"><a class="header" href="#prepare-mutator">Prepare mutator</a></h3>
 <p>Going back to <code>mutator.rs</code>, create a new function called 
 <code>mygc_mutator_prepare(_mutator: &amp;mut Mutator &lt;MyGC&lt;VM&gt;&gt;, _tls: OpaquePointer,)</code>. 
@@ -287,8 +281,7 @@ run after each collection.</p>
         self.common.release(tls, true);
         self.fromspace().release();
     }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>This function is called at the end of a collection. It calls the release 
 routines for the common plan spaces and the fromspace.</p>
 <h3 id="release-in-mutator"><a class="header" href="#release-in-mutator">Release in mutator</a></h3>
@@ -324,8 +317,7 @@ will then go to the new tospace.</p>
             .tospace(),
     );
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>Delete <code>mygc_mutator_noop()</code>. It was a placeholder for the prepare and 
 release functions that you have now added, so it is now dead code.</p>
 <h2 id="processedgeswork-for-mygc"><a class="header" href="#processedgeswork-for-mygc">ProcessEdgesWork for MyGC</a></h2>
@@ -373,8 +365,7 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
     #[fallback_trace]
     pub common: CommonPlan&lt;VM&gt;,
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>Once this is done, you can specify <code>PlanProcessEdges</code> as the <code>ProcessEdgesWorkType</code> in your GC work context:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -460,8 +451,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&l
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = MyGCProcessEdges&lt;Self::VM&gt;;
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <h3 id="approach-3-implement-your-own-processedgeswork"><a class="header" href="#approach-3-implement-your-own-processedgeswork">Approach 3: Implement your own <code>ProcessEdgesWork</code></a></h3>
 <p>Apart from the two approaches above, you can always implement your own <code>ProcessEdgesWork</code>. This is
 an overkill for simple plans like semi space, but might be necessary for more complex plans.
@@ -474,8 +464,7 @@ back to the plan, and a <code>ProcessEdgesBase</code> field:</p>
     plan: &amp;'static MyGC&lt;VM&gt;,
     base: ProcessEdgesBase&lt;VM&gt;,
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>Implement <code>ProcessEdgesWork</code> for <code>MyGCProcessEdges</code>. As most methods in the trait have a default
 implemetation, we only need to implement <code>new()</code> and <code>trace_object()</code> for our plan. However, this
 may not be true when you implement it for other GC plans. It would be better to check the default
@@ -527,8 +516,7 @@ object is not in any of the semi spaces in the plan, we forward the call to <cod
         ScanObjects::&lt;Self&gt;::new(nodes, false, roots)
     }
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>We would also need to implement <code>Deref</code> and <code>DerefMut</code> to our <code>ProcessEdgesWork</code> impl to be
 dereferenced as <code>ProcessEdgesBase</code>.</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
@@ -547,8 +535,7 @@ impl&lt;VM: VMBinding&gt; DerefMut for MyGCProcessEdges&lt;VM&gt; {
         &amp;mut self.base
     }
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <p>In the end, use <code>MyGCProcessEdges</code> as <code>ProcessEdgesWorkType</code> in the <code>GCWorkContext</code>:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -558,8 +545,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext3&l
     type PlanType = MyGC&lt;VM&gt;;
     type ProcessEdgesWorkType = MyGCProcessEdges&lt;Self::VM&gt;;
 }
-<span class="boring">}
-</span></code></pre></pre>
+<span class="boring">}</span></code></pre></pre>
 <h2 id="summary"><a class="header" href="#summary">Summary</a></h2>
 <p>You should now have MyGC working and able to collect garbage. All three
 benchmarks should be able to pass now. </p>
@@ -600,18 +586,18 @@ is available <a href="https://github.com/mmtk/mmtk-core/tree/master/docs/tutoria
 
 
 
-        <script type="text/javascript">
+        <script>
             window.playground_copyable = true;
         </script>
 
 
-        <script src="../../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../../mark.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../../searcher.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../elasticlunr.min.js"></script>
+        <script src="../../mark.min.js"></script>
+        <script src="../../searcher.js"></script>
 
-        <script src="../../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../../highlight.js" type="text/javascript" charset="utf-8"></script>
-        <script src="../../book.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../../clipboard.min.js"></script>
+        <script src="../../highlight.js"></script>
+        <script src="../../book.js"></script>
 
         <!-- Custom JS scripts -->
 

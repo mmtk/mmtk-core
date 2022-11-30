@@ -1,1 +1,1 @@
-initSidebarItems({"mod":[["accounting",""],["freelistpageresource",""],["heap_meta",""],["layout",""],["monotonepageresource",""],["pageresource",""],["space_descriptor",""],["vmrequest",""]]});
+initSidebarItems({"mod":[["accounting",""],["blockpageresource",""],["freelistpageresource",""],["heap_meta",""],["layout",""],["monotonepageresource",""],["pageresource",""],["space_descriptor",""],["vmrequest",""]]});

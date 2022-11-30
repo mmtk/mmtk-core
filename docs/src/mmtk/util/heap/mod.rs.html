@@ -16,9 +16,12 @@
 <span id="14">14</span>
 <span id="15">15</span>
 <span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
 </pre><pre class="rust"><code><span class="kw">mod</span> <span class="ident">accounting</span>;
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">layout</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">blockpageresource</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">freelistpageresource</span>;
 <span class="kw">mod</span> <span class="ident">heap_meta</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">monotonepageresource</span>;
@@ -27,6 +30,7 @@
 <span class="kw">mod</span> <span class="ident">vmrequest</span>;
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::accounting::PageAccounting</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::blockpageresource::BlockPageResource</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::freelistpageresource::FreeListPageResource</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::heap_meta::HeapMeta</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::monotonepageresource::MonotonePageResource</span>;

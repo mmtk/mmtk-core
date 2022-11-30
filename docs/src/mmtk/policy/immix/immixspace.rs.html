@@ -731,6 +731,21 @@
 <span id="729">729</span>
 <span id="730">730</span>
 <span id="731">731</span>
+<span id="732">732</span>
+<span id="733">733</span>
+<span id="734">734</span>
+<span id="735">735</span>
+<span id="736">736</span>
+<span id="737">737</span>
+<span id="738">738</span>
+<span id="739">739</span>
+<span id="740">740</span>
+<span id="741">741</span>
+<span id="742">742</span>
+<span id="743">743</span>
+<span id="744">744</span>
+<span id="745">745</span>
+<span id="746">746</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{
     <span class="ident">block</span>::<span class="kw-2">*</span>,
@@ -744,6 +759,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::BlockPageResource</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
@@ -756,10 +772,7 @@
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">plan::ObjectQueue</span>,
     <span class="ident">scheduler</span>::{<span class="ident">GCWork</span>, <span class="ident">GCWorkScheduler</span>, <span class="ident">GCWorker</span>, <span class="ident">WorkBucketStage</span>},
-    <span class="ident">util</span>::{
-        <span class="ident">heap::FreeListPageResource</span>,
-        <span class="ident">opaque_pointer</span>::{<span class="ident">VMThread</span>, <span class="ident">VMWorkerThread</span>},
-    },
+    <span class="ident">util::opaque_pointer</span>::{<span class="ident">VMThread</span>, <span class="ident">VMWorkerThread</span>},
     <span class="ident">MMTK</span>,
 };
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -770,7 +783,7 @@
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="ident">common</span>: <span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
-    <span class="ident">pr</span>: <span class="ident">FreeListPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">pr</span>: <span class="ident">BlockPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>, <span class="ident">Block</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Allocation status for all chunks in immix space</span>
     <span class="kw">pub</span> <span class="ident">chunk_map</span>: <span class="ident">ChunkMap</span>,
     <span class="doccomment">/// Current line mark state</span>
@@ -778,7 +791,7 @@
     <span class="doccomment">/// Line mark state in previous GC</span>
     <span class="ident">line_unavail_state</span>: <span class="ident">AtomicU8</span>,
     <span class="doccomment">/// A list of all reusable blocks</span>
-    <span class="kw">pub</span> <span class="ident">reusable_blocks</span>: <span class="ident">BlockList</span>,
+    <span class="kw">pub</span> <span class="ident">reusable_blocks</span>: <span class="ident">ReusableBlockPool</span>,
     <span class="doccomment">/// Defrag utilities</span>
     <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">defrag</span>: <span class="ident">Defrag</span>,
     <span class="doccomment">/// Object mark state</span>
@@ -949,19 +962,36 @@
         );
         <span class="ident">ImmixSpace</span> {
             <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
-                <span class="ident">FreeListPageResource::new_discontiguous</span>(<span class="ident">vm_map</span>)
+                <span class="ident">BlockPageResource::new_discontiguous</span>(
+                    <span class="ident">Block::LOG_PAGES</span>,
+                    <span class="ident">vm_map</span>,
+                    <span class="ident">scheduler</span>.<span class="ident">num_workers</span>(),
+                )
             } <span class="kw">else</span> {
-                <span class="ident">FreeListPageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="ident">vm_map</span>)
+                <span class="ident">BlockPageResource::new_contiguous</span>(
+                    <span class="ident">Block::LOG_PAGES</span>,
+                    <span class="ident">common</span>.<span class="ident">start</span>,
+                    <span class="ident">common</span>.<span class="ident">extent</span>,
+                    <span class="ident">vm_map</span>,
+                    <span class="ident">scheduler</span>.<span class="ident">num_workers</span>(),
+                )
             },
             <span class="ident">common</span>,
             <span class="ident">chunk_map</span>: <span class="ident">ChunkMap::new</span>(),
             <span class="ident">line_mark_state</span>: <span class="ident">AtomicU8::new</span>(<span class="ident">Line::RESET_MARK_STATE</span>),
             <span class="ident">line_unavail_state</span>: <span class="ident">AtomicU8::new</span>(<span class="ident">Line::RESET_MARK_STATE</span>),
-            <span class="ident">reusable_blocks</span>: <span class="ident">BlockList::default</span>(),
+            <span class="ident">reusable_blocks</span>: <span class="ident">ReusableBlockPool::new</span>(<span class="ident">scheduler</span>.<span class="ident">num_workers</span>()),
             <span class="ident">defrag</span>: <span class="ident">Defrag::default</span>(),
             <span class="ident">mark_state</span>: <span class="ident"><span class="self">Self</span>::UNMARKED_STATE</span>,
             <span class="ident">scheduler</span>,
         }
+    }
+
+    <span class="doccomment">/// Flush the thread-local queues in BlockPageResource</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_page_resource</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">reusable_blocks</span>.<span class="ident">flush_all</span>();
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_pointer_width</span> <span class="op">=</span> <span class="string">&quot;64&quot;</span>)]</span>
+        <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">flush_all</span>()
     }
 
     <span class="doccomment">/// Get the number of defrag headroom pages.</span>
@@ -1072,7 +1102,7 @@
     <span class="doccomment">/// Release a block.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">release_block</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">Block</span>) {
         <span class="ident">block</span>.<span class="ident">deinit</span>();
-        <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">release_pages</span>(<span class="ident">block</span>.<span class="ident">start</span>());
+        <span class="self">self</span>.<span class="ident">pr</span>.<span class="ident">release_block</span>(<span class="ident">block</span>);
     }
 
     <span class="doccomment">/// Allocate a clean block.</span>

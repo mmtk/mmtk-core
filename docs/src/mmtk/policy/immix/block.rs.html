@@ -309,16 +309,28 @@
 <span id="307">307</span>
 <span id="308">308</span>
 <span id="309">309</span>
+<span id="310">310</span>
+<span id="311">311</span>
+<span id="312">312</span>
+<span id="313">313</span>
+<span id="314">314</span>
+<span id="315">315</span>
+<span id="316">316</span>
+<span id="317">317</span>
+<span id="318">318</span>
+<span id="319">319</span>
+<span id="320">320</span>
+<span id="321">321</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::chunk::Chunk</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ImmixSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::blockpageresource::BlockPool</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan</span>::{<span class="ident">Region</span>, <span class="ident">RegionIterator</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">MetadataByteArrayRef</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident">spin</span>::{<span class="ident">Mutex</span>, <span class="ident">MutexGuard</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
 <span class="doccomment">/// The block allocation state.</span>
@@ -582,40 +594,52 @@
 }
 
 <span class="doccomment">/// A non-block single-linked list to store blocks.</span>
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">BlockList</span> {
-    <span class="ident">queue</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">ReusableBlockPool</span> {
+    <span class="ident">queue</span>: <span class="ident">BlockPool</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>,
+    <span class="ident">num_workers</span>: <span class="ident">usize</span>,
 }
 
-<span class="kw">impl</span> <span class="ident">BlockList</span> {
+<span class="kw">impl</span> <span class="ident">ReusableBlockPool</span> {
+    <span class="doccomment">/// Create empty block list</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">num_workers</span>: <span class="ident">usize</span>) -&gt; <span class="self">Self</span> {
+        <span class="self">Self</span> {
+            <span class="ident">queue</span>: <span class="ident">BlockPool::new</span>(<span class="ident">num_workers</span>),
+            <span class="ident">num_workers</span>,
+        }
+    }
+
     <span class="doccomment">/// Get number of blocks in this list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">len</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>().<span class="ident">len</span>()
+        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">len</span>()
     }
 
     <span class="doccomment">/// Add a block to the list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">block</span>: <span class="ident">Block</span>) {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>().<span class="ident">push</span>(<span class="ident">block</span>)
+        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">push</span>(<span class="ident">block</span>)
     }
 
     <span class="doccomment">/// Pop a block out of the list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">pop</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>().<span class="ident">pop</span>()
+        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">pop</span>()
     }
 
     <span class="doccomment">/// Clear the list.</span>
-    <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>() <span class="op">=</span> <span class="ident">Vec::new</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">reset</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">queue</span> <span class="op">=</span> <span class="ident">BlockPool::new</span>(<span class="self">self</span>.<span class="ident">num_workers</span>);
     }
 
-    <span class="doccomment">/// Get an array of all reusable blocks stored in this BlockList.</span>
+    <span class="doccomment">/// Iterate all the blocks in the queue. Call the visitor for each reported block.</span>
     <span class="attribute">#[<span class="ident">inline</span>]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">MutexGuard</span><span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">lock</span>()
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut</span> <span class="ident">f</span>: <span class="kw">impl</span> <span class="ident">FnMut</span>(<span class="ident">Block</span>)) {
+        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">iterate_blocks</span>(<span class="kw-2">&amp;mut</span> <span class="ident">f</span>);
+    }
+
+    <span class="doccomment">/// Flush the block queue</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">flush_all</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="ident">queue</span>.<span class="ident">flush_all</span>();
     }
 }
 </code></pre></div>

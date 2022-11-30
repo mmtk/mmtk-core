@@ -345,7 +345,7 @@
         <span class="ident">spill_avail_histograms</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Histogram</span>,
     ) -&gt; <span class="ident">usize</span> {
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">total_available_lines</span> <span class="op">=</span> <span class="number">0</span>;
-        <span class="kw">for</span> <span class="ident">block</span> <span class="kw">in</span> <span class="ident">space</span>.<span class="ident">reusable_blocks</span>.<span class="ident">get_blocks</span>().<span class="ident">iter</span>() {
+        <span class="ident">space</span>.<span class="ident">reusable_blocks</span>.<span class="ident">iterate_blocks</span>(<span class="op">|</span><span class="ident">block</span><span class="op">|</span> {
             <span class="kw">let</span> <span class="ident">bucket</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">get_holes</span>();
             <span class="kw">let</span> <span class="ident">unavailable_lines</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">block</span>.<span class="ident">get_state</span>() {
                 <span class="ident">BlockState::Reusable</span> { <span class="ident">unavailable_lines</span> } =&gt; <span class="ident">unavailable_lines</span> <span class="kw">as</span> <span class="ident">usize</span>,
@@ -354,7 +354,7 @@
             <span class="kw">let</span> <span class="ident">available_lines</span> <span class="op">=</span> <span class="ident">Block::LINES</span> <span class="op">-</span> <span class="ident">unavailable_lines</span>;
             <span class="ident">spill_avail_histograms</span>[<span class="ident">bucket</span>] <span class="op">+</span><span class="op">=</span> <span class="ident">available_lines</span>;
             <span class="ident">total_available_lines</span> <span class="op">+</span><span class="op">=</span> <span class="ident">available_lines</span>;
-        }
+        });
         <span class="ident">total_available_lines</span>
     }
 

@@ -32,6 +32,7 @@
 <span id="30">30</span>
 <span id="31">31</span>
 <span id="32">32</span>
+<span id="33">33</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A general scheduler implementation. MMTk uses it to schedule GC-related work.</span>
 
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">affinity</span>;
@@ -53,6 +54,7 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">work_bucket::WorkBucketStage</span>;
 
 <span class="kw">mod</span> <span class="ident">worker</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use</span> <span class="ident">worker::current_worker_ordinal</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">worker::GCWorker</span>;
 
 <span class="kw">mod</span> <span class="ident">controller</span>;
