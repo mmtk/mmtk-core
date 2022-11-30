@@ -3,7 +3,6 @@ use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
-use std::fmt::Debug;
 use std::marker::PhantomData;
 
 /// Iterate over an address range, and find each object by alloc bit.
@@ -76,7 +75,7 @@ impl<VM: VMBinding> LinearScanObjectSize for DefaultObjectSize<VM> {
 
 /// Region represents a memory region with a properly aligned address as its start and a fixed size for the region.
 /// Region provides a set of utility methods, along with a RegionIterator that linearly scans at the step of a region.
-pub trait Region: Copy + PartialEq + PartialOrd + Debug {
+pub trait Region: Copy + PartialEq + PartialOrd {
     const LOG_BYTES: usize;
     const BYTES: usize = 1 << Self::LOG_BYTES;
 
