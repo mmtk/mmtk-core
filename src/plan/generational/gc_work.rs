@@ -43,7 +43,7 @@ impl<VM: VMBinding, P: GenerationalPlan<VM>> ProcessEdgesWork for GenNurseryProc
     fn process_edge(&mut self, slot: EdgeOf<Self>) {
         let object = slot.load();
         let new_object = self.trace_object(object);
-        debug_assert!(!self.plan.is_object_in_nursery(new_object));
+        // debug_assert!(!self.plan.is_object_in_nursery(new_object));
         slot.store(new_object);
     }
 

@@ -38,7 +38,7 @@ pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
-    common: CommonSpace<VM>,
+    pub(crate) common: CommonSpace<VM>,
     pr: FreeListPageResource<VM>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
@@ -56,6 +56,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     mark_state: u8,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
+    nursery_collection: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -233,6 +234,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
+            nursery_collection: false,
         }
     }
 
@@ -273,6 +275,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&mut self, major_gc: bool) {
+        self.nursery_collection = !major_gc;
+
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -282,6 +286,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
         }
+
 
         // Prepare defrag info
         if super::DEFRAG {
@@ -304,11 +309,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         });
         self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
         // Update line mark state
-        if !super::BLOCK_ONLY {
-            self.line_mark_state.fetch_add(1, Ordering::AcqRel);
-            if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
-                self.line_mark_state
-                    .store(Line::RESET_MARK_STATE, Ordering::Release);
+        if major_gc {
+            if !super::BLOCK_ONLY {
+                self.line_mark_state.fetch_add(1, Ordering::AcqRel);
             }
         }
     }
@@ -320,6 +323,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if major_gc {
             // Update line_unavail_state for hole searching afte this GC.
             if !super::BLOCK_ONLY {
+                if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
+                    self.line_mark_state
+                        .store(Line::RESET_MARK_STATE, Ordering::Release);
+                }
                 self.line_unavail_state.store(
                     self.line_mark_state.load(Ordering::Acquire),
                     Ordering::Release,
@@ -416,7 +423,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         if Block::containing::<VM>(object).is_defrag_source() {
             debug_assert!(self.in_defrag());
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker)
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false)
         } else {
             self.trace_object_without_moving(trace, object)
         }
@@ -453,7 +460,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         object: ObjectReference,
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
+        nursery_collection: bool,
     ) -> ObjectReference {
+        debug_assert!(nursery_collection == self.nursery_collection);
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
@@ -487,7 +496,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             debug_assert!(
-                self.defrag.space_exhausted() || Self::is_pinned(object),
+                nursery_collection || self.defrag.space_exhausted() || Self::is_pinned(object),
                 "Forwarded object is the same as original object {} even though it should have been copied",
                 object,
             );
@@ -496,7 +505,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
-            let new_object = if Self::is_pinned(object) || self.defrag.space_exhausted() {
+            let new_object = if Self::is_pinned(object) || (!nursery_collection && self.defrag.space_exhausted()) {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -626,6 +635,27 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     pub(crate) fn get_pages_allocated(&self) -> usize {
         self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
     }
+
+    #[inline(always)]
+    pub(crate) fn is_live(&self, object: ObjectReference) -> bool {
+        if self.defrag.in_defrag() && Block::containing::<VM>(object).is_defrag_source() {
+            ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
+        } else {
+            self.is_marked(object, self.mark_state)
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn copy_nursery_is_live(&self, object: ObjectReference) -> bool {
+        ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
+    }
+
+    #[inline(always)]
+    pub(crate) fn fast_is_live(&self, object: ObjectReference) -> bool {
+        debug_assert!(!self.defrag.in_defrag());
+        self.is_marked(object, self.mark_state)
+    }
+
 }
 
 /// A work packet to prepare each block for GC.
@@ -718,6 +748,9 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
             None,
             Ordering::SeqCst,
         );
+        if self.get_space().nursery_collection {
+            VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.set_mature::<VM>(obj, Ordering::SeqCst);
+        }
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.get_space().mark_lines(obj);

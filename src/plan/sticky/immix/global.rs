@@ -5,7 +5,11 @@ use crate::plan::immix;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
+use crate::util::copy::CopyConfig;
+use crate::util::copy::CopySelector;
 use crate::util::heap::HeapMeta;
+use crate::util::metadata::MetadataSpec;
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use crate::plan::global::CommonPlan;
 use crate::policy::immix::ImmixSpace;
@@ -53,15 +57,23 @@ impl<VM: VMBinding> GenerationalPlan<VM> for StickyImmix<VM> {
         object: crate::util::ObjectReference,
         worker: &mut crate::scheduler::GCWorker<VM>,
     ) -> crate::util::ObjectReference {
-        if !self.is_object_in_nursery(object) {
-            // Mature object
-            return object;
-        } else if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
-            // Should we use DefaultCopy? Or PromoteMature?
-            return self.immix.immix_space.trace_object_with_opportunistic_copy(queue, object, CopySemantics::DefaultCopy, worker);
-        } else {
-            return self.immix.immix_space.trace_object_without_moving(queue, object);
+        if self.immix.immix_space.in_space(object) {
+            if !self.is_object_in_nursery(object) {
+                // Mature object
+                return object;
+            } else if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                // Should we use DefaultCopy? Or PromoteMature?
+                return self.immix.immix_space.trace_object_with_opportunistic_copy(queue, object, CopySemantics::DefaultCopy, worker, true);
+            } else {
+                return self.immix.immix_space.trace_object_without_moving(queue, object);
+            }
         }
+
+        if self.immix.common().get_los().in_space(object) {
+            return self.immix.common().get_los().trace_object::<Q>(queue, object);
+        }
+
+        object
     }
 }
 
@@ -70,6 +82,18 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn constraints(&self) -> &'static crate::plan::PlanConstraints {
         &STICKY_IMMIX_CONSTRAINTS
+    }
+
+    fn create_copy_config(&'static self) -> CopyConfig<Self::VM> {
+        use enum_map::enum_map;
+        CopyConfig {
+            copy_mapping: enum_map! {
+                CopySemantics::DefaultCopy => CopySelector::Immix(0),
+                _ => CopySelector::Unused,
+            },
+            space_mapping: vec![(CopySelector::Immix(0), &self.immix.immix_space)],
+            constraints: &STICKY_IMMIX_CONSTRAINTS,
+        }
     }
 
     fn base(&self) -> &crate::plan::global::BasePlan<Self::VM> {
@@ -128,10 +152,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if self.is_current_gc_nursery() {
             let was_defrag = self.immix.immix_space.release(false);
             self.immix.last_gc_was_defrag.store(was_defrag, Ordering::Relaxed);
+            return;
         }
 
         self.immix.release(tls);
-
         self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery(), Ordering::Relaxed);
     }
 
@@ -159,8 +183,33 @@ impl<VM: VMBinding> StickyImmix<VM> {
         options: Arc<Options>,
         scheduler: Arc<GCWorkScheduler<VM>>,
     ) -> Self {
+        let mut heap = HeapMeta::new(&options);
+        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+
+        let space = {
+            // Customize the immix space a bit -- add nursery bit if it is on the side
+            let mut space = ImmixSpace::new(
+                "immix",
+                vm_map,
+                mmapper,
+                &mut heap,
+                scheduler,
+                global_metadata_specs.clone(),
+            );
+
+            // If the nursery bit is on the side, add it for immix space
+            match VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.as_spec() {
+                MetadataSpec::OnSide(spec) => {
+                    space.common.metadata.local.push(*spec);
+                }
+                _ => {}
+            }
+
+            space
+        };
+
         Self {
-            immix: immix::Immix::new(vm_map, mmapper, options, scheduler),
+            immix: immix::Immix::new_with_immix_space(heap, global_metadata_specs, space, vm_map, mmapper, options),
             gc_full_heap: AtomicBool::new(false),
             next_gc_full_heap: AtomicBool::new(false),
         }

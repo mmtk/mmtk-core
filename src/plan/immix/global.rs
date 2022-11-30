@@ -16,6 +16,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
@@ -142,15 +143,27 @@ impl<VM: VMBinding> Immix<VM> {
     ) -> Self {
         let mut heap = HeapMeta::new(&options);
         let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let space = ImmixSpace::new(
+            "immix",
+            vm_map,
+            mmapper,
+            &mut heap,
+            scheduler,
+            global_metadata_specs.clone(),
+        );
+        Self::new_with_immix_space(heap, global_metadata_specs, space, vm_map, mmapper, options)
+    }
+
+    pub fn new_with_immix_space(
+        heap: HeapMeta,
+        global_metadata_specs: Vec<SideMetadataSpec>,
+        space: ImmixSpace<VM>,
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<Options>,
+    ) -> Self {
         let immix = Immix {
-            immix_space: ImmixSpace::new(
-                "immix",
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-                global_metadata_specs.clone(),
-            ),
+            immix_space: space,
             common: CommonPlan::new(
                 vm_map,
                 mmapper,
