@@ -299,8 +299,8 @@ impl<B: Region> BlockPool<B> {
     /// Create a BlockQueue
     pub fn new(num_workers: usize) -> Self {
         Self {
-            head_global_freed_blocks: Default::default(),
-            global_freed_blocks: Default::default(),
+            head_global_freed_blocks: RwLock::new(None),
+            global_freed_blocks: RwLock::new(vec![]),
             worker_local_freed_blocks: (0..num_workers).map(|_| BlockQueue::new()).collect(),
             count: AtomicUsize::new(0),
         }
