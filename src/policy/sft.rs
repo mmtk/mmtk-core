@@ -45,13 +45,15 @@ pub trait SFT {
         self.is_live(object)
     }
 
-    // Returns true if object status unpinned => pinned
+    // Functions for pinning/unpining and checking if an object is pinned
+    // For non moving policies, all the objects are considered as forever pinned,
+    // thus attempting to pin or unpin them will not succeed and will always return false.
+    // For policies where moving is compusory, pin/unpin is impossible and will panic (is_object_pinned will return false).
+    // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
+    // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
+    // is currently pinned.
     fn pin_object(&self, object: ObjectReference) -> bool;
-
-    // Returns true if object status pinned => unpinned
     fn unpin_object(&self, object: ObjectReference) -> bool;
-
-    // Returns true if object status is currently pinned
     fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
