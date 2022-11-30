@@ -11,6 +11,7 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::BlockPageResource;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -23,10 +24,7 @@ use crate::vm::*;
 use crate::{
     plan::ObjectQueue,
     scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
-    util::{
-        heap::FreeListPageResource,
-        opaque_pointer::{VMThread, VMWorkerThread},
-    },
+    util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
 use atomic::Ordering;
@@ -37,7 +35,7 @@ pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
+    pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -45,7 +43,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
     /// A list of all reusable blocks
-    pub reusable_blocks: BlockList,
+    pub reusable_blocks: ReusableBlockPool,
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
@@ -216,19 +214,36 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(vm_map)
+                BlockPageResource::new_discontiguous(
+                    Block::LOG_PAGES,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
+                BlockPageResource::new_contiguous(
+                    Block::LOG_PAGES,
+                    common.start,
+                    common.extent,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             },
             common,
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            reusable_blocks: BlockList::default(),
+            reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
         }
+    }
+
+    /// Flush the thread-local queues in BlockPageResource
+    pub fn flush_page_resource(&self) {
+        self.reusable_blocks.flush_all();
+        #[cfg(target_pointer_width = "64")]
+        self.pr.flush_all()
     }
 
     /// Get the number of defrag headroom pages.
@@ -339,7 +354,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Release a block.
     pub fn release_block(&self, block: Block) {
         block.deinit();
-        self.pr.release_pages(block.start());
+        self.pr.release_block(block);
     }
 
     /// Allocate a clean block.
