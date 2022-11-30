@@ -129,14 +129,6 @@ impl Shl<usize> for Address {
     }
 }
 
-/// Default constructor
-impl Default for Address {
-    #[inline(always)]
-    fn default() -> Self {
-        Self::ZERO
-    }
-}
-
 impl Address {
     pub const ZERO: Self = Address(0);
     pub const MAX: Self = Address(usize::max_value());
