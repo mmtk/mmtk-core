@@ -6,7 +6,7 @@ use crate::util::ObjectReference;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
-use crate::vm::{ActivePlan, Collection, ObjectModel};
+use crate::vm::{ActivePlan, Collection};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use crate::util::conversions;
@@ -187,8 +187,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn in_space(&self, object: ObjectReference) -> bool {
-        let start = VM::VMObjectModel::ref_to_address(object);
-        self.address_in_space(start)
+        self.address_in_space(object.to_address::<VM>())
     }
 
     /**

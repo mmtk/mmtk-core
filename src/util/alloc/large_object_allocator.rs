@@ -35,9 +35,6 @@ impl<VM: VMBinding> Allocator<VM> for LargeObjectAllocator<VM> {
     }
 
     fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
-        #[cfg(debug_assertions)]
-        crate::util::alloc::object_ref_guard::assert_object_ref_in_cell::<VM>(size);
-
         let cell: Address = self.alloc_slow(size, align, offset);
         // We may get a null ptr from alloc due to the VM being OOM
         if !cell.is_zero() {
