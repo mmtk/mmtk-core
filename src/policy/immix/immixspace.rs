@@ -34,6 +34,7 @@ use std::sync::{atomic::AtomicU8, Arc};
 
 pub(crate) const TRACE_KIND_FAST: TraceKind = 0;
 pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
+pub(crate) const TRACE_KIND_IMMOVABLE: TraceKind = 2;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
@@ -140,7 +141,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     ) -> ObjectReference {
         if KIND == TRACE_KIND_DEFRAG {
             self.trace_object(queue, object, copy.unwrap(), worker)
-        } else if KIND == TRACE_KIND_FAST {
+        } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_IMMOVABLE {
             self.fast_trace_object(queue, object)
         } else {
             unreachable!()
@@ -159,7 +160,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
     fn may_move_objects<const KIND: TraceKind>() -> bool {
         if KIND == TRACE_KIND_DEFRAG {
             true
-        } else if KIND == TRACE_KIND_FAST {
+        } else if KIND == TRACE_KIND_FAST || KIND == TRACE_KIND_IMMOVABLE {
             false
         } else {
             unreachable!()

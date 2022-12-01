@@ -63,6 +63,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         let mut work_buckets = enum_map! {
             WorkBucketStage::Unconstrained => WorkBucket::new(true, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::Prepare => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
+            WorkBucketStage::ClosureImmovable => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::Closure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::SoftRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),
             WorkBucketStage::WeakRefClosure => WorkBucket::new(false, worker_monitor.clone(), worker_group.clone()),

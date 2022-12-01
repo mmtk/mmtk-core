@@ -115,3 +115,45 @@ impl<'a, E: ProcessEdgesWork> Drop for ObjectsClosure<'a, E> {
         self.flush();
     }
 }
+
+/// A transitive closure visitor to collect all the edges of an object during ClosureImmovable.
+pub struct ImmovableObjectsClosure<'a, E: ProcessEdgesWork> {
+    buffer: VectorQueue<EdgeOf<E>>,
+    worker: &'a mut GCWorker<E::VM>,
+}
+
+impl<'a, E: ProcessEdgesWork> ImmovableObjectsClosure<'a, E> {
+    pub fn new(worker: &'a mut GCWorker<E::VM>) -> Self {
+        Self {
+            buffer: VectorQueue::new(),
+            worker,
+        }
+    }
+
+    fn flush(&mut self) {
+        let buf = self.buffer.take();
+        if !buf.is_empty() {
+            self.worker.add_work(
+                WorkBucketStage::ClosureImmovable,
+                E::new(buf, false, self.worker.mmtk),
+            );
+        }
+    }
+}
+
+impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ImmovableObjectsClosure<'a, E> {
+    #[inline(always)]
+    fn visit_edge(&mut self, slot: EdgeOf<E>) {
+        self.buffer.push(slot);
+        if self.buffer.is_full() {
+            self.flush();
+        }
+    }
+}
+
+impl<'a, E: ProcessEdgesWork> Drop for ImmovableObjectsClosure<'a, E> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
