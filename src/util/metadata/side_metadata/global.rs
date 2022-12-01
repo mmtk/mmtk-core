@@ -146,7 +146,53 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// Bulk-zero a specific metadata for a chunk.
+    /// This method is used for bulk zeroing side metadata for a data address range. As we cannot guarantee
+    /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
+    /// we need to mask and zero certain bits in a metadata byte.
+    /// The end address and the end bit are exclusive.
+    pub(super) fn zero_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        // Start/end is the same, we don't need to do anything.
+        if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
+            return;
+        }
+
+        // zeroing bytes
+        if meta_start_bit == 0 && meta_end_bit == 0 {
+            memory::zero(meta_start_addr, meta_end_addr - meta_start_addr);
+            return;
+        }
+
+        if meta_start_addr == meta_end_addr {
+            // we are zeroing selected bits in one byte
+            let mask: u8 = ((1 << meta_end_bit) - 1) - ((1 << meta_start_bit) - 1);
+            let mask = !mask;
+
+            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+        } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
+            // we are zeroing the rest bits in one byte
+            let mask = u8::MAX - ((1 << meta_start_bit) - 1);
+            let mask = !mask;
+
+            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+        } else {
+            // zero bits in the first byte
+            Self::zero_meta_bits(meta_start_addr, meta_start_bit, meta_start_addr + 1usize, 0);
+            // zero bytes in the middle
+            Self::zero_meta_bits(meta_start_addr + 1usize, 0, meta_end_addr, 0);
+            // zero bits in the last byte
+            Self::zero_meta_bits(meta_end_addr, 0, meta_end_addr, meta_end_bit);
+        }
+    }
+
+    /// Bulk-zero a specific metadata for a chunk. Note that this method is more sophisiticated than a simple memset, especially in the following
+    /// cases:
+    /// * the metadata for the range includes partial bytes (a few bits in the same byte).
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk's side metadata.
     ///
     /// # Arguments
     ///
@@ -157,19 +203,19 @@ impl SideMetadataSpec {
         #[cfg(feature = "extreme_assertions")]
         let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-        // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
-        #[cfg(not(feature = "global_alloc_bit"))]
-        debug_assert!(start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(self, start) == 0);
-
         #[cfg(feature = "extreme_assertions")]
         sanity::verify_bzero(self, start, size);
 
-        let meta_start = address_to_meta_address(self, start);
+        let zero = |data_start: Address, data_end: Address| {
+            let meta_start = address_to_meta_address(self, data_start);
+            let meta_start_shift = meta_byte_lshift(self, data_start);
+            let meta_end = address_to_meta_address(self, data_end);
+            let meta_end_shift = meta_byte_lshift(self, data_end);
+            Self::zero_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
+        };
+
         if cfg!(target_pointer_width = "64") || self.is_global {
-            memory::zero(
-                meta_start,
-                address_to_meta_address(self, start + size) - meta_start,
-            );
+            zero(start, start + size);
         }
         #[cfg(target_pointer_width = "32")]
         if !self.is_global {
@@ -178,31 +224,21 @@ impl SideMetadataSpec {
                 - start.align_down(BYTES_IN_CHUNK))
                 / BYTES_IN_CHUNK;
             if chunk_num == 0 {
-                memory::zero(
-                    meta_start,
-                    address_to_meta_address(self, start + size) - meta_start,
-                );
+                zero(start, start + size);
             } else {
                 let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
                 // bzero the first sub-chunk
-                memory::zero(
-                    meta_start,
-                    address_to_meta_address(self, second_data_chunk) - meta_start,
-                );
+                zero(start, second_data_chunk);
+
                 let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
                 let last_meta_chunk = address_to_meta_address(self, last_data_chunk);
                 // bzero the last sub-chunk
-                memory::zero(
-                    last_meta_chunk,
-                    address_to_meta_address(self, start + size) - last_meta_chunk,
-                );
+                zero(last_meta_chunk, start + size);
                 let mut next_data_chunk = second_data_chunk;
+
                 // bzero all chunks in the middle
                 while next_data_chunk != last_data_chunk {
-                    memory::zero(
-                        address_to_meta_address(self, next_data_chunk),
-                        metadata_bytes_per_chunk(self.log_bytes_in_region, self.log_num_of_bits),
-                    );
+                    zero(next_data_chunk, next_data_chunk + BYTES_IN_CHUNK);
                     next_data_chunk += BYTES_IN_CHUNK;
                 }
             }
