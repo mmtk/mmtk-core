@@ -191,7 +191,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutatorScanImmovable<E> {
                     );
                 }
             }
-            // Scan immovable roots`
+            // Scan immovable roots with immovable trace
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMImmovableRoots::<
                 PlanProcessEdges<E::VM, Immix<E::VM>, TRACE_KIND_IMMOVABLE>,
             >::new());
