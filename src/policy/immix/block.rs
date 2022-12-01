@@ -3,11 +3,11 @@ use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::heap::blockpageresource::BlockPool;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
 use crate::vm::*;
-use spin::{Mutex, MutexGuard};
 use std::sync::atomic::Ordering;
 
 /// The block allocation state.
@@ -271,39 +271,51 @@ impl Block {
 }
 
 /// A non-block single-linked list to store blocks.
-#[derive(Default)]
-pub struct BlockList {
-    queue: Mutex<Vec<Block>>,
+pub struct ReusableBlockPool {
+    queue: BlockPool<Block>,
+    num_workers: usize,
 }
 
-impl BlockList {
+impl ReusableBlockPool {
+    /// Create empty block list
+    pub fn new(num_workers: usize) -> Self {
+        Self {
+            queue: BlockPool::new(num_workers),
+            num_workers,
+        }
+    }
+
     /// Get number of blocks in this list.
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.queue.lock().len()
+        self.queue.len()
     }
 
     /// Add a block to the list.
-    #[inline]
+    #[inline(always)]
     pub fn push(&self, block: Block) {
-        self.queue.lock().push(block)
+        self.queue.push(block)
     }
 
     /// Pop a block out of the list.
-    #[inline]
+    #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.lock().pop()
+        self.queue.pop()
     }
 
     /// Clear the list.
-    #[inline]
-    pub fn reset(&self) {
-        *self.queue.lock() = Vec::new()
+    pub fn reset(&mut self) {
+        self.queue = BlockPool::new(self.num_workers);
     }
 
-    /// Get an array of all reusable blocks stored in this BlockList.
+    /// Iterate all the blocks in the queue. Call the visitor for each reported block.
     #[inline]
-    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
-        self.queue.lock()
+    pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
+        self.queue.iterate_blocks(&mut f);
+    }
+
+    /// Flush the block queue
+    pub fn flush_all(&self) {
+        self.queue.flush_all();
     }
 }
