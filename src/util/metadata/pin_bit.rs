@@ -20,10 +20,7 @@ impl VMLocalPinningBitSpec {
             Ordering::SeqCst,
         );
 
-        match res {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        res.is_ok()
     }
 
     pub fn unpin_object<VM: VMBinding>(&self, object: ObjectReference) -> bool {
@@ -41,10 +38,7 @@ impl VMLocalPinningBitSpec {
             Ordering::SeqCst,
         );
 
-        match res {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        res.is_ok()
     }
 
     pub fn is_object_pinned<VM: VMBinding>(&self, object: ObjectReference) -> bool {
@@ -52,6 +46,6 @@ impl VMLocalPinningBitSpec {
             return true;
         }
 
-        return false;
+        false
     }
 }
