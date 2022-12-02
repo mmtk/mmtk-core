@@ -757,7 +757,7 @@ pub fn add_finalizer<VM: VMBinding>(
 ///
 /// Arguments:
 /// * `object`: The object to be pinned
-#[cfg(feature = "object-pinning")]
+#[cfg(feature = "object_pinning")]
 pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;
@@ -772,7 +772,7 @@ pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 ///
 /// Arguments:
 /// * `object`: The object to be pinned
-#[cfg(feature = "object-pinning")]
+#[cfg(feature = "object_pinning")]
 pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;
@@ -785,7 +785,7 @@ pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
 ///
 /// Arguments:
 /// * `object`: The object to be checked
-#[cfg(feature = "object-pinning")]
+#[cfg(feature = "object_pinning")]
 pub fn is_pinned<VM: VMBinding>(object: ObjectReference) -> bool {
     use crate::mmtk::SFT_MAP;
     use crate::policy::sft_map::SFTMap;

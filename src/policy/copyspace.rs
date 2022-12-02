@@ -36,17 +36,17 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.is_from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
 
-    #[cfg(feature = "object-pinning")]
+    #[cfg(feature = "object_pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of CopySpace.")
     }
 
-    #[cfg(feature = "object-pinning")]
+    #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of CopySpace.")
     }
 
-    #[cfg(feature = "object-pinning")]
+    #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false
     }

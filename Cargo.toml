@@ -85,7 +85,7 @@ global_alloc_bit = []
 is_mmtk_object = ["global_alloc_bit"]
 
 # Enable object pinning, in particular, enable pinning/unpinning, and its metadata
-object-pinning = []
+object_pinning = []
 
 # The following two features are useful for using Immix for VMs that do not support moving GC.
 
