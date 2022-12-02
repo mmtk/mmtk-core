@@ -292,17 +292,16 @@ impl Block {
         let mut cell = self.start();
         let mut last = unsafe { Address::zero() };
         while cell + cell_size <= self.start() + Block::BYTES {
-            // We know the cell and the object reference is the same.
+            // The invariants we checked earlier ensures that we can use cell and object reference interchangably
+            // We may not really have an object in this cell, but if we do, this object reference is correct.
+            let potential_object = ObjectReference::from_raw_address(cell);
+
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
-                .is_marked::<VM>(ObjectReference::from_raw_address(cell), Ordering::SeqCst)
+                .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
                 // clear alloc bit if it is ever set.
                 #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(
-                    cell,
-                    0,
-                    Ordering::SeqCst,
-                );
+                crate::util::alloc_bit::unset_alloc_bit::<VM>(potential_object);
                 unsafe {
                     cell.store::<Address>(last);
                 }
@@ -365,12 +364,9 @@ impl Block {
                         self, cell, last
                     );
 
-                    // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the possible area.
+                    // Clear alloc bit: we don't know where the object reference actually is, so we bulk zero the cell.
                     #[cfg(feature = "global_alloc_bit")]
-                    crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC.bzero_metadata(
-                        cell + VM::VMObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND,
-                        cell_size,
-                    );
+                    crate::util::alloc_bit::bzero_alloc_bit(cell, cell_size);
 
                     // store the previous cell to make the free list
                     debug_assert!(last.is_zero() || (last >= self.start() && last < self.end()));
