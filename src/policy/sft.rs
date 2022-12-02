@@ -49,8 +49,11 @@ pub trait SFT {
     // For policies that support pinning (eg. Immix), pin/unpin will return a boolean indicating that the
     // pinning/unpinning action has been performed by the function, and is_object_pinned will return whether the object
     // is currently pinned.
+    #[cfg(feature = "object-pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool;
+    #[cfg(feature = "object-pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool;
+    #[cfg(feature = "object-pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool;
 
     /// Is the object movable, determined by the policy? E.g. the policy is non-moving,
@@ -127,12 +130,15 @@ impl SFT for EmptySpaceSFT {
         warn!("Object in empty space!");
         false
     }
+    #[cfg(feature = "object-pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of EmptySpace.")
     }
+    #[cfg(feature = "object-pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of EmptySpace.")
     }
+    #[cfg(feature = "object-pinning")]
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false
     }

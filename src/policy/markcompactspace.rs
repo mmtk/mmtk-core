@@ -52,14 +52,17 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         Self::is_marked(object)
     }
 
+    #[cfg(feature = "object-pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of MarkCompactSpace.")
     }
 
+    #[cfg(feature = "object-pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
         panic!("Cannot pin/unpin objects of MarkCompactSpace.")
     }
 
+    #[cfg(feature = "object-pinning")]
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         false
     }

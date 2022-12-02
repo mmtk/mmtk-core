@@ -43,12 +43,15 @@ impl<VM: VMBinding> SFT for LargeObjectSpace<VM> {
     fn is_live(&self, object: ObjectReference) -> bool {
         self.test_mark_bit(object, self.mark_state)
     }
+    #[cfg(feature = "object-pinning")]
     fn pin_object(&self, _object: ObjectReference) -> bool {
         false
     }
+    #[cfg(feature = "object-pinning")]
     fn unpin_object(&self, _object: ObjectReference) -> bool {
         false
     }
+    #[cfg(feature = "object-pinning")]
     fn is_object_pinned(&self, _object: ObjectReference) -> bool {
         true
     }

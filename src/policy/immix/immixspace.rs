@@ -66,12 +66,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
         }
     }
+    #[cfg(feature = "object-pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
     }
+    #[cfg(feature = "object-pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
     }
+    #[cfg(feature = "object-pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
@@ -177,6 +180,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                #[cfg(feature = "object-pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
         } else {
@@ -186,6 +190,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                #[cfg(feature = "object-pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
         })
@@ -480,7 +485,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 if new_object == object {
                     debug_assert!(
-                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || self.is_object_pinned(object),
+                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || self.is_pinned(object),
                         "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
@@ -499,7 +504,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             debug_assert!(
-                self.defrag.space_exhausted() || self.is_object_pinned(object),
+                self.defrag.space_exhausted() || self.is_pinned(object),
                 "Forwarded object is the same as original object {} even though it should have been copied",
                 object,
             );
@@ -508,7 +513,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
-            let new_object = if self.is_object_pinned(object) || self.defrag.space_exhausted() {
+            let new_object = if self.is_pinned(object) || self.defrag.space_exhausted() {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -575,6 +580,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Ordering::SeqCst,
         );
         old_value == mark_state
+    }
+
+    /// Check if an object is pinned.
+    #[inline(always)]
+    fn is_pinned(&self, _object: ObjectReference) -> bool {
+        #[cfg(feature = "object-pinning")]
+        return self.is_object_pinned(_object);
+
+        #[cfg(not(feature = "object-pinning"))]
+        false
     }
 
     /// Hole searching.
