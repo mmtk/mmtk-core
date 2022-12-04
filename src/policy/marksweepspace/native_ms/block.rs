@@ -299,9 +299,10 @@ impl Block {
             if !VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
                 .is_marked::<VM>(potential_object, Ordering::SeqCst)
             {
-                // clear alloc bit if it is ever set.
+                // clear alloc bit if it is ever set. It is possible that the alloc bit is never set for this cell (i.e. there was no object in this cell before this GC),
+                // we unset the bit anyway.
                 #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit::<VM>(potential_object);
+                crate::util::alloc_bit::unset_alloc_bit_nocheck::<VM>(potential_object);
                 unsafe {
                     cell.store::<Address>(last);
                 }
