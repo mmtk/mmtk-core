@@ -11,7 +11,7 @@ use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
 
-type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
+pub(crate) type SpaceMapping<VM> = Vec<(AllocatorSelector, &'static dyn Space<VM>)>;
 
 // This struct is part of the Mutator struct.
 // We are trying to make it fixed-sized so that VM bindings can easily define a Mutator type to have the exact same layout as our Mutator struct.
@@ -129,6 +129,28 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
     }
 }
 
+impl<VM: VMBinding> Mutator<VM> {
+    /// Get all the valid allocator selector (no duplicate)
+    fn get_all_allocator_selectors(&self) -> Vec<AllocatorSelector> {
+        use itertools::Itertools;
+        self.config
+            .allocator_mapping
+            .iter()
+            .map(|(_, selector)| *selector)
+            .sorted()
+            .dedup()
+            .filter(|selector| *selector != AllocatorSelector::None)
+            .collect()
+    }
+
+    /// Inform each allocator about destroying. Call allocator-specific on destroy methods.
+    pub fn on_destroy(&mut self) {
+        for selector in self.get_all_allocator_selectors() {
+            unsafe { self.allocators.get_allocator_mut(selector) }.on_mutator_destroy();
+        }
+    }
+}
+
 /// Each GC plan should provide their implementation of a MutatorContext. *Note that this trait is no longer needed as we removed
 /// per-plan mutator implementation and we will remove this trait as well in the future.*
 
@@ -175,6 +197,7 @@ pub(crate) struct ReservedAllocators {
     pub n_malloc: u8,
     pub n_immix: u8,
     pub n_mark_compact: u8,
+    pub n_free_list: u8,
 }
 
 impl ReservedAllocators {
@@ -184,6 +207,7 @@ impl ReservedAllocators {
         n_malloc: 0,
         n_immix: 0,
         n_mark_compact: 0,
+        n_free_list: 0,
     };
     /// check if the number of each allocator is okay. Panics if any allocator exceeds the max number.
     fn validate(&self) {
@@ -207,6 +231,10 @@ impl ReservedAllocators {
         assert!(
             self.n_mark_compact as usize <= MAX_MARK_COMPACT_ALLOCATORS,
             "Allocator mapping declared more mark compact allocators than the max allowed."
+        );
+        assert!(
+            self.n_free_list as usize <= MAX_FREE_LIST_ALLOCATORS,
+            "Allocator mapping declared more free list allocators than the max allowed."
         );
     }
 }

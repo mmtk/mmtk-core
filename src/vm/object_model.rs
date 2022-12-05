@@ -379,6 +379,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
+    /// If this is true, the binding guarantees that an object reference's raw address is always equal to the return value of the `ref_to_address` method
+    /// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// make some assumptions and optimize for this case.
+    /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
+    /// if any assertion catches this error, but may also fail silently.
+    const UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = false;
+
+    /// For our allocation result (object_start), the binding may have an offset between the allocation result
+    /// and the raw address of their object reference, i.e. object ref's raw address = object_start + offset.
+    /// The offset could be zero. The offset is not necessary to be
+    /// constant for all the objects. This constant defines the smallest possible offset.
+    ///
+    /// This is used as an indication for MMTk to predict where object references may point to in some algorithms.
+    ///
+    /// We should have the invariant:
+    /// * object ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND
+    const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
+
     /// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
@@ -400,12 +418,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// for an given object. For a given object, the returned address
     /// should be a constant offset from the object reference address.
     ///
-    /// If a binding enables the `is_mmtk_object` feature, MMTk may forge the queried address
+    /// Note that MMTk may forge an arbitrary address
     /// directly into a potential object reference, and call this method on the 'object reference'.
     /// In that case, the argument `object` may not be a valid object reference,
     /// and the implementation of this method should not use any object metadata.
-    /// However, if a binding, does not use the`is_mmtk_object` feature, they can expect
-    /// the `object` to be valid.
     ///
     /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///

@@ -14,7 +14,6 @@ pub use allocators::AllocatorSelector;
 mod bumpallocator;
 pub use bumpallocator::BumpAllocator;
 
-/// Large object allocator
 mod large_object_allocator;
 pub use large_object_allocator::LargeObjectAllocator;
 
@@ -25,6 +24,10 @@ pub use malloc_allocator::MallocAllocator;
 /// Immix allocator
 pub mod immix_allocator;
 pub use self::immix_allocator::ImmixAllocator;
+
+// Free list allocator based on Mimalloc
+pub mod free_list_allocator;
+pub use free_list_allocator::FreeListAllocator;
 
 /// Mark compact allocator (actually a bump pointer allocator with an extra heade word)
 mod markcompact_allocator;

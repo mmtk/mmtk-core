@@ -235,9 +235,7 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             #[cfg(feature = "global_alloc_bit")]
             crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
             self.pr
-                .release_pages(get_super_page(VM::VMObjectModel::ref_to_object_start(
-                    object,
-                )));
+                .release_pages(get_super_page(object.to_object_start::<VM>()));
         };
         if sweep_nursery {
             for object in self.treadmill.collect_nursery() {

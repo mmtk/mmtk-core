@@ -37,12 +37,7 @@ for fn in $(ls src/tests/*.rs); do
 
     # Run the test with each plan it needs.
     for MMTK_PLAN in $PLANS; do
-        # Deal with mark sweep specially, we only have malloc mark sweep, and we need to enable the feature to make it work.
-        if [[ $MMTK_PLAN == 'MarkSweep' ]]; then
-            env MMTK_PLAN=$MMTK_PLAN cargo test --features "malloc_mark_sweep,$FEATURES" -- $t;
-        else
-            env MMTK_PLAN=$MMTK_PLAN cargo test --features "$FEATURES" -- $t;
-        fi
+        env MMTK_PLAN=$MMTK_PLAN cargo test --features "$FEATURES" -- $t;
     done
 done
 

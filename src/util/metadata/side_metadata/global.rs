@@ -106,9 +106,10 @@ impl SideMetadataSpec {
     pub(crate) fn assert_metadata_mapped(&self, data_addr: Address) {
         let meta_start = address_to_meta_address(self, data_addr).align_down(BYTES_IN_PAGE);
 
-        debug!(
+        trace!(
             "ensure_metadata_is_mapped({}).meta_start({})",
-            data_addr, meta_start
+            data_addr,
+            meta_start
         );
 
         memory::panic_if_unmapped(meta_start, BYTES_IN_PAGE);
@@ -447,6 +448,41 @@ impl SideMetadataSpec {
                 sanity::verify_store(self, data_addr, metadata);
             },
         )
+    }
+
+    /// Non-atomically store zero to the side metadata for the given address.
+    /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because:
+    ///
+    /// 1. Concurrent access to this operation is undefined behaviour.
+    /// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.
+    #[inline(always)]
+    pub unsafe fn set_zero(&self, data_addr: Address) {
+        use num_traits::Zero;
+        match self.log_num_of_bits {
+            0..=3 => self.store(data_addr, u8::zero()),
+            4 => self.store(data_addr, u16::zero()),
+            5 => self.store(data_addr, u32::zero()),
+            6 => self.store(data_addr, u64::zero()),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Atomiccally store zero to the side metadata for the given address.
+    /// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.
+    #[inline(always)]
+    pub fn set_zero_atomic(&self, data_addr: Address, order: Ordering) {
+        use num_traits::Zero;
+        match self.log_num_of_bits {
+            0..=3 => self.store_atomic(data_addr, u8::zero(), order),
+            4 => self.store_atomic(data_addr, u16::zero(), order),
+            5 => self.store_atomic(data_addr, u32::zero(), order),
+            6 => self.store_atomic(data_addr, u64::zero(), order),
+            _ => unreachable!(),
+        }
     }
 
     #[inline(always)]

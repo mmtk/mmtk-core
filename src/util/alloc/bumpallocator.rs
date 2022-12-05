@@ -28,8 +28,8 @@ pub struct BumpAllocator<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> BumpAllocator<VM> {
-    pub fn set_limit(&mut self, cursor: Address, limit: Address) {
-        self.cursor = cursor;
+    pub fn set_limit(&mut self, start: Address, limit: Address) {
+        self.cursor = start;
         self.limit = limit;
     }
 

@@ -1,4 +1,4 @@
-//! Plan: marksweep (currently using malloc as its freelist allocator)
+//! Plan: marksweep
 
 mod gc_work;
 mod global;
