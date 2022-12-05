@@ -10,6 +10,8 @@ use crate::{
     MMTK,
 };
 use spin::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 use std::{ops::Range, sync::atomic::Ordering};
 
 /// Data structure to reference a MMTk 4 MB chunk.
@@ -160,7 +162,19 @@ impl ChunkMap {
         space: &'static ImmixSpace<VM>,
     ) -> Vec<Box<dyn GCWork<VM>>> {
         space.defrag.mark_histograms.lock().clear();
-        self.generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
+        let epilogue = Arc::new(FlushPageResource {
+            space,
+            counter: AtomicUsize::new(0),
+        });
+        let tasks = self.generate_tasks(|chunk| {
+            Box::new(SweepChunk {
+                space,
+                chunk,
+                epilogue: epilogue.clone(),
+            })
+        });
+        epilogue.counter.store(tasks.len(), Ordering::SeqCst);
+        tasks
     }
 }
 
@@ -174,6 +188,8 @@ impl Default for ChunkMap {
 struct SweepChunk<VM: VMBinding> {
     space: &'static ImmixSpace<VM>,
     chunk: Chunk,
+    /// A destructor invoked when all `SweepChunk` packets are finished.
+    epilogue: Arc<FlushPageResource<VM>>,
 }
 
 impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
@@ -184,5 +200,23 @@ impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
             self.chunk.sweep(self.space, &mut histogram);
         }
         self.space.defrag.add_completed_mark_histogram(histogram);
+        self.epilogue.finish_one_work_packet();
+    }
+}
+
+/// Count number of remaining work pacets, and flush page resource if all packets are finished.
+struct FlushPageResource<VM: VMBinding> {
+    space: &'static ImmixSpace<VM>,
+    counter: AtomicUsize,
+}
+
+impl<VM: VMBinding> FlushPageResource<VM> {
+    /// Called after a related work packet is finished.
+    fn finish_one_work_packet(&self) {
+        if 1 == self.counter.fetch_sub(1, Ordering::SeqCst) {
+            // We've finished releasing all the dead blocks to the BlockPageResource's thread-local queues.
+            // Now flush the BlockPageResource.
+            self.space.flush_page_resource()
+        }
     }
 }

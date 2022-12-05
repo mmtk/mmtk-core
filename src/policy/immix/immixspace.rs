@@ -11,6 +11,7 @@ use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
 use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
+use crate::util::heap::BlockPageResource;
 use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
 use crate::util::heap::VMRequest;
@@ -23,10 +24,7 @@ use crate::vm::*;
 use crate::{
     plan::ObjectQueue,
     scheduler::{GCWork, GCWorkScheduler, GCWorker, WorkBucketStage},
-    util::{
-        heap::FreeListPageResource,
-        opaque_pointer::{VMThread, VMWorkerThread},
-    },
+    util::opaque_pointer::{VMThread, VMWorkerThread},
     MMTK,
 };
 use atomic::Ordering;
@@ -37,7 +35,7 @@ pub(crate) const TRACE_KIND_DEFRAG: TraceKind = 1;
 
 pub struct ImmixSpace<VM: VMBinding> {
     common: CommonSpace<VM>,
-    pr: FreeListPageResource<VM>,
+    pr: BlockPageResource<VM, Block>,
     /// Allocation status for all chunks in immix space
     pub chunk_map: ChunkMap,
     /// Current line mark state
@@ -45,7 +43,7 @@ pub struct ImmixSpace<VM: VMBinding> {
     /// Line mark state in previous GC
     line_unavail_state: AtomicU8,
     /// A list of all reusable blocks
-    pub reusable_blocks: BlockList,
+    pub reusable_blocks: ReusableBlockPool,
     /// Defrag utilities
     pub(super) defrag: Defrag,
     /// Object mark state
@@ -68,12 +66,15 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
             self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
         }
     }
+    #[cfg(feature = "object_pinning")]
     fn pin_object(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.pin_object::<VM>(object)
     }
+    #[cfg(feature = "object_pinning")]
     fn unpin_object(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.unpin_object::<VM>(object)
     }
+    #[cfg(feature = "object_pinning")]
     fn is_object_pinned(&self, object: ObjectReference) -> bool {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
@@ -179,6 +180,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
         } else {
@@ -188,6 +190,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                #[cfg(feature = "object_pinning")]
                 *VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
         })
@@ -228,19 +231,36 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
-                FreeListPageResource::new_discontiguous(vm_map)
+                BlockPageResource::new_discontiguous(
+                    Block::LOG_PAGES,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             } else {
-                FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
+                BlockPageResource::new_contiguous(
+                    Block::LOG_PAGES,
+                    common.start,
+                    common.extent,
+                    vm_map,
+                    scheduler.num_workers(),
+                )
             },
             common,
             chunk_map: ChunkMap::new(),
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
-            reusable_blocks: BlockList::default(),
+            reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
             scheduler,
         }
+    }
+
+    /// Flush the thread-local queues in BlockPageResource
+    pub fn flush_page_resource(&self) {
+        self.reusable_blocks.flush_all();
+        #[cfg(target_pointer_width = "64")]
+        self.pr.flush_all()
     }
 
     /// Get the number of defrag headroom pages.
@@ -351,7 +371,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     /// Release a block.
     pub fn release_block(&self, block: Block) {
         block.deinit();
-        self.pr.release_pages(block.start());
+        self.pr.release_block(block);
     }
 
     /// Allocate a clean block.
@@ -465,7 +485,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             {
                 if new_object == object {
                     debug_assert!(
-                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || self.is_object_pinned(object),
+                        self.is_marked(object, self.mark_state) || self.defrag.space_exhausted() || self.is_pinned(object),
                         "Forwarded object is the same as original object {} even though it should have been copied",
                         object,
                     );
@@ -484,7 +504,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
             debug_assert!(
-                self.defrag.space_exhausted() || self.is_object_pinned(object),
+                self.defrag.space_exhausted() || self.is_pinned(object),
                 "Forwarded object is the same as original object {} even though it should have been copied",
                 object,
             );
@@ -493,7 +513,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
-            let new_object = if self.is_object_pinned(object) || self.defrag.space_exhausted() {
+            let new_object = if self.is_pinned(object) || self.defrag.space_exhausted() {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -560,6 +580,16 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Ordering::SeqCst,
         );
         old_value == mark_state
+    }
+
+    /// Check if an object is pinned.
+    #[inline(always)]
+    fn is_pinned(&self, _object: ObjectReference) -> bool {
+        #[cfg(feature = "object_pinning")]
+        return self.is_object_pinned(_object);
+
+        #[cfg(not(feature = "object_pinning"))]
+        false
     }
 
     /// Hole searching.

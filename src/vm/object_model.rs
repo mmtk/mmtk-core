@@ -81,6 +81,7 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
     /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
+    #[cfg(feature = "object_pinning")]
     /// The metadata specification for the pinning bit, used by most plans that need to pin objects. 1 bit.
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec;
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.

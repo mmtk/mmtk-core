@@ -146,7 +146,51 @@ impl SideMetadataSpec {
         MMAPPER.is_mapped_address(meta_addr)
     }
 
-    /// Bulk-zero a specific metadata for a chunk.
+    /// This method is used for bulk zeroing side metadata for a data address range. As we cannot guarantee
+    /// that the data address range can be mapped to whole metadata bytes, we have to deal with cases that
+    /// we need to mask and zero certain bits in a metadata byte.
+    /// The end address and the end bit are exclusive.
+    pub(super) fn zero_meta_bits(
+        meta_start_addr: Address,
+        meta_start_bit: u8,
+        meta_end_addr: Address,
+        meta_end_bit: u8,
+    ) {
+        // Start/end is the same, we don't need to do anything.
+        if meta_start_addr == meta_end_addr && meta_start_bit == meta_end_bit {
+            return;
+        }
+
+        // zeroing bytes
+        if meta_start_bit == 0 && meta_end_bit == 0 {
+            memory::zero(meta_start_addr, meta_end_addr - meta_start_addr);
+            return;
+        }
+
+        if meta_start_addr == meta_end_addr {
+            // we are zeroing selected bits in one byte
+            let mask: u8 = (u8::MAX << meta_end_bit) | !(u8::MAX << meta_start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
+
+            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+        } else if meta_start_addr + 1usize == meta_end_addr && meta_end_bit == 0 {
+            // we are zeroing the rest bits in one byte
+            let mask = !(u8::MAX << meta_start_bit); // Get a mask that the bits we need to zero are set to zero, and the other bits are 1.
+
+            unsafe { meta_start_addr.as_ref::<AtomicU8>() }.fetch_and(mask, Ordering::SeqCst);
+        } else {
+            // zero bits in the first byte
+            Self::zero_meta_bits(meta_start_addr, meta_start_bit, meta_start_addr + 1usize, 0);
+            // zero bytes in the middle
+            Self::zero_meta_bits(meta_start_addr + 1usize, 0, meta_end_addr, 0);
+            // zero bits in the last byte
+            Self::zero_meta_bits(meta_end_addr, 0, meta_end_addr, meta_end_bit);
+        }
+    }
+
+    /// Bulk-zero a specific metadata for a chunk. Note that this method is more sophisiticated than a simple memset, especially in the following
+    /// cases:
+    /// * the metadata for the range includes partial bytes (a few bits in the same byte).
+    /// * for 32 bits local side metadata, the side metadata is stored in discontiguous chunks, we will have to bulk zero for each chunk's side metadata.
     ///
     /// # Arguments
     ///
@@ -157,19 +201,66 @@ impl SideMetadataSpec {
         #[cfg(feature = "extreme_assertions")]
         let _lock = sanity::SANITY_LOCK.lock().unwrap();
 
-        // yiluowei: Not Sure but this assertion seems too strict for Immix recycled lines
-        #[cfg(not(feature = "global_alloc_bit"))]
-        debug_assert!(start.is_aligned_to(BYTES_IN_PAGE) && meta_byte_lshift(self, start) == 0);
-
         #[cfg(feature = "extreme_assertions")]
         sanity::verify_bzero(self, start, size);
 
-        let meta_start = address_to_meta_address(self, start);
-        if cfg!(target_pointer_width = "64") || self.is_global {
-            memory::zero(
-                meta_start,
-                address_to_meta_address(self, start + size) - meta_start,
+        // Zero for a contiguous side metadata spec. We can simply calculate the data end address, and
+        // calculate the metadata address for the data end.
+        let zero_contiguous = |data_start: Address, data_bytes: usize| {
+            if data_bytes == 0 {
+                return;
+            }
+            let meta_start = address_to_meta_address(self, data_start);
+            let meta_start_shift = meta_byte_lshift(self, data_start);
+            let meta_end = address_to_meta_address(self, data_start + data_bytes);
+            let meta_end_shift = meta_byte_lshift(self, data_start + data_bytes);
+            Self::zero_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
+        };
+
+        // Zero for a discontiguous side metadata spec (chunked metadata). The side metadata for different
+        // chunks are stored in discontiguous memory. For example, Chunk #2 follows Chunk #1, but the side metadata
+        // for Chunk #2 does not immediately follow the side metadata for Chunk #1. So when we bulk zero metadata for Chunk #1,
+        // we cannot zero up to the metadata address for the Chunk #2 start. Otherwise it may zero unrelated metadata
+        // between the two chunks' metadata.
+        // Instead, we compute how many bytes/bits we need to zero.
+        // The data for which the metadata will be zeroed has to be in the same chunk.
+        #[cfg(target_pointer_width = "32")]
+        let zero_discontiguous = |data_start: Address, data_bytes: usize| {
+            use crate::util::constants::BITS_IN_BYTE;
+            if data_bytes == 0 {
+                return;
+            }
+
+            debug_assert_eq!(
+                data_start.align_down(BYTES_IN_CHUNK),
+                (data_start + data_bytes - 1).align_down(BYTES_IN_CHUNK),
+                "The data to be zeroed in discontiguous specs needs to be in the same chunk"
             );
+
+            let meta_start = address_to_meta_address(self, data_start);
+            let meta_start_shift = meta_byte_lshift(self, data_start);
+
+            // How many bits we need to zero for data_bytes
+            let meta_total_bits = (data_bytes >> self.log_bytes_in_region) << self.log_num_of_bits;
+            let meta_delta_bytes = meta_total_bits >> LOG_BITS_IN_BYTE;
+            let meta_delta_bits: u8 = (meta_total_bits % BITS_IN_BYTE) as u8;
+
+            // Calculate the end byte/addr and end bit
+            let (meta_end, meta_end_shift) = {
+                let mut end_addr = meta_start + meta_delta_bytes;
+                let mut end_bit = meta_start_shift + meta_delta_bits;
+                if end_bit >= BITS_IN_BYTE as u8 {
+                    end_bit -= BITS_IN_BYTE as u8;
+                    end_addr += 1usize;
+                }
+                (end_addr, end_bit)
+            };
+
+            Self::zero_meta_bits(meta_start, meta_start_shift, meta_end, meta_end_shift);
+        };
+
+        if cfg!(target_pointer_width = "64") || self.is_global {
+            zero_contiguous(start, size);
         }
         #[cfg(target_pointer_width = "32")]
         if !self.is_global {
@@ -178,31 +269,20 @@ impl SideMetadataSpec {
                 - start.align_down(BYTES_IN_CHUNK))
                 / BYTES_IN_CHUNK;
             if chunk_num == 0 {
-                memory::zero(
-                    meta_start,
-                    address_to_meta_address(self, start + size) - meta_start,
-                );
+                zero_discontiguous(start, size);
             } else {
                 let second_data_chunk = start.align_up(BYTES_IN_CHUNK);
                 // bzero the first sub-chunk
-                memory::zero(
-                    meta_start,
-                    address_to_meta_address(self, second_data_chunk) - meta_start,
-                );
+                zero_discontiguous(start, second_data_chunk - start);
+
                 let last_data_chunk = (start + size).align_down(BYTES_IN_CHUNK);
-                let last_meta_chunk = address_to_meta_address(self, last_data_chunk);
                 // bzero the last sub-chunk
-                memory::zero(
-                    last_meta_chunk,
-                    address_to_meta_address(self, start + size) - last_meta_chunk,
-                );
+                zero_discontiguous(last_data_chunk, start + size - last_data_chunk);
                 let mut next_data_chunk = second_data_chunk;
+
                 // bzero all chunks in the middle
                 while next_data_chunk != last_data_chunk {
-                    memory::zero(
-                        address_to_meta_address(self, next_data_chunk),
-                        metadata_bytes_per_chunk(self.log_bytes_in_region, self.log_num_of_bits),
-                    );
+                    zero_discontiguous(next_data_chunk, BYTES_IN_CHUNK);
                     next_data_chunk += BYTES_IN_CHUNK;
                 }
             }
