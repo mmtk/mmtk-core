@@ -92,6 +92,11 @@
 <span id="90">90</span>
 <span id="91">91</span>
 <span id="92">92</span>
+<span id="93">93</span>
+<span id="94">94</span>
+<span id="95">95</span>
+<span id="96">96</span>
+<span id="97">97</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
@@ -118,6 +123,11 @@
 <span class="doccomment">/// Atomically unset the alloc bit for an object.</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
     <span class="macro">debug_assert!</span>(<span class="ident">is_alloced</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>), <span class="string">&quot;{:x}: alloc bit not set&quot;</span>, <span class="ident">object</span>);
+    <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
+}
+
+<span class="doccomment">/// Atomically unset the alloc bit for an object, regardless whether the bit is set or not.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">unset_alloc_bit_nocheck</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) {
     <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>.<span class="ident">store_atomic</span>::<span class="op">&lt;</span><span class="ident">u8</span><span class="op">&gt;</span>(<span class="ident">object</span>.<span class="ident">to_address</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(), <span class="number">0</span>, <span class="ident">Ordering::SeqCst</span>);
 }
 

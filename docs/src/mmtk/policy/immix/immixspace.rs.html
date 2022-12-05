@@ -746,18 +746,88 @@
 <span id="744">744</span>
 <span id="745">745</span>
 <span id="746">746</span>
+<span id="747">747</span>
+<span id="748">748</span>
+<span id="749">749</span>
+<span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
+<span id="782">782</span>
+<span id="783">783</span>
+<span id="784">784</span>
+<span id="785">785</span>
+<span id="786">786</span>
+<span id="787">787</span>
+<span id="788">788</span>
+<span id="789">789</span>
+<span id="790">790</span>
+<span id="791">791</span>
+<span id="792">792</span>
+<span id="793">793</span>
+<span id="794">794</span>
+<span id="795">795</span>
+<span id="796">796</span>
+<span id="797">797</span>
+<span id="798">798</span>
+<span id="799">799</span>
+<span id="800">800</span>
+<span id="801">801</span>
+<span id="802">802</span>
+<span id="803">803</span>
+<span id="804">804</span>
+<span id="805">805</span>
+<span id="806">806</span>
+<span id="807">807</span>
+<span id="808">808</span>
+<span id="809">809</span>
+<span id="810">810</span>
+<span id="811">811</span>
+<span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="kw">super</span>::{
-    <span class="ident">block</span>::<span class="kw-2">*</span>,
-    <span class="ident">chunk</span>::{<span class="ident">Chunk</span>, <span class="ident">ChunkMap</span>, <span class="ident">ChunkState</span>},
-    <span class="ident">defrag::Defrag</span>,
-};
+<span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">block</span>::<span class="kw-2">*</span>, <span class="ident">defrag::Defrag</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::BlockPageResource</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
@@ -776,7 +846,7 @@
     <span class="ident">MMTK</span>,
 };
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">atomic::AtomicU8</span>, <span class="ident">Arc</span>};
+<span class="kw">use</span> <span class="ident">std::sync</span>::{<span class="ident">atomic::AtomicU8</span>, <span class="ident">atomic::AtomicUsize</span>, <span class="ident">Arc</span>};
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">TRACE_KIND_FAST</span>: <span class="ident">TraceKind</span> <span class="op">=</span> <span class="number">0</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const</span> <span class="ident">TRACE_KIND_DEFRAG</span>: <span class="ident">TraceKind</span> <span class="op">=</span> <span class="number">1</span>;
@@ -1089,14 +1159,32 @@
             <span class="self">self</span>.<span class="ident">reusable_blocks</span>.<span class="ident">reset</span>();
         }
         <span class="comment">// Sweep chunks and blocks</span>
-        <span class="comment">// # Safety: ImmixSpace reference is always valid within this collection cycle.</span>
-        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="self">Self</span>) };
-        <span class="kw">let</span> <span class="ident">work_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">chunk_map</span>.<span class="ident">generate_sweep_tasks</span>(<span class="ident">space</span>);
+        <span class="kw">let</span> <span class="ident">work_packets</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">generate_sweep_tasks</span>();
         <span class="self">self</span>.<span class="ident">scheduler</span>().<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">bulk_add</span>(<span class="ident">work_packets</span>);
         <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::DEFRAG</span> {
             <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">release</span>(<span class="self">self</span>);
         }
         <span class="ident">did_defrag</span>
+    }
+
+    <span class="doccomment">/// Generate chunk sweep tasks</span>
+    <span class="kw">fn</span> <span class="ident">generate_sweep_tasks</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">mark_histograms</span>.<span class="ident">lock</span>().<span class="ident">clear</span>();
+        <span class="comment">// # Safety: ImmixSpace reference is always valid within this collection cycle.</span>
+        <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="self">self</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="self">Self</span>) };
+        <span class="kw">let</span> <span class="ident">epilogue</span> <span class="op">=</span> <span class="ident">Arc::new</span>(<span class="ident">FlushPageResource</span> {
+            <span class="ident">space</span>,
+            <span class="ident">counter</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
+        });
+        <span class="kw">let</span> <span class="ident">tasks</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">chunk_map</span>.<span class="ident">generate_tasks</span>(<span class="op">|</span><span class="ident">chunk</span><span class="op">|</span> {
+            <span class="ident">Box::new</span>(<span class="ident">SweepChunk</span> {
+                <span class="ident">space</span>,
+                <span class="ident">chunk</span>,
+                <span class="ident">epilogue</span>: <span class="ident">epilogue</span>.<span class="ident">clone</span>(),
+            })
+        });
+        <span class="ident">epilogue</span>.<span class="ident">counter</span>.<span class="ident">store</span>(<span class="ident">tasks</span>.<span class="ident">len</span>(), <span class="ident">Ordering::SeqCst</span>);
+        <span class="ident">tasks</span>
     }
 
     <span class="doccomment">/// Release a block.</span>
@@ -1397,7 +1485,7 @@
         <span class="comment">// Clear object mark table for this chunk</span>
         <span class="ident"><span class="self">Self</span>::reset_object_mark</span>(<span class="self">self</span>.<span class="ident">chunk</span>);
         <span class="comment">// Iterate over all blocks in this chunk</span>
-        <span class="kw">for</span> <span class="ident">block</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">blocks</span>() {
+        <span class="kw">for</span> <span class="ident">block</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">chunk</span>.<span class="ident">iter_region</span>::<span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>() {
             <span class="kw">let</span> <span class="ident">state</span> <span class="op">=</span> <span class="ident">block</span>.<span class="ident">get_state</span>();
             <span class="comment">// Skip unallocated blocks.</span>
             <span class="kw">if</span> <span class="ident">state</span> <span class="op">==</span> <span class="ident">BlockState::Unallocated</span> {
@@ -1413,6 +1501,64 @@
             <span class="ident">block</span>.<span class="ident">set_state</span>(<span class="ident">BlockState::Unmarked</span>);
             <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">block</span>.<span class="ident">get_state</span>().<span class="ident">is_reusable</span>());
             <span class="macro">debug_assert_ne!</span>(<span class="ident">block</span>.<span class="ident">get_state</span>(), <span class="ident">BlockState::Marked</span>);
+        }
+    }
+}
+
+<span class="doccomment">/// Chunk sweeping work packet.</span>
+<span class="kw">struct</span> <span class="ident">SweepChunk</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">chunk</span>: <span class="ident">Chunk</span>,
+    <span class="doccomment">/// A destructor invoked when all `SweepChunk` packets are finished.</span>
+    <span class="ident">epilogue</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">SweepChunk</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="attribute">#[<span class="ident">inline</span>]</span>
+    <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">_mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">histogram</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">new_histogram</span>();
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">chunk_map</span>.<span class="ident">get</span>(<span class="self">self</span>.<span class="ident">chunk</span>) <span class="op">==</span> <span class="ident">ChunkState::Allocated</span> {
+            <span class="kw">let</span> <span class="ident">line_mark_state</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span> {
+                <span class="prelude-val">None</span>
+            } <span class="kw">else</span> {
+                <span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">space</span>.<span class="ident">line_mark_state</span>.<span class="ident">load</span>(<span class="ident">Ordering::Acquire</span>))
+            };
+            <span class="comment">// number of allocated blocks.</span>
+            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">allocated_blocks</span> <span class="op">=</span> <span class="number">0</span>;
+            <span class="comment">// Iterate over all allocated blocks in this chunk.</span>
+            <span class="kw">for</span> <span class="ident">block</span> <span class="kw">in</span> <span class="self">self</span>
+                .<span class="ident">chunk</span>
+                .<span class="ident">iter_region</span>::<span class="op">&lt;</span><span class="ident">Block</span><span class="op">&gt;</span>()
+                .<span class="ident">filter</span>(<span class="op">|</span><span class="ident">block</span><span class="op">|</span> <span class="ident">block</span>.<span class="ident">get_state</span>() <span class="op">!</span><span class="op">=</span> <span class="ident">BlockState::Unallocated</span>)
+            {
+                <span class="kw">if</span> <span class="op">!</span><span class="ident">block</span>.<span class="ident">sweep</span>(<span class="self">self</span>.<span class="ident">space</span>, <span class="kw-2">&amp;mut</span> <span class="ident">histogram</span>, <span class="ident">line_mark_state</span>) {
+                    <span class="comment">// Block is live. Increment the allocated block count.</span>
+                    <span class="ident">allocated_blocks</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
+                }
+            }
+            <span class="comment">// Set this chunk as free if there is not live blocks.</span>
+            <span class="kw">if</span> <span class="ident">allocated_blocks</span> <span class="op">==</span> <span class="number">0</span> {
+                <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">chunk_map</span>.<span class="ident">set</span>(<span class="self">self</span>.<span class="ident">chunk</span>, <span class="ident">ChunkState::Free</span>)
+            }
+        }
+        <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">defrag</span>.<span class="ident">add_completed_mark_histogram</span>(<span class="ident">histogram</span>);
+        <span class="self">self</span>.<span class="ident">epilogue</span>.<span class="ident">finish_one_work_packet</span>();
+    }
+}
+
+<span class="doccomment">/// Count number of remaining work pacets, and flush page resource if all packets are finished.</span>
+<span class="kw">struct</span> <span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="ident">space</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">ImmixSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">counter</span>: <span class="ident">AtomicUsize</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">FlushPageResource</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Called after a related work packet is finished.</span>
+    <span class="kw">fn</span> <span class="ident">finish_one_work_packet</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">if</span> <span class="number">1</span> <span class="op">==</span> <span class="self">self</span>.<span class="ident">counter</span>.<span class="ident">fetch_sub</span>(<span class="number">1</span>, <span class="ident">Ordering::SeqCst</span>) {
+            <span class="comment">// We&#39;ve finished releasing all the dead blocks to the BlockPageResource&#39;s thread-local queues.</span>
+            <span class="comment">// Now flush the BlockPageResource.</span>
+            <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">flush_page_resource</span>()
         }
     }
 }

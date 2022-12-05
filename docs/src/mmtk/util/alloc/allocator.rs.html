@@ -357,6 +357,26 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 
@@ -385,11 +405,20 @@
     <span class="ident">alignment</span>: <span class="ident">usize</span>,
     <span class="ident">offset</span>: <span class="ident">isize</span>,
 ) -&gt; <span class="ident">Address</span> {
-    <span class="ident">align_allocation</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">alignment</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">false</span>)
+    <span class="ident">align_allocation_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">alignment</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">false</span>)
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+    <span class="ident">region</span>: <span class="ident">Address</span>,
+    <span class="ident">alignment</span>: <span class="ident">usize</span>,
+    <span class="ident">offset</span>: <span class="ident">isize</span>,
+) -&gt; <span class="ident">Address</span> {
+    <span class="ident">align_allocation_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">region</span>, <span class="ident">alignment</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">true</span>)
+}
+
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">align_allocation_inner</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">region</span>: <span class="ident">Address</span>,
     <span class="ident">alignment</span>: <span class="ident">usize</span>,
     <span class="ident">offset</span>: <span class="ident">isize</span>,
@@ -450,7 +479,12 @@
 }
 
 <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_maximum_aligned_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_maximum_aligned_size</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">alignment</span>: <span class="ident">usize</span>) -&gt; <span class="ident">usize</span> {
+    <span class="ident">get_maximum_aligned_size_inner</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span>, <span class="ident">alignment</span>, <span class="ident">VM::MIN_ALIGNMENT</span>)
+}
+
+<span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_maximum_aligned_size_inner</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
     <span class="ident">size</span>: <span class="ident">usize</span>,
     <span class="ident">alignment</span>: <span class="ident">usize</span>,
     <span class="ident">known_alignment</span>: <span class="ident">usize</span>,
@@ -710,6 +744,12 @@
             <span class="macro">warn!</span>(<span class="string">&quot;{} does not support stress GC (An allocator that does thread local allocation needs to implement allow_slow_once_stress_test()).&quot;</span>, <span class="ident">std::any::type_name</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>());
         }
         <span class="self">self</span>.<span class="ident">alloc_slow_once</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
+    }
+
+    <span class="doccomment">/// The [`crate::plan::Mutator`] that includes this allocator is going to be destroyed. Some allocators</span>
+    <span class="doccomment">/// may need to save/transfer its thread local data to the space.</span>
+    <span class="kw">fn</span> <span class="ident">on_mutator_destroy</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>) {
+        <span class="comment">// By default, do nothing</span>
     }
 }
 

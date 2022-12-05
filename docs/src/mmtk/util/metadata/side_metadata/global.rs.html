@@ -1472,6 +1472,42 @@
 <span id="1470">1470</span>
 <span id="1471">1471</span>
 <span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
@@ -1580,9 +1616,10 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn</span> <span class="ident">assert_metadata_mapped</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) {
         <span class="kw">let</span> <span class="ident">meta_start</span> <span class="op">=</span> <span class="ident">address_to_meta_address</span>(<span class="self">self</span>, <span class="ident">data_addr</span>).<span class="ident">align_down</span>(<span class="ident">BYTES_IN_PAGE</span>);
 
-        <span class="macro">debug!</span>(
+        <span class="macro">trace!</span>(
             <span class="string">&quot;ensure_metadata_is_mapped({}).meta_start({})&quot;</span>,
-            <span class="ident">data_addr</span>, <span class="ident">meta_start</span>
+            <span class="ident">data_addr</span>,
+            <span class="ident">meta_start</span>
         );
 
         <span class="ident">memory::panic_if_unmapped</span>(<span class="ident">meta_start</span>, <span class="ident">BYTES_IN_PAGE</span>);
@@ -1921,6 +1958,41 @@
                 <span class="ident">sanity::verify_store</span>(<span class="self">self</span>, <span class="ident">data_addr</span>, <span class="ident">metadata</span>);
             },
         )
+    }
+
+    <span class="doccomment">/// Non-atomically store zero to the side metadata for the given address.</span>
+    <span class="doccomment">/// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// # Safety</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is unsafe because:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// 1. Concurrent access to this operation is undefined behaviour.</span>
+    <span class="doccomment">/// 2. Interleaving Non-atomic and atomic operations is undefined behaviour.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">set_zero</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>) {
+        <span class="kw">use</span> <span class="ident">num_traits::Zero</span>;
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">log_num_of_bits</span> {
+            <span class="number">0</span>..<span class="op">=</span><span class="number">3</span> =&gt; <span class="self">self</span>.<span class="ident">store</span>(<span class="ident">data_addr</span>, <span class="ident">u8::zero</span>()),
+            <span class="number">4</span> =&gt; <span class="self">self</span>.<span class="ident">store</span>(<span class="ident">data_addr</span>, <span class="ident">u16::zero</span>()),
+            <span class="number">5</span> =&gt; <span class="self">self</span>.<span class="ident">store</span>(<span class="ident">data_addr</span>, <span class="ident">u32::zero</span>()),
+            <span class="number">6</span> =&gt; <span class="self">self</span>.<span class="ident">store</span>(<span class="ident">data_addr</span>, <span class="ident">u64::zero</span>()),
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+        }
+    }
+
+    <span class="doccomment">/// Atomiccally store zero to the side metadata for the given address.</span>
+    <span class="doccomment">/// This method mainly facilitates clearing multiple metadata specs for the same address in a loop.</span>
+    <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_zero_atomic</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">data_addr</span>: <span class="ident">Address</span>, <span class="ident">order</span>: <span class="ident">Ordering</span>) {
+        <span class="kw">use</span> <span class="ident">num_traits::Zero</span>;
+        <span class="kw">match</span> <span class="self">self</span>.<span class="ident">log_num_of_bits</span> {
+            <span class="number">0</span>..<span class="op">=</span><span class="number">3</span> =&gt; <span class="self">self</span>.<span class="ident">store_atomic</span>(<span class="ident">data_addr</span>, <span class="ident">u8::zero</span>(), <span class="ident">order</span>),
+            <span class="number">4</span> =&gt; <span class="self">self</span>.<span class="ident">store_atomic</span>(<span class="ident">data_addr</span>, <span class="ident">u16::zero</span>(), <span class="ident">order</span>),
+            <span class="number">5</span> =&gt; <span class="self">self</span>.<span class="ident">store_atomic</span>(<span class="ident">data_addr</span>, <span class="ident">u32::zero</span>(), <span class="ident">order</span>),
+            <span class="number">6</span> =&gt; <span class="self">self</span>.<span class="ident">store_atomic</span>(<span class="ident">data_addr</span>, <span class="ident">u64::zero</span>(), <span class="ident">order</span>),
+            <span class="kw">_</span> =&gt; <span class="macro">unreachable!</span>(),
+        }
     }
 
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>

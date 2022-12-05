@@ -71,6 +71,8 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
 </pre><pre class="rust"><code><span class="doccomment">//! MMTk-to-VM interface: the VMBinding trait.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides VM-specific traits that serve as MMTK-to-VM interfaces.</span>
@@ -108,6 +110,9 @@
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::RootsWorkFactory</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::scanning::Scanning</span>;
 
+<span class="kw">const</span> <span class="ident">DEFAULT_LOG_MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
+<span class="kw">const</span> <span class="ident">DEFAULT_LOG_MAX_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_LONG</span> <span class="kw">as</span> <span class="ident">usize</span>;
+
 <span class="doccomment">/// The `VMBinding` trait associates with each trait, and provides VM-specific constants.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">VMBinding</span>
 <span class="kw">where</span>
@@ -126,15 +131,14 @@
 
     <span class="doccomment">/// A value to fill in alignment gaps. This value can be used for debugging.</span>
     <span class="kw">const</span> <span class="ident">ALIGNMENT_VALUE</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">0xdead_beef</span>;
-    <span class="doccomment">/// Allowed minimal alignment.</span>
-    <span class="kw">const</span> <span class="ident">LOG_MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
     <span class="doccomment">/// Allowed minimal alignment in bytes.</span>
-    <span class="kw">const</span> <span class="ident">MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::LOG_MIN_ALIGNMENT</span>;
-    <span class="doccomment">/// Allowed maximum alignment as shift by min alignment.</span>
-    <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT_SHIFT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident">LOG_BYTES_IN_LONG</span> <span class="kw">as</span> <span class="ident">usize</span> <span class="op">-</span> <span class="ident">LOG_BYTES_IN_INT</span> <span class="kw">as</span> <span class="ident">usize</span>;
-
+    <span class="kw">const</span> <span class="ident">MIN_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">DEFAULT_LOG_MIN_ALIGNMENT</span>;
     <span class="doccomment">/// Allowed maximum alignment in bytes.</span>
-    <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="ident"><span class="self">Self</span>::MIN_ALIGNMENT</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident"><span class="self">Self</span>::MAX_ALIGNMENT_SHIFT</span>;
+    <span class="kw">const</span> <span class="ident">MAX_ALIGNMENT</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="ident">DEFAULT_LOG_MAX_ALIGNMENT</span>;
+    <span class="doccomment">/// Does the binding use a non-zero allocation offset? If this is false, we expect the binding</span>
+    <span class="doccomment">/// to always use offset === 0 for allocation, and we are able to do some optimization if we know</span>
+    <span class="doccomment">/// offset === 0.</span>
+    <span class="kw">const</span> <span class="ident">USE_ALLOCATION_OFFSET</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">true</span>;
 
     <span class="doccomment">/// This value is used to assert if the cursor is reasonable after allocations.</span>
     <span class="doccomment">/// At the end of an allocation, the allocation cursor should be aligned to this value.</span>

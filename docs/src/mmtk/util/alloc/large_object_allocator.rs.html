@@ -68,7 +68,6 @@
 <span id="66">66</span>
 <span id="67">67</span>
 <span id="68">68</span>
-<span id="69">69</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
@@ -109,7 +108,7 @@
         <span class="kw">let</span> <span class="ident">cell</span>: <span class="ident">Address</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">alloc_slow</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>);
         <span class="comment">// We may get a null ptr from alloc due to the VM being OOM</span>
         <span class="kw">if</span> <span class="op">!</span><span class="ident">cell</span>.<span class="ident">is_zero</span>() {
-            <span class="ident">allocator::align_allocation</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">cell</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">VM::MIN_ALIGNMENT</span>, <span class="bool-val">true</span>)
+            <span class="ident">allocator::align_allocation</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">cell</span>, <span class="ident">align</span>, <span class="ident">offset</span>)
         } <span class="kw">else</span> {
             <span class="ident">cell</span>
         }
@@ -117,8 +116,7 @@
 
     <span class="kw">fn</span> <span class="ident">alloc_slow_once</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">_offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="kw">let</span> <span class="ident">header</span> <span class="op">=</span> <span class="number">0</span>; <span class="comment">// HashSet is used instead of DoublyLinkedList</span>
-        <span class="kw">let</span> <span class="ident">maxbytes</span> <span class="op">=</span>
-            <span class="ident">allocator::get_maximum_aligned_size</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span> <span class="op">+</span> <span class="ident">header</span>, <span class="ident">align</span>, <span class="ident">VM::MIN_ALIGNMENT</span>);
+        <span class="kw">let</span> <span class="ident">maxbytes</span> <span class="op">=</span> <span class="ident">allocator::get_maximum_aligned_size</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">size</span> <span class="op">+</span> <span class="ident">header</span>, <span class="ident">align</span>);
         <span class="kw">let</span> <span class="ident">pages</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages_up</span>(<span class="ident">maxbytes</span>);
         <span class="kw">let</span> <span class="ident">sp</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">space</span>.<span class="ident">allocate_pages</span>(<span class="self">self</span>.<span class="ident">tls</span>, <span class="ident">pages</span>);
         <span class="kw">if</span> <span class="ident">sp</span>.<span class="ident">is_zero</span>() {

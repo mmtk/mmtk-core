@@ -190,6 +190,25 @@
 <span id="188">188</span>
 <span id="189">189</span>
 <span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan::Region</span>;
@@ -267,8 +286,27 @@
     <span class="ident">IX_BLOCK_DEFRAG</span> <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES</span>),
     <span class="comment">// Mark blocks by immix</span>
     <span class="ident">IX_BLOCK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::block::Block::LOG_BYTES</span>),
-    <span class="comment">// Mark chunks by immix</span>
-    <span class="ident">IX_CHUNK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::immix::chunk::Chunk::LOG_BYTES</span>),
+    <span class="comment">// Mark chunks (any plan that uses the chunk map should include this spec in their local sidemetadata specs)</span>
+    <span class="ident">CHUNK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map::Chunk::LOG_BYTES</span>),
+    <span class="comment">// Mark blocks by (native mimalloc) marksweep</span>
+    <span class="ident">MS_BLOCK_MARK</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="number">3</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// Next block in list for native mimalloc</span>
+    <span class="ident">MS_BLOCK_NEXT</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// Previous block in list for native mimalloc</span>
+    <span class="ident">MS_BLOCK_PREV</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// Pointer to owning list for blocks for native mimalloc</span>
+    <span class="ident">MS_BLOCK_LIST</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// Size of cells in block for native mimalloc FIXME: do we actually need usize?</span>
+    <span class="ident">MS_BLOCK_SIZE</span>         <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// TLS of owning mutator of block for native mimalloc</span>
+    <span class="ident">MS_BLOCK_TLS</span>    <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// First cell of free list in block for native mimalloc</span>
+    <span class="ident">MS_FREE</span>         <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// The following specs are only used for manual malloc/free</span>
+    <span class="comment">// First cell of local free list in block for native mimalloc</span>
+    <span class="ident">MS_LOCAL_FREE</span>   <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
+    <span class="comment">// First cell of thread free list in block for native mimalloc</span>
+    <span class="ident">MS_THREAD_FREE</span>  <span class="op">=</span> (<span class="ident">global</span>: <span class="bool-val">false</span>, <span class="ident">log_num_of_bits</span>: <span class="ident">LOG_BITS_IN_ADDRESS</span>, <span class="ident">log_bytes_in_region</span>: <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::Block::LOG_BYTES</span>),
 );
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>

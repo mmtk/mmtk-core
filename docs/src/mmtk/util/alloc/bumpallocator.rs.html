@@ -219,8 +219,8 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BumpAllocator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_limit</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">cursor</span>: <span class="ident">Address</span>, <span class="ident">limit</span>: <span class="ident">Address</span>) {
-        <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">cursor</span>;
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">set_limit</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">limit</span>: <span class="ident">Address</span>) {
+        <span class="self">self</span>.<span class="ident">cursor</span> <span class="op">=</span> <span class="ident">start</span>;
         <span class="self">self</span>.<span class="ident">limit</span> <span class="op">=</span> <span class="ident">limit</span>;
     }
 

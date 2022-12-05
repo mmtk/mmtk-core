@@ -208,10 +208,11 @@
 <span id="206">206</span>
 <span id="207">207</span>
 <span id="208">208</span>
+<span id="209">209</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident">core::sync::atomic</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">FromPrimitive</span>, <span class="ident">ToPrimitive</span>};
-<span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">Unsigned</span>, <span class="ident">WrappingAdd</span>, <span class="ident">WrappingSub</span>};
+<span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">Unsigned</span>, <span class="ident">WrappingAdd</span>, <span class="ident">WrappingSub</span>, <span class="ident">Zero</span>};
 
 <span class="doccomment">/// Describes bits and log2 bits for the numbers.</span>
 <span class="doccomment">/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/247</span>
@@ -270,6 +271,7 @@
 <span class="doccomment">/// The methods in this trait are mostly about atomically accessing such types.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">MetadataValue</span>:
     <span class="ident">Unsigned</span>
+    <span class="op">+</span> <span class="ident">Zero</span>
     <span class="op">+</span> <span class="ident">WrappingAdd</span>
     <span class="op">+</span> <span class="ident">WrappingSub</span>
     <span class="op">+</span> <span class="ident">Bits</span>

@@ -521,6 +521,22 @@
 <span id="519">519</span>
 <span id="520">520</span>
 <span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
+<span id="536">536</span>
+<span id="537">537</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
@@ -902,6 +918,24 @@
     <span class="doccomment">/// mature space for generational plans.</span>
     <span class="kw">const</span> <span class="ident">VM_WORST_CASE_COPY_EXPANSION</span>: <span class="ident">f64</span> <span class="op">=</span> <span class="number">1.5</span>;
 
+    <span class="doccomment">/// If this is true, the binding guarantees that an object reference&#39;s raw address is always equal to the return value of the `ref_to_address` method</span>
+    <span class="doccomment">/// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to</span>
+    <span class="doccomment">/// make some assumptions and optimize for this case.</span>
+    <span class="doccomment">/// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic</span>
+    <span class="doccomment">/// if any assertion catches this error, but may also fail silently.</span>
+    <span class="kw">const</span> <span class="ident">UNIFIED_OBJECT_REFERENCE_ADDRESS</span>: <span class="ident">bool</span> <span class="op">=</span> <span class="bool-val">false</span>;
+
+    <span class="doccomment">/// For our allocation result (object_start), the binding may have an offset between the allocation result</span>
+    <span class="doccomment">/// and the raw address of their object reference, i.e. object ref&#39;s raw address = object_start + offset.</span>
+    <span class="doccomment">/// The offset could be zero. The offset is not necessary to be</span>
+    <span class="doccomment">/// constant for all the objects. This constant defines the smallest possible offset.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This is used as an indication for MMTk to predict where object references may point to in some algorithms.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// We should have the invariant:</span>
+    <span class="doccomment">/// * object ref &gt;= object_start + OBJECT_REF_OFFSET_LOWER_BOUND</span>
+    <span class="kw">const</span> <span class="ident">OBJECT_REF_OFFSET_LOWER_BOUND</span>: <span class="ident">isize</span>;
+
     <span class="doccomment">/// Return the lowest address of the storage associated with an object. This should be</span>
     <span class="doccomment">/// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).</span>
     <span class="doccomment">///</span>
@@ -923,12 +957,10 @@
     <span class="doccomment">/// for an given object. For a given object, the returned address</span>
     <span class="doccomment">/// should be a constant offset from the object reference address.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// If a binding enables the `is_mmtk_object` feature, MMTk may forge the queried address</span>
+    <span class="doccomment">/// Note that MMTk may forge an arbitrary address</span>
     <span class="doccomment">/// directly into a potential object reference, and call this method on the &#39;object reference&#39;.</span>
     <span class="doccomment">/// In that case, the argument `object` may not be a valid object reference,</span>
     <span class="doccomment">/// and the implementation of this method should not use any object metadata.</span>
-    <span class="doccomment">/// However, if a binding, does not use the`is_mmtk_object` feature, they can expect</span>
-    <span class="doccomment">/// the `object` to be valid.</span>
     <span class="doccomment">///</span>
     <span class="doccomment">/// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].</span>
     <span class="doccomment">///</span>

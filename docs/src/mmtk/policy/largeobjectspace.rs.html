@@ -336,8 +336,6 @@
 <span id="334">334</span>
 <span id="335">335</span>
 <span id="336">336</span>
-<span id="337">337</span>
-<span id="338">338</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
@@ -575,9 +573,7 @@
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
             <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
             <span class="self">self</span>.<span class="ident">pr</span>
-                .<span class="ident">release_pages</span>(<span class="ident">get_super_page</span>(<span class="ident">VM::VMObjectModel::ref_to_object_start</span>(
-                    <span class="ident">object</span>,
-                )));
+                .<span class="ident">release_pages</span>(<span class="ident">get_super_page</span>(<span class="ident">object</span>.<span class="ident">to_object_start</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>()));
         };
         <span class="kw">if</span> <span class="ident">sweep_nursery</span> {
             <span class="kw">for</span> <span class="ident">object</span> <span class="kw">in</span> <span class="self">self</span>.<span class="ident">treadmill</span>.<span class="ident">collect_nursery</span>() {

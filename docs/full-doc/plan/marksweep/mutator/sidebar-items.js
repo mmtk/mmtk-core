@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["RESERVED_ALLOCATORS",""]],"fn":[["create_ms_mutator",""],["ms_mutator_prepare",""],["ms_mutator_release",""]],"struct":[["ALLOCATOR_MAPPING",""]]});
+initSidebarItems({"fn":[["create_ms_mutator",""]],"mod":[["native_mark_sweep",""]]});

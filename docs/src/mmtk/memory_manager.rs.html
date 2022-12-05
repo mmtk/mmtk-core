@@ -858,6 +858,17 @@
 <span id="856">856</span>
 <span id="857">857</span>
 <span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
 </pre><pre class="rust"><code><span class="doccomment">//! VM-to-MMTk interface: safe Rust APIs.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module provides a safe Rust API for mmtk-core.</span>
@@ -944,8 +955,11 @@
     <span class="ident">Box::new</span>(<span class="ident">mmtk</span>)
 }
 
-<span class="doccomment">/// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should</span>
-<span class="doccomment">/// store the returned mutator in a thread local storage that can be accessed efficiently.</span>
+<span class="doccomment">/// Request MMTk to create a mutator for the given thread. The ownership</span>
+<span class="doccomment">/// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its</span>
+<span class="doccomment">/// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage</span>
+<span class="doccomment">/// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data</span>
+<span class="doccomment">/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mmtk`: A reference to an MMTk instance.</span>
@@ -963,12 +977,14 @@
     <span class="ident">mutator</span>
 }
 
-<span class="doccomment">/// Reclaim a mutator that is no longer needed.</span>
+<span class="doccomment">/// Report to MMTk that a mutator is no longer needed. A binding should not attempt</span>
+<span class="doccomment">/// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the</span>
+<span class="doccomment">/// mutator, so a binding should properly reclaim the memory for the mutator after this call.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// Arguments:</span>
 <span class="doccomment">/// * `mutator`: A reference to the mutator to be destroyed.</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">destroy_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) {
-    <span class="ident">drop</span>(<span class="ident">mutator</span>);
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">destroy_mutator</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">mutator</span>: <span class="kw-2">&amp;mut</span> <span class="ident">Mutator</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {
+    <span class="ident">mutator</span>.<span class="ident">on_destroy</span>();
 }
 
 <span class="doccomment">/// Flush the mutator&#39;s local states.</span>
@@ -1004,6 +1020,12 @@
     <span class="comment">// If you plan to use MMTk with a VM with its object size smaller than MMTk&#39;s min object size, you should</span>
     <span class="comment">// meet the min object size in the fastpath.</span>
     <span class="macro">debug_assert!</span>(<span class="ident">size</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">MIN_OBJECT_SIZE</span>);
+    <span class="comment">// Assert alignment</span>
+    <span class="macro">debug_assert!</span>(<span class="ident">align</span> <span class="op">&gt;</span><span class="op">=</span> <span class="ident">VM::MIN_ALIGNMENT</span>);
+    <span class="macro">debug_assert!</span>(<span class="ident">align</span> <span class="op">&lt;</span><span class="op">=</span> <span class="ident">VM::MAX_ALIGNMENT</span>);
+    <span class="comment">// Assert offset</span>
+    <span class="macro">debug_assert!</span>(<span class="ident">VM::USE_ALLOCATION_OFFSET</span> <span class="op">|</span><span class="op">|</span> <span class="ident">offset</span> <span class="op">==</span> <span class="number">0</span>);
+
     <span class="ident">mutator</span>.<span class="ident">alloc</span>(<span class="ident">size</span>, <span class="ident">align</span>, <span class="ident">offset</span>, <span class="ident">semantics</span>)
 }
 

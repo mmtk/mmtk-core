@@ -34,6 +34,9 @@
 <span id="32">32</span>
 <span id="33">33</span>
 <span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
 </pre><pre class="rust"><code><span class="doccomment">///! Various allocators implementation.</span>
 
 <span class="doccomment">/// The allocator trait and allocation-related functions.</span>
@@ -50,7 +53,6 @@
 <span class="kw">mod</span> <span class="ident">bumpallocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">bumpallocator::BumpAllocator</span>;
 
-<span class="doccomment">/// Large object allocator</span>
 <span class="kw">mod</span> <span class="ident">large_object_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">large_object_allocator::LargeObjectAllocator</span>;
 
@@ -61,6 +63,10 @@
 <span class="doccomment">/// Immix allocator</span>
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">immix_allocator</span>;
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::immix_allocator::ImmixAllocator</span>;
+
+<span class="comment">// Free list allocator based on Mimalloc</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">free_list_allocator</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">free_list_allocator::FreeListAllocator</span>;
 
 <span class="doccomment">/// Mark compact allocator (actually a bump pointer allocator with an extra heade word)</span>
 <span class="kw">mod</span> <span class="ident">markcompact_allocator</span>;

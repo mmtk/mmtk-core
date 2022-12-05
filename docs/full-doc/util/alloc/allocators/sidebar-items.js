@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["MAX_BUMP_ALLOCATORS",""],["MAX_IMMIX_ALLOCATORS",""],["MAX_LARGE_OBJECT_ALLOCATORS",""],["MAX_MALLOC_ALLOCATORS",""],["MAX_MARK_COMPACT_ALLOCATORS",""]],"enum":[["AllocatorSelector",""]],"struct":[["Allocators",""]]});
+initSidebarItems({"constant":[["MAX_BUMP_ALLOCATORS",""],["MAX_FREE_LIST_ALLOCATORS",""],["MAX_IMMIX_ALLOCATORS",""],["MAX_LARGE_OBJECT_ALLOCATORS",""],["MAX_MALLOC_ALLOCATORS",""],["MAX_MARK_COMPACT_ALLOCATORS",""]],"enum":[["AllocatorSelector",""]],"struct":[["Allocators",""]]});

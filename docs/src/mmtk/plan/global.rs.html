@@ -1181,7 +1181,7 @@
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::MarkSweep</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::marksweep::MarkSweep::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
+            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
         )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
         <span class="ident">PlanSelector::Immix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::immix::Immix::new</span>(
             <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,

@@ -580,7 +580,7 @@
     <span class="doccomment">/// Get the address for header forwarding pointer</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">header_forwarding_pointer_address</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">Address</span> {
-        <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>) <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>
+        <span class="ident">object</span>.<span class="ident">to_object_start</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>() <span class="op">-</span> <span class="ident">GC_EXTRA_HEADER_BYTES</span>
     }
 
     <span class="doccomment">/// Get header forwarding pointer for an object</span>
@@ -819,7 +819,7 @@
                 <span class="kw">let</span> <span class="ident">end_of_new_object</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::copy_to</span>(<span class="ident">obj</span>, <span class="ident">new_object</span>, <span class="ident">Address::ZERO</span>);
                 <span class="comment">// update alloc_bit,</span>
                 <span class="ident">alloc_bit::set_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">new_object</span>);
-                <span class="ident">to</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">new_object</span>) <span class="op">+</span> <span class="ident">copied_size</span>;
+                <span class="ident">to</span> <span class="op">=</span> <span class="ident">new_object</span>.<span class="ident">to_object_start</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>() <span class="op">+</span> <span class="ident">copied_size</span>;
                 <span class="macro">debug_assert_eq!</span>(<span class="ident">end_of_new_object</span>, <span class="ident">to</span>);
             }
         }

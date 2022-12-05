@@ -141,40 +141,52 @@
 <span id="139">139</span>
 <span id="140">140</span>
 <span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::marksweep::gc_work</span>::{<span class="ident">MSGCWorkContext</span>, <span class="ident">MSSweepChunks</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::marksweep::gc_work::MSGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::marksweep::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::mallocspace::MallocSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
+<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
-<span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_mark_sweep&quot;</span>)]</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::malloc_ms::MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_mark_sweep&quot;</span>)]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::malloc_ms::MAX_OBJECT_SIZE</span>;
 
-<span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_mark_sweep&quot;</span>))]</span>
+<span class="kw">pub</span> <span class="kw">type</span> <span class="ident">MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_mark_sweep&quot;</span>))]</span>
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE</span>;
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">PlanTraceObject</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">MarkSweep</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="attribute">#[<span class="ident">fallback_trace</span>]</span>
     <span class="ident">common</span>: <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">trace</span>]</span>
-    <span class="ident">ms</span>: <span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">ms</span>: <span class="ident">MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MS_CONSTRAINTS</span>: <span class="ident">PlanConstraints</span> <span class="op">=</span> <span class="ident">PlanConstraints</span> {
@@ -182,6 +194,7 @@
     <span class="ident">gc_header_bits</span>: <span class="number">2</span>,
     <span class="ident">gc_header_words</span>: <span class="number">0</span>,
     <span class="ident">num_specialized_scans</span>: <span class="number">1</span>,
+    <span class="ident">max_non_los_default_alloc_bytes</span>: <span class="ident">MAX_OBJECT_SIZE</span>,
     <span class="ident">may_trace_duplicate_edges</span>: <span class="bool-val">true</span>,
     ..<span class="ident">PlanConstraints::default</span>()
 };
@@ -199,7 +212,6 @@
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_collection_kind</span>::<span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span>(<span class="self">self</span>);
         <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">set_gc_status</span>(<span class="ident">GcStatus::GcPrepare</span>);
         <span class="ident">scheduler</span>.<span class="ident">schedule_common_work</span>::<span class="op">&lt;</span><span class="ident">MSGCWorkContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>(<span class="self">self</span>);
-        <span class="ident">scheduler</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Prepare</span>].<span class="ident">add</span>(<span class="ident">MSSweepChunks</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::new</span>(<span class="self">self</span>));
     }
 
     <span class="kw">fn</span> <span class="ident">get_allocator_mapping</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">EnumMap</span><span class="op">&lt;</span><span class="ident">AllocationSemantics</span>, <span class="ident">AllocatorSelector</span><span class="op">&gt;</span> {
@@ -208,11 +220,11 @@
 
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">prepare</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
-        <span class="comment">// Dont need to prepare for MallocSpace</span>
+        <span class="self">self</span>.<span class="ident">ms</span>.<span class="ident">prepare</span>();
     }
 
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>) {
-        <span class="macro">trace!</span>(<span class="string">&quot;Marksweep: Release&quot;</span>);
+        <span class="self">self</span>.<span class="ident">ms</span>.<span class="ident">release</span>();
         <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">release</span>(<span class="ident">tls</span>, <span class="bool-val">true</span>);
     }
 
@@ -238,47 +250,49 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkSweep</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
-        <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to</span>
-        <span class="comment">// SideMetadataContext by default, so we don&#39;t need to add it here.</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>
-            <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[<span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>]);
-        <span class="comment">// if global_alloc_bit is NOT enabled,</span>
-        <span class="comment">// we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.</span>
-        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[
-            <span class="ident">ALLOC_SIDE_METADATA_SPEC</span>,
-            <span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>,
-        ]);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
+        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
+        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
+        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
+        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
+        <span class="ident">MarkSweepSpace</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::extend_global_side_metadata_specs</span>(<span class="kw-2">&amp;mut</span> <span class="ident">global_metadata_specs</span>);
 
-        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MarkSweep</span> {
-            <span class="ident">ms</span>: <span class="ident">MallocSpace::new</span>(<span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>()),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
+        <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> {
+            <span class="kw">let</span> <span class="ident">ms</span> <span class="op">=</span> <span class="ident">MarkSweepSpace::new</span>(
+                <span class="string">&quot;MarkSweepSpace&quot;</span>,
+                <span class="bool-val">false</span>,
+                <span class="ident">VMRequest::discontiguous</span>(),
+                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
+                <span class="ident">vm_map</span>,
+                <span class="ident">mmapper</span>,
+                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
+                <span class="ident">scheduler</span>,
+            );
+
+            <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonPlan::new</span>(
                 <span class="ident">vm_map</span>,
                 <span class="ident">mmapper</span>,
                 <span class="ident">options</span>,
                 <span class="ident">heap</span>,
                 <span class="kw-2">&amp;</span><span class="ident">MS_CONSTRAINTS</span>,
                 <span class="ident">global_metadata_specs</span>,
-            ),
+            );
+
+            <span class="ident">MarkSweep</span> { <span class="ident">common</span>, <span class="ident">ms</span> }
         };
 
-        <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>
-        <span class="comment">// side metadata in extreme_assertions.</span>
-        {
-            <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
-            <span class="ident">res</span>.<span class="ident">common</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-            <span class="ident">res</span>.<span class="ident">ms</span>
-                .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
-        }
-
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">side_metadata_sanity_checker</span> <span class="op">=</span> <span class="ident">SideMetadataSanity::new</span>();
+        <span class="ident">res</span>.<span class="ident">common</span>
+            .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
+        <span class="ident">res</span>.<span class="ident">ms</span>
+            .<span class="ident">verify_side_metadata_sanity</span>(<span class="kw-2">&amp;mut</span> <span class="ident">side_metadata_sanity_checker</span>);
         <span class="ident">res</span>
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ms_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MallocSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">ms_space</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">MarkSweepSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">ms</span>
     }
 }

@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["block",""],["block_list",""],["global",""]]});

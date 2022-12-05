@@ -164,7 +164,7 @@
     <span class="attribute">#[<span class="ident">inline</span>]</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mark_lines_for_object</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">object</span>: <span class="ident">ObjectReference</span>, <span class="ident">state</span>: <span class="ident">u8</span>) -&gt; <span class="ident">usize</span> {
         <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident"><span class="kw">super</span>::BLOCK_ONLY</span>);
-        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">VM::VMObjectModel::ref_to_object_start</span>(<span class="ident">object</span>);
+        <span class="kw">let</span> <span class="ident">start</span> <span class="op">=</span> <span class="ident">object</span>.<span class="ident">to_object_start</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
         <span class="kw">let</span> <span class="ident">end</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">VM::VMObjectModel::get_current_size</span>(<span class="ident">object</span>);
         <span class="kw">let</span> <span class="ident">start_line</span> <span class="op">=</span> <span class="ident">Line::from_unaligned_address</span>(<span class="ident">start</span>);
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">end_line</span> <span class="op">=</span> <span class="ident">Line::from_unaligned_address</span>(<span class="ident">end</span>);

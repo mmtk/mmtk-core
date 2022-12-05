@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["malloc_ms","Malloc mark sweep. This uses `MallocSpace` and `MallocAllocator`."],["native_ms","Native mark sweep. This uses `MarkSweepSpace` and `FreeListAllocator`."]]});
