@@ -1,16 +1,11 @@
-use super::block::{Block, BlockState};
-use super::defrag::Histogram;
-use super::immixspace::ImmixSpace;
-use crate::util::linear_scan::{Region, RegionIterator};
+use crate::scheduler::GCWork;
+use crate::util::linear_scan::Region;
+use crate::util::linear_scan::RegionIterator;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::{
-    scheduler::*,
-    util::{heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK, Address},
-    vm::*,
-    MMTK,
-};
+use crate::util::Address;
+use crate::vm::VMBinding;
 use spin::Mutex;
-use std::{ops::Range, sync::atomic::Ordering};
+use std::ops::Range;
 
 /// Data structure to reference a MMTk 4 MB chunk.
 #[repr(transparent)]
@@ -18,7 +13,7 @@ use std::{ops::Range, sync::atomic::Ordering};
 pub struct Chunk(Address);
 
 impl Region for Chunk {
-    const LOG_BYTES: usize = LOG_BYTES_IN_CHUNK;
+    const LOG_BYTES: usize = crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
 
     #[inline(always)]
     fn from_aligned_address(address: Address) -> Self {
@@ -34,43 +29,21 @@ impl Region for Chunk {
 
 impl Chunk {
     /// Chunk constant with zero address
-    const ZERO: Self = Self(Address::ZERO);
-    /// Log blocks in chunk
-    pub const LOG_BLOCKS: usize = Self::LOG_BYTES - Block::LOG_BYTES;
-    /// Blocks in chunk
-    pub const BLOCKS: usize = 1 << Self::LOG_BLOCKS;
+    // FIXME: We use this as an empty value. What if we actually use the first chunk?
+    pub const ZERO: Self = Self(Address::ZERO);
 
-    /// Get a range of blocks within this chunk.
+    /// Get an iterator for regions within this chunk.
     #[inline(always)]
-    pub fn blocks(&self) -> RegionIterator<Block> {
-        let start = Block::from_unaligned_address(self.0);
-        let end = Block::from_aligned_address(start.start() + (Self::BLOCKS << Block::LOG_BYTES));
-        RegionIterator::<Block>::new(start, end)
-    }
+    pub fn iter_region<R: Region>(&self) -> RegionIterator<R> {
+        // R should be smaller than a chunk
+        debug_assert!(R::LOG_BYTES < Self::LOG_BYTES);
+        // R should be aligned to chunk boundary
+        debug_assert!(R::is_aligned(self.start()));
+        debug_assert!(R::is_aligned(self.end()));
 
-    /// Sweep this chunk.
-    pub fn sweep<VM: VMBinding>(&self, space: &ImmixSpace<VM>, mark_histogram: &mut Histogram) {
-        let line_mark_state = if super::BLOCK_ONLY {
-            None
-        } else {
-            Some(space.line_mark_state.load(Ordering::Acquire))
-        };
-        // number of allocated blocks.
-        let mut allocated_blocks = 0;
-        // Iterate over all allocated blocks in this chunk.
-        for block in self
-            .blocks()
-            .filter(|block| block.get_state() != BlockState::Unallocated)
-        {
-            if !block.sweep(space, mark_histogram, line_mark_state) {
-                // Block is live. Increment the allocated block count.
-                allocated_blocks += 1;
-            }
-        }
-        // Set this chunk as free if there is not live blocks.
-        if allocated_blocks == 0 {
-            space.chunk_map.set(*self, ChunkState::Free)
-        }
+        let start = R::from_aligned_address(self.start());
+        let end = R::from_aligned_address(self.end());
+        RegionIterator::<R>::new(start, end)
     }
 }
 
@@ -84,7 +57,9 @@ pub enum ChunkState {
     Allocated = 1,
 }
 
-/// A byte-map to record all the allocated chunks
+/// A byte-map to record all the allocated chunks.
+/// A plan can use this to maintain records for the chunks that they used, and the states of the chunks.
+/// Any plan that uses the chunk map should include the `ALLOC_TABLE` spec in their local sidemetadata specs
 pub struct ChunkMap {
     chunk_range: Mutex<Range<Chunk>>,
 }
@@ -92,7 +67,7 @@ pub struct ChunkMap {
 impl ChunkMap {
     /// Chunk alloc table
     pub const ALLOC_TABLE: SideMetadataSpec =
-        crate::util::metadata::side_metadata::spec_defs::IX_CHUNK_MARK;
+        crate::util::metadata::side_metadata::spec_defs::CHUNK_MARK;
 
     pub fn new() -> Self {
         Self {
@@ -113,6 +88,7 @@ impl ChunkMap {
             debug_assert!(!chunk.start().is_zero());
             let mut range = self.chunk_range.lock();
             if range.start == Chunk::ZERO {
+                // FIXME: what if we actually use the first chunk?
                 range.start = chunk;
                 range.end = chunk.next();
             } else if chunk < range.start {
@@ -139,7 +115,7 @@ impl ChunkMap {
         RegionIterator::<Chunk>::new(chunk_range.start, chunk_range.end)
     }
 
-    /// Helper function to create per-chunk processing work packets.
+    /// Helper function to create per-chunk processing work packets for each allocated chunks.
     pub fn generate_tasks<VM: VMBinding>(
         &self,
         func: impl Fn(Chunk) -> Box<dyn GCWork<VM>>,
@@ -153,36 +129,10 @@ impl ChunkMap {
         }
         work_packets
     }
-
-    /// Generate chunk sweep work packets.
-    pub fn generate_sweep_tasks<VM: VMBinding>(
-        &self,
-        space: &'static ImmixSpace<VM>,
-    ) -> Vec<Box<dyn GCWork<VM>>> {
-        space.defrag.mark_histograms.lock().clear();
-        self.generate_tasks(|chunk| Box::new(SweepChunk { space, chunk }))
-    }
 }
 
 impl Default for ChunkMap {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Chunk sweeping work packet.
-struct SweepChunk<VM: VMBinding> {
-    space: &'static ImmixSpace<VM>,
-    chunk: Chunk,
-}
-
-impl<VM: VMBinding> GCWork<VM> for SweepChunk<VM> {
-    #[inline]
-    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
-        let mut histogram = self.space.defrag.new_histogram();
-        if self.space.chunk_map.get(self.chunk) == ChunkState::Allocated {
-            self.chunk.sweep(self.space, &mut histogram);
-        }
-        self.space.defrag.add_completed_mark_histogram(histogram);
     }
 }

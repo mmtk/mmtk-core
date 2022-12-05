@@ -1,37 +1,42 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
-use crate::plan::marksweep::gc_work::{MSGCWorkContext, MSSweepChunks};
+use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
-use crate::policy::mallocspace::metadata::ACTIVE_CHUNK_METADATA_SPEC;
-use crate::policy::mallocspace::MallocSpace;
 use crate::policy::space::Space;
-use crate::scheduler::*;
+use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-#[cfg(not(feature = "global_alloc_bit"))]
-use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
+use enum_map::EnumMap;
+use mmtk_macros::PlanTraceObject;
 use std::sync::Arc;
 
-use enum_map::EnumMap;
+#[cfg(feature = "malloc_mark_sweep")]
+pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::malloc_ms::MallocSpace<VM>;
+#[cfg(feature = "malloc_mark_sweep")]
+use crate::policy::marksweepspace::malloc_ms::MAX_OBJECT_SIZE;
 
-use mmtk_macros::PlanTraceObject;
+#[cfg(not(feature = "malloc_mark_sweep"))]
+pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::native_ms::MarkSweepSpace<VM>;
+#[cfg(not(feature = "malloc_mark_sweep"))]
+use crate::policy::marksweepspace::native_ms::MAX_OBJECT_SIZE;
 
 #[derive(PlanTraceObject)]
 pub struct MarkSweep<VM: VMBinding> {
     #[fallback_trace]
     common: CommonPlan<VM>,
     #[trace]
-    ms: MallocSpace<VM>,
+    ms: MarkSweepSpace<VM>,
 }
 
 pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -39,6 +44,7 @@ pub const MS_CONSTRAINTS: PlanConstraints = PlanConstraints {
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
+    max_non_los_default_alloc_bytes: MAX_OBJECT_SIZE,
     may_trace_duplicate_edges: true,
     ..PlanConstraints::default()
 };
@@ -56,7 +62,6 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
         scheduler.schedule_common_work::<MSGCWorkContext<VM>>(self);
-        scheduler.work_buckets[WorkBucketStage::Prepare].add(MSSweepChunks::<VM>::new(self));
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -65,11 +70,11 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 
     fn prepare(&mut self, tls: VMWorkerThread) {
         self.common.prepare(tls, true);
-        // Dont need to prepare for MallocSpace
+        self.ms.prepare();
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        trace!("Marksweep: Release");
+        self.ms.release();
         self.common.release(tls, true);
     }
 
@@ -95,47 +100,49 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let heap = HeapMeta::new(&options);
-        // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
-        // SideMetadataContext by default, so we don't need to add it here.
-        #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs =
-            SideMetadataContext::new_global_specs(&[ACTIVE_CHUNK_METADATA_SPEC]);
-        // if global_alloc_bit is NOT enabled,
-        // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
-        #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[
-            ALLOC_SIDE_METADATA_SPEC,
-            ACTIVE_CHUNK_METADATA_SPEC,
-        ]);
+    pub fn new(
+        vm_map: &'static VMMap,
+        mmapper: &'static Mmapper,
+        options: Arc<Options>,
+        scheduler: Arc<GCWorkScheduler<VM>>,
+    ) -> Self {
+        let mut heap = HeapMeta::new(&options);
+        let mut global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_metadata_specs);
 
-        let res = MarkSweep {
-            ms: MallocSpace::new(global_metadata_specs.clone()),
-            common: CommonPlan::new(
+        let res = {
+            let ms = MarkSweepSpace::new(
+                "MarkSweepSpace",
+                false,
+                VMRequest::discontiguous(),
+                global_metadata_specs.clone(),
+                vm_map,
+                mmapper,
+                &mut heap,
+                scheduler,
+            );
+
+            let common = CommonPlan::new(
                 vm_map,
                 mmapper,
                 options,
                 heap,
                 &MS_CONSTRAINTS,
                 global_metadata_specs,
-            ),
+            );
+
+            MarkSweep { common, ms }
         };
 
-        // Use SideMetadataSanity to check if each spec is valid. This is also needed for check
-        // side metadata in extreme_assertions.
-        {
-            let mut side_metadata_sanity_checker = SideMetadataSanity::new();
-            res.common
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-            res.ms
-                .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
-        }
-
+        let mut side_metadata_sanity_checker = SideMetadataSanity::new();
+        res.common
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
+        res.ms
+            .verify_side_metadata_sanity(&mut side_metadata_sanity_checker);
         res
     }
 
-    pub fn ms_space(&self) -> &MallocSpace<VM> {
+    pub fn ms_space(&self) -> &MarkSweepSpace<VM> {
         &self.ms
     }
 }

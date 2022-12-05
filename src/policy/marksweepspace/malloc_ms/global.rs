@@ -4,7 +4,12 @@ use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
+use crate::scheduler::GCWorkScheduler;
+use crate::util::heap::layout::heap_layout::Mmapper;
+use crate::util::heap::layout::heap_layout::VMMap;
+use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
+use crate::util::heap::VMRequest;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -24,14 +29,15 @@ use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 #[cfg(debug_assertions)]
 use std::sync::Mutex;
-
 // If true, we will use a hashmap to store all the allocated memory from malloc, and use it
 // to make sure our allocation is correct.
 #[cfg(debug_assertions)]
 const ASSERT_ALLOCATION: bool = false;
 
+/// This space uses malloc to get new memory, and performs mark-sweep for the memory.
 pub struct MallocSpace<VM: VMBinding> {
     phantom: PhantomData<VM>,
     active_bytes: AtomicUsize,
@@ -39,6 +45,8 @@ pub struct MallocSpace<VM: VMBinding> {
     pub chunk_addr_min: AtomicUsize, // XXX: have to use AtomicUsize to represent an Address
     pub chunk_addr_max: AtomicUsize,
     metadata: SideMetadataContext,
+    /// Work packet scheduler
+    scheduler: Arc<GCWorkScheduler<VM>>,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -135,7 +143,7 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
         #[cfg(debug_assertions)]
         if ASSERT_ALLOCATION {
-            let addr = VM::VMObjectModel::ref_to_object_start(object);
+            let addr = object.to_object_start::<VM>();
             let active_mem = self.active_mem.lock().unwrap();
             if ret {
                 // The alloc bit tells that the object is in space.
@@ -211,8 +219,35 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for MallocSpac
     }
 }
 
+// Actually no max object size.
+#[allow(dead_code)]
+pub const MAX_OBJECT_SIZE: usize = crate::util::constants::MAX_INT;
+
 impl<VM: VMBinding> MallocSpace<VM> {
-    pub fn new(global_side_metadata_specs: Vec<SideMetadataSpec>) -> Self {
+    pub fn extend_global_side_metadata_specs(specs: &mut Vec<SideMetadataSpec>) {
+        // MallocSpace needs to use alloc bit. If the feature is turned on, the alloc bit spec is in the global specs.
+        // Otherwise, we manually add it.
+        if !cfg!(feature = "global_alloc_bit") {
+            specs.push(crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC);
+        }
+        // MallocSpace also need a global chunk metadata.
+        // TODO: I don't know why this is a global spec. Can we replace it with the chunk map (and the local spec used in the chunk map)?
+        // One reason could be that the address range in this space is not in our control, and it could be anywhere in the heap, thus we have
+        // to make it a global spec. I am not too sure about this.
+        specs.push(ACTIVE_CHUNK_METADATA_SPEC);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        _name: &'static str,
+        _zeroed: bool,
+        _vmrequest: VMRequest,
+        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        _vm_map: &'static VMMap,
+        _mmapper: &'static Mmapper,
+        _heap: &mut HeapMeta,
+        scheduler: Arc<GCWorkScheduler<VM>>,
+    ) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -227,6 +262,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
+            scheduler,
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -371,8 +407,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         );
 
         if !is_marked::<VM>(object, Ordering::Relaxed) {
-            let chunk_start =
-                conversions::chunk_align_down(VM::VMObjectModel::ref_to_object_start(object));
+            let chunk_start = conversions::chunk_align_down(object.to_object_start::<VM>());
             set_mark_bit::<VM>(object, Ordering::SeqCst);
             set_chunk_mark(chunk_start);
             queue.enqueue(object);
@@ -425,6 +460,39 @@ impl<VM: VMBinding> MallocSpace<VM> {
         }
     }
 
+    pub fn prepare(&mut self) {}
+
+    pub fn release(&mut self) {
+        use crate::scheduler::WorkBucketStage;
+        let mut work_packets: Vec<Box<dyn GCWork<VM>>> = vec![];
+        let mut chunk = unsafe { Address::from_usize(self.chunk_addr_min.load(Ordering::Relaxed)) }; // XXX: have to use AtomicUsize to represent an Address
+        let end = unsafe { Address::from_usize(self.chunk_addr_max.load(Ordering::Relaxed)) }
+            + BYTES_IN_CHUNK;
+
+        // Since only a single thread generates the sweep work packets as well as it is a Stop-the-World collector,
+        // we can assume that the chunk mark metadata is not being accessed by anything else and hence we use
+        // non-atomic accesses
+        let space = unsafe { &*(self as *const Self) };
+        while chunk < end {
+            if is_chunk_mapped(chunk) && unsafe { is_chunk_marked_unsafe(chunk) } {
+                work_packets.push(Box::new(MSSweepChunk { ms: space, chunk }));
+            }
+
+            chunk += BYTES_IN_CHUNK;
+        }
+
+        debug!("Generated {} sweep work packets", work_packets.len());
+        #[cfg(debug_assertions)]
+        {
+            self.total_work_packets
+                .store(work_packets.len() as u32, Ordering::SeqCst);
+            self.completed_work_packets.store(0, Ordering::SeqCst);
+            self.work_live_bytes.store(0, Ordering::SeqCst);
+        }
+
+        self.scheduler.work_buckets[WorkBucketStage::Release].bulk_add(work_packets);
+    }
+
     pub fn sweep_chunk(&self, chunk_start: Address) {
         // Call the relevant sweep function depending on the location of the mark bits
         match *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
@@ -440,7 +508,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     /// Given an object in MallocSpace, return its malloc address, whether it is an offset malloc, and malloc size
     #[inline(always)]
     fn get_malloc_addr_size(object: ObjectReference) -> (Address, bool, usize) {
-        let obj_start = VM::VMObjectModel::ref_to_object_start(object);
+        let obj_start = object.to_object_start::<VM>();
         let offset_malloc_bit = is_offset_malloc(obj_start);
         let bytes = get_malloc_usable_size(obj_start, offset_malloc_bit);
         (obj_start, offset_malloc_bit, bytes)
@@ -479,8 +547,9 @@ impl<VM: VMBinding> MallocSpace<VM> {
             // Unset marks for free pages and update last_object_end
             if !empty_page_start.is_zero() {
                 // unset marks for pages since last object
-                let current_page =
-                    VM::VMObjectModel::ref_to_object_start(object).align_down(BYTES_IN_MALLOC_PAGE);
+                let current_page = object
+                    .to_object_start::<VM>()
+                    .align_down(BYTES_IN_MALLOC_PAGE);
                 if current_page > *empty_page_start {
                     // we are the only GC thread that is accessing this chunk
                     unsafe {
@@ -727,5 +796,22 @@ impl<VM: VMBinding> crate::util::linear_scan::LinearScanObjectSize for MallocObj
     fn size(object: ObjectReference) -> usize {
         let (_, _, bytes) = MallocSpace::<VM>::get_malloc_addr_size(object);
         bytes
+    }
+}
+
+use crate::scheduler::GCWork;
+use crate::MMTK;
+
+/// Simple work packet that just sweeps a single chunk
+pub struct MSSweepChunk<VM: VMBinding> {
+    ms: &'static MallocSpace<VM>,
+    // starting address of a chunk
+    chunk: Address,
+}
+
+impl<VM: VMBinding> GCWork<VM> for MSSweepChunk<VM> {
+    #[inline]
+    fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        self.ms.sweep_chunk(self.chunk);
     }
 }

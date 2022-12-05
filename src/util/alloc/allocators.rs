@@ -2,7 +2,8 @@ use std::mem::MaybeUninit;
 
 use crate::plan::Plan;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::mallocspace::MallocSpace;
+use crate::policy::marksweepspace::malloc_ms::MallocSpace;
+use crate::policy::marksweepspace::native_ms::MarkSweepSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::LargeObjectAllocator;
 use crate::util::alloc::MallocAllocator;
@@ -10,12 +11,14 @@ use crate::util::alloc::{Allocator, BumpAllocator, ImmixAllocator};
 use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 
+use super::FreeListAllocator;
 use super::MarkCompactAllocator;
 
 pub(crate) const MAX_BUMP_ALLOCATORS: usize = 6;
 pub(crate) const MAX_LARGE_OBJECT_ALLOCATORS: usize = 2;
 pub(crate) const MAX_MALLOC_ALLOCATORS: usize = 1;
 pub(crate) const MAX_IMMIX_ALLOCATORS: usize = 1;
+pub(crate) const MAX_FREE_LIST_ALLOCATORS: usize = 2;
 pub(crate) const MAX_MARK_COMPACT_ALLOCATORS: usize = 1;
 
 // The allocators set owned by each mutator. We provide a fixed number of allocators for each allocator type in the mutator,
@@ -28,6 +31,7 @@ pub struct Allocators<VM: VMBinding> {
     pub large_object: [MaybeUninit<LargeObjectAllocator<VM>>; MAX_LARGE_OBJECT_ALLOCATORS],
     pub malloc: [MaybeUninit<MallocAllocator<VM>>; MAX_MALLOC_ALLOCATORS],
     pub immix: [MaybeUninit<ImmixAllocator<VM>>; MAX_IMMIX_ALLOCATORS],
+    pub free_list: [MaybeUninit<FreeListAllocator<VM>>; MAX_FREE_LIST_ALLOCATORS],
     pub markcompact: [MaybeUninit<MarkCompactAllocator<VM>>; MAX_MARK_COMPACT_ALLOCATORS],
 }
 
@@ -44,6 +48,7 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_ref(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_ref(),
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_ref(),
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_ref()
             }
@@ -66,6 +71,7 @@ impl<VM: VMBinding> Allocators<VM> {
             }
             AllocatorSelector::Malloc(index) => self.malloc[index as usize].assume_init_mut(),
             AllocatorSelector::Immix(index) => self.immix[index as usize].assume_init_mut(),
+            AllocatorSelector::FreeList(index) => self.free_list[index as usize].assume_init_mut(),
             AllocatorSelector::MarkCompact(index) => {
                 self.markcompact[index as usize].assume_init_mut()
             }
@@ -83,6 +89,7 @@ impl<VM: VMBinding> Allocators<VM> {
             large_object: unsafe { MaybeUninit::uninit().assume_init() },
             malloc: unsafe { MaybeUninit::uninit().assume_init() },
             immix: unsafe { MaybeUninit::uninit().assume_init() },
+            free_list: unsafe { MaybeUninit::uninit().assume_init() },
             markcompact: unsafe { MaybeUninit::uninit().assume_init() },
         };
 
@@ -117,6 +124,13 @@ impl<VM: VMBinding> Allocators<VM> {
                         false,
                     ));
                 }
+                AllocatorSelector::FreeList(index) => {
+                    ret.free_list[index as usize].write(FreeListAllocator::new(
+                        mutator_tls.0,
+                        space.downcast_ref::<MarkSweepSpace<VM>>().unwrap(),
+                        plan,
+                    ));
+                }
                 AllocatorSelector::MarkCompact(index) => {
                     ret.markcompact[index as usize].write(MarkCompactAllocator::new(
                         mutator_tls.0,
@@ -145,13 +159,14 @@ impl<VM: VMBinding> Allocators<VM> {
 //   LargeObject,
 // }
 #[repr(C, u8)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AllocatorSelector {
     BumpPointer(u8),
     LargeObject(u8),
     Malloc(u8),
     Immix(u8),
     MarkCompact(u8),
+    FreeList(u8),
     None,
 }
 
