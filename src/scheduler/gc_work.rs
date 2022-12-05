@@ -1,8 +1,11 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
+#[cfg(feature = "object_pinning")]
+use crate::memory_manager::is_in_mmtk_spaces;
 use crate::plan::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
+use crate::policy::immix::TRACE_KIND_FAST;
 use crate::util::*;
 use crate::vm::edge_shape::Edge;
 use crate::vm::*;
@@ -337,6 +340,7 @@ pub struct ProcessEdgesBase<VM: VMBinding> {
     // Because a copying gc will dereference this pointer at least once for every object copy.
     worker: *mut GCWorker<VM>,
     pub roots: bool,
+    pub is_immovable: bool,
 }
 
 unsafe impl<VM: VMBinding> Send for ProcessEdgesBase<VM> {}
@@ -344,7 +348,12 @@ unsafe impl<VM: VMBinding> Send for ProcessEdgesBase<VM> {}
 impl<VM: VMBinding> ProcessEdgesBase<VM> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
-    pub fn new(edges: Vec<VM::VMEdge>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new(
+        edges: Vec<VM::VMEdge>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        is_immovable: bool,
+    ) -> Self {
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             for edge in &edges {
@@ -358,6 +367,7 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
             mmtk,
             worker: std::ptr::null_mut(),
             roots,
+            is_immovable,
         }
     }
     pub fn set_worker(&mut self, worker: &mut GCWorker<VM>) {
@@ -405,7 +415,12 @@ pub trait ProcessEdgesWork:
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<Self::VM>,
+        immovable: bool,
+    ) -> Self;
 
     /// Trace an MMTk object. The implementation should forward this call to the policy-specific
     /// `trace_object()` methods, depending on which space this object is in.
@@ -435,7 +450,12 @@ pub trait ProcessEdgesWork:
             // Executing these work packets now can remarkably reduce the global synchronization time.
             self.worker().do_work(work_packet);
         } else {
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
+            if self.is_immovable_trace() {
+                self.mmtk.scheduler.work_buckets[WorkBucketStage::ClosureImmovable]
+                    .add(work_packet);
+            } else {
+                self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(work_packet);
+            }
         }
     }
 
@@ -447,6 +467,7 @@ pub trait ProcessEdgesWork:
         &self,
         nodes: Vec<ObjectReference>,
         roots: bool,
+        is_immovable: bool,
     ) -> Self::ScanObjectsWorkType;
 
     /// Flush the nodes in ProcessEdgesBase, and create a ScanObjects work packet for it. If the node set is empty,
@@ -454,8 +475,9 @@ pub trait ProcessEdgesWork:
     #[cold]
     fn flush(&mut self) {
         let nodes = self.pop_nodes();
+        let is_immovable = self.is_immovable_trace();
         if !nodes.is_empty() {
-            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false, is_immovable));
         }
     }
 
@@ -473,6 +495,10 @@ pub trait ProcessEdgesWork:
         for i in 0..self.edges.len() {
             self.process_edge(self.edges[i])
         }
+    }
+
+    fn is_immovable_trace(&mut self) -> bool {
+        false
     }
 }
 
@@ -508,8 +534,13 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        is_immovable: bool,
+    ) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, is_immovable);
         Self { base }
     }
 
@@ -531,8 +562,13 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     }
 
     #[inline(always)]
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
-        ScanObjects::<Self>::new(nodes, false, roots)
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        roots: bool,
+        is_immovable: bool,
+    ) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, roots, is_immovable)
     }
 }
 
@@ -551,24 +587,55 @@ impl<E: ProcessEdgesWork> RootsWorkFactory<EdgeOf<E>> for ProcessEdgesWorkRootsW
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
-            E::new(edges, true, self.mmtk),
+            E::new(edges, true, self.mmtk, false),
         );
     }
 
-    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>) {
+    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>, is_immovable: bool) {
         // Note: Node roots cannot be moved.  Currently, this implies that the plan must never
         // move objects.  However, in the future, if we start to support object pinning, then
         // moving plans that support object pinning (such as Immix) can still use node roots.
+        #[cfg(not(feature = "object_pinning"))]
         assert!(
-            !self.mmtk.plan.constraints().moves_objects,
+            !self.mmtk.plan.constraints().moves_objects || is_immovable,
             "Attempted to add node roots when using a plan that moves objects.  Plan: {:?}",
             *self.mmtk.options.plan
         );
 
+        // if the trace is not immovable assert that each root is pinned before creating the scanning work
+        #[cfg(feature = "object_pinning")]
+        if self.mmtk.plan.constraints().moves_objects && !is_immovable {
+            for node in nodes.iter() {
+                if !is_in_mmtk_spaces::<E::VM>(*node) {
+                    continue;
+                }
+
+                use crate::mmtk::SFT_MAP;
+                use crate::policy::sft_map::SFTMap;
+                let pinned_status = SFT_MAP
+                    .get_checked(node.to_raw_address())
+                    .is_object_pinned(*node);
+                let is_movable = SFT_MAP.get_checked(node.to_raw_address()).is_movable();
+
+                assert!(
+                    pinned_status || !is_movable,
+                    "Attempted to create a scan object work for an root object {} that has not been pinned", *node
+                );
+            }
+        }
+
         // We want to use E::create_scan_work.
-        let process_edges_work = E::new(vec![], true, self.mmtk);
-        let work = process_edges_work.create_scan_work(nodes, true);
-        crate::memory_manager::add_work_packet(self.mmtk, WorkBucketStage::Closure, work);
+        let process_edges_work = E::new(vec![], true, self.mmtk, is_immovable);
+        let work = process_edges_work.create_scan_work(nodes, true, is_immovable);
+        if is_immovable {
+            crate::memory_manager::add_work_packet(
+                self.mmtk,
+                WorkBucketStage::ClosureImmovable,
+                work,
+            );
+        } else {
+            crate::memory_manager::add_work_packet(self.mmtk, WorkBucketStage::Closure, work);
+        }
     }
 }
 
@@ -629,7 +696,8 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         // objects which are traced for the first time.
         let scanned_root_objects = self.roots().then(|| {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = Self::E::new(vec![], false, mmtk);
+            let mut process_edges_work =
+                Self::E::new(vec![], false, mmtk, self.is_immovable_trace());
 
             for object in buffer.iter().copied() {
                 let new_object = process_edges_work.trace_object(object);
@@ -652,7 +720,7 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         // Then scan those objects for edges.
         let mut scan_later = vec![];
         {
-            let mut closure = ObjectsClosure::<Self::E>::new(worker);
+            let mut closure = ObjectsClosure::<Self::E>::new(worker, self.is_immovable_trace());
             for object in objects_to_scan.iter().copied() {
                 if <VM as VMBinding>::VMScanning::support_edge_enqueuing(tls, object) {
                     // If an object supports edge-enqueuing, we enqueue its edges.
@@ -673,7 +741,8 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
         // If any object does not support edge-enqueuing, we process them now.
         if !scan_later.is_empty() {
             // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = Self::E::new(vec![], false, mmtk);
+            let mut process_edges_work =
+                Self::E::new(vec![], false, mmtk, self.is_immovable_trace());
             let mut closure = |object| process_edges_work.trace_object(object);
 
             // Scan objects and trace their edges at the same time.
@@ -692,7 +761,19 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
                 let next_nodes = process_edges_work.nodes.take();
                 let make_packet = |nodes| {
                     let work_packet = self.make_another(nodes);
-                    memory_manager::add_work_packet(mmtk, WorkBucketStage::Closure, work_packet);
+                    if self.is_immovable_trace() {
+                        memory_manager::add_work_packet(
+                            mmtk,
+                            WorkBucketStage::ClosureImmovable,
+                            work_packet,
+                        );
+                    } else {
+                        memory_manager::add_work_packet(
+                            mmtk,
+                            WorkBucketStage::Closure,
+                            work_packet,
+                        );
+                    }
                 };
 
                 // Divide the resulting nodes into appropriately sized packets.
@@ -706,6 +787,8 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
             }
         }
     }
+
+    fn is_immovable_trace(&self) -> bool;
 }
 
 /// Scan objects and enqueue the edges of the objects.  For objects that do not support
@@ -720,15 +803,22 @@ pub struct ScanObjects<Edges: ProcessEdgesWork> {
     #[allow(unused)]
     concurrent: bool,
     roots: bool,
+    is_immovable: bool,
     phantom: PhantomData<Edges>,
 }
 
 impl<Edges: ProcessEdgesWork> ScanObjects<Edges> {
-    pub fn new(buffer: Vec<ObjectReference>, concurrent: bool, roots: bool) -> Self {
+    pub fn new(
+        buffer: Vec<ObjectReference>,
+        concurrent: bool,
+        roots: bool,
+        is_immovable: bool,
+    ) -> Self {
         Self {
             buffer,
             concurrent,
             roots,
+            is_immovable,
             phantom: PhantomData,
         }
     }
@@ -747,7 +837,11 @@ impl<VM: VMBinding, E: ProcessEdgesWork<VM = VM>> ScanObjectsWork<VM> for ScanOb
     }
 
     fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(buffer, self.concurrent, false)
+        Self::new(buffer, self.concurrent, false, self.is_immovable)
+    }
+
+    fn is_immovable_trace(&self) -> bool {
+        self.is_immovable
     }
 }
 
@@ -781,8 +875,13 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     type VM = VM;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        is_immovable: bool,
+    ) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, is_immovable);
         let plan = base.plan().downcast_ref::<P>().unwrap();
         Self { plan, base }
     }
@@ -792,8 +891,9 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         &self,
         nodes: Vec<ObjectReference>,
         roots: bool,
+        is_immovable: bool,
     ) -> Self::ScanObjectsWorkType {
-        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, roots)
+        PlanScanObjects::<Self, P>::new(self.plan, nodes, false, roots, is_immovable)
     }
 
     #[inline(always)]
@@ -803,8 +903,17 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         }
         // We cannot borrow `self` twice in a call, so we extract `worker` as a local variable.
         let worker = self.worker();
-        self.plan
-            .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
+        if self.is_immovable_trace() {
+            self.plan
+                .trace_object::<VectorObjectQueue, TRACE_KIND_FAST>(
+                    &mut self.base.nodes,
+                    object,
+                    worker,
+                )
+        } else {
+            self.plan
+                .trace_object::<VectorObjectQueue, KIND>(&mut self.base.nodes, object, worker)
+        }
     }
 
     #[inline]
@@ -814,6 +923,11 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
         if P::may_move_objects::<KIND>() {
             slot.store(new_object);
         }
+    }
+
+    #[inline]
+    fn is_immovable_trace(&mut self) -> bool {
+        self.is_immovable
     }
 }
 
@@ -846,6 +960,7 @@ pub struct PlanScanObjects<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceO
     concurrent: bool,
     roots: bool,
     phantom: PhantomData<E>,
+    is_immovable: bool,
 }
 
 impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScanObjects<E, P> {
@@ -854,6 +969,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
         buffer: Vec<ObjectReference>,
         concurrent: bool,
         roots: bool,
+        is_immovable: bool,
     ) -> Self {
         Self {
             plan,
@@ -861,6 +977,7 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> PlanScan
             concurrent,
             roots,
             phantom: PhantomData,
+            is_immovable,
         }
     }
 }
@@ -880,7 +997,11 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>> ScanObje
     }
 
     fn make_another(&self, buffer: Vec<ObjectReference>) -> Self {
-        Self::new(self.plan, buffer, self.concurrent, false)
+        Self::new(self.plan, buffer, self.concurrent, false, self.is_immovable)
+    }
+
+    fn is_immovable_trace(&self) -> bool {
+        self.is_immovable
     }
 }
 

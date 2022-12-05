@@ -78,23 +78,32 @@ impl ObjectQueue for VectorQueue<ObjectReference> {
 pub struct ObjectsClosure<'a, E: ProcessEdgesWork> {
     buffer: VectorQueue<EdgeOf<E>>,
     worker: &'a mut GCWorker<E::VM>,
+    is_immovable: bool,
 }
 
 impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
-    pub fn new(worker: &'a mut GCWorker<E::VM>) -> Self {
+    pub fn new(worker: &'a mut GCWorker<E::VM>, is_immovable: bool) -> Self {
         Self {
             buffer: VectorQueue::new(),
             worker,
+            is_immovable,
         }
     }
 
     fn flush(&mut self) {
         let buf = self.buffer.take();
         if !buf.is_empty() {
-            self.worker.add_work(
-                WorkBucketStage::Closure,
-                E::new(buf, false, self.worker.mmtk),
-            );
+            if self.is_immovable {
+                self.worker.add_work(
+                    WorkBucketStage::ClosureImmovable,
+                    E::new(buf, false, self.worker.mmtk, true),
+                );
+            } else {
+                self.worker.add_work(
+                    WorkBucketStage::Closure,
+                    E::new(buf, false, self.worker.mmtk, false),
+                );
+            }
         }
     }
 }

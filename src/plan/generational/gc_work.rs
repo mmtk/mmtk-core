@@ -22,8 +22,13 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
-    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
-        let base = ProcessEdgesBase::new(edges, roots, mmtk);
+    fn new(
+        edges: Vec<EdgeOf<Self>>,
+        roots: bool,
+        mmtk: &'static MMTK<VM>,
+        is_immovable: bool,
+    ) -> Self {
+        let base = ProcessEdgesBase::new(edges, roots, mmtk, is_immovable);
         let gen = base.plan().generational();
         Self { gen, base }
     }
@@ -46,8 +51,13 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
     }
 
     #[inline(always)]
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> ScanObjects<Self> {
-        ScanObjects::<Self>::new(nodes, false, roots)
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        roots: bool,
+        is_immovable: bool,
+    ) -> ScanObjects<Self> {
+        ScanObjects::<Self>::new(nodes, false, roots, is_immovable)
     }
 }
 
@@ -99,7 +109,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
-                &mut ScanObjects::<E>::new(modbuf, false, false),
+                &mut ScanObjects::<E>::new(modbuf, false, false, false),
                 worker,
                 mmtk,
             )
@@ -138,7 +148,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
                 }
             }
             // Forward entries
-            GCWork::do_work(&mut E::new(edges, false, mmtk), worker, mmtk)
+            GCWork::do_work(&mut E::new(edges, false, mmtk, false), worker, mmtk)
         }
     }
 }

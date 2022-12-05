@@ -68,7 +68,7 @@ pub trait RootsWorkFactory<ES: Edge>: Clone + Send + 'static {
     ///
     /// Arguments:
     /// * `nodes`: A vector of references to objects pointed by root edges.
-    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>);
+    fn create_process_node_roots_work(&mut self, nodes: Vec<ObjectReference>, is_immovable: bool);
 }
 
 /// VM-specific methods for scanning roots/objects.
