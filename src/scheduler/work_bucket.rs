@@ -208,7 +208,6 @@ impl<VM: VMBinding> WorkBucket<VM> {
 pub enum WorkBucketStage {
     Unconstrained,
     Prepare,
-    ClosureImmovable,
     Closure,
     SoftRefClosure,
     WeakRefClosure,
