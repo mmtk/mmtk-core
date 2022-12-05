@@ -6,11 +6,6 @@ use std::sync::atomic::Ordering;
 impl VMLocalPinningBitSpec {
     /// Pin the object
     pub fn pin_object<VM: VMBinding>(&self, object: ObjectReference) -> bool {
-        debug_assert!(
-            !crate::util::object_forwarding::is_forwarded_or_being_forwarded::<VM>(object),
-            "Object to be unpinned should not be forwarded or being forwarded."
-        );
-
         let res = self.compare_exchange_metadata::<VM, u8>(
             object,
             0,
@@ -24,11 +19,6 @@ impl VMLocalPinningBitSpec {
     }
 
     pub fn unpin_object<VM: VMBinding>(&self, object: ObjectReference) -> bool {
-        debug_assert!(
-            !crate::util::object_forwarding::is_forwarded_or_being_forwarded::<VM>(object),
-            "Object to be unpinned should not be forwarded or being forwarded."
-        );
-
         let res = self.compare_exchange_metadata::<VM, u8>(
             object,
             1,
