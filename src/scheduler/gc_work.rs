@@ -1,6 +1,5 @@
 use super::work_bucket::WorkBucketStage;
 use super::*;
-use crate::memory_manager::is_in_mmtk_spaces;
 use crate::plan::GcStatus;
 use crate::plan::ImmovableObjectsClosure;
 use crate::plan::ObjectsClosure;
@@ -214,8 +213,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             }
         }
         mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMSpecificRoots::<E>::new());
-        // Scan immovable roots with fast trace
-        mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanVMImmovableRoots::<E>::new());
     }
 }
 
@@ -650,25 +647,11 @@ impl<E: ProcessEdgesWork> RootsWorkFactory<EdgeOf<E>> for ProcessEdgesWorkRootsW
         // Note: Node roots cannot be moved.  Currently, this implies that the plan must never
         // move objects.  However, in the future, if we start to support object pinning, then
         // moving plans that support object pinning (such as Immix) can still use node roots.
-        if self.mmtk.plan.constraints().moves_objects {
-            for node in nodes.iter() {
-                if !is_in_mmtk_spaces::<E::VM>(*node) {
-                    continue;
-                }
-
-                use crate::mmtk::SFT_MAP;
-                use crate::policy::sft_map::SFTMap;
-                let pinned_status = SFT_MAP
-                    .get_checked(node.to_raw_address())
-                    .is_object_pinned(*node);
-                let is_movable = SFT_MAP.get_checked(node.to_raw_address()).is_movable();
-
-                assert!(
-                    pinned_status || !is_movable,
-                    "Attempted to create a scan object work for an object {} that has not been pinned", *node
-                );
-            }
-        }
+        assert!(
+            !self.mmtk.plan.constraints().moves_objects,
+            "Attempted to add node roots when using a plan that moves objects.  Plan: {:?}",
+            *self.mmtk.options.plan
+        );
 
         // We want to use E::create_scan_work.
         let process_edges_work = E::new(vec![], true, self.mmtk);
@@ -1123,13 +1106,13 @@ impl<E: ProcessEdgesWork, P: Plan<VM = E::VM> + PlanTraceObject<E::VM>, const KI
                     if KIND == TRACE_KIND_IMMOVABLE {
                         memory_manager::add_work_packet(
                             mmtk,
-                            WorkBucketStage::ClosureImmovable,
+                            WorkBucketStage::Closure,
                             work_packet,
                         );
                     } else {
                         memory_manager::add_work_packet(
                             mmtk,
-                            WorkBucketStage::Closure,
+                            WorkBucketStage::ClosureImmovable,
                             work_packet,
                         );
                     }
