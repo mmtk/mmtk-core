@@ -350,6 +350,21 @@
 <span id="348">348</span>
 <span id="349">349</span>
 <span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
@@ -386,6 +401,21 @@
 
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="op">!</span><span class="self">self</span>.<span class="ident">is_from_space</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">object_forwarding::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">pin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;Cannot pin/unpin objects of CopySpace.&quot;</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">unpin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="macro">panic!</span>(<span class="string">&quot;Cannot pin/unpin objects of CopySpace.&quot;</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_object_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
     }
 
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {

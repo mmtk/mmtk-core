@@ -819,6 +819,26 @@
 <span id="817">817</span>
 <span id="818">818</span>
 <span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">block</span>::<span class="kw-2">*</span>, <span class="ident">defrag::Defrag</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span>;
@@ -884,9 +904,22 @@
             <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">ForwardingWord::is_forwarded</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
         }
     }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">pin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident">VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC</span>.<span class="ident">pin_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">unpin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident">VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC</span>.<span class="ident">unpin_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_object_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="ident">VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC</span>.<span class="ident">is_object_pinned</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>)
+    }
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident"><span class="kw">super</span>::DEFRAG</span>
     }
+
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">fn</span> <span class="ident">is_sane</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="bool-val">true</span>
@@ -985,6 +1018,8 @@
                 <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">Block::MARK_TABLE</span>),
                 <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ChunkMap::ALLOC_TABLE</span>),
                 <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+                <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC</span>,
             ]
         } <span class="kw">else</span> {
             <span class="macro">vec!</span>[
@@ -993,6 +1028,8 @@
                 <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">Block::MARK_TABLE</span>),
                 <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ChunkMap::ALLOC_TABLE</span>),
                 <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
+                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+                <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC</span>,
             ]
         })
     }
@@ -1304,7 +1341,7 @@
             {
                 <span class="kw">if</span> <span class="ident">new_object</span> <span class="op">==</span> <span class="ident">object</span> {
                     <span class="macro">debug_assert!</span>(
-                        <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() <span class="op">|</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::is_pinned</span>(<span class="ident">object</span>),
+                        <span class="self">self</span>.<span class="ident">is_marked</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>) <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">is_pinned</span>(<span class="ident">object</span>),
                         <span class="string">&quot;Forwarded object is the same as original object {} even though it should have been copied&quot;</span>,
                         <span class="ident">object</span>,
                     );
@@ -1323,7 +1360,7 @@
             <span class="comment">// We won the forwarding race but the object is already marked so we clear the</span>
             <span class="comment">// forwarding status and return the unmoved object</span>
             <span class="macro">debug_assert!</span>(
-                <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() <span class="op">|</span><span class="op">|</span> <span class="ident"><span class="self">Self</span>::is_pinned</span>(<span class="ident">object</span>),
+                <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">is_pinned</span>(<span class="ident">object</span>),
                 <span class="string">&quot;Forwarded object is the same as original object {} even though it should have been copied&quot;</span>,
                 <span class="ident">object</span>,
             );
@@ -1332,7 +1369,7 @@
         } <span class="kw">else</span> {
             <span class="comment">// We won the forwarding race; actually forward and copy the object if it is not pinned</span>
             <span class="comment">// and we have sufficient space in our copy allocator</span>
-            <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident"><span class="self">Self</span>::is_pinned</span>(<span class="ident">object</span>) <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() {
+            <span class="kw">let</span> <span class="ident">new_object</span> <span class="op">=</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">is_pinned</span>(<span class="ident">object</span>) <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">defrag</span>.<span class="ident">space_exhausted</span>() {
                 <span class="self">self</span>.<span class="ident">attempt_mark</span>(<span class="ident">object</span>, <span class="self">self</span>.<span class="ident">mark_state</span>);
                 <span class="ident">ForwardingWord::clear_forwarding_bits</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
                 <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">set_state</span>(<span class="ident">BlockState::Marked</span>);
@@ -1403,8 +1440,11 @@
 
     <span class="doccomment">/// Check if an object is pinned.</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
-    <span class="kw">fn</span> <span class="ident">is_pinned</span>(<span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
-        <span class="comment">// TODO(wenyuzhao): Object pinning not supported yet.</span>
+    <span class="kw">fn</span> <span class="ident">is_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+        <span class="kw">return</span> <span class="self">self</span>.<span class="ident">is_object_pinned</span>(<span class="ident">_object</span>);
+
+        <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>))]</span>
         <span class="bool-val">false</span>
     }
 

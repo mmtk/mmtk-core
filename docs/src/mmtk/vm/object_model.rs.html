@@ -537,6 +537,11 @@
 <span id="535">535</span>
 <span id="536">536</span>
 <span id="537">537</span>
+<span id="538">538</span>
+<span id="539">539</span>
+<span id="540">540</span>
+<span id="541">541</span>
+<span id="542">542</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
@@ -620,6 +625,9 @@
     <span class="kw">const</span> <span class="ident">LOCAL_FORWARDING_BITS_SPEC</span>: <span class="ident">VMLocalForwardingBitsSpec</span>;
     <span class="doccomment">/// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_MARK_BIT_SPEC</span>: <span class="ident">VMLocalMarkBitSpec</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="doccomment">/// The metadata specification for the pinning bit, used by most plans that need to pin objects. 1 bit.</span>
+    <span class="kw">const</span> <span class="ident">LOCAL_PINNING_BIT_SPEC</span>: <span class="ident">VMLocalPinningBitSpec</span>;
     <span class="doccomment">/// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.</span>
     <span class="kw">const</span> <span class="ident">LOCAL_LOS_MARK_NURSERY_SPEC</span>: <span class="ident">VMLocalLOSMarkNurserySpec</span>;
 
@@ -1071,6 +1079,8 @@
     <span class="macro">define_vm_metadata_spec!</span>(<span class="ident">VMLocalForwardingBitsSpec</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="ident">LOG_MIN_OBJECT_SIZE</span>);
     <span class="comment">// Mark bit: 1 bit per object, local</span>
     <span class="macro">define_vm_metadata_spec!</span>(<span class="ident">VMLocalMarkBitSpec</span>, <span class="bool-val">false</span>, <span class="number">0</span>, <span class="ident">LOG_MIN_OBJECT_SIZE</span>);
+    <span class="comment">// Pinning bit: 1 bit per object, local</span>
+    <span class="macro">define_vm_metadata_spec!</span>(<span class="ident">VMLocalPinningBitSpec</span>, <span class="bool-val">false</span>, <span class="number">0</span>, <span class="ident">LOG_MIN_OBJECT_SIZE</span>);
     <span class="comment">// Mark&amp;nursery bits for LOS: 2 bit per page, local</span>
     <span class="macro">define_vm_metadata_spec!</span>(<span class="ident">VMLocalLOSMarkNurserySpec</span>, <span class="bool-val">false</span>, <span class="number">1</span>, <span class="ident">LOG_BYTES_IN_PAGE</span>);
 }

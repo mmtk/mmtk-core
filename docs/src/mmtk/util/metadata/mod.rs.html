@@ -230,6 +230,7 @@
 <span id="228">228</span>
 <span id="229">229</span>
 <span id="230">230</span>
+<span id="231">231</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This is a generic module to work with metadata including side metadata and in-object metadata.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! This module is designed to enable the implementation of a wide range of GC algorithms for VMs with various combinations of in-object and on-side space for GC-specific metadata (e.g. forwarding bits, marking bit, logging bit, etc.).</span>
@@ -458,6 +459,7 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">log_bit</span>;
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">mark_bit</span>;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod</span> <span class="ident">pin_bit</span>;
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">global</span>::<span class="kw-2">*</span>;
 </code></pre></div>

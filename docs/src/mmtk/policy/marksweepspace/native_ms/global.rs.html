@@ -375,6 +375,21 @@
 <span id="373">373</span>
 <span id="374">374</span>
 <span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -464,6 +479,21 @@
 
     <span class="kw">fn</span> <span class="ident">is_live</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">object</span>: <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>) -&gt; <span class="ident">bool</span> {
         <span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>.<span class="ident">is_marked</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">Ordering::SeqCst</span>)
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">pin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">unpin_object</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
+    }
+
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;object_pinning&quot;</span>)]</span>
+    <span class="kw">fn</span> <span class="ident">is_object_pinned</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
     }
 
     <span class="kw">fn</span> <span class="ident">is_movable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
