@@ -17,7 +17,7 @@ Policies
 
 * Add `MarkSweepSpace`:
   * It uses our native MiMalloc implementation in MMTk core.
-  * When the feature `malloc_mark_sweep` is enabled, it uses the selected mimalloc library to back up its allocation.
+  * When the feature `malloc_mark_sweep` is enabled, it uses the selected malloc library to back up its allocation.
 * Malloc mark sweep now accounts for memory based on page usage, and each malloc library may use a different page size.
 * The immix space now uses the newly added `BlockPageResource`.
 * Changes to Space Function Table (SFT) to improve our boot time and reduce the memory footprint:
@@ -30,7 +30,7 @@ API
 
 * Add an option `thread_affinity` to set processor affinity for MMTk GC threads.
 * Add `AllocationSemantics::NonMoving` to allocate objects that are known to be non-moving at allocation time.
-* Add `ReferenceGlue::is_referent_cleared` to allow some bindings to use a special value rathen a normal null reference for a cleared referent.
+* Add `ReferenceGlue::is_referent_cleared` to allow some bindings to use a special value rather than a normal null reference for a cleared referent.
 * Add `pin`, `unpin`, and `is_pinned` for object pinning. Note that some spaces do not support object pinning, and using these methods may
   cause panic if the space does not support object pinning.
 * Refactor `ObjectReference`:
@@ -50,7 +50,7 @@ Misc
 ---
 
 * Add a lock-free `BlockPageResource` that can be used for policies that always allocate memory at the granularity of a fixed sized block.
-  The page resource facilitate block allocation and reclamation, and use lock-free operations where possible.
+  This page resource facilitates block allocation and reclamation, and uses lock-free operations where possible.
 * Fix a race condition in `FreeListPageResource` when multiple threads release pages.
 * Fix a bug in `fetch_and/or` in our metadata implementation.
 * Fix a bug in side metadata bulk zeroing that may zero unrelated bits if the zeroed region cannot be mapped to whole metadata bytes.
