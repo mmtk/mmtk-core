@@ -81,7 +81,7 @@ pub fn create_plan<VM: VMBinding>(
             vm_map, mmapper, options, scheduler,
         )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options,
+            vm_map, mmapper, options, scheduler,
         )) as Box<dyn Plan<VM = VM>>,
         PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
             vm_map, mmapper, options, scheduler,

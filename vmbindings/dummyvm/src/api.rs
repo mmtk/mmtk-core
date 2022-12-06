@@ -36,7 +36,10 @@ pub extern "C" fn mmtk_bind_mutator(tls: VMMutatorThread) -> *mut Mutator<DummyV
 
 #[no_mangle]
 pub extern "C" fn mmtk_destroy_mutator(mutator: *mut Mutator<DummyVM>) {
-    memory_manager::destroy_mutator(unsafe { Box::from_raw(mutator) })
+    // notify mmtk-core about destroyed mutator
+    memory_manager::destroy_mutator(unsafe { &mut *mutator });
+    // turn the ptr back to a box, and let Rust properly reclaim it
+    let _ = unsafe { Box::from_raw(mutator) };
 }
 
 #[no_mangle]
