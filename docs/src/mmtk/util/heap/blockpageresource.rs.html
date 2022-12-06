@@ -409,6 +409,12 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::pageresource</span>::{<span class="ident">PRAllocFail</span>, <span class="ident">PRAllocResult</span>};
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">FreeListPageResource</span>, <span class="ident">PageResource</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
@@ -523,15 +529,21 @@
         <span class="macro">assert!</span>(<span class="ident">start</span>.<span class="ident">is_aligned_to</span>(<span class="ident">BYTES_IN_CHUNK</span>));
         <span class="comment">// 2. Take the first block int the chunk as the allocation result</span>
         <span class="kw">let</span> <span class="ident">first_block</span> <span class="op">=</span> <span class="ident">start</span>;
-        <span class="comment">// 3. Push all remaining blocks to a block list</span>
+        <span class="comment">// 3. Push all remaining blocks to one or more block lists</span>
         <span class="kw">let</span> <span class="ident">last_block</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">BYTES_IN_CHUNK</span>;
-        <span class="kw">let</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">array</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">cursor</span> <span class="op">=</span> <span class="ident">start</span> <span class="op">+</span> <span class="ident">B::BYTES</span>;
         <span class="kw">while</span> <span class="ident">cursor</span> <span class="op">&lt;</span> <span class="ident">last_block</span> {
             <span class="kw">let</span> <span class="ident">result</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">array</span>.<span class="ident">push_relaxed</span>(<span class="ident">B::from_aligned_address</span>(<span class="ident">cursor</span>)) };
-            <span class="macro">debug_assert!</span>(<span class="ident">result</span>.<span class="ident">is_ok</span>());
+            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">block</span>) <span class="op">=</span> <span class="ident">result</span> {
+                <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">add_global_array</span>(<span class="ident">array</span>);
+                <span class="ident">array</span> <span class="op">=</span> <span class="ident">BlockQueue::new</span>();
+                <span class="kw">let</span> <span class="ident">result2</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="ident">array</span>.<span class="ident">push_relaxed</span>(<span class="ident">block</span>) };
+                <span class="macro">debug_assert!</span>(<span class="ident">result2</span>.<span class="ident">is_ok</span>());
+            }
             <span class="ident">cursor</span> <span class="op">+</span><span class="op">=</span> <span class="ident">B::BYTES</span>;
         }
+        <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="ident">array</span>.<span class="ident">is_empty</span>());
         <span class="comment">// 4. Push the block list to the global pool</span>
         <span class="self">self</span>.<span class="ident">block_queue</span>.<span class="ident">add_global_array</span>(<span class="ident">array</span>);
         <span class="comment">// Finish slow-allocation</span>
