@@ -83,8 +83,6 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
-    /// The metadata specification for the nursery bit, used by non-copying or opportunisitcally copying policies to identify nursery objects.
-    const LOCAL_NURSERY_BIT_SPEC: VMLocalNurseryBitSpec;
 
     /// A function to non-atomically load the specified per-object metadata's content.
     /// The default implementation assumes the bits defined by the spec are always avilable for MMTk to use. If that is not the case, a binding should override this method, and provide their implementation.
@@ -520,6 +518,4 @@ pub mod specs {
     define_vm_metadata_spec!(VMLocalMarkBitSpec, false, 0, LOG_MIN_OBJECT_SIZE);
     // Mark&nursery bits for LOS: 2 bit per page, local
     define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, false, 1, LOG_BYTES_IN_PAGE);
-    // Nursery bit: 1 bit per object, local
-    define_vm_metadata_spec!(VMLocalNurseryBitSpec, false, 0, LOG_MIN_OBJECT_SIZE);
 }

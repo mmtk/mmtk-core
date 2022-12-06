@@ -292,22 +292,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if super::DEFRAG {
             self.defrag.prepare(self);
         }
-        // Prepare each block for GC
-        let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
-        // # Safety: ImmixSpace reference is always valid within this collection cycle.
-        let space = unsafe { &*(self as *const Self) };
-        let work_packets = self.chunk_map.generate_tasks(|chunk| {
-            Box::new(PrepareBlockState {
-                space,
-                chunk,
-                defrag_threshold: if space.in_defrag() {
-                    Some(threshold)
-                } else {
-                    None
-                },
-            })
-        });
-        self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
+        if major_gc {
+            // Prepare each block for GC
+            let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
+            // # Safety: ImmixSpace reference is always valid within this collection cycle.
+            let space = unsafe { &*(self as *const Self) };
+            let work_packets = self.chunk_map.generate_tasks(|chunk| {
+                Box::new(PrepareBlockState {
+                    space,
+                    chunk,
+                    defrag_threshold: if space.in_defrag() {
+                        Some(threshold)
+                    } else {
+                        None
+                    },
+                })
+            });
+            self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
+        }
         // Update line mark state
         if major_gc {
             if !super::BLOCK_ONLY {
@@ -574,6 +576,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         old_value == mark_state
     }
 
+    #[inline(always)]
+    pub(crate) fn is_marked_with_current_mark_state(&self, object: ObjectReference) -> bool {
+        self.is_marked(object, self.mark_state)
+    }
+
     /// Check if an object is pinned.
     #[inline(always)]
     fn is_pinned(_object: ObjectReference) -> bool {
@@ -669,9 +676,11 @@ pub struct PrepareBlockState<VM: VMBinding> {
 impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
-    fn reset_object_mark(chunk: Chunk) {
-        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
-            side.bzero_metadata(chunk.start(), Chunk::BYTES);
+    fn reset_object_mark(&self) {
+        if !self.space.nursery_collection {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+                side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+            }
         }
     }
 }
@@ -681,7 +690,7 @@ impl<VM: VMBinding> GCWork<VM> for PrepareBlockState<VM> {
     fn do_work(&mut self, _worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
         let defrag_threshold = self.defrag_threshold.unwrap_or(0);
         // Clear object mark table for this chunk
-        Self::reset_object_mark(self.chunk);
+        self.reset_object_mark();
         // Iterate over all blocks in this chunk
         for block in self.chunk.blocks() {
             let state = block.get_state();
@@ -748,9 +757,6 @@ impl<VM: VMBinding> PolicyCopyContext for ImmixCopyContext<VM> {
             None,
             Ordering::SeqCst,
         );
-        if self.get_space().nursery_collection {
-            VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.set_mature::<VM>(obj, Ordering::SeqCst);
-        }
         // Mark the line
         if !super::MARK_LINE_AT_SCAN_TIME {
             self.get_space().mark_lines(obj);

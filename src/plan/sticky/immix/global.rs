@@ -44,11 +44,11 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
 
 impl<VM: VMBinding> GenerationalPlan<VM> for StickyImmix<VM> {
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
-        self.immix.immix_space.in_space(object) && VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.is_nursery::<VM>(object, Ordering::SeqCst)
+        self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked_with_current_mark_state(object)
     }
 
     fn is_address_in_nursery(&self, addr: crate::util::Address) -> bool {
-        panic!("We cannot check if an address is in logical nursery --  we need an object reference")
+        false
     }
 
     fn trace_object_nursery<Q: crate::ObjectQueue>(
@@ -142,10 +142,9 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn prepare(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             self.immix.immix_space.prepare(false);
-            return;
+        } else {
+            self.immix.prepare(tls);
         }
-
-        self.immix.prepare(tls);
     }
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
@@ -153,10 +152,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             let was_defrag = self.immix.immix_space.release(false);
             self.immix.last_gc_was_defrag.store(was_defrag, Ordering::Relaxed);
             return;
+        } else {
+            self.immix.release(tls);
+            self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery(), Ordering::Relaxed);
         }
-
-        self.immix.release(tls);
-        self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery(), Ordering::Relaxed);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<&dyn crate::policy::space::Space<Self::VM>>) -> bool {
@@ -198,12 +197,12 @@ impl<VM: VMBinding> StickyImmix<VM> {
             );
 
             // If the nursery bit is on the side, add it for immix space
-            match VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.as_spec() {
-                MetadataSpec::OnSide(spec) => {
-                    space.common.metadata.local.push(*spec);
-                }
-                _ => {}
-            }
+            // match VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.as_spec() {
+            //     MetadataSpec::OnSide(spec) => {
+            //         space.common.metadata.local.push(*spec);
+            //     }
+            //     _ => {}
+            // }
 
             space
         };

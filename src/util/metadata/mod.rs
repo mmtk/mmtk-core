@@ -225,6 +225,5 @@ pub mod side_metadata;
 pub use metadata_val_traits::*;
 
 pub(crate) mod log_bit;
-pub(crate) mod nursery_bit;
 
 pub use global::*;

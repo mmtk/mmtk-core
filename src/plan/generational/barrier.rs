@@ -1,5 +1,6 @@
 //! Generational read/write barrier implementations.
 
+use crate::plan::PlanTraceObject;
 use crate::plan::barriers::BarrierSemantics;
 use crate::plan::VectorQueue;
 use crate::policy::space::Space;
@@ -16,7 +17,7 @@ use super::gc_work::ProcessRegionModBuf;
 use super::global::Gen;
 use super::global::GenerationalPlan;
 
-pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM>> {
+pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> {
     /// MMTk instance
     mmtk: &'static MMTK<VM>,
     /// Generational plan
@@ -27,7 +28,7 @@ pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM>> {
     region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
-impl<VM: VMBinding, P: GenerationalPlan<VM>> GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> GenObjectBarrierSemantics<VM, P> {
     pub fn new(mmtk: &'static MMTK<VM>, plan: &'static P) -> Self {
         Self {
             mmtk,
@@ -57,7 +58,7 @@ impl<VM: VMBinding, P: GenerationalPlan<VM>> GenObjectBarrierSemantics<VM, P> {
     }
 }
 
-impl<VM: VMBinding, P: GenerationalPlan<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
     type VM = VM;
 
     #[cold]
