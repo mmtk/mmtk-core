@@ -501,7 +501,9 @@ impl ObjectReference {
     #[inline(always)]
     pub fn to_address<VM: VMBinding>(self) -> Address {
         use crate::vm::ObjectModel;
-        VM::VMObjectModel::ref_to_address(self)
+        let to_address = VM::VMObjectModel::ref_to_address(self);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, to_address);
+        to_address
     }
 
     /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
@@ -513,13 +515,23 @@ impl ObjectReference {
         VM::VMObjectModel::ref_to_header(self)
     }
 
+    #[inline(always)]
+    pub fn to_object_start<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        let object_start = VM::VMObjectModel::ref_to_object_start(self);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, object_start);
+        object_start
+    }
+
     /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
     /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
     /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
     #[inline(always)]
     pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
         use crate::vm::ObjectModel;
-        VM::VMObjectModel::address_to_ref(addr)
+        let obj = VM::VMObjectModel::address_to_ref(addr);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        obj
     }
 
     /// is this object reference null reference?

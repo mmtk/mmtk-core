@@ -2,6 +2,7 @@ mod accounting;
 #[macro_use]
 pub mod layout;
 pub mod blockpageresource;
+pub mod chunk_map;
 pub mod freelistpageresource;
 mod heap_meta;
 pub mod monotonepageresource;

@@ -174,7 +174,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     /// Get the address for header forwarding pointer
     #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
-        VM::VMObjectModel::ref_to_object_start(object) - GC_EXTRA_HEADER_BYTES
+        object.to_object_start::<VM>() - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
@@ -413,7 +413,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                 // update alloc_bit,
                 alloc_bit::set_alloc_bit::<VM>(new_object);
-                to = VM::VMObjectModel::ref_to_object_start(new_object) + copied_size;
+                to = new_object.to_object_start::<VM>() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);
             }
         }
