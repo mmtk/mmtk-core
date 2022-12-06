@@ -112,15 +112,21 @@ impl<VM: VMBinding, B: Region> BlockPageResource<VM, B> {
         assert!(start.is_aligned_to(BYTES_IN_CHUNK));
         // 2. Take the first block int the chunk as the allocation result
         let first_block = start;
-        // 3. Push all remaining blocks to a block list
+        // 3. Push all remaining blocks to one or more block lists
         let last_block = start + BYTES_IN_CHUNK;
-        let array = BlockQueue::new();
+        let mut array = BlockQueue::new();
         let mut cursor = start + B::BYTES;
         while cursor < last_block {
             let result = unsafe { array.push_relaxed(B::from_aligned_address(cursor)) };
-            debug_assert!(result.is_ok());
+            if let Err(block) = result {
+                self.block_queue.add_global_array(array);
+                array = BlockQueue::new();
+                let result2 = unsafe { array.push_relaxed(block) };
+                debug_assert!(result2.is_ok());
+            }
             cursor += B::BYTES;
         }
+        debug_assert!(!array.is_empty());
         // 4. Push the block list to the global pool
         self.block_queue.add_global_array(array);
         // Finish slow-allocation
