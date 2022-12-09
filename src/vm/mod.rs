@@ -27,6 +27,7 @@ pub use self::active_plan::ActivePlan;
 pub use self::collection::Collection;
 pub use self::collection::GCThreadContext;
 pub use self::collection::ProcessWeakRefsContext;
+pub use self::collection::ProcessWeakRefsTracer;
 pub use self::object_model::specs::*;
 pub use self::object_model::ObjectModel;
 pub use self::reference_glue::Finalizable;

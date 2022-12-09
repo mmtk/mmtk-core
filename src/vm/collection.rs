@@ -10,8 +10,19 @@ pub enum GCThreadContext<VM: VMBinding> {
     Worker(Box<GCWorker<VM>>),
 }
 
-/// This trait is implemented by the `context` parameter of `Collection::process_weak_refs`.
-pub trait ProcessWeakRefsContext {
+/// Information related to weak reference processing.  Used by `Collection::process_weak_refs`.
+pub struct ProcessWeakRefsContext {
+    /// `true` if `process_weak_refs` is called during the forwarding phase in MarkCompact.
+    /// Always `false` if the GC is not MarkCompact.
+    pub forwarding: bool,
+
+    /// `true` if the current GC is a nursery GC.
+    /// Always `false` if not using a generationl GC algorithm.
+    pub nursery: bool,
+}
+
+/// `Collection::process_weak_refs` uses a tracer to retain and update weak references.
+pub trait ProcessWeakRefsTracer: Send {
     /// Add `object` to the transitive closure, and return its new address.
     ///
     /// During `process_weak_refs`, calling this on an `object` will add it to the transitive
@@ -21,14 +32,6 @@ pub trait ProcessWeakRefsContext {
     /// The return value is the new location of `object`, which may be different when using copying
     /// GC.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
-
-    /// Returns `true` if `process_weak_refs` is called during the forwarding phase in MarkCompact.
-    /// Always returns `false` if the GC is not MarkCompact.
-    fn forwarding(&self) -> bool;
-
-    /// Retruns `true` if the current GC is a nursery GC.
-    /// Always returns `false` if not using a generationl GC algorithm.
-    fn nursery(&self) -> bool;
 }
 
 /// VM-specific methods for garbage collection.
@@ -150,27 +153,27 @@ pub trait Collection<VM: VMBinding> {
     /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
     /// currently reached.
     ///
-    /// The VM binding can call `context.trace_object(object)` to keep `object` and its decendents
+    /// The VM binding can call `tracer.trace_object(object)` to keep `object` and its decendents
     /// alive, and get its new address as return value.  For examles:
     ///
     /// -   In Java, when the VM decides to keep the referent of `SoftReference`, it can call
-    ///     `context.trace_object` on the referent.
-    /// -   In Java, when a finalizable object is unreachable, it can call `context.trace_object`
+    ///     `tracer.trace_object` on the referent.
+    /// -   In Java, when a finalizable object is unreachable, it can call `tracer.trace_object`
     ///     to resurrect that object and pass it to the finalizer thread.
     /// -   When implementing ephemerons, if the key is alive, the VM shall call
-    ///     `context.trace_object` on the value, and return `true` so that MMTk core will call
-    ///     `process_weak_refs` again, which will give the VM a chance to handle transitively
-    ///     reachable ephemerons.
+    ///     `tracer.trace_object` on the value, and ensure `process_weak_refs` returns `true` in
+    ///     the end so that MMTk core will call `process_weak_refs` again, which will give the VM
+    ///     a chance to handle transitively reachable ephemerons.
     ///
-    /// The VM binding also needs to use `context.trace_object` to update weak reference fields,
+    /// The VM binding also needs to use `tracer.trace_object` to update weak reference fields,
     /// even when the referent is still alive, because the referent may be moved to a different
-    /// address.  Things like `*field = context.trace_object(*field)` should work.
+    /// address.  Things like `*field = tracer.trace_object(*field)` should work.
     ///
     /// GC algorithms other than mark-compact compute transitive closure only once.
     ///
     /// Mark-compact GC will compute transive closure twice during each GC.  It will mark objects
     /// in the first transitive closure, and forward references in the second transitive closure.
-    /// During the second transitive closure, `context.forwarding()` will return `true`, and the VM
+    /// During the second transitive closure, `context.forwarding` will return `true`, and the VM
     /// binding is only responsible for updating weak references.  Other things, such as enqueuing
     /// references for finalizing, should not be repeated.  However, if a reference was put into
     /// other data structures (such as the finalization queue or a `java.lang.ref.ReferenceQueue`
@@ -179,11 +182,16 @@ pub trait Collection<VM: VMBinding> {
     /// finalizable objects.
     ///
     /// Arguments:
-    /// * `context`: Provides some methods to query the GC status and process weak references.
+    /// * `context`: Provides more information of the current trace.
+    /// * `tracer`: Use this to retain and update weak references.
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(_tls: VMWorkerThread, _context: impl ProcessWeakRefsContext) -> bool {
+    fn process_weak_refs(
+        _tls: VMWorkerThread,
+        _context: ProcessWeakRefsContext,
+        _tracer: impl ProcessWeakRefsTracer,
+    ) -> bool {
         false
     }
 }
