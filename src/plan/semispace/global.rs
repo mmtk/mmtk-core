@@ -1,5 +1,7 @@
 use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
+use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -131,40 +133,18 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 }
 
 impl<VM: VMBinding> SemiSpace<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut common_plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &SS_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[])
+        };
 
         let res = SemiSpace {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &SS_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            copyspace0: CopySpace::new(common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
+            copyspace1: CopySpace::new(common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
+            common: CommonPlan::new(common_plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

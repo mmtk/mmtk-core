@@ -8,12 +8,13 @@ use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::largeobjectspace::LargeObjectSpace;
-use crate::policy::space::Space;
+use crate::policy::space::{Space, PlanCreateSpaceArgs};
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
@@ -68,30 +69,25 @@ pub fn create_plan<VM: VMBinding>(
     options: Arc<Options>,
     scheduler: Arc<GCWorkScheduler<VM>>,
 ) -> Box<dyn Plan<VM = VM>> {
+    let args = CreateGeneralPlanArgs {
+        vm_map,
+        mmapper,
+        heap: HeapMeta::new(&options),
+        options,
+        gc_trigger: todo!(),
+        scheduler,
+    };
+
     let plan = match plan {
-        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options))
+        PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(args))
             as Box<dyn Plan<VM = VM>>,
-        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(
-            vm_map, mmapper, options,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(
-            vm_map, mmapper, options, scheduler,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(
-            vm_map, mmapper, options, scheduler,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(
-            vm_map, mmapper, options, scheduler,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(
-            vm_map, mmapper, options,
-        )) as Box<dyn Plan<VM = VM>>,
-        PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(
-            vm_map, mmapper, options,
-        )) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::SemiSpace => Box::new(crate::plan::semispace::SemiSpace::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::GenCopy => Box::new(crate::plan::generational::copying::GenCopy::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::GenImmix => Box::new(crate::plan::generational::immix::GenImmix::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::MarkSweep => Box::new(crate::plan::marksweep::MarkSweep::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::Immix => Box::new(crate::plan::immix::Immix::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::PageProtect => Box::new(crate::plan::pageprotect::PageProtect::new(args)) as Box<dyn Plan<VM = VM>>,
+        PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>,
     };
 
     // We have created Plan in the heap, and we won't explicitly move it. So each space
@@ -280,7 +276,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// Get the total number of pages for the heap.
     fn get_total_pages(&self) -> usize {
-        self.base().heap.get_total_pages()
+        self.base().gc_trigger.get_heap_size_in_pages()
     }
 
     /// Get the number of pages that are still available for use. The available pages
@@ -389,6 +385,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub options: Arc<Options>,
     pub heap: HeapMeta,
+    pub gc_trigger: Arc<dyn GCTrigger<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
     /// A counter for per-mutator stack scanning
@@ -435,12 +432,7 @@ pub struct BasePlan<VM: VMBinding> {
 
 #[cfg(feature = "vm_space")]
 pub fn create_vm_space<VM: VMBinding>(
-    vm_map: &'static VMMap,
-    mmapper: &'static Mmapper,
-    heap: &mut HeapMeta,
-    boot_segment_bytes: usize,
-    constraints: &'static PlanConstraints,
-    global_side_metadata_specs: Vec<SideMetadataSpec>,
+    args: CreateBasePlanArgs,
 ) -> ImmortalSpace<VM> {
     use crate::util::constants::LOG_BYTES_IN_MBYTE;
     //    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;
@@ -450,16 +442,7 @@ pub fn create_vm_space<VM: VMBinding>(
     use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
     let boot_segment_mb = raw_align_up(boot_segment_bytes, BYTES_IN_CHUNK) >> LOG_BYTES_IN_MBYTE;
 
-    let space = ImmortalSpace::new(
-        "boot",
-        false,
-        VMRequest::fixed_size(boot_segment_mb),
-        global_side_metadata_specs,
-        vm_map,
-        mmapper,
-        heap,
-        constraints,
-    );
+    let space = ImmortalSpace::new(args.get_space_args("boot", false, VMRequest::fixed_size(boot_segment_mb)));
 
     // The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.
     space.ensure_mapped();
@@ -467,65 +450,61 @@ pub fn create_vm_space<VM: VMBinding>(
     space
 }
 
+/// Args needed for creating any plan
+pub struct CreateGeneralPlanArgs<VM: VMBinding> {
+    pub vm_map: &'static VMMap,
+    pub mmapper: &'static Mmapper,
+    pub heap: HeapMeta,
+    pub options: Arc<Options>,
+    pub gc_trigger: Arc<dyn crate::util::heap::gc_trigger::GCTrigger<VM>>,
+    pub scheduler: Arc<GCWorkScheduler<VM>>,
+}
+
+/// Args needed for creating a specific plan. This includes plan-specific args.
+pub struct CreateSpecificPlanArgs<VM: VMBinding> {
+    pub global_args: CreateGeneralPlanArgs<VM>,
+    pub constraints: &'static PlanConstraints,
+    pub global_side_metadata_specs: Vec<SideMetadataSpec>,
+}
+
+impl<VM: VMBinding> CreateSpecificPlanArgs<VM> {
+    /// Get a PlanCreateSpaceArgs that can be used to create a space
+    pub fn get_space_args(&mut self, name: &'static str, zeroed: bool, vmrequest: VMRequest) -> PlanCreateSpaceArgs<VM> {
+        PlanCreateSpaceArgs {
+            name,
+            zeroed,
+            vmrequest,
+            global_side_metadata_specs: self.global_side_metadata_specs.clone(),
+            vm_map: self.global_args.vm_map,
+            mmapper: self.global_args.mmapper,
+            heap: &mut self.global_args.heap,
+            constraints: self.constraints,
+            gc_trigger: self.global_args.gc_trigger.clone(),
+            scheduler: self.global_args.scheduler.clone(),
+        }
+    }
+}
+
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'heap' only needs to be mutable for certain features
     #[allow(unused_variables)] // 'constraints' is only needed for certain features
     #[allow(clippy::redundant_clone)] // depends on features, the last clone of side metadata specs is not necessary.
     pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        mut heap: HeapMeta,
-        constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        args: CreateSpecificPlanArgs<VM>,
     ) -> BasePlan<VM> {
-        let stats = Stats::new(&options);
+        let stats = Stats::new(&args.global_args.options);
         // Initializing the analysis manager and routines
         #[cfg(feature = "analysis")]
         let analysis_manager = AnalysisManager::new(&stats);
         BasePlan {
             #[cfg(feature = "code_space")]
-            code_space: ImmortalSpace::new(
-                "code_space",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-            ),
+            code_space: ImmortalSpace::new(args.get_space_args("code_space", true, VMRequest::discontiguous())),
             #[cfg(feature = "code_space")]
-            code_lo_space: ImmortalSpace::new(
-                "code_lo_space",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-            ),
+            code_lo_space: ImmortalSpace::new(args.get_space_args("code_lo_space", true, VMRuquest::discontiguous())),
             #[cfg(feature = "ro_space")]
-            ro_space: ImmortalSpace::new(
-                "ro_space",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-            ),
+            ro_space: ImmortalSpace::new(args.get_space_args("ro_space", true, VMRequest::discontiguous())),
             #[cfg(feature = "vm_space")]
-            vm_space: create_vm_space(
-                vm_map,
-                mmapper,
-                &mut heap,
-                *options.vm_space_size,
-                constraints,
-                global_side_metadata_specs,
-            ),
+            vm_space: create_vm_space(args),
 
             initialized: AtomicBool::new(false),
             trigger_gc_when_heap_is_full: AtomicBool::new(true),
@@ -541,10 +520,11 @@ impl<VM: VMBinding> BasePlan<VM> {
             cur_collection_attempts: AtomicUsize::new(0),
             gc_requester: Arc::new(GCRequester::new()),
             stats,
-            mmapper,
-            heap,
-            vm_map,
-            options,
+            mmapper: args.global_args.mmapper,
+            heap: args.global_args.heap,
+            gc_trigger: crate::util::heap::gc_trigger::create_gc_trigger(&args.global_args.options),
+            vm_map: args.global_args.vm_map,
+            options: args.global_args.options.clone(),
             #[cfg(feature = "sanity")]
             inside_sanity: AtomicBool::new(false),
             scanned_stacks: AtomicUsize::new(0),
@@ -898,53 +878,13 @@ pub struct CommonPlan<VM: VMBinding> {
 
 impl<VM: VMBinding> CommonPlan<VM> {
     pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        mut heap: HeapMeta,
-        constraints: &'static PlanConstraints,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        mut args: CreateSpecificPlanArgs<VM>,
     ) -> CommonPlan<VM> {
         CommonPlan {
-            immortal: ImmortalSpace::new(
-                "immortal",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-            ),
-            los: LargeObjectSpace::new(
-                "los",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-                false,
-            ),
-            nonmoving: ImmortalSpace::new(
-                "nonmoving",
-                true,
-                VMRequest::discontiguous(),
-                global_side_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                constraints,
-            ),
-            base: BasePlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                constraints,
-                global_side_metadata_specs,
-            ),
+            immortal: ImmortalSpace::new(args.get_space_args("immortal", true, VMRequest::discontiguous())),
+            los: LargeObjectSpace::new(args.get_space_args("los", true, VMRequest::discontiguous()), false),
+            nonmoving: ImmortalSpace::new(args.get_space_args("nonmoving", true, VMRequest::discontiguous())),
+            base: BasePlan::new(args),
         }
     }
 

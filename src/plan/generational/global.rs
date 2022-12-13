@@ -2,6 +2,7 @@ use crate::plan::global::CommonPlan;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -42,32 +43,9 @@ pub struct Gen<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> Gen<VM> {
-    pub fn new(
-        mut heap: HeapMeta,
-        global_metadata_specs: Vec<SideMetadataSpec>,
-        constraints: &'static PlanConstraints,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-    ) -> Self {
-        let nursery = CopySpace::new(
-            "nursery",
-            false,
-            true,
-            VMRequest::fixed_extent(options.get_max_nursery(), false),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
-        let common = CommonPlan::new(
-            vm_map,
-            mmapper,
-            options,
-            heap,
-            constraints,
-            global_metadata_specs,
-        );
+    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
+        let nursery = CopySpace::new(args.get_space_args("nursery", true, VMRequest::fixed_extent(args.global_args.options.get_max_nursery(), false)), true);
+        let common = CommonPlan::new(args);
 
         let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 

@@ -1,5 +1,7 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
+use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
@@ -100,38 +102,19 @@ impl<VM: VMBinding> Plan for MarkSweep<VM> {
 }
 
 impl<VM: VMBinding> MarkSweep<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let mut global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_metadata_specs);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
-        let res = {
-            let ms = MarkSweepSpace::new(
-                "MarkSweepSpace",
-                false,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-            );
+        let mut common_plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MS_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
 
-            let common = CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MS_CONSTRAINTS,
-                global_metadata_specs,
-            );
-
-            MarkSweep { common, ms }
+        let res = MarkSweep {
+            ms: MarkSweepSpace::new(common_plan_args.get_space_args("ms", true, VMRequest::discontiguous())),
+            common: CommonPlan::new(common_plan_args),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();

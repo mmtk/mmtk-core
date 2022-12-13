@@ -3,7 +3,6 @@ use super::{block::*, defrag::Defrag};
 use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
-use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::copy::*;
 use crate::util::heap::chunk_map::*;
@@ -194,12 +193,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn new(
-        name: &'static str,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
     ) -> Self {
         #[cfg(feature = "immix_no_defrag")]
         info!(
@@ -209,23 +203,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
 
         super::validate_features();
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                zeroed: true,
-                vmrequest: VMRequest::discontiguous(),
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: Self::side_metadata_specs(),
-                },
-                needs_log_bit: false,
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let vm_map = args.vm_map;
+        let scheduler = args.scheduler.clone();
+        let common = CommonSpace::new(args.into_policy_args(true, false, Self::side_metadata_specs()));
         ImmixSpace {
             pr: if common.vmrequest.is_discontiguous() {
                 BlockPageResource::new_discontiguous(
@@ -249,7 +229,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             mark_state: Self::UNMARKED_STATE,
-            scheduler,
+            scheduler: scheduler.clone(),
         }
     }
 

@@ -3,7 +3,7 @@ use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
-use crate::plan::global::BasePlan;
+use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
@@ -177,38 +177,28 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         // if global_alloc_bit is NOT enabled,
         // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
         #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs =
+        let global_side_metadata_specs =
             SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 
-        let mc_space = MarkCompactSpace::new(
-            "mark_compact_space",
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
+        let mut common_plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MARKCOMPACT_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+
+        let mc_space = MarkCompactSpace::new(common_plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
 
         let res = MarkCompact {
             mc_space,
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MARKCOMPACT_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(common_plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

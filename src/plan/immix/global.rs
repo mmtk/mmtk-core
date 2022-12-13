@@ -2,6 +2,8 @@ use super::gc_work::ImmixGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
+use crate::plan::global::CreateGeneralPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -11,6 +13,7 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
+use crate::util::heap::VMRequest;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
@@ -134,31 +137,15 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 }
 
 impl<VM: VMBinding> Immix<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut common_plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &IMMIX_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
         let immix = Immix {
-            immix_space: ImmixSpace::new(
-                "immix",
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-                global_metadata_specs.clone(),
-            ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &IMMIX_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            immix_space: ImmixSpace::new(common_plan_args.get_space_args("immix", true, VMRequest::discontiguous())),
+            common: CommonPlan::new(common_plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
 

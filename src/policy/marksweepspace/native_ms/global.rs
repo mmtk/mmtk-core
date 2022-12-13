@@ -3,7 +3,7 @@ use std::sync::Arc;
 use atomic::Ordering;
 
 use crate::{
-    policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef, space::SpaceOptions},
+    policy::{marksweepspace::native_ms::*, sft::GCWorkerMutRef},
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
@@ -188,15 +188,11 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
     ) -> MarkSweepSpace<VM> {
+        let scheduler = args.scheduler.clone();
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = {
             metadata::extract_side_metadata(&vec![
                 MetadataSpec::OnSide(Block::NEXT_BLOCK_TABLE),
@@ -214,33 +210,16 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
                 *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
             ])
         };
-
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: false,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let common = CommonSpace::new(args.into_policy_args(false, false, local_specs));
         MarkSweepSpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 FreeListPageResource::new_discontiguous(vm_map)
             } else {
                 FreeListPageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
             chunk_map: ChunkMap::new(),
-            scheduler,
+            scheduler: scheduler,
             abandoned: Mutex::new(AbandonedBlockLists {
                 available: new_empty_block_lists(),
                 unswept: new_empty_block_lists(),

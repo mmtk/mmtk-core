@@ -2,7 +2,6 @@ use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
-use crate::policy::space::SpaceOptions;
 use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
 use crate::util::copy::*;
@@ -147,38 +146,17 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
 impl<VM: VMBinding> CopySpace<VM> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: &'static str,
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         from_space: bool,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
     ) -> Self {
-        let local_specs = extract_side_metadata(&[
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(true, false, extract_side_metadata(&[
             *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
             *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-        ]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        ])));
         CopySpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)

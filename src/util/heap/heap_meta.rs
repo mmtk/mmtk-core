@@ -6,7 +6,6 @@ use crate::util::Address;
 pub struct HeapMeta {
     pub heap_cursor: Address,
     pub heap_limit: Address,
-    pub total_pages: usize,
 }
 
 impl HeapMeta {
@@ -14,7 +13,6 @@ impl HeapMeta {
         HeapMeta {
             heap_cursor: HEAP_START,
             heap_limit: HEAP_END,
-            total_pages: conversions::bytes_to_pages(*options.heap_size),
         }
     }
 
@@ -45,9 +43,5 @@ impl HeapMeta {
 
     pub fn get_discontig_end(&self) -> Address {
         self.heap_limit - 1
-    }
-
-    pub fn get_total_pages(&self) -> usize {
-        self.total_pages
     }
 }

@@ -626,7 +626,7 @@ options! {
     // there is no core with (perceived) id 12.
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
-    // Set the GC trigger. This defines how MMTk triggers a GC.
+    // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.3x physical memory.
     gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [always_valid] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.3f64) as usize)
 }

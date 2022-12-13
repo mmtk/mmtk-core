@@ -254,14 +254,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        _name: &'static str,
-        _zeroed: bool,
-        _vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        _vm_map: &'static VMMap,
-        _mmapper: &'static Mmapper,
-        _heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
     ) -> Self {
         MallocSpace {
             phantom: PhantomData,
@@ -270,14 +263,14 @@ impl<VM: VMBinding> MallocSpace<VM> {
             chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
             chunk_addr_max: AtomicUsize::new(0),
             metadata: SideMetadataContext {
-                global: global_side_metadata_specs,
+                global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
                     MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
-            scheduler,
+            scheduler: args.scheduler.clone(),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]

@@ -169,12 +169,11 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeIm
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     #[allow(dead_code)] // Only used with certain features.
     pub fn new(
-        name: &'static str,
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         slow_path_zeroing: bool,
-        options: &Options,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
     ) -> Self {
-        let total_bytes = *options.heap_size;
+        // let total_bytes = *options.heap_size;
+        let total_bytes = unimplemented!();
         assert!(
             total_bytes <= AVAILABLE_BYTES,
             "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
@@ -185,14 +184,14 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
         // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
-            name,
+            name: args.name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_START + total_bytes,
             start: AVAILABLE_START,
             extent: total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
-                global: global_side_metadata_specs,
+                global: args.global_side_metadata_specs,
                 local: vec![],
             },
             phantom: PhantomData,

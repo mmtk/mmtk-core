@@ -9,6 +9,7 @@ pub mod monotonepageresource;
 pub mod pageresource;
 pub mod space_descriptor;
 mod vmrequest;
+pub mod gc_trigger;
 
 pub use self::accounting::PageAccounting;
 pub use self::blockpageresource::BlockPageResource;
