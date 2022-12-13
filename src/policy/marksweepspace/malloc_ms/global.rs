@@ -5,6 +5,8 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
+use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::gc_trigger::GCTriggerPolicy;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
@@ -47,6 +49,7 @@ pub struct MallocSpace<VM: VMBinding> {
     metadata: SideMetadataContext,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
+    gc_trigger: Arc<GCTrigger<VM>>,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -141,6 +144,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
+    }
+
+    fn get_gc_trigger(&self) -> &GCTrigger<VM> {
+        self.gc_trigger.as_ref()
     }
 
     fn initialize_sft(&self) {
@@ -271,6 +278,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 ]),
             },
             scheduler: args.scheduler.clone(),
+            gc_trigger: args.gc_trigger.clone(),
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -331,7 +339,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
-        if VM::VMActivePlan::global().poll(false, Some(self)) {
+        if self.get_gc_trigger().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
             VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };

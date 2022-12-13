@@ -28,7 +28,7 @@ use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
-use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::gc_trigger::{GCTriggerPolicy, GCTrigger};
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::Mutex;
@@ -63,7 +63,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         trace!("Pages reserved");
         trace!("Polling ..");
 
-        if should_poll && VM::VMActivePlan::global().poll(false, Some(self.as_space())) {
+        if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
             pr.clear_request(pages_reserved);
@@ -171,7 +171,7 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
                         "Physical allocation failed when GC is not allowed!"
                     );
 
-                    let gc_performed = VM::VMActivePlan::global().poll(true, Some(self.as_space()));
+                    let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
                     pr.clear_request(pages_reserved);
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
@@ -273,6 +273,9 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
     }
 
     fn common(&self) -> &CommonSpace<VM>;
+    fn get_gc_trigger(&self) -> &GCTrigger<VM> {
+        self.common().gc_trigger.as_ref()
+    }
 
     fn release_multiple_pages(&mut self, start: Address);
 
@@ -389,7 +392,7 @@ pub struct CommonSpace<VM: VMBinding> {
     /// A lock used during acquire() to make sure only one thread can allocate.
     pub acquire_lock: Mutex<()>,
 
-    pub gc_trigger: Arc<dyn GCTrigger<VM>>,
+    pub gc_trigger: Arc<GCTrigger<VM>>,
 
     p: PhantomData<VM>,
 }
@@ -412,7 +415,7 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub mmapper: &'static Mmapper,
     pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
-    pub gc_trigger: Arc<dyn GCTrigger<VM>>,
+    pub gc_trigger: Arc<GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
 }
 

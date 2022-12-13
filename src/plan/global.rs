@@ -14,7 +14,7 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(feature = "analysis")]
 use crate::util::analysis::AnalysisManager;
 use crate::util::copy::{CopyConfig, GCWorkerCopyContext};
-use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::gc_trigger::{GCTriggerPolicy, GCTrigger};
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::HeapMeta;
@@ -73,10 +73,11 @@ pub fn create_plan<VM: VMBinding>(
         vm_map,
         mmapper,
         heap: HeapMeta::new(&options),
+        gc_trigger: Arc::new(GCTrigger::new(&options)),
         options,
-        gc_trigger: todo!(),
         scheduler,
     };
+    let gc_trigger = args.gc_trigger.clone();
 
     let plan = match plan {
         PlanSelector::NoGC => Box::new(crate::plan::nogc::NoGC::new(args))
@@ -90,8 +91,20 @@ pub fn create_plan<VM: VMBinding>(
         PlanSelector::MarkCompact => Box::new(crate::plan::markcompact::MarkCompact::new(args)) as Box<dyn Plan<VM = VM>>,
     };
 
-    // We have created Plan in the heap, and we won't explicitly move it. So each space
-    // now has a fixed address for its lifetime. It is safe now to initialize SFT.
+    // We have created Plan in the heap, and we won't explicitly move it.
+
+    // The plan has a fixed address. Set plan in gc_trigger
+    {
+        // We haven't finished creating the plan. No one is using the GC trigger. We cast the arc into a mutable reference.
+        // TODO: use Arc::get_mut_unchecked() when it is availble.
+        let gc_trigger: &mut GCTrigger<VM> = unsafe { &mut *(Arc::as_ptr(&gc_trigger) as *mut _) };
+        // We know the plan address will not change. Cast it to a static reference.
+        let static_plan: &'static dyn Plan<VM = VM> = unsafe { &*(&*plan as *const _) };
+        // Set the plan so we can trigger GC and check GC condition without using plan
+        gc_trigger.set_plan(static_plan);
+    }
+
+    // Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.
     plan.get_spaces()
         .into_iter()
         .for_each(|s| s.initialize_sft());
@@ -206,45 +219,45 @@ pub trait Plan: 'static + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    /// This method is called periodically by the allocation subsystem
-    /// (by default, each time a page is consumed), and provides the
-    /// collector with an opportunity to collect.
-    ///
-    /// Arguments:
-    /// * `space_full`: Space request failed, must recover pages within 'space'.
-    /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
-    fn poll(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool {
-        if self.collection_required(space_full, space) {
-            // FIXME
-            /*if space == META_DATA_SPACE {
-                /* In general we must not trigger a GC on metadata allocation since
-                 * this is not, in general, in a GC safe point.  Instead we initiate
-                 * an asynchronous GC, which will occur at the next safe point.
-                 */
-                self.log_poll(space, "Asynchronous collection requested");
-                self.common().control_collector_context.request();
-                return false;
-            }*/
-            self.log_poll(space, "Triggering collection");
-            self.base().gc_requester.request();
-            return true;
-        }
+    // /// This method is called periodically by the allocation subsystem
+    // /// (by default, each time a page is consumed), and provides the
+    // /// collector with an opportunity to collect.
+    // ///
+    // /// Arguments:
+    // /// * `space_full`: Space request failed, must recover pages within 'space'.
+    // /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
+    // fn poll(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool {
+    //     if self.collection_required(space_full, space) {
+    //         // FIXME
+    //         /*if space == META_DATA_SPACE {
+    //             /* In general we must not trigger a GC on metadata allocation since
+    //              * this is not, in general, in a GC safe point.  Instead we initiate
+    //              * an asynchronous GC, which will occur at the next safe point.
+    //              */
+    //             self.log_poll(space, "Asynchronous collection requested");
+    //             self.common().control_collector_context.request();
+    //             return false;
+    //         }*/
+    //         self.log_poll(space, "Triggering collection");
+    //         self.base().gc_requester.request();
+    //         return true;
+    //     }
 
-        // FIXME
-        /*if self.concurrent_collection_required() {
-            // FIXME
-            /*if space == self.common().meta_data_space {
-                self.log_poll(space, "Triggering async concurrent collection");
-                Self::trigger_internal_collection_request();
-                return false;
-            } else {*/
-            self.log_poll(space, "Triggering concurrent collection");
-            Self::trigger_internal_collection_request();
-            return true;
-        }*/
+    //     // FIXME
+    //     /*if self.concurrent_collection_required() {
+    //         // FIXME
+    //         /*if space == self.common().meta_data_space {
+    //             self.log_poll(space, "Triggering async concurrent collection");
+    //             Self::trigger_internal_collection_request();
+    //             return false;
+    //         } else {*/
+    //         self.log_poll(space, "Triggering concurrent collection");
+    //         Self::trigger_internal_collection_request();
+    //         return true;
+    //     }*/
 
-        false
-    }
+    //     false
+    // }
 
     fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
         if let Some(space) = space {
@@ -276,7 +289,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// Get the total number of pages for the heap.
     fn get_total_pages(&self) -> usize {
-        self.base().gc_trigger.get_heap_size_in_pages()
+        self.base().gc_trigger.get_total_pages()
     }
 
     /// Get the number of pages that are still available for use. The available pages
@@ -385,7 +398,7 @@ pub struct BasePlan<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub options: Arc<Options>,
     pub heap: HeapMeta,
-    pub gc_trigger: Arc<dyn GCTrigger<VM>>,
+    pub gc_trigger: Arc<GCTrigger<VM>>,
     #[cfg(feature = "sanity")]
     pub inside_sanity: AtomicBool,
     /// A counter for per-mutator stack scanning
@@ -456,7 +469,7 @@ pub struct CreateGeneralPlanArgs<VM: VMBinding> {
     pub mmapper: &'static Mmapper,
     pub heap: HeapMeta,
     pub options: Arc<Options>,
-    pub gc_trigger: Arc<dyn crate::util::heap::gc_trigger::GCTrigger<VM>>,
+    pub gc_trigger: Arc<crate::util::heap::gc_trigger::GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
@@ -522,7 +535,7 @@ impl<VM: VMBinding> BasePlan<VM> {
             stats,
             mmapper: args.global_args.mmapper,
             heap: args.global_args.heap,
-            gc_trigger: crate::util::heap::gc_trigger::create_gc_trigger(&args.global_args.options),
+            gc_trigger: args.global_args.gc_trigger,
             vm_map: args.global_args.vm_map,
             options: args.global_args.options.clone(),
             #[cfg(feature = "sanity")]
@@ -825,7 +838,7 @@ impl<VM: VMBinding> BasePlan<VM> {
         );
         // Check if we reserved more pages (including the collection copy reserve)
         // than the heap's total pages. In that case, we will have to do a GC.
-        let heap_full = plan.get_reserved_pages() > plan.get_total_pages();
+        let heap_full = plan.base().gc_trigger.is_heap_full();
 
         space_full || stress_force_gc || heap_full
     }
