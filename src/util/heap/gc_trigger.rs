@@ -13,7 +13,7 @@ use std::mem::MaybeUninit;
 
 pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
-    policy: Box<dyn GCTriggerPolicy<VM>>,
+    pub policy: Box<dyn GCTriggerPolicy<VM>>,
 }
 
 impl<VM: VMBinding> GCTrigger<VM> {
@@ -45,10 +45,6 @@ impl<VM: VMBinding> GCTrigger<VM> {
             return true;
         }
         false
-    }
-
-    pub fn get_total_pages(&self) -> usize {
-        self.policy.get_heap_size_in_pages()
     }
 
     pub fn is_heap_full(&self) -> bool {

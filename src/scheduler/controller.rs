@@ -100,6 +100,9 @@ impl<VM: VMBinding> GCController<VM> {
 
     /// Coordinate workers to perform GC in response to a GC request.
     pub fn do_gc_until_completion(&mut self) {
+        // Tell GC trigger that GC started
+        self.mmtk.plan.base().gc_trigger.policy.on_gc_start(self.mmtk);
+
         // Schedule collection.
         ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
@@ -126,6 +129,9 @@ impl<VM: VMBinding> GCController<VM> {
         //       newly generated remembered-sets from those open buckets.
         //       But these remsets should be preserved until next GC.
         EndOfGC.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
+
+        // Tell GC trigger that GC ended
+        self.mmtk.plan.base().gc_trigger.policy.on_gc_end(self.mmtk);
 
         self.scheduler.debug_assert_all_buckets_deactivated();
     }
