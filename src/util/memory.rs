@@ -173,6 +173,17 @@ pub fn get_process_memory_maps() -> String {
     data
 }
 
+/// Returns the total physical memory for the system in bytes.
+pub(crate) fn get_system_total_memory() -> usize {
+    match sys_info::mem_info() {
+        Ok(mem_info) => mem_info.total as usize,
+        Err(e) => {
+            warn!("Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()", e);
+            1024 * 1024 * 1024
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +336,11 @@ mod tests {
                 },
             )
         })
+    }
+
+    #[test]
+    fn test_get_system_total_memory() {
+        let total = get_system_total_memory();
+        println!("Total memory: {:?}", total);
     }
 }
