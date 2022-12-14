@@ -173,7 +173,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
 impl<VM: VMBinding> GenCopy<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &GENCOPY_CONSTRAINTS,
             global_side_metadata_specs:
@@ -181,16 +181,16 @@ impl<VM: VMBinding> GenCopy<VM> {
         };
 
         let copyspace0 = CopySpace::new(
-            common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+            plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
             false,
         );
         let copyspace1 = CopySpace::new(
-            common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+            plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
             true,
         );
 
         let res = GenCopy {
-            gen: Gen::new(common_plan_args),
+            gen: Gen::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,

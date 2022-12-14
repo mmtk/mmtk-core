@@ -133,18 +133,18 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
 impl<VM: VMBinding> Immix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
         let immix = Immix {
-            immix_space: ImmixSpace::new(common_plan_args.get_space_args(
+            immix_space: ImmixSpace::new(plan_args.get_space_args(
                 "immix",
                 true,
                 VMRequest::discontiguous(),
             )),
-            common: CommonPlan::new(common_plan_args),
+            common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
 

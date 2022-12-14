@@ -143,7 +143,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LargeObjec
 }
 
 impl<VM: VMBinding> LargeObjectSpace<VM> {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         args: crate::policy::space::PlanCreateSpaceArgs<VM>,
         protect_memory_on_release: bool,

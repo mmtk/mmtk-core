@@ -232,62 +232,14 @@ pub trait Plan: 'static + Sync + Downcast {
     /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
 
-    // /// This method is called periodically by the allocation subsystem
-    // /// (by default, each time a page is consumed), and provides the
-    // /// collector with an opportunity to collect.
-    // ///
-    // /// Arguments:
-    // /// * `space_full`: Space request failed, must recover pages within 'space'.
-    // /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
-    // fn poll(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool {
-    //     if self.collection_required(space_full, space) {
-    //         // FIXME
-    //         /*if space == META_DATA_SPACE {
-    //             /* In general we must not trigger a GC on metadata allocation since
-    //              * this is not, in general, in a GC safe point.  Instead we initiate
-    //              * an asynchronous GC, which will occur at the next safe point.
-    //              */
-    //             self.log_poll(space, "Asynchronous collection requested");
-    //             self.common().control_collector_context.request();
-    //             return false;
-    //         }*/
-    //         self.log_poll(space, "Triggering collection");
-    //         self.base().gc_requester.request();
-    //         return true;
-    //     }
-
-    //     // FIXME
-    //     /*if self.concurrent_collection_required() {
-    //         // FIXME
-    //         /*if space == self.common().meta_data_space {
-    //             self.log_poll(space, "Triggering async concurrent collection");
-    //             Self::trigger_internal_collection_request();
-    //             return false;
-    //         } else {*/
-    //         self.log_poll(space, "Triggering concurrent collection");
-    //         Self::trigger_internal_collection_request();
-    //         return true;
-    //     }*/
-    //     false
-    // }
-
-    // fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
-    //     if let Some(space) = space {
-    //         info!("  [POLL] {}: {}", space.get_name(), message);
-    //     } else {
-    //         info!("  [POLL] {}", message);
-    //     }
-    // }
-
-    /**
-     * This method controls the triggering of a GC. It is called periodically
-     * during allocation. Returns <code>true</code> to trigger a collection.
-     *
-     * @param spaceFull Space request failed, must recover pages within 'space'.
-     * @param space TODO
-     * @return <code>true</code> if a collection is requested by the plan.
-     */
-    fn collection_required(&self, space_full: bool, _space: Option<&dyn Space<Self::VM>>) -> bool;
+    /// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called
+    /// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,
+    /// in which case, this method may not be called. This method returns true to trigger a collection.
+    ///
+    /// # Arguments
+    /// * `space_full`: the allocation to a specific space failed, must recover pages within 'space'.
+    /// * `space`: an option to indicate if there is a space that has failed in an allocation.
+    fn collection_required(&self, space_full: bool, space: Option<&dyn Space<Self::VM>>) -> bool;
 
     // Note: The following methods are about page accounting. The default implementation should
     // work fine for non-copying plans. For copying plans, the plan should override any of these methods
@@ -477,7 +429,8 @@ pub fn create_vm_space<VM: VMBinding>(args: &mut CreateSpecificPlanArgs<VM>) -> 
     space
 }
 
-/// Args needed for creating any plan
+/// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This
+/// is passed to each plan's constructor.
 pub struct CreateGeneralPlanArgs<VM: VMBinding> {
     pub vm_map: &'static VMMap,
     pub mmapper: &'static Mmapper,
@@ -487,7 +440,10 @@ pub struct CreateGeneralPlanArgs<VM: VMBinding> {
     pub scheduler: Arc<GCWorkScheduler<VM>>,
 }
 
-/// Args needed for creating a specific plan. This includes plan-specific args.
+/// Args needed for creating a specific plan. This includes plan-specific args, such as plan constrainst
+/// and their global side metadata specs. This is created in each plan's constructor, and will be passed
+/// to `CommonPlan` or `BasePlan`. Also you can create `PlanCreateSpaceArg` from this type, and use that
+/// to create spaces.
 pub struct CreateSpecificPlanArgs<VM: VMBinding> {
     pub global_args: CreateGeneralPlanArgs<VM>,
     pub constraints: &'static PlanConstraints,
@@ -520,7 +476,6 @@ impl<VM: VMBinding> CreateSpecificPlanArgs<VM> {
 
 impl<VM: VMBinding> BasePlan<VM> {
     #[allow(unused_mut)] // 'args' only needs to be mutable for certain features
-    #[allow(clippy::redundant_clone)] // depends on features, the last clone of side metadata specs is not necessary.
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> BasePlan<VM> {
         let stats = Stats::new(&args.global_args.options);
         // Initializing the analysis manager and routines

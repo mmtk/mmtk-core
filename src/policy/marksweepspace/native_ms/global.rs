@@ -179,7 +179,6 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
         // we need this method for MallocSpace, and we want those two spaces to be used interchangably.
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> MarkSweepSpace<VM> {
         let scheduler = args.scheduler.clone();
         let vm_map = args.vm_map;

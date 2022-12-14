@@ -140,7 +140,6 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>, from_space: bool) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();

@@ -83,29 +83,29 @@ impl<VM: VMBinding> Plan for NoGC<VM> {
 
 impl<VM: VMBinding> NoGC<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &NOGC_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
         let res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(common_plan_args.get_space_args(
+            nogc_space: NoGCImmortalSpace::new(plan_args.get_space_args(
                 "nogc_space",
                 cfg!(not(feature = "nogc_no_zeroing")),
                 VMRequest::discontiguous(),
             )),
-            immortal: ImmortalSpace::new(common_plan_args.get_space_args(
+            immortal: ImmortalSpace::new(plan_args.get_space_args(
                 "immortal",
                 true,
                 VMRequest::discontiguous(),
             )),
-            los: ImmortalSpace::new(common_plan_args.get_space_args(
+            los: ImmortalSpace::new(plan_args.get_space_args(
                 "los",
                 true,
                 VMRequest::discontiguous(),
             )),
-            base: BasePlan::new(common_plan_args),
+            base: BasePlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

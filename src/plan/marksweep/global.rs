@@ -101,19 +101,19 @@ impl<VM: VMBinding> MarkSweep<VM> {
         let mut global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         MarkSweepSpace::<VM>::extend_global_side_metadata_specs(&mut global_side_metadata_specs);
 
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &MS_CONSTRAINTS,
             global_side_metadata_specs,
         };
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(common_plan_args.get_space_args(
+            ms: MarkSweepSpace::new(plan_args.get_space_args(
                 "ms",
                 true,
                 VMRequest::discontiguous(),
             )),
-            common: CommonPlan::new(common_plan_args),
+            common: CommonPlan::new(plan_args),
         };
 
         let mut side_metadata_sanity_checker = SideMetadataSanity::new();

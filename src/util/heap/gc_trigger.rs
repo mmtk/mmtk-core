@@ -8,10 +8,16 @@ use crate::vm::VMBinding;
 use crate::MMTK;
 use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
 
+/// GCTrigger is responsible for triggering GCs based on the given policy.
+/// All the decisions about heap limit and GC triggering should be resolved here.
+/// Depending on the actual policy, we may either forward the calls either to the plan
+/// or to the binding/runtime.
 pub struct GCTrigger<VM: VMBinding> {
+    /// The current plan. This is uninitialized when we create it, and later initialized
+    /// once we have a fixed address for the plan.
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
+    /// The triggering policy.
     pub policy: Box<dyn GCTriggerPolicy<VM>>,
 }
 
@@ -23,20 +29,27 @@ impl<VM: VMBinding> GCTrigger<VM> {
                 GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger {
                     total_pages: size >> LOG_BYTES_IN_PAGE,
                 }),
-                GCTriggerSelector::DynamicHeapSize(min, max) => Box::new(MemBalancerTrigger {
-                    min_heap_pages: min >> LOG_BYTES_IN_PAGE,
-                    max_heap_pages: max >> LOG_BYTES_IN_PAGE,
-                    current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE),
-                }),
+                GCTriggerSelector::DynamicHeapSize(min, max) => Box::new(MemBalancerTrigger::new(
+                    min >> LOG_BYTES_IN_PAGE,
+                    max >> LOG_BYTES_IN_PAGE,
+                )),
                 GCTriggerSelector::Delegated => unimplemented!(),
             },
         }
     }
 
+    /// Set the plan. This is called in `create_plan()` after we created a boxed plan.
     pub fn set_plan(&mut self, plan: &'static dyn Plan<VM = VM>) {
         self.plan.write(plan);
     }
 
+    /// This method is called periodically by the allocation subsystem
+    /// (by default, each time a page is consumed), and provides the
+    /// collector with an opportunity to collect.
+    ///
+    /// Arguments:
+    /// * `space_full`: Space request failed, must recover pages within 'space'.
+    /// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
         if self.policy.is_gc_required(space_full, space, plan) {
@@ -55,69 +68,51 @@ impl<VM: VMBinding> GCTrigger<VM> {
         false
     }
 
+    /// Check if the heap is full
     pub fn is_heap_full(&self) -> bool {
         let plan = unsafe { self.plan.assume_init() };
         self.policy.is_heap_full(plan)
     }
 }
 
+/// This trait describes a GC trigger policy. A triggering policy have hooks to be informed about
+/// GC start/end so they can collect some statistics about GC and allocation. The policy needs to
+/// decide the (current) heap limit and decide whether a GC should be performed.
 pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
-    fn on_gc_start(&self, mmtk: &'static MMTK<VM>);
-    fn on_gc_end(&self, mmtk: &'static MMTK<VM>);
+    /// Inform the triggering policy that a GC starts.
+    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC ends.
+    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Is a GC required now?
     fn is_gc_required(
         &self,
         space_full: bool,
         space: Option<&dyn Space<VM>>,
         plan: &dyn Plan<VM = VM>,
     ) -> bool;
+    /// Is current heap full?
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool;
+    /// Return the current heap size (in pages)
     fn get_heap_size_in_pages(&self) -> usize;
-    fn poll(
-        &self,
-        space_full: bool,
-        space: Option<&dyn Space<VM>>,
-        plan: &dyn Plan<VM = VM>,
-    ) -> bool {
-        if self.is_gc_required(space_full, space, plan) {
-            plan.base().gc_requester.request();
-            return true;
-        }
-        false
-    }
 }
 
-pub fn create_gc_trigger<VM: VMBinding>(options: &Options) -> Arc<dyn GCTriggerPolicy<VM>> {
-    match *options.gc_trigger {
-        GCTriggerSelector::FixedHeapSize(size) => Arc::new(FixedHeapSizeTrigger {
-            total_pages: size >> LOG_BYTES_IN_PAGE,
-        }),
-        GCTriggerSelector::DynamicHeapSize(min, max) => Arc::new(MemBalancerTrigger {
-            min_heap_pages: min >> LOG_BYTES_IN_PAGE,
-            max_heap_pages: max >> LOG_BYTES_IN_PAGE,
-            current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE),
-        }),
-        GCTriggerSelector::Delegated => unimplemented!(),
-    }
-}
-
+/// A simple GC trigger that uses a fixed heap size.
 pub struct FixedHeapSizeTrigger {
     total_pages: usize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
-    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
-
-    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
-
     fn is_gc_required(
         &self,
         space_full: bool,
         space: Option<&dyn Space<VM>>,
         plan: &dyn Plan<VM = VM>,
     ) -> bool {
+        // Let the plan decide
         plan.collection_required(space_full, space)
     }
 
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+        // If reserved pages is larger than the total pages, the heap is full.
         plan.get_reserved_pages() > self.total_pages
     }
 
@@ -126,17 +121,27 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
     }
 }
 
+/// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, https://dl.acm.org/doi/10.1145/3563323)
+/// We use MemBalancer to decide a heap limit between the min heap and the max heap.
+/// The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
+/// and uses a fixed constant instead.
+// TODO: implement a complete mem balancer.
 pub struct MemBalancerTrigger {
+    /// The min heap size
     min_heap_pages: usize,
+    /// The max heap size
     max_heap_pages: usize,
+    /// The current heap size
     current_heap_pages: AtomicUsize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
-    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
-
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
+        // live memory after a GC
         let live = mmtk.plan.get_used_pages() as f64;
+        // We use a simplified version of mem balancer. Instead of collecting allocation/collection speed and a constant c,
+        // we use a fixed constant 4096 instead.
         let optimal_heap = (live + (live * 4096f64).sqrt()) as usize;
+        // The new heap size must be within min/max.
         let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);
         debug!(
             "MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])",
@@ -151,14 +156,26 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
         space: Option<&dyn Space<VM>>,
         plan: &dyn Plan<VM = VM>,
     ) -> bool {
+        // Let the plan decide
         plan.collection_required(space_full, space)
     }
 
     fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
+        // If reserved pages is larger than the current heap size, the heap is full.
         plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }
 
     fn get_heap_size_in_pages(&self) -> usize {
         self.current_heap_pages.load(Ordering::Relaxed)
+    }
+}
+impl MemBalancerTrigger {
+    fn new(min_heap_pages: usize, max_heap_pages: usize) -> Self {
+        Self {
+            min_heap_pages,
+            max_heap_pages,
+            // start with min heap
+            current_heap_pages: AtomicUsize::new(min_heap_pages),
+        }
     }
 }

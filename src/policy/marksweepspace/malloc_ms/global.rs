@@ -254,7 +254,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
         specs.push(ACTIVE_CHUNK_METADATA_SPEC);
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         MallocSpace {
             phantom: PhantomData,

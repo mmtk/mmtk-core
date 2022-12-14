@@ -595,9 +595,6 @@ options! {
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
-    // Heap size. Default to 512MB.
-    // TODO: We should have a default heap size related to the max physical memory.
-    // heap_size:             usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 512 << 20,
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
@@ -667,8 +664,8 @@ options! {
     // XXX: This option is currently only supported on Linux.
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
-    // Default to a fixed heap size of 0.3x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [always_valid] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.3f64) as usize)
+    // Default to a fixed heap size of 0.5x physical memory.
+    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [always_valid] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
 }
 
 #[cfg(test)]

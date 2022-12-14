@@ -129,7 +129,7 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
 
 impl<VM: VMBinding> SemiSpace<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &SS_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
@@ -138,14 +138,14 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let res = SemiSpace {
             hi: AtomicBool::new(false),
             copyspace0: CopySpace::new(
-                common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
                 false,
             ),
             copyspace1: CopySpace::new(
-                common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
                 true,
             ),
-            common: CommonPlan::new(common_plan_args),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

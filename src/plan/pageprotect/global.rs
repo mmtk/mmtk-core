@@ -96,7 +96,7 @@ impl<VM: VMBinding> PageProtect<VM> {
             }
         );
 
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
@@ -104,10 +104,10 @@ impl<VM: VMBinding> PageProtect<VM> {
 
         let ret = PageProtect {
             space: LargeObjectSpace::new(
-                common_plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
+                plan_args.get_space_args("pageprotect", true, VMRequest::discontiguous()),
                 true,
             ),
-            common: CommonPlan::new(common_plan_args),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

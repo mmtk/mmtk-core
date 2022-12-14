@@ -183,21 +183,18 @@ impl<VM: VMBinding> MarkCompact<VM> {
         let global_side_metadata_specs =
             SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &MARKCOMPACT_CONSTRAINTS,
             global_side_metadata_specs,
         };
 
-        let mc_space = MarkCompactSpace::new(common_plan_args.get_space_args(
-            "mc",
-            true,
-            VMRequest::discontiguous(),
-        ));
+        let mc_space =
+            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
 
         let res = MarkCompact {
             mc_space,
-            common: CommonPlan::new(common_plan_args),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

@@ -215,20 +215,20 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
 impl<VM: VMBinding> GenImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        let mut common_plan_args = CreateSpecificPlanArgs {
+        let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &GENIMMIX_CONSTRAINTS,
             global_side_metadata_specs:
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
-        let immix_space = ImmixSpace::new(common_plan_args.get_space_args(
+        let immix_space = ImmixSpace::new(plan_args.get_space_args(
             "immix_mature",
             true,
             VMRequest::discontiguous(),
         ));
 
         let genimmix = GenImmix {
-            gen: Gen::new(common_plan_args),
+            gen: Gen::new(plan_args),
             immix: immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
             last_gc_was_full_heap: AtomicBool::new(false),

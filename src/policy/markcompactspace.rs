@@ -202,7 +202,6 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
