@@ -61,18 +61,18 @@ pub trait SFTMap {
 }
 
 pub(crate) fn create_sft_map() -> Box<dyn SFTMap> {
-    #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))]
-    return Box::new(dense_chunk_map::SFTDenseChunkMap::<'static>::new());
-    #[cfg(target_pointer_width = "64")]
-    return Box::new(space_map::SFTSpaceMap::<'static>::new());
-    #[cfg(target_pointer_width = "32")]
-    return Box::new(sparse_chunk_map::SFTSparseChunkMap::<'static>::new());
-    #[cfg(not(any(
-        target_pointer_width = "32",
-        target_pointer_width = "64",
-        all(feature = "malloc_mark_sweep", target_pointer_width = "64")
-    )))]
-    compile_err!("Cannot figure out which SFT map to use.");
+    cfg_if::cfg_if! {
+        if #[cfg(all(feature = "malloc_mark_sweep", target_pointer_width = "64"))] {
+            // 64-bit malloc mark sweep needs a chunk-based SFT map, but the sparse map is not suitable for 64bits.
+            return Box::new(dense_chunk_map::SFTDenseChunkMap::<'static>::new());
+        } else if #[cfg(target_pointer_width = "64")] {
+            return Box::new(space_map::SFTSpaceMap::<'static>::new());
+        } else if #[cfg(target_pointer_width = "32")] {
+            return Box::new(sparse_chunk_map::SFTSparseChunkMap::<'static>::new());
+        } else {
+            compile_err!("Cannot figure out which SFT map to use.");
+        }
+    }
 }
 
 #[allow(dead_code)]
