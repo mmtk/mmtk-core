@@ -9,10 +9,9 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft_map::SFTMap;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -168,12 +167,14 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeIm
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     #[allow(dead_code)] // Only used with certain features.
-    pub fn new(
-        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-        slow_path_zeroing: bool,
-    ) -> Self {
-        // let total_bytes = *options.heap_size;
-        let total_bytes = unimplemented!();
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let slow_path_zeroing = args.zeroed;
+        // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
+        // https://github.com/mmtk/mmtk-core/issues/314
+        let total_bytes = match *args.options.gc_trigger {
+            crate::util::options::GCTriggerSelector::FixedHeapSize(bytes) => bytes,
+            _ => unimplemented!(),
+        };
         assert!(
             total_bytes <= AVAILABLE_BYTES,
             "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",

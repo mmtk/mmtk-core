@@ -1,7 +1,7 @@
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::marksweep::gc_work::MSGCWorkContext;
 use crate::plan::marksweep::mutator::ALLOCATOR_MAPPING;
@@ -11,17 +11,12 @@ use crate::plan::PlanConstraints;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
-use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use mmtk_macros::PlanTraceObject;
-use std::sync::Arc;
 
 #[cfg(feature = "malloc_mark_sweep")]
 pub type MarkSweepSpace<VM> = crate::policy::marksweepspace::malloc_ms::MallocSpace<VM>;
@@ -113,7 +108,11 @@ impl<VM: VMBinding> MarkSweep<VM> {
         };
 
         let res = MarkSweep {
-            ms: MarkSweepSpace::new(common_plan_args.get_space_args("ms", true, VMRequest::discontiguous())),
+            ms: MarkSweepSpace::new(common_plan_args.get_space_args(
+                "ms",
+                true,
+                VMRequest::discontiguous(),
+            )),
             common: CommonPlan::new(common_plan_args),
         };
 

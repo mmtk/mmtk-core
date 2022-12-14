@@ -1,6 +1,4 @@
-use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{HEAP_END, HEAP_START};
-use crate::util::options::Options;
 use crate::util::Address;
 
 pub struct HeapMeta {
@@ -9,7 +7,7 @@ pub struct HeapMeta {
 }
 
 impl HeapMeta {
-    pub fn new(options: &Options) -> Self {
+    pub fn new() -> Self {
         HeapMeta {
             heap_cursor: HEAP_START,
             heap_limit: HEAP_END,
@@ -43,5 +41,12 @@ impl HeapMeta {
 
     pub fn get_discontig_end(&self) -> Address {
         self.heap_limit - 1
+    }
+}
+
+// make clippy happy
+impl Default for HeapMeta {
+    fn default() -> Self {
+        Self::new()
     }
 }

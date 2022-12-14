@@ -1,15 +1,14 @@
 use atomic::Ordering;
 
-use crate::plan::gc_requester::GCRequester;
+use crate::plan::Plan;
+use crate::policy::space::Space;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::options::{Options, GCTriggerSelector};
+use crate::util::options::{GCTriggerSelector, Options};
 use crate::vm::VMBinding;
 use crate::MMTK;
-use crate::policy::space::Space;
-use crate::plan::Plan;
-use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
 use std::mem::MaybeUninit;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
 
 pub struct GCTrigger<VM: VMBinding> {
     plan: MaybeUninit<&'static dyn Plan<VM = VM>>,
@@ -21,16 +20,16 @@ impl<VM: VMBinding> GCTrigger<VM> {
         GCTrigger {
             plan: MaybeUninit::uninit(),
             policy: match *options.gc_trigger {
-                GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger{
+                GCTriggerSelector::FixedHeapSize(size) => Box::new(FixedHeapSizeTrigger {
                     total_pages: size >> LOG_BYTES_IN_PAGE,
                 }),
                 GCTriggerSelector::DynamicHeapSize(min, max) => Box::new(MemBalancerTrigger {
                     min_heap_pages: min >> LOG_BYTES_IN_PAGE,
                     max_heap_pages: max >> LOG_BYTES_IN_PAGE,
-                    current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE)
+                    current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE),
                 }),
-                GCTriggerSelector::Delegated => unimplemented!()
-            }
+                GCTriggerSelector::Delegated => unimplemented!(),
+            },
         }
     }
 
@@ -41,7 +40,15 @@ impl<VM: VMBinding> GCTrigger<VM> {
     pub fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>) -> bool {
         let plan = unsafe { self.plan.assume_init() };
         if self.policy.is_gc_required(space_full, space, plan) {
-            info!("[POLL] {}{}", if let Some(space) = space { format!("{}: ", space.get_name()) } else { "".to_string() }, "Triggering collection");
+            info!(
+                "[POLL] {}{}",
+                if let Some(space) = space {
+                    format!("{}: ", space.get_name())
+                } else {
+                    "".to_string()
+                },
+                "Triggering collection"
+            );
             plan.base().gc_requester.request();
             return true;
         }
@@ -57,10 +64,20 @@ impl<VM: VMBinding> GCTrigger<VM> {
 pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     fn on_gc_start(&self, mmtk: &'static MMTK<VM>);
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>);
-    fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>, plan: &dyn Plan<VM=VM>) -> bool;
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM=VM>) -> bool;
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool;
+    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool;
     fn get_heap_size_in_pages(&self) -> usize;
-    fn poll(&self, space_full: bool, space: Option<&dyn Space<VM>>, plan: &dyn Plan<VM = VM>) -> bool {
+    fn poll(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
         if self.is_gc_required(space_full, space, plan) {
             plan.base().gc_requester.request();
             return true;
@@ -71,15 +88,15 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
 
 pub fn create_gc_trigger<VM: VMBinding>(options: &Options) -> Arc<dyn GCTriggerPolicy<VM>> {
     match *options.gc_trigger {
-        GCTriggerSelector::FixedHeapSize(size) => Arc::new(FixedHeapSizeTrigger{
+        GCTriggerSelector::FixedHeapSize(size) => Arc::new(FixedHeapSizeTrigger {
             total_pages: size >> LOG_BYTES_IN_PAGE,
         }),
         GCTriggerSelector::DynamicHeapSize(min, max) => Arc::new(MemBalancerTrigger {
             min_heap_pages: min >> LOG_BYTES_IN_PAGE,
             max_heap_pages: max >> LOG_BYTES_IN_PAGE,
-            current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE)
+            current_heap_pages: AtomicUsize::new(min >> LOG_BYTES_IN_PAGE),
         }),
-        GCTriggerSelector::Delegated => unimplemented!()
+        GCTriggerSelector::Delegated => unimplemented!(),
     }
 }
 
@@ -87,19 +104,20 @@ pub struct FixedHeapSizeTrigger {
     total_pages: usize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
-    fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
+    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
 
-    }
+    fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
 
-    fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
-
-    }
-
-    fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>, plan: &dyn Plan<VM=VM>) -> bool {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
         plan.collection_required(space_full, space)
     }
 
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM=VM>) -> bool {
+    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
         plan.get_reserved_pages() > self.total_pages
     }
 
@@ -114,23 +132,29 @@ pub struct MemBalancerTrigger {
     current_heap_pages: AtomicUsize,
 }
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
-    fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
-
-    }
+    fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
 
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
         let live = mmtk.plan.get_used_pages() as f64;
         let optimal_heap = (live + (live * 4096f64).sqrt()) as usize;
         let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);
-        debug!("MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])", new_heap, optimal_heap, self.min_heap_pages, self.max_heap_pages);
+        debug!(
+            "MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])",
+            new_heap, optimal_heap, self.min_heap_pages, self.max_heap_pages
+        );
         self.current_heap_pages.store(new_heap, Ordering::Relaxed);
     }
 
-    fn is_gc_required(&self, space_full: bool, space: Option<&dyn Space<VM>>, plan: &dyn Plan<VM=VM>) -> bool {
+    fn is_gc_required(
+        &self,
+        space_full: bool,
+        space: Option<&dyn Space<VM>>,
+        plan: &dyn Plan<VM = VM>,
+    ) -> bool {
         plan.collection_required(space_full, space)
     }
 
-    fn is_heap_full(&self, plan: &'static dyn Plan<VM=VM>) -> bool {
+    fn is_heap_full(&self, plan: &'static dyn Plan<VM = VM>) -> bool {
         plan.get_reserved_pages() > self.current_heap_pages.load(Ordering::Relaxed)
     }
 

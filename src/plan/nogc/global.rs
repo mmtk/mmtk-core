@@ -1,6 +1,6 @@
 use crate::plan::global::BasePlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::nogc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -9,17 +9,12 @@ use crate::policy::immortalspace::ImmortalSpace;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 #[allow(unused_imports)]
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
-use std::sync::Arc;
 
 #[cfg(not(feature = "nogc_lock_free"))]
 use crate::policy::immortalspace::ImmortalSpace as NoGCImmortalSpace;
@@ -91,13 +86,25 @@ impl<VM: VMBinding> NoGC<VM> {
         let mut common_plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &NOGC_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[])
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
         let res = NoGC {
-            nogc_space: NoGCImmortalSpace::new(common_plan_args.get_space_args("nogc_space", cfg!(not(feature = "nogc_no_zeroing")), VMRequest::discontiguous())),
-            immortal: ImmortalSpace::new(common_plan_args.get_space_args("immortal", true, VMRequest::discontiguous())),
-            los: ImmortalSpace::new(common_plan_args.get_space_args("los", true, VMRequest::discontiguous())),
+            nogc_space: NoGCImmortalSpace::new(common_plan_args.get_space_args(
+                "nogc_space",
+                cfg!(not(feature = "nogc_no_zeroing")),
+                VMRequest::discontiguous(),
+            )),
+            immortal: ImmortalSpace::new(common_plan_args.get_space_args(
+                "immortal",
+                true,
+                VMRequest::discontiguous(),
+            )),
+            los: ImmortalSpace::new(common_plan_args.get_space_args(
+                "los",
+                true,
+                VMRequest::discontiguous(),
+            )),
             base: BasePlan::new(common_plan_args),
         };
 

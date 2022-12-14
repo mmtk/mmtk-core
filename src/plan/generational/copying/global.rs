@@ -4,8 +4,8 @@ use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -15,17 +15,12 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -181,11 +176,18 @@ impl<VM: VMBinding> GenCopy<VM> {
         let mut common_plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &GENCOPY_CONSTRAINTS,
-            global_side_metadata_specs: crate::plan::generational::new_generational_global_metadata_specs::<VM>()
+            global_side_metadata_specs:
+                crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
 
-        let copyspace0 = CopySpace::new(common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false);
-        let copyspace1 = CopySpace::new(common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true);
+        let copyspace0 = CopySpace::new(
+            common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+            false,
+        );
+        let copyspace1 = CopySpace::new(
+            common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+            true,
+        );
 
         let res = GenCopy {
             gen: Gen::new(common_plan_args),

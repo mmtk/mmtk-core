@@ -1,7 +1,7 @@
 use super::gc_work::SSGCWorkContext;
 use crate::plan::global::CommonPlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::semispace::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
@@ -12,16 +12,11 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::VMWorkerThread;
-use crate::util::options::Options;
 use crate::{plan::global::BasePlan, vm::VMBinding};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -137,13 +132,19 @@ impl<VM: VMBinding> SemiSpace<VM> {
         let mut common_plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &SS_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[])
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
 
         let res = SemiSpace {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
-            copyspace1: CopySpace::new(common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
+            copyspace0: CopySpace::new(
+                common_plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
+                false,
+            ),
+            copyspace1: CopySpace::new(
+                common_plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
+                true,
+            ),
             common: CommonPlan::new(common_plan_args),
         };
 

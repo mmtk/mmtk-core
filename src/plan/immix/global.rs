@@ -2,8 +2,8 @@ use super::gc_work::ImmixGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
-use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -14,16 +14,11 @@ use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -144,7 +139,11 @@ impl<VM: VMBinding> Immix<VM> {
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
         let immix = Immix {
-            immix_space: ImmixSpace::new(common_plan_args.get_space_args("immix", true, VMRequest::discontiguous())),
+            immix_space: ImmixSpace::new(common_plan_args.get_space_args(
+                "immix",
+                true,
+                VMRequest::discontiguous(),
+            )),
             common: CommonPlan::new(common_plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };

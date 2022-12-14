@@ -1,13 +1,16 @@
 use crate::plan::PlanConstraints;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::conversions::*;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity, SideMetadataSpec};
+use crate::util::metadata::side_metadata::{
+    SideMetadataContext, SideMetadataSanity, SideMetadataSpec,
+};
 use crate::util::Address;
 use crate::util::ObjectReference;
 
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
 use crate::util::heap::{PageResource, VMRequest};
+use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
 
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
@@ -20,6 +23,7 @@ use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
 use crate::policy::sft_map::SFTMap;
 use crate::util::copy::*;
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_layout::Mmapper;
 use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::layout::map::Map;
@@ -28,11 +32,10 @@ use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
-use crate::util::heap::gc_trigger::{GCTriggerPolicy, GCTrigger};
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
-use std::sync::Mutex;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use downcast_rs::Downcast;
 
@@ -417,24 +420,28 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
     pub scheduler: Arc<GCWorkScheduler<VM>>,
+    pub options: &'a Options,
 }
 
 impl<'a, VM: VMBinding> PlanCreateSpaceArgs<'a, VM> {
     /// Turning PlanCreateSpaceArgs into a PolicyCreateSpaceArgs
-    pub fn into_policy_args(self, movable: bool, immortal: bool, policy_metadata_specs: Vec<SideMetadataSpec>) -> PolicyCreateSpaceArgs<'a, VM> {
+    pub fn into_policy_args(
+        self,
+        movable: bool,
+        immortal: bool,
+        policy_metadata_specs: Vec<SideMetadataSpec>,
+    ) -> PolicyCreateSpaceArgs<'a, VM> {
         PolicyCreateSpaceArgs {
             movable,
             immortal,
             local_side_metadata_specs: policy_metadata_specs,
             plan_args: self,
-         }
+        }
     }
 }
 
 impl<VM: VMBinding> CommonSpace<VM> {
-    pub fn new<'a>(
-        mut args: PolicyCreateSpaceArgs<'a, VM>,
-    ) -> Self {
+    pub fn new(args: PolicyCreateSpaceArgs<VM>) -> Self {
         let mut rtn = CommonSpace {
             name: args.plan_args.name,
             descriptor: SpaceDescriptor::UNINITIALIZED,

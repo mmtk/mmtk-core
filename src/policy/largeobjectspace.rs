@@ -1,18 +1,13 @@
 use atomic::Ordering;
 
 use crate::plan::ObjectQueue;
-use crate::plan::PlanConstraints;
 use crate::plan::VectorObjectQueue;
 use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::constants::BYTES_IN_PAGE;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
-use crate::util::heap::{FreeListPageResource, PageResource, VMRequest};
+use crate::util::heap::{FreeListPageResource, PageResource};
 use crate::util::metadata;
-use crate::util::metadata::side_metadata::SideMetadataContext;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::util::opaque_pointer::*;
 use crate::util::treadmill::TreadMill;
 use crate::util::{Address, ObjectReference};
@@ -155,9 +150,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
     ) -> Self {
         let is_discontiguous = args.vmrequest.is_discontiguous();
         let vm_map = args.vm_map;
-        let common = CommonSpace::new(args.into_policy_args(false, false, metadata::extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC,
-        ])));
+        let common = CommonSpace::new(args.into_policy_args(
+            false,
+            false,
+            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_LOS_MARK_NURSERY_SPEC]),
+        ));
         let mut pr = if is_discontiguous {
             FreeListPageResource::new_discontiguous(vm_map)
         } else {

@@ -178,7 +178,10 @@ pub(crate) fn get_system_total_memory() -> usize {
     match sys_info::mem_info() {
         Ok(mem_info) => mem_info.total as usize,
         Err(e) => {
-            warn!("Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()", e);
+            warn!(
+                "Failed to get sys_info::mem_info: {:?}. Return 1G in get_system_total_memory()",
+                e
+            );
             1024 * 1024 * 1024
         }
     }

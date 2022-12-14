@@ -445,15 +445,20 @@ impl GCTriggerSelector {
         println!("parse: {:?}", s);
         let s = s.to_lowercase();
         if s.ends_with(char::is_alphabetic) {
-            let num = s[0..s.len() - 1].parse::<usize>().map_err(|e| e.to_string())?;
-            if s.ends_with("k") {
+            let num = s[0..s.len() - 1]
+                .parse::<usize>()
+                .map_err(|e| e.to_string())?;
+            if s.ends_with('k') {
                 Ok(num * Self::K)
-            } else if s.ends_with("m") {
+            } else if s.ends_with('m') {
                 Ok(num * Self::M)
-            } else if s.ends_with("g") {
+            } else if s.ends_with('g') {
                 Ok(num * Self::G)
             } else {
-                Err(format!("Unknown size descriptor: {:?}", &s[(s.len() - 1)..]))
+                Err(format!(
+                    "Unknown size descriptor: {:?}",
+                    &s[(s.len() - 1)..]
+                ))
             }
         } else {
             s.parse::<usize>().map_err(|e| e.to_string())
@@ -469,19 +474,21 @@ impl FromStr for GCTriggerSelector {
             return Err("No GC trigger policy is supplied".to_string());
         }
 
-        if s.starts_with("FixedHeapSize") {
+        if let Some(stripped) = s.strip_prefix("FixedHeapSize") {
             // FixedHeapSize:size
-            let remain = &s["FixedHeapSize".len()..];
-            if remain.starts_with(":") {
-                return Self::parse_size(&remain[1..]).map(|byte_size| Self::FixedHeapSize(byte_size));
+            if let Some(size_str) = stripped.strip_prefix(':') {
+                return Self::parse_size(size_str).map(Self::FixedHeapSize);
             }
         } else if s.starts_with("DynamicHeapSize") {
             // DynamicHeapSize:min,max
-            if let (Some(colon), Some(comma)) = (s.find(":"), s.find(",")) {
-                let min = Self::parse_size(&s[(colon+1)..comma])?;
-                let max = Self::parse_size(&s[(comma+1)..])?;
+            if let (Some(colon), Some(comma)) = (s.find(':'), s.find(',')) {
+                let min = Self::parse_size(&s[(colon + 1)..comma])?;
+                let max = Self::parse_size(&s[(comma + 1)..])?;
                 if min > max {
-                    return Err(format!("Min heap size {:?} is larger than the given max heap size {:?}", min, max));
+                    return Err(format!(
+                        "Min heap size {:?} is larger than the given max heap size {:?}",
+                        min, max
+                    ));
                 }
                 return Ok(Self::DynamicHeapSize(min, max));
             }
@@ -503,16 +510,28 @@ mod gc_trigger_tests {
         assert_eq!(GCTriggerSelector::parse_size("0"), Ok(0));
         assert_eq!(GCTriggerSelector::parse_size("1K"), Ok(1024));
         assert_eq!(GCTriggerSelector::parse_size("1k"), Ok(1024));
-        assert_eq!(GCTriggerSelector::parse_size("2M"), Ok(2*1024*1024));
-        assert_eq!(GCTriggerSelector::parse_size("2m"), Ok(2*1024*1024));
-        assert_eq!(GCTriggerSelector::parse_size("4G"), Ok(4*1024*1024*1024));
-        assert_eq!(GCTriggerSelector::parse_size("4g"), Ok(4*1024*1024*1024));
+        assert_eq!(GCTriggerSelector::parse_size("2M"), Ok(2 * 1024 * 1024));
+        assert_eq!(GCTriggerSelector::parse_size("2m"), Ok(2 * 1024 * 1024));
+        assert_eq!(
+            GCTriggerSelector::parse_size("4G"),
+            Ok(4 * 1024 * 1024 * 1024)
+        );
+        assert_eq!(
+            GCTriggerSelector::parse_size("4g"),
+            Ok(4 * 1024 * 1024 * 1024)
+        );
 
         // empty
-        assert_eq!(GCTriggerSelector::parse_size(""), Err("cannot parse integer from empty string".to_string()));
+        assert_eq!(
+            GCTriggerSelector::parse_size(""),
+            Err("cannot parse integer from empty string".to_string())
+        );
 
         // unknown size descriptor
-        assert_eq!(GCTriggerSelector::parse_size("1T"), Err("Unknown size descriptor: \"t\"".to_string()));
+        assert_eq!(
+            GCTriggerSelector::parse_size("1T"),
+            Err("Unknown size descriptor: \"t\"".to_string())
+        );
 
         // negative number - we dont care about actual error message
         assert!(GCTriggerSelector::parse_size("-1").is_err());
@@ -523,8 +542,14 @@ mod gc_trigger_tests {
 
     #[test]
     fn test_parse_fixed_heap() {
-        assert_eq!(GCTriggerSelector::from_str("FixedHeapSize:1024"), Ok(GCTriggerSelector::FixedHeapSize(1024)));
-        assert_eq!(GCTriggerSelector::from_str("FixedHeapSize:4m"), Ok(GCTriggerSelector::FixedHeapSize(4 * 1024 * 1024)));
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:1024"),
+            Ok(GCTriggerSelector::FixedHeapSize(1024))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:4m"),
+            Ok(GCTriggerSelector::FixedHeapSize(4 * 1024 * 1024))
+        );
 
         // incorrect
         assert!(GCTriggerSelector::from_str("FixedHeapSize").is_err());
@@ -535,12 +560,27 @@ mod gc_trigger_tests {
 
     #[test]
     fn test_parse_dynamic_heap() {
-        assert_eq!(GCTriggerSelector::from_str("DynamicHeapSize:1024,2048"), Ok(GCTriggerSelector::DynamicHeapSize(1024, 2048)));
-        assert_eq!(GCTriggerSelector::from_str("DynamicHeapSize:1024,1024"), Ok(GCTriggerSelector::DynamicHeapSize(1024, 1024)));
-        assert_eq!(GCTriggerSelector::from_str("DynamicHeapSize:1m,2m"), Ok(GCTriggerSelector::DynamicHeapSize(1 * 1024 * 1024, 2 * 1024 * 1024)));
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1024,2048"),
+            Ok(GCTriggerSelector::DynamicHeapSize(1024, 2048))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1024,1024"),
+            Ok(GCTriggerSelector::DynamicHeapSize(1024, 1024))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1m,2m"),
+            Ok(GCTriggerSelector::DynamicHeapSize(
+                1024 * 1024,
+                2 * 1024 * 1024
+            ))
+        );
 
         // incorrect
-        assert_eq!(GCTriggerSelector::from_str("DynamicHeapSize:2048,1024"), Err("Min heap size 2048 is larger than the given max heap size 1024".to_string()));
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:2048,1024"),
+            Err("Min heap size 2048 is larger than the given max heap size 1024".to_string())
+        );
         assert!(GCTriggerSelector::from_str("DynamicHeapSize:1024,1024,").is_err());
     }
 }

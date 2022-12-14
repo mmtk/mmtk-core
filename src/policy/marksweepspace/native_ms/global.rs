@@ -7,15 +7,8 @@ use crate::{
     scheduler::{GCWorkScheduler, GCWorker},
     util::{
         copy::CopySemantics,
-        heap::{
-            layout::heap_layout::{Mmapper, VMMap},
-            FreeListPageResource, HeapMeta, VMRequest,
-        },
-        metadata::{
-            self,
-            side_metadata::{SideMetadataContext, SideMetadataSpec},
-            MetadataSpec,
-        },
+        heap::FreeListPageResource,
+        metadata::{self, side_metadata::SideMetadataSpec, MetadataSpec},
         ObjectReference,
     },
     vm::VMBinding,
@@ -187,9 +180,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-    ) -> MarkSweepSpace<VM> {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> MarkSweepSpace<VM> {
         let scheduler = args.scheduler.clone();
         let vm_map = args.vm_map;
         let is_discontiguous = args.vmrequest.is_discontiguous();
@@ -219,7 +210,7 @@ impl<VM: VMBinding> MarkSweepSpace<VM> {
             },
             common,
             chunk_map: ChunkMap::new(),
-            scheduler: scheduler,
+            scheduler,
             abandoned: Mutex::new(AbandonedBlockLists {
                 available: new_empty_block_lists(),
                 unswept: new_empty_block_lists(),

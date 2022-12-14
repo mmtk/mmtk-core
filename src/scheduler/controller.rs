@@ -101,7 +101,12 @@ impl<VM: VMBinding> GCController<VM> {
     /// Coordinate workers to perform GC in response to a GC request.
     pub fn do_gc_until_completion(&mut self) {
         // Tell GC trigger that GC started
-        self.mmtk.plan.base().gc_trigger.policy.on_gc_start(self.mmtk);
+        self.mmtk
+            .plan
+            .base()
+            .gc_trigger
+            .policy
+            .on_gc_start(self.mmtk);
 
         // Schedule collection.
         ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);

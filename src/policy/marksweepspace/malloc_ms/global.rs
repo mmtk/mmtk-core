@@ -6,12 +6,7 @@ use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::heap::gc_trigger::GCTrigger;
-use crate::util::heap::gc_trigger::GCTriggerPolicy;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::PageResource;
-use crate::util::heap::VMRequest;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -260,9 +255,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
-    ) -> Self {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -278,7 +271,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
                 ]),
             },
             scheduler: args.scheduler.clone(),
-            gc_trigger: args.gc_trigger.clone(),
+            gc_trigger: args.gc_trigger,
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
