@@ -259,13 +259,13 @@ pub trait Plan: 'static + Sync + Downcast {
     //     false
     // }
 
-    fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
-        if let Some(space) = space {
-            info!("  [POLL] {}: {}", space.get_name(), message);
-        } else {
-            info!("  [POLL] {}", message);
-        }
-    }
+    // fn log_poll(&self, space: Option<&dyn Space<Self::VM>>, message: &'static str) {
+    //     if let Some(space) = space {
+    //         info!("  [POLL] {}: {}", space.get_name(), message);
+    //     } else {
+    //         info!("  [POLL] {}", message);
+    //     }
+    // }
 
     /**
      * This method controls the triggering of a GC. It is called periodically
