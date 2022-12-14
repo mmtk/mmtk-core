@@ -1,8 +1,10 @@
 use crate::plan::MutatorContext;
 use crate::util::alloc::AllocationError;
-use crate::util::{opaque_pointer::*, ObjectReference};
+use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
+
+use super::scanning::QueuingTracerFactory;
 
 /// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
 pub enum GCThreadContext<VM: VMBinding> {
@@ -19,19 +21,6 @@ pub struct ProcessWeakRefsContext {
     /// `true` if the current GC is a nursery GC.
     /// Always `false` if not using a generationl GC algorithm.
     pub nursery: bool,
-}
-
-/// `Collection::process_weak_refs` uses a tracer to retain and update weak references.
-pub trait ProcessWeakRefsTracer: Send {
-    /// Add `object` to the transitive closure, and return its new address.
-    ///
-    /// During `process_weak_refs`, calling this on an `object` will add it to the transitive
-    /// closure.  MMTk core will continue computing the transitive closure with `object` added to
-    /// the object graph, therefore it will keep `object` and its children alive in this GC.
-    ///
-    /// The return value is the new location of `object`, which may be different when using copying
-    /// GC.
-    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
 /// VM-specific methods for garbage collection.
@@ -137,60 +126,57 @@ pub trait Collection<VM: VMBinding> {
 
     /// Process weak references.
     ///
-    /// The VM binding can do the following in this method:
+    /// This function is called after a transitive closure is completed.
     ///
-    /// 1.  Query if an object is already reached.
-    /// 2.  Keep certain objects alive.
-    /// 3.  Clear some weak references.
-    /// 4.  Enqueue objects for further processing, such as finalization.
-    /// 5.  Other operations relevant to the VM.
+    /// MMTk core enables the VM binding to do the following in this function:
     ///
-    /// And the VM binding has the responsibility of:
-    ///
-    /// 1.  Update weak references so that they point to new addresses if the referents are moved.
-    ///     This is for supporting copying GC.
+    /// 1.  Query if an object is already reached in this transitive closure.
+    /// 2.  Keep certain objects and their descendents alive.
+    /// 3.  Get the new address of objects that are either
+    ///     -   already alive before this function is called, or
+    ///     -   explicitly kept alive in this function.
+    /// 4.  Request this function to be called again after transitive closure is finished again.
     ///
     /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
     /// currently reached.
     ///
-    /// The VM binding can call `tracer.trace_object(object)` to keep `object` and its decendents
-    /// alive, and get its new address as return value.  For examles:
+    /// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call
+    /// its `trace_object(object)` method to keep `object` and its decendents alive.
     ///
-    /// -   In Java, when the VM decides to keep the referent of `SoftReference`, it can call
-    ///     `tracer.trace_object` on the referent.
-    /// -   In Java, when a finalizable object is unreachable, it can call `tracer.trace_object`
-    ///     to resurrect that object and pass it to the finalizer thread.
-    /// -   When implementing ephemerons, if the key is alive, the VM shall call
-    ///     `tracer.trace_object` on the value, and ensure `process_weak_refs` returns `true` in
-    ///     the end so that MMTk core will call `process_weak_refs` again, which will give the VM
-    ///     a chance to handle transitively reachable ephemerons.
+    /// The return value of `ObjectTracer::trace_object(object)` is the new address of the given
+    /// `object` if it is moved by the GC.
     ///
-    /// The VM binding also needs to use `tracer.trace_object` to update weak reference fields,
-    /// even when the referent is still alive, because the referent may be moved to a different
-    /// address.  Things like `*field = tracer.trace_object(*field)` should work.
+    /// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`
+    /// to be called again after the MMTk core finishes transitive closure again from the objects
+    /// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple
+    /// levels of reachabilities (such as Java) or ephemerons.
     ///
-    /// GC algorithms other than mark-compact compute transitive closure only once.
+    /// Implementation-wise, this function is called as the "sentinel" of the `VMRefClosure` work
+    /// bucket, which means it is called when all work packets in that bucket have finished.  The
+    /// `tracer_factory` expands the transitive closure by adding more work packets in the same
+    /// bucket.  This means if `process_weak_refs` returns true, those work packets will have
+    /// finished (completing the transitive closure) by the time `process_weak_refs` is called
+    /// again.  The VM binding can make use of this by adding custom work packets into the
+    /// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.
+    /// See below.
     ///
-    /// Mark-compact GC will compute transive closure twice during each GC.  It will mark objects
-    /// in the first transitive closure, and forward references in the second transitive closure.
-    /// During the second transitive closure, `context.forwarding` will return `true`, and the VM
-    /// binding is only responsible for updating weak references.  Other things, such as enqueuing
-    /// references for finalizing, should not be repeated.  However, if a reference was put into
-    /// other data structures (such as the finalization queue or a `java.lang.ref.ReferenceQueue`
-    /// in the case of Java) during the first transitive closure, the VM binding needs to update
-    /// the fields of those data structure as well, so that they point to the new locations of
-    /// finalizable objects.
+    /// GC algorithms other than mark-compact compute transitive closure only once.  Mark-compact
+    /// GC will compute transive closure twice during each GC.  It will mark objects in the first
+    /// transitive closure, and forward references in the second transitive closure. During the
+    /// second transitive closure, `context.forwarding` will be `true`.
     ///
     /// Arguments:
+    /// * `worker`: The current GC worker.
     /// * `context`: Provides more information of the current trace.
-    /// * `tracer`: Use this to retain and update weak references.
+    /// * `tracer_factory`: Use this to create an `ObjectTracer` and use it to retain and update
+    ///   weak references.
     ///
     /// This function shall return true if this function needs to be called again after the GC
     /// finishes expanding the transitive closure from the objects kept alive.
     fn process_weak_refs(
-        _tls: VMWorkerThread,
+        _worker: &mut GCWorker<VM>,
         _context: ProcessWeakRefsContext,
-        _tracer: impl ProcessWeakRefsTracer,
+        _tracer_factory: impl QueuingTracerFactory<VM>,
     ) -> bool {
         false
     }

@@ -1,4 +1,5 @@
 use crate::plan::Mutator;
+use crate::scheduler::GCWorker;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::edge_shape::Edge;
@@ -29,6 +30,41 @@ impl<F: FnMut(ObjectReference) -> ObjectReference> ObjectTracer for F {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self(object)
     }
+}
+
+/// A `QueuingTracerFactory` can create a "tracer" object local to a GC Worker to trace and
+/// update edges, and create `ScanObjects` work packets to expand the transitive closure starting
+/// from newly traced objects.  It is used during root scanning and binding-side weak reference
+/// processing.
+pub trait QueuingTracerFactory<VM: VMBinding>: Clone + Send + 'static {
+    /// The type of the tracer.
+    ///
+    /// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.
+    /// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.
+    /// For this reason, `TracerType` should have a `<'w>` lifetime parameter.
+    /// Generic Associated Types (GAT) is already stablized in Rust 1.65.
+    /// We should update our toolchain version, too.
+    type TracerType: ObjectTracer;
+
+    /// Create a temporary queuing `ObjectTracer` and provide access in the scope of `func`.
+    ///
+    /// When the `ObjectTracer::trace_object` is called, if the traced object is first visited
+    /// in this transitive closure, it will be enqueued.  After `func` returns, all enqueued
+    /// objects will be put into a `ScanObjects` work packet and added to an appropriate work
+    /// bucket.
+    ///
+    /// API functions that provide `QueuingTracerFactory` should document
+    /// 1.  on which field the user is supposed to call `ObjectTracer::trace_object`, and
+    /// 2.  which work bucket the generated work packet will be added to.
+    ///
+    /// Arguments:
+    /// -   `worker`: The current GC worker.
+    /// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.
+    ///
+    /// Returns: The return value of `func`.
+    fn with_queuing_tracer<R, F>(&self, worker: &mut GCWorker<VM>, func: F) -> R
+    where
+        F: FnOnce(&mut Self::TracerType) -> R;
 }
 
 /// Root-scanning methods use this trait to create work packets for processing roots.

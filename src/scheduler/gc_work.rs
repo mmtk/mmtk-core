@@ -252,13 +252,67 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
-struct SimpleProcessWeakRefsTracer<'a, E: ProcessEdgesWork> {
-    process_edges_work: &'a mut E,
+struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
+    process_edges_work: E,
 }
 
-impl<'a, E: ProcessEdgesWork> ProcessWeakRefsTracer for SimpleProcessWeakRefsTracer<'a, E> {
+impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self.process_edges_work.trace_object(object)
+    }
+}
+
+struct ProcessEdgesWorkTracerFactory<E: ProcessEdgesWork> {
+    stage: WorkBucketStage,
+    process_nodes_immediately: bool,
+    phantom_data: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork> Clone for ProcessEdgesWorkTracerFactory<E> {
+    fn clone(&self) -> Self {
+        Self { ..*self }
+    }
+}
+
+impl<E: ProcessEdgesWork> QueuingTracerFactory<E::VM> for ProcessEdgesWorkTracerFactory<E> {
+    type TracerType = ProcessEdgesWorkTracer<E>;
+
+    fn with_queuing_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
+    where
+        F: FnOnce(&mut Self::TracerType) -> R,
+    {
+        let mmtk = worker.mmtk;
+
+        // Prepare the underlying ProcessEdgesWork
+        let mut process_edges_work = E::new(vec![], false, mmtk);
+        // FIXME: This line allows us to omit the borrowing lifetime of worker.
+        // We should refactor ProcessEdgesWork so that it uses `worker` locally, not as a member.
+        process_edges_work.set_worker(worker);
+
+        // Cretae the tracer.
+        let mut tracer = ProcessEdgesWorkTracer { process_edges_work };
+
+        // The caller can use the tracer here.
+        let result = func(&mut tracer);
+
+        // Flush the queued nodes.
+        let ProcessEdgesWorkTracer {
+            mut process_edges_work,
+        } = tracer;
+        let newly_enqueued_nodes = process_edges_work.pop_nodes();
+
+        if !newly_enqueued_nodes.is_empty() {
+            let mut process_nodes_work =
+                process_edges_work.create_scan_work(newly_enqueued_nodes, false);
+
+            if self.process_nodes_immediately {
+                process_nodes_work.do_work(worker, mmtk);
+            } else {
+                worker.scheduler().work_buckets[self.stage].add(process_nodes_work);
+            }
+        }
+
+        result
     }
 }
 
@@ -287,18 +341,24 @@ impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         trace!("ProcessWeakRefs");
-        let mut process_edges_work = E::new(vec![], false, mmtk);
-        process_edges_work.set_worker(worker);
+
+        let stage = if self.forwarding {
+            WorkBucketStage::VMRefForwarding
+        } else {
+            WorkBucketStage::VMRefClosure
+        };
 
         let need_to_repeat = {
             let context = ProcessWeakRefsContext {
                 forwarding: self.forwarding,
                 nursery: mmtk.plan.is_current_gc_nursery(),
             };
-            let tracer = SimpleProcessWeakRefsTracer {
-                process_edges_work: &mut process_edges_work,
+            let tracer_factory = ProcessEdgesWorkTracerFactory::<E> {
+                stage,
+                process_nodes_immediately: true,
+                phantom_data: PhantomData,
             };
-            <E::VM as VMBinding>::VMCollection::process_weak_refs(worker.tls, context, tracer)
+            <E::VM as VMBinding>::VMCollection::process_weak_refs(worker, context, tracer_factory)
         };
 
         if need_to_repeat {
@@ -306,20 +366,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
             // current transitive closure.
             let new_self = Box::new(Self::new(self.forwarding));
 
-            let stage = if self.forwarding {
-                WorkBucketStage::VMRefForwarding
-            } else {
-                WorkBucketStage::VMRefClosure
-            };
             worker.scheduler().work_buckets[stage].set_sentinel(new_self);
-        }
-
-        let newly_enqueued_nodes = process_edges_work.pop_nodes();
-
-        if !newly_enqueued_nodes.is_empty() {
-            let mut process_nodes_work =
-                process_edges_work.create_scan_work(newly_enqueued_nodes, false);
-            process_nodes_work.do_work(worker, mmtk);
         }
     }
 }
