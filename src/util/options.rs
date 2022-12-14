@@ -513,12 +513,12 @@ mod gc_trigger_tests {
         assert_eq!(GCTriggerSelector::parse_size("2M"), Ok(2 * 1024 * 1024));
         assert_eq!(GCTriggerSelector::parse_size("2m"), Ok(2 * 1024 * 1024));
         assert_eq!(
-            GCTriggerSelector::parse_size("4G"),
-            Ok(4 * 1024 * 1024 * 1024)
+            GCTriggerSelector::parse_size("2G"),
+            Ok(2 * 1024 * 1024 * 1024)
         );
         assert_eq!(
-            GCTriggerSelector::parse_size("4g"),
-            Ok(4 * 1024 * 1024 * 1024)
+            GCTriggerSelector::parse_size("2g"),
+            Ok(2 * 1024 * 1024 * 1024)
         );
 
         // empty
