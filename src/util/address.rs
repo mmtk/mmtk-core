@@ -5,7 +5,6 @@ use std::ops::*;
 use std::sync::atomic::Ordering;
 
 use crate::mmtk::{MMAPPER, SFT_MAP};
-use crate::policy::sft_map::SFTMap;
 use crate::util::heap::layout::mmapper::Mmapper;
 
 /// size in bytes

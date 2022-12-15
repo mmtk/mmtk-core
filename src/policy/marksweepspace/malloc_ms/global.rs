@@ -350,7 +350,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
             // If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).
             if !is_meta_space_mapped(address, actual_size) {
-                use crate::policy::sft_map::SFTMap;
                 // Map the metadata space for the associated chunk
                 self.map_metadata_and_update_bound(address, actual_size);
                 // Update SFT
@@ -531,7 +530,6 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     /// Clean up for an empty chunk
     fn clean_up_empty_chunk(&self, chunk_start: Address) {
-        use crate::policy::sft_map::SFTMap;
         // Since the chunk mark metadata is a byte, we don't need synchronization
         unsafe { unset_chunk_mark_unsafe(chunk_start) };
         // Clear the SFT entry
