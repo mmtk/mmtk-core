@@ -830,8 +830,6 @@
 <span id="828">828</span>
 <span id="829">829</span>
 <span id="830">830</span>
-<span id="831">831</span>
-<span id="832">832</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
@@ -1184,7 +1182,6 @@
 
             <span class="comment">// If the side metadata for the address has not yet been mapped, we will map all the side metadata for the range [address, address + actual_size).</span>
             <span class="kw">if</span> <span class="op">!</span><span class="ident">is_meta_space_mapped</span>(<span class="ident">address</span>, <span class="ident">actual_size</span>) {
-                <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
                 <span class="comment">// Map the metadata space for the associated chunk</span>
                 <span class="self">self</span>.<span class="ident">map_metadata_and_update_bound</span>(<span class="ident">address</span>, <span class="ident">actual_size</span>);
                 <span class="comment">// Update SFT</span>
@@ -1365,7 +1362,6 @@
 
     <span class="doccomment">/// Clean up for an empty chunk</span>
     <span class="kw">fn</span> <span class="ident">clean_up_empty_chunk</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">chunk_start</span>: <span class="ident">Address</span>) {
-        <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
         <span class="comment">// Since the chunk mark metadata is a byte, we don&#39;t need synchronization</span>
         <span class="kw">unsafe</span> { <span class="ident">unset_chunk_mark_unsafe</span>(<span class="ident">chunk_start</span>) };
         <span class="comment">// Clear the SFT entry</span>

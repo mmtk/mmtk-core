@@ -1505,9 +1505,6 @@
 <span id="1503">1503</span>
 <span id="1504">1504</span>
 <span id="1505">1505</span>
-<span id="1506">1506</span>
-<span id="1507">1507</span>
-<span id="1508">1508</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
@@ -2342,12 +2339,9 @@
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
         <span class="ident">ret</span>.<span class="ident">push</span>(<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>);
 
-        {
-            <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft_map::SFTMap</span>;
-            <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">spec</span>) <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">get_side_metadata</span>() {
-                <span class="kw">if</span> <span class="ident">spec</span>.<span class="ident">is_global</span> {
-                    <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">*</span><span class="ident">spec</span>);
-                }
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">spec</span>) <span class="op">=</span> <span class="ident"><span class="kw">crate</span>::mmtk::SFT_MAP</span>.<span class="ident">get_side_metadata</span>() {
+            <span class="kw">if</span> <span class="ident">spec</span>.<span class="ident">is_global</span> {
+                <span class="ident">ret</span>.<span class="ident">push</span>(<span class="kw-2">*</span><span class="ident">spec</span>);
             }
         }
 
