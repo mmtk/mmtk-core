@@ -175,8 +175,8 @@ pub trait Plan: 'static + Sync + Downcast {
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
-    fn generational(&self) -> &Gen<Self::VM> {
-        panic!("This is not a generational plan.")
+    fn generational(&self) -> Option<&Gen<Self::VM>> {
+        None
     }
     fn mmapper(&self) -> &'static Mmapper {
         self.base().mmapper
@@ -274,6 +274,12 @@ pub trait Plan: 'static + Sync + Downcast {
     /// Return the number of pages available for allocation into the mature space. Only
     /// generational plans have to implement this function.
     fn get_mature_physical_pages_available(&self) -> usize {
+        panic!("This is not a generational plan.")
+    }
+
+    /// Return the number of used pages in the mature space. Only
+    /// generational plans have to implement this function.
+    fn get_mature_used_pages(&self) -> usize {
         panic!("This is not a generational plan.")
     }
 

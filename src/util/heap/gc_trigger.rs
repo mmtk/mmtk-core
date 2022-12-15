@@ -81,6 +81,8 @@ impl<VM: VMBinding> GCTrigger<VM> {
 pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Inform the triggering policy that a GC starts.
     fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
+    /// Inform the triggering policy that a GC is about to start the release work
+    fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC ends.
     fn on_gc_end(&self, _mmtk: &'static MMTK<VM>) {}
     /// Is a GC required now?
@@ -121,6 +123,9 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
     }
 }
 
+use atomic::Atomic;
+use std::time::Instant;
+
 /// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, https://dl.acm.org/doi/10.1145/3563323)
 /// We use MemBalancer to decide a heap limit between the min heap and the max heap.
 /// The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
@@ -133,21 +138,114 @@ pub struct MemBalancerTrigger {
     max_heap_pages: usize,
     /// The current heap size
     current_heap_pages: AtomicUsize,
+
+    stats: Atomic<MemBalancerStats>,
 }
+
+#[derive(Copy, Clone, Debug)]
+struct MemBalancerStats {
+    allocated_pages_prev: f64,
+    allocation_time_prev: f64,
+    collected_pages_prev: f64,
+    collection_time_prev: f64,
+
+    allocated_pages: f64,
+    allocation_time: f64,
+    collected_pages: f64,
+    collection_time: f64,
+
+    gc_start_time: Instant,
+    gc_start_all_live_pages: usize,
+    gc_start_mature_live_pages: usize,
+
+    gc_release_live_pages: usize,
+
+    gc_end_time: Instant,
+    gc_end_all_live_pages: usize,
+}
+
+const NO_PREV: f64 = -1f64;
+
+impl std::default::Default for MemBalancerStats {
+    fn default() -> Self {
+        let now = Instant::now();
+        Self {
+            allocated_pages_prev: NO_PREV,
+            allocation_time_prev: NO_PREV,
+            collected_pages_prev: NO_PREV,
+            collection_time_prev: NO_PREV,
+            allocated_pages: 0f64,
+            allocation_time: 0f64,
+            collected_pages: 0f64,
+            collection_time: 0f64,
+            gc_start_time: now,
+            gc_start_all_live_pages: 0,
+            gc_start_mature_live_pages: 0,
+            gc_release_live_pages: 0,
+            gc_end_time: now,
+            gc_end_all_live_pages: 0,
+        }
+    }
+}
+
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
+    fn on_gc_start(&self, mmtk: &'static MMTK<VM>) {
+        trace!("=== on_gc_start ===");
+        self.access_stats(|stats| {
+            stats.gc_start_time = Instant::now();
+            stats.allocation_time += (stats.gc_start_time - stats.gc_end_time).as_secs_f64();
+            trace!("gc_start = {:?}, allocation_time = {}", stats.gc_start_time, stats.allocation_time);
+
+            if mmtk.plan.generational().is_some() {
+                stats.gc_start_mature_live_pages = mmtk.plan.get_mature_used_pages();
+                trace!("mature pages = {}", stats.gc_start_mature_live_pages);
+            } else {
+                stats.allocated_pages = (mmtk.plan.get_used_pages() - stats.gc_end_all_live_pages) as f64;
+                trace!("allocated pages = used {} - live in last gc {} = {}", mmtk.plan.get_used_pages(), stats.gc_end_all_live_pages, stats.allocated_pages);
+            }
+        });
+    }
+
+    fn on_gc_release(&self, mmtk: &'static MMTK<VM>) {
+        trace!("=== on_gc_release ===");
+        self.access_stats(|stats| {
+            if mmtk.plan.generational().is_some() {
+                stats.gc_release_live_pages = mmtk.plan.get_mature_used_pages();
+
+                let promoted = stats.gc_release_live_pages - stats.gc_start_mature_live_pages;
+                stats.allocated_pages += promoted as f64;
+                trace!("promoted = mature live before release {} - mature live at gc start {} = {}", stats.gc_release_live_pages, stats.gc_start_mature_live_pages, promoted);
+                trace!("allocated pages (accumulated to) = {}", stats.allocated_pages);
+            } else {
+                stats.gc_release_live_pages = mmtk.plan.get_used_pages();
+                trace!("live before release = {}", stats.gc_release_live_pages);
+            }
+        });
+    }
+
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
-        // live memory after a GC
-        let live = mmtk.plan.get_used_pages() as f64;
-        // We use a simplified version of mem balancer. Instead of collecting allocation/collection speed and a constant c,
-        // we use a fixed constant 4096 instead.
-        let optimal_heap = (live + (live * 4096f64).sqrt()) as usize;
-        // The new heap size must be within min/max.
-        let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);
-        debug!(
-            "MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])",
-            new_heap, optimal_heap, self.min_heap_pages, self.max_heap_pages
-        );
-        self.current_heap_pages.store(new_heap, Ordering::Relaxed);
+        trace!("=== on_gc_end ===");
+        self.access_stats(|stats| {
+            stats.gc_end_time = Instant::now();
+            stats.collection_time += (stats.gc_end_time - stats.gc_start_time).as_secs_f64();
+            trace!("gc_end = {:?}, collection_time = {}", stats.gc_end_time, stats.collection_time);
+
+            if mmtk.plan.generational().is_some() {
+                if mmtk.plan.is_current_gc_nursery() {
+
+                } else {
+                    stats.collected_pages = (stats.gc_release_live_pages - mmtk.plan.get_mature_used_pages()) as f64;
+                    trace!("collected pages = mature live at gc end {} - mature live at gc release {} = {}", stats.gc_release_live_pages, mmtk.plan.get_mature_used_pages(), stats.collected_pages);
+                    self.compute_new_heap_limit(mmtk.plan.get_mature_used_pages(), mmtk.plan.get_collection_reserved_pages(), stats);
+                }
+            } else {
+                stats.gc_end_all_live_pages = mmtk.plan.get_used_pages();
+                trace!("live pages = {}", stats.gc_end_all_live_pages);
+                stats.collected_pages = (stats.gc_release_live_pages - stats.gc_end_all_live_pages) as f64;
+                trace!("collected pages = live at gc end {} - live at gc release {} = {}", stats.gc_release_live_pages, stats.gc_end_all_live_pages, stats.collected_pages);
+                self.compute_new_heap_limit(mmtk.plan.get_used_pages(), mmtk.plan.get_collection_reserved_pages(), stats);
+            }
+        });
     }
 
     fn is_gc_required(
@@ -176,6 +274,59 @@ impl MemBalancerTrigger {
             max_heap_pages,
             // start with min heap
             current_heap_pages: AtomicUsize::new(min_heap_pages),
+            stats: Atomic::new(Default::default())
         }
+    }
+
+    fn access_stats<F>(&self, mut f: F) where F: FnMut(&mut MemBalancerStats) {
+        let mut stats = self.stats.load(Ordering::Relaxed);
+        f(&mut stats);
+        self.stats.store(stats, Ordering::Relaxed);
+    }
+
+    fn compute_new_heap_limit(&self, live: usize, extra_reserve: usize, stats: &mut MemBalancerStats) {
+        trace!("compute new heap limit: {:?}", stats);
+        const ALLOCATION_SMOOTH_FACTOR: f64 = 0.95;
+        const COLLECTION_SMOOTH_FACTOR: f64 = 0.5;
+
+        const TUNING_FACTOR: f64 = 0.2;
+
+        let smooth = |prev, cur, factor| {
+            if prev == NO_PREV {
+                cur
+            } else {
+                prev * factor + cur * (1f64 - factor)
+            }
+        };
+        let alloc_mem = smooth(stats.allocated_pages_prev, stats.allocated_pages, ALLOCATION_SMOOTH_FACTOR);
+        let alloc_time = smooth(stats.allocation_time_prev, stats.allocation_time, ALLOCATION_SMOOTH_FACTOR);
+        let gc_mem = smooth(stats.collected_pages_prev, stats.collected_pages, COLLECTION_SMOOTH_FACTOR);
+        let gc_time = smooth(stats.collection_time_prev, stats.collection_time, COLLECTION_SMOOTH_FACTOR);
+        trace!("after smoothing, alloc mem = {}, alloc_time = {}", alloc_mem, alloc_time);
+        trace!("after smoothing, gc mem    = {}, gc_time    = {}", gc_mem, gc_time);
+
+        stats.allocated_pages_prev = stats.allocated_pages;
+        stats.allocated_pages = 0f64;
+        stats.allocation_time_prev = stats.allocation_time;
+        stats.allocation_time = 0f64;
+        stats.collected_pages_prev = stats.collected_pages;
+        stats.collected_pages = 0f64;
+        stats.collection_time_prev = stats.collection_time;
+        stats.collection_time = 0f64;
+
+        let mut e = live as f64;
+        e *= alloc_mem / alloc_time;
+        e /= TUNING_FACTOR;
+        e /= gc_mem / gc_time;
+
+        let optimal_heap = live + e as usize + extra_reserve;
+
+        // The new heap size must be within min/max.
+        let new_heap = optimal_heap.clamp(self.min_heap_pages, self.max_heap_pages);
+        debug!(
+            "MemBalander: new heap limit = {} pages (optimal = {}, clamped to [{}, {}])",
+            new_heap, optimal_heap, self.min_heap_pages, self.max_heap_pages
+        );
+        self.current_heap_pages.store(new_heap, Ordering::Relaxed);
     }
 }

@@ -196,6 +196,10 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.immix.available_physical_pages()
     }
 
+    fn get_mature_used_pages(&self) -> usize {
+        self.immix.reserved_pages()
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.gen.common.base
     }
@@ -204,8 +208,8 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> &Gen<VM> {
-        &self.gen
+    fn generational(&self) -> Option<&Gen<VM>> {
+        Some(&self.gen)
     }
 
     fn is_current_gc_nursery(&self) -> bool {

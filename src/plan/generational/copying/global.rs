@@ -154,6 +154,10 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.tospace().available_physical_pages()
     }
 
+    fn get_mature_used_pages(&self) -> usize {
+        self.tospace().reserved_pages()
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.gen.common.base
     }
@@ -162,8 +166,8 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> &Gen<VM> {
-        &self.gen
+    fn generational(&self) -> Option<&Gen<VM>> {
+        Some(&self.gen)
     }
 
     fn is_current_gc_nursery(&self) -> bool {

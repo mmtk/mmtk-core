@@ -24,7 +24,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
 
     fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let gen = base.plan().generational();
+        let gen = base.plan().generational().unwrap();
         Self { gen, base }
     }
     #[inline]
