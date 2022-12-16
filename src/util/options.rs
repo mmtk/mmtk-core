@@ -570,6 +570,7 @@ mod gc_trigger_tests {
             GCTriggerSelector::from_str("FixedHeapSize:4m"),
             Ok(GCTriggerSelector::FixedHeapSize(4 * 1024 * 1024))
         );
+        #[cfg(target_pointer_width = "64")]
         assert_eq!(
             GCTriggerSelector::from_str("FixedHeapSize:4t"),
             Ok(GCTriggerSelector::FixedHeapSize(
