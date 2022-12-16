@@ -434,34 +434,48 @@ pub enum GCTriggerSelector {
 }
 
 impl GCTriggerSelector {
-    const K: usize = 1024;
-    const M: usize = 1024 * 1024;
-    const G: usize = 1024 * 1024 * 1024;
+    const K: u64 = 1024;
+    const M: u64 = 1024 * Self::K;
+    const G: u64 = 1024 * Self::M;
+    const T: u64 = 1024 * Self::G;
 
     /// Parse a size representation, which could be a number to represents bytes,
     /// or a number with the suffix K/k/M/m/G/g. Return the byte number if it can be
     /// parsed properly, otherwise return an error string.
     fn parse_size(s: &str) -> Result<usize, String> {
-        println!("parse: {:?}", s);
         let s = s.to_lowercase();
         if s.ends_with(char::is_alphabetic) {
             let num = s[0..s.len() - 1]
-                .parse::<usize>()
+                .parse::<u64>()
                 .map_err(|e| e.to_string())?;
-            if s.ends_with('k') {
-                Ok(num * Self::K)
+            let size = if s.ends_with('k') {
+                num * Self::K
             } else if s.ends_with('m') {
-                Ok(num * Self::M)
+                num * Self::M
             } else if s.ends_with('g') {
-                Ok(num * Self::G)
+                num * Self::G
+            } else if s.ends_with('t') {
+                num * Self::T
             } else {
-                Err(format!(
+                return Err(format!(
                     "Unknown size descriptor: {:?}",
                     &s[(s.len() - 1)..]
-                ))
-            }
+                ));
+            };
+
+            size.try_into()
+                .map_err(|_| format!("size overflow: {}", size))
         } else {
             s.parse::<usize>().map_err(|e| e.to_string())
+        }
+    }
+
+    /// Return true if the gc trigger is valid
+    fn validate(&self) -> bool {
+        match self {
+            Self::FixedHeapSize(size) => *size > 0,
+            Self::DynamicHeapSize(min, max) => min <= max,
+            Self::Delegated => true,
         }
     }
 }
@@ -470,28 +484,25 @@ impl FromStr for GCTriggerSelector {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use regex::Regex;
+        lazy_static! {
+            static ref FIXED_HEAP_REGEX: Regex =
+                Regex::new(r"^FixedHeapSize:(?P<size>\d+[kKmMgGtT]?)$").unwrap();
+            static ref DYNAMIC_HEAP_REGEX: Regex =
+                Regex::new(r"^DynamicHeapSize:(?P<min>\d+[kKmMgGtT]?),(?P<max>\d+[kKmMgGtT]?)$")
+                    .unwrap();
+        }
+
         if s.is_empty() {
             return Err("No GC trigger policy is supplied".to_string());
         }
 
-        if let Some(stripped) = s.strip_prefix("FixedHeapSize") {
-            // FixedHeapSize:size
-            if let Some(size_str) = stripped.strip_prefix(':') {
-                return Self::parse_size(size_str).map(Self::FixedHeapSize);
-            }
-        } else if s.starts_with("DynamicHeapSize") {
-            // DynamicHeapSize:min,max
-            if let (Some(colon), Some(comma)) = (s.find(':'), s.find(',')) {
-                let min = Self::parse_size(&s[(colon + 1)..comma])?;
-                let max = Self::parse_size(&s[(comma + 1)..])?;
-                if min > max {
-                    return Err(format!(
-                        "Min heap size {:?} is larger than the given max heap size {:?}",
-                        min, max
-                    ));
-                }
-                return Ok(Self::DynamicHeapSize(min, max));
-            }
+        if let Some(captures) = FIXED_HEAP_REGEX.captures(s) {
+            return Self::parse_size(&captures["size"]).map(Self::FixedHeapSize);
+        } else if let Some(captures) = DYNAMIC_HEAP_REGEX.captures(s) {
+            let min = Self::parse_size(&captures["min"])?;
+            let max = Self::parse_size(&captures["max"])?;
+            return Ok(Self::DynamicHeapSize(min, max));
         } else if s.starts_with("Delegated") {
             return Ok(Self::Delegated);
         }
@@ -520,6 +531,11 @@ mod gc_trigger_tests {
             GCTriggerSelector::parse_size("2g"),
             Ok(2 * 1024 * 1024 * 1024)
         );
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(
+            GCTriggerSelector::parse_size("2T"),
+            Ok(2 * 1024 * 1024 * 1024 * 1024)
+        );
 
         // empty
         assert_eq!(
@@ -527,17 +543,21 @@ mod gc_trigger_tests {
             Err("cannot parse integer from empty string".to_string())
         );
 
-        // unknown size descriptor
-        assert_eq!(
-            GCTriggerSelector::parse_size("1T"),
-            Err("Unknown size descriptor: \"t\"".to_string())
-        );
-
         // negative number - we dont care about actual error message
         assert!(GCTriggerSelector::parse_size("-1").is_err());
 
         // no number
         assert!(GCTriggerSelector::parse_size("k").is_err());
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "32")]
+    fn test_parse_overflow_size() {
+        assert_eq!(
+            GCTriggerSelector::parse_size("4G"),
+            Err("size overflow: 4294967296".to_string())
+        );
+        assert_eq!(GCTriggerSelector::parse_size("4294967295"), Ok(4294967295));
     }
 
     #[test]
@@ -550,12 +570,17 @@ mod gc_trigger_tests {
             GCTriggerSelector::from_str("FixedHeapSize:4m"),
             Ok(GCTriggerSelector::FixedHeapSize(4 * 1024 * 1024))
         );
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:4t"),
+            Ok(GCTriggerSelector::FixedHeapSize(
+                4 * 1024 * 1024 * 1024 * 1024
+            ))
+        );
 
         // incorrect
         assert!(GCTriggerSelector::from_str("FixedHeapSize").is_err());
         assert!(GCTriggerSelector::from_str("FixedHeapSize:").is_err());
         assert!(GCTriggerSelector::from_str("FixedHeapSize:-1").is_err());
-        assert!(GCTriggerSelector::from_str("FixedHeapSize:4t").is_err());
     }
 
     #[test]
@@ -577,11 +602,17 @@ mod gc_trigger_tests {
         );
 
         // incorrect
-        assert_eq!(
-            GCTriggerSelector::from_str("DynamicHeapSize:2048,1024"),
-            Err("Min heap size 2048 is larger than the given max heap size 1024".to_string())
-        );
         assert!(GCTriggerSelector::from_str("DynamicHeapSize:1024,1024,").is_err());
+    }
+
+    #[test]
+    fn test_validate() {
+        assert!(GCTriggerSelector::FixedHeapSize(1024).validate());
+        assert!(GCTriggerSelector::DynamicHeapSize(1024, 2048).validate());
+        assert!(GCTriggerSelector::DynamicHeapSize(1024, 1024).validate());
+
+        assert!(!GCTriggerSelector::FixedHeapSize(0).validate());
+        assert!(!GCTriggerSelector::DynamicHeapSize(2048, 1024).validate());
     }
 }
 
@@ -665,7 +696,7 @@ options! {
     thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
     // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
     // Default to a fixed heap size of 0.5x physical memory.
-    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [always_valid] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
+    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
 }
 
 #[cfg(test)]

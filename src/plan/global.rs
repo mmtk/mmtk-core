@@ -683,7 +683,8 @@ impl<VM: VMBinding> BasePlan<VM> {
 
         let emergency_collection = !self.is_internal_triggered_collection()
             && plan.last_collection_was_exhaustive()
-            && self.cur_collection_attempts.load(Ordering::Relaxed) > 1;
+            && self.cur_collection_attempts.load(Ordering::Relaxed) > 1
+            && !self.gc_trigger.policy.can_heap_size_grow();
         self.emergency_collection
             .store(emergency_collection, Ordering::Relaxed);
 
