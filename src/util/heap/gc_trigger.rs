@@ -143,7 +143,13 @@ pub struct MemBalancerTrigger {
 impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     fn on_gc_end(&self, mmtk: &'static MMTK<VM>) {
         // live memory after a GC
-        let live = mmtk.plan.get_used_pages() as f64;
+        // Use reserved pages here: reserved pages includes the pending allocation requests that haven't been completed. Using
+        // reserved pages makes sure that the new heap size could accomodate those pending allocation.
+        // Otherwise, we may get into a stuck state where our computed heap size does not accomodate the next allocation,
+        // and a GC is triggered. But the GC cannot collect anything, thus live bytes does not change, and the heap size
+        // does not update. And we still cannot accomodate the next allocation. We have to avoid this, and make sure
+        // our computed heap size works for the currently pending allocation.
+        let live = mmtk.plan.get_reserved_pages() as f64;
         // We use a simplified version of mem balancer. Instead of collecting allocation/collection speed and a constant c,
         // we use a fixed constant 4096 instead.
         let optimal_heap = (live + (live * 4096f64).sqrt()) as usize;
