@@ -449,13 +449,13 @@ impl GCTriggerSelector {
                 .parse::<u64>()
                 .map_err(|e| e.to_string())?;
             let size = if s.ends_with('k') {
-                num * Self::K
+                num.checked_mul(Self::K)
             } else if s.ends_with('m') {
-                num * Self::M
+                num.checked_mul(Self::M)
             } else if s.ends_with('g') {
-                num * Self::G
+                num.checked_mul(Self::G)
             } else if s.ends_with('t') {
-                num * Self::T
+                num.checked_mul(Self::T)
             } else {
                 return Err(format!(
                     "Unknown size descriptor: {:?}",
@@ -463,8 +463,12 @@ impl GCTriggerSelector {
                 ));
             };
 
-            size.try_into()
-                .map_err(|_| format!("size overflow: {}", size))
+            if let Some(size) = size {
+                size.try_into()
+                    .map_err(|_| format!("size overflow: {}", size))
+            } else {
+                Err(format!("size overflow: {}", s))
+            }
         } else {
             s.parse::<usize>().map_err(|e| e.to_string())
         }
