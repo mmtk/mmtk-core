@@ -1,6 +1,5 @@
 use super::map::Map;
 use crate::mmtk::SFT_MAP;
-use crate::policy::sft_map::SFTMap;
 use crate::util::conversions;
 use crate::util::generic_freelist::GenericFreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;

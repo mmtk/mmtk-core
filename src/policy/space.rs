@@ -21,7 +21,6 @@ use crate::mmtk::SFT_MAP;
 #[cfg(debug_assertions)]
 use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
-use crate::policy::sft_map::SFTMap;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_layout::Mmapper;
