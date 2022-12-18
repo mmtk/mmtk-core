@@ -409,33 +409,8 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
-<span id="410">410</span>
-<span id="411">411</span>
-<span id="412">412</span>
-<span id="413">413</span>
-<span id="414">414</span>
-<span id="415">415</span>
-<span id="416">416</span>
-<span id="417">417</span>
-<span id="418">418</span>
-<span id="419">419</span>
-<span id="420">420</span>
-<span id="421">421</span>
-<span id="422">422</span>
-<span id="423">423</span>
-<span id="424">424</span>
-<span id="425">425</span>
-<span id="426">426</span>
-<span id="427">427</span>
-<span id="428">428</span>
-<span id="429">429</span>
-<span id="430">430</span>
-<span id="431">431</span>
-<span id="432">432</span>
-<span id="433">433</span>
-<span id="434">434</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::sft::SFT</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>, <span class="ident">SpaceOptions</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
@@ -443,10 +418,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocator::align_allocation_no_fill</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_WORD</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">HeapMeta</span>, <span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::extract_side_metadata</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">alloc_bit</span>, <span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">vm</span>::<span class="kw-2">*</span>, <span class="ident">ObjectQueue</span>};
 <span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
@@ -640,36 +613,13 @@
         );
     }
 
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">zeroed</span>: <span class="ident">bool</span>,
-        <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident"><span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">vm_map</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vm_map</span>;
+        <span class="kw">let</span> <span class="ident">is_discontiguous</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>();
         <span class="kw">let</span> <span class="ident">local_specs</span> <span class="op">=</span> <span class="ident">extract_side_metadata</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>]);
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
-            <span class="ident">SpaceOptions</span> {
-                <span class="ident">name</span>,
-                <span class="ident">movable</span>: <span class="bool-val">true</span>,
-                <span class="ident">immortal</span>: <span class="bool-val">false</span>,
-                <span class="ident">needs_log_bit</span>: <span class="bool-val">false</span>,
-                <span class="ident">zeroed</span>,
-                <span class="ident">vmrequest</span>,
-                <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
-                    <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="ident">local_specs</span>,
-                },
-            },
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">heap</span>,
-        );
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(<span class="ident">args</span>.<span class="ident">into_policy_args</span>(<span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="ident">local_specs</span>));
         <span class="ident">MarkCompactSpace</span> {
-            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
+            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">is_discontiguous</span> {
                 <span class="ident">MonotonePageResource::new_discontiguous</span>(<span class="ident">vm_map</span>)
             } <span class="kw">else</span> {
                 <span class="ident">MonotonePageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="ident">vm_map</span>)

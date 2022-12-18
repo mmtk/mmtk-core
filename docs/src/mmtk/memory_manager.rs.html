@@ -1326,7 +1326,7 @@
     );
 
     <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="ident">mmtk</span>.<span class="ident">get_plan</span>();
-    <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">should_trigger_gc_when_heap_is_full</span>() <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
+    <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">should_trigger_gc_when_heap_is_full</span>() <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_trigger</span>.<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">None</span>) {
         <span class="macro">debug!</span>(<span class="string">&quot;Collection required&quot;</span>);
         <span class="macro">assert!</span>(<span class="ident">plan</span>.<span class="ident">is_initialized</span>(), <span class="string">&quot;GC is not allowed here: collection is not initialized (did you call initialize_collection()?).&quot;</span>);
         <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">tls</span>);

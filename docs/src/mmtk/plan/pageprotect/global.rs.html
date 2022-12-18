@@ -126,22 +126,10 @@
 <span id="124">124</span>
 <span id="125">125</span>
 <span id="126">126</span>
-<span id="127">127</span>
-<span id="128">128</span>
-<span id="129">129</span>
-<span id="130">130</span>
-<span id="131">131</span>
-<span id="132">132</span>
-<span id="133">133</span>
-<span id="134">134</span>
-<span id="135">135</span>
-<span id="136">136</span>
-<span id="137">137</span>
-<span id="138">138</span>
-<span id="139">139</span>
-<span id="140">140</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::PPGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::mutator::ALLOCATOR_MAPPING</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -149,19 +137,14 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataContext</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">plan::global::BasePlan</span>, <span class="ident">vm::VMBinding</span>};
 <span class="kw">use</span> <span class="kw">crate</span>::{
     <span class="ident">plan::global::CommonPlan</span>, <span class="ident">policy::largeobjectspace::LargeObjectSpace</span>,
     <span class="ident">util::opaque_pointer::VMWorkerThread</span>,
 };
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 
@@ -228,7 +211,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">PageProtect</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="comment">// Warn users that the plan may fail due to maximum mapping allowed.</span>
         <span class="macro">warn!</span>(
             <span class="string">&quot;PageProtect uses a high volume of memory mappings. \
@@ -241,29 +224,18 @@
             }
         );
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
+            <span class="ident">global_args</span>: <span class="ident">args</span>,
+            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">CONSTRAINTS</span>,
+            <span class="ident">global_side_metadata_specs</span>: <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]),
+        };
 
         <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">PageProtect</span> {
             <span class="ident">space</span>: <span class="ident">LargeObjectSpace::new</span>(
-                <span class="string">&quot;los&quot;</span>,
-                <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="kw-2">&amp;</span><span class="ident">CONSTRAINTS</span>,
+                <span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;pageprotect&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
                 <span class="bool-val">true</span>,
             ),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-                <span class="ident">heap</span>,
-                <span class="kw-2">&amp;</span><span class="ident">CONSTRAINTS</span>,
-                <span class="ident">global_metadata_specs</span>,
-            ),
+            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">plan_args</span>),
         };
 
         <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>

@@ -211,50 +211,18 @@
 <span id="209">209</span>
 <span id="210">210</span>
 <span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::address::Address</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>, <span class="ident">VMRequest</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>};
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">metadata</span>, <span class="ident">ObjectReference</span>};
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::{<span class="ident">ObjectModel</span>, <span class="ident">VMBinding</span>};
 
 <span class="doccomment">/// This type implements a simple immortal collection</span>
@@ -384,39 +352,17 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">zeroed</span>: <span class="ident">bool</span>,
-        <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
-            <span class="ident">SpaceOptions</span> {
-                <span class="ident">name</span>,
-                <span class="ident">movable</span>: <span class="bool-val">false</span>,
-                <span class="ident">immortal</span>: <span class="bool-val">true</span>,
-                <span class="ident">needs_log_bit</span>: <span class="ident">constraints</span>.<span class="ident">needs_log_bit</span>,
-                <span class="ident">zeroed</span>,
-                <span class="ident">vmrequest</span>,
-                <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
-                    <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
-                        <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
-                    ]),
-                },
-            },
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">heap</span>,
-        );
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident"><span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">vm_map</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vm_map</span>;
+        <span class="kw">let</span> <span class="ident">is_discontiguous</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>();
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(<span class="ident">args</span>.<span class="ident">into_policy_args</span>(
+            <span class="bool-val">false</span>,
+            <span class="bool-val">true</span>,
+            <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[<span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>]),
+        ));
         <span class="ident">ImmortalSpace</span> {
             <span class="ident">mark_state</span>: <span class="number">0</span>,
-            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
+            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">is_discontiguous</span> {
                 <span class="ident">MonotonePageResource::new_discontiguous</span>(<span class="ident">vm_map</span>)
             } <span class="kw">else</span> {
                 <span class="ident">MonotonePageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="ident">vm_map</span>)

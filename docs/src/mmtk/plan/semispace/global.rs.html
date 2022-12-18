@@ -197,27 +197,10 @@
 <span id="195">195</span>
 <span id="196">196</span>
 <span id="197">197</span>
-<span id="198">198</span>
-<span id="199">199</span>
-<span id="200">200</span>
-<span id="201">201</span>
-<span id="202">202</span>
-<span id="203">203</span>
-<span id="204">204</span>
-<span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
-<span id="209">209</span>
-<span id="210">210</span>
-<span id="211">211</span>
-<span id="212">212</span>
-<span id="213">213</span>
-<span id="214">214</span>
-<span id="215">215</span>
-<span id="216">216</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::SSGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::semispace::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
@@ -228,16 +211,11 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer::VMWorkerThread</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="kw">crate</span>::{<span class="ident">plan::global::BasePlan</span>, <span class="ident">vm::VMBinding</span>};
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicBool</span>, <span class="ident">Ordering</span>};
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 
@@ -349,40 +327,24 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">SemiSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
+            <span class="ident">global_args</span>: <span class="ident">args</span>,
+            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">SS_CONSTRAINTS</span>,
+            <span class="ident">global_side_metadata_specs</span>: <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]),
+        };
 
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">SemiSpace</span> {
             <span class="ident">hi</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">copyspace0</span>: <span class="ident">CopySpace::new</span>(
-                <span class="string">&quot;copyspace0&quot;</span>,
+                <span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;copyspace0&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
                 <span class="bool-val">false</span>,
-                <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
             ),
             <span class="ident">copyspace1</span>: <span class="ident">CopySpace::new</span>(
-                <span class="string">&quot;copyspace1&quot;</span>,
+                <span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;copyspace1&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
                 <span class="bool-val">true</span>,
-                <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
             ),
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-                <span class="ident">heap</span>,
-                <span class="kw-2">&amp;</span><span class="ident">SS_CONSTRAINTS</span>,
-                <span class="ident">global_metadata_specs</span>,
-            ),
+            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">plan_args</span>),
         };
 
         <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>

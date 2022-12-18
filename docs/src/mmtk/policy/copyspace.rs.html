@@ -339,47 +339,16 @@
 <span id="337">337</span>
 <span id="338">338</span>
 <span id="339">339</span>
-<span id="340">340</span>
-<span id="341">341</span>
-<span id="342">342</span>
-<span id="343">343</span>
-<span id="344">344</span>
-<span id="345">345</span>
-<span id="346">346</span>
-<span id="347">347</span>
-<span id="348">348</span>
-<span id="349">349</span>
-<span id="350">350</span>
-<span id="351">351</span>
-<span id="352">352</span>
-<span id="353">353</span>
-<span id="354">354</span>
-<span id="355">355</span>
-<span id="356">356</span>
-<span id="357">357</span>
-<span id="358">358</span>
-<span id="359">359</span>
-<span id="360">360</span>
-<span id="361">361</span>
-<span id="362">362</span>
-<span id="363">363</span>
-<span id="364">364</span>
-<span id="365">365</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan</span>::{<span class="ident">ObjectQueue</span>, <span class="ident">VectorObjectQueue</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copy_context::PolicyCopyContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap</span>::{<span class="ident">MonotonePageResource</span>, <span class="ident">PageResource</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{<span class="ident">extract_side_metadata</span>, <span class="ident">MetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::object_forwarding</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -512,40 +481,19 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CopySpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">from_space</span>: <span class="ident">bool</span>,
-        <span class="ident">zeroed</span>: <span class="ident">bool</span>,
-        <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="ident">local_specs</span> <span class="op">=</span> <span class="ident">extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
-            <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
-            <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
-        ]);
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
-            <span class="ident">SpaceOptions</span> {
-                <span class="ident">name</span>,
-                <span class="ident">movable</span>: <span class="bool-val">true</span>,
-                <span class="ident">immortal</span>: <span class="bool-val">false</span>,
-                <span class="ident">needs_log_bit</span>: <span class="bool-val">false</span>,
-                <span class="ident">zeroed</span>,
-                <span class="ident">vmrequest</span>,
-                <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
-                    <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="ident">local_specs</span>,
-                },
-            },
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">heap</span>,
-        );
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident"><span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">from_space</span>: <span class="ident">bool</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="ident">vm_map</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vm_map</span>;
+        <span class="kw">let</span> <span class="ident">is_discontiguous</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>();
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(<span class="ident">args</span>.<span class="ident">into_policy_args</span>(
+            <span class="bool-val">true</span>,
+            <span class="bool-val">false</span>,
+            <span class="ident">extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
+                <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC</span>,
+                <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC</span>,
+            ]),
+        ));
         <span class="ident">CopySpace</span> {
-            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
+            <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">is_discontiguous</span> {
                 <span class="ident">MonotonePageResource::new_discontiguous</span>(<span class="ident">vm_map</span>)
             } <span class="kw">else</span> {
                 <span class="ident">MonotonePageResource::new_contiguous</span>(<span class="ident">common</span>.<span class="ident">start</span>, <span class="ident">common</span>.<span class="ident">extent</span>, <span class="ident">vm_map</span>)

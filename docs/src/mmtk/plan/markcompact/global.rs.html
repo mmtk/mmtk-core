@@ -216,28 +216,14 @@
 <span id="214">214</span>
 <span id="215">215</span>
 <span id="216">216</span>
-<span id="217">217</span>
-<span id="218">218</span>
-<span id="219">219</span>
-<span id="220">220</span>
-<span id="221">221</span>
-<span id="222">222</span>
-<span id="223">223</span>
-<span id="224">224</span>
-<span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::MarkCompactGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work</span>::{
     <span class="ident">CalculateForwardingAddress</span>, <span class="ident">Compact</span>, <span class="ident">ForwardingProcessEdges</span>, <span class="ident">MarkingProcessEdges</span>,
     <span class="ident">UpdateReferences</span>,
 };
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global</span>::{<span class="ident">BasePlan</span>, <span class="ident">CreateGeneralPlanArgs</span>, <span class="ident">CreateSpecificPlanArgs</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::markcompact::mutator::ALLOCATOR_MAPPING</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -250,17 +236,12 @@
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSanity</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::VMBinding</span>;
 
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 
@@ -409,38 +390,29 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">MarkCompact</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>, <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>, <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="comment">// if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to</span>
         <span class="comment">// SideMetadataContext by default, so we don&#39;t need to add it here.</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
+        <span class="kw">let</span> <span class="ident">global_side_metadata_specs</span> <span class="op">=</span> <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[]);
         <span class="comment">// if global_alloc_bit is NOT enabled,</span>
         <span class="comment">// we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>))]</span>
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>
+        <span class="kw">let</span> <span class="ident">global_side_metadata_specs</span> <span class="op">=</span>
             <span class="ident">SideMetadataContext::new_global_specs</span>(<span class="kw-2">&amp;</span>[<span class="ident">ALLOC_SIDE_METADATA_SPEC</span>]);
 
-        <span class="kw">let</span> <span class="ident">mc_space</span> <span class="op">=</span> <span class="ident">MarkCompactSpace::new</span>(
-            <span class="string">&quot;mark_compact_space&quot;</span>,
-            <span class="bool-val">true</span>,
-            <span class="ident">VMRequest::discontiguous</span>(),
-            <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-        );
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
+            <span class="ident">global_args</span>: <span class="ident">args</span>,
+            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>,
+            <span class="ident">global_side_metadata_specs</span>,
+        };
+
+        <span class="kw">let</span> <span class="ident">mc_space</span> <span class="op">=</span>
+            <span class="ident">MarkCompactSpace::new</span>(<span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;mc&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()));
 
         <span class="kw">let</span> <span class="ident">res</span> <span class="op">=</span> <span class="ident">MarkCompact</span> {
             <span class="ident">mc_space</span>,
-            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-                <span class="ident">heap</span>,
-                <span class="kw-2">&amp;</span><span class="ident">MARKCOMPACT_CONSTRAINTS</span>,
-                <span class="ident">global_metadata_specs</span>,
-            ),
+            <span class="ident">common</span>: <span class="ident">CommonPlan::new</span>(<span class="ident">plan_args</span>),
         };
 
         <span class="comment">// Use SideMetadataSanity to check if each spec is valid. This is also needed for check</span>

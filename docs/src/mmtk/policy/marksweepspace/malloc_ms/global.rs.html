@@ -823,13 +823,6 @@
 <span id="821">821</span>
 <span id="822">822</span>
 <span id="823">823</span>
-<span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
-<span id="829">829</span>
-<span id="830">830</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::metadata</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::VectorObjectQueue</span>;
@@ -837,11 +830,8 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::CommonSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::library</span>::{<span class="ident">BYTES_IN_MALLOC_PAGE</span>, <span class="ident">LOG_BYTES_IN_MALLOC_PAGE</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::malloc::malloc_ms_util</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{
@@ -879,6 +869,7 @@
     <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span>,
     <span class="doccomment">/// Work packet scheduler</span>
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="ident">gc_trigger</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="comment">// Mapping between allocated address and its size - this is used to check correctness.</span>
     <span class="comment">// Size will be set to zero when the memory is freed.</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -973,6 +964,10 @@
 
     <span class="kw">fn</span> <span class="ident">common</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">CommonSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="macro">unreachable!</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_gc_trigger</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="self">self</span>.<span class="ident">gc_trigger</span>.<span class="ident">as_ref</span>()
     }
 
     <span class="kw">fn</span> <span class="ident">initialize_sft</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {
@@ -1084,17 +1079,7 @@
         <span class="ident">specs</span>.<span class="ident">push</span>(<span class="ident">ACTIVE_CHUNK_METADATA_SPEC</span>);
     }
 
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::too_many_arguments</span>)]</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">_name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">_zeroed</span>: <span class="ident">bool</span>,
-        <span class="ident">_vmrequest</span>: <span class="ident">VMRequest</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-        <span class="ident">_vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">_mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">_heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident"><span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="ident">MallocSpace</span> {
             <span class="ident">phantom</span>: <span class="ident">PhantomData</span>,
             <span class="ident">active_bytes</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
@@ -1102,14 +1087,15 @@
             <span class="ident">chunk_addr_min</span>: <span class="ident">AtomicUsize::new</span>(<span class="ident">usize::max_value</span>()), <span class="comment">// XXX: have to use AtomicUsize to represent an Address</span>
             <span class="ident">chunk_addr_max</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">metadata</span>: <span class="ident">SideMetadataContext</span> {
-                <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
+                <span class="ident">global</span>: <span class="ident">args</span>.<span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
                 <span class="ident">local</span>: <span class="ident">metadata::extract_side_metadata</span>(<span class="kw-2">&amp;</span>[
                     <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">ACTIVE_PAGE_METADATA_SPEC</span>),
                     <span class="ident">MetadataSpec::OnSide</span>(<span class="ident">OFFSET_MALLOC_METADATA_SPEC</span>),
                     <span class="kw-2">*</span><span class="ident">VM::VMObjectModel::LOCAL_MARK_BIT_SPEC</span>,
                 ]),
             },
-            <span class="ident">scheduler</span>,
+            <span class="ident">scheduler</span>: <span class="ident">args</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+            <span class="ident">gc_trigger</span>: <span class="ident">args</span>.<span class="ident">gc_trigger</span>,
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
             <span class="ident">active_mem</span>: <span class="ident">Mutex::new</span>(<span class="ident">HashMap::new</span>()),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">debug_assertions</span>)]</span>
@@ -1170,7 +1156,7 @@
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">alloc</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMThread</span>, <span class="ident">size</span>: <span class="ident">usize</span>, <span class="ident">align</span>: <span class="ident">usize</span>, <span class="ident">offset</span>: <span class="ident">isize</span>) -&gt; <span class="ident">Address</span> {
         <span class="comment">// TODO: Should refactor this and Space.acquire()</span>
-        <span class="kw">if</span> <span class="ident">VM::VMActivePlan::global</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>)) {
+        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">get_gc_trigger</span>().<span class="ident">poll</span>(<span class="bool-val">false</span>, <span class="prelude-val">Some</span>(<span class="self">self</span>)) {
             <span class="macro">assert!</span>(<span class="ident">VM::VMActivePlan::is_mutator</span>(<span class="ident">tls</span>), <span class="string">&quot;Polling in GC worker&quot;</span>);
             <span class="ident">VM::VMCollection::block_for_gc</span>(<span class="ident">VMMutatorThread</span>(<span class="ident">tls</span>));
             <span class="kw">return</span> <span class="kw">unsafe</span> { <span class="ident">Address::zero</span>() };

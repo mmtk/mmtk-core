@@ -269,43 +269,17 @@
 <span id="267">267</span>
 <span id="268">268</span>
 <span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
-<span id="287">287</span>
-<span id="288">288</span>
-<span id="289">289</span>
-<span id="290">290</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::PlanConstraints</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::copyspace::CopySpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy::CopySemantics</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSanity</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::statistics::counter::EventCounter</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
@@ -334,32 +308,16 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="kw-2">mut</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
-        <span class="ident">global_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="kw-2">mut</span> <span class="ident">args</span>: <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">nursery</span> <span class="op">=</span> <span class="ident">CopySpace::new</span>(
-            <span class="string">&quot;nursery&quot;</span>,
-            <span class="bool-val">false</span>,
+            <span class="ident">args</span>.<span class="ident">get_space_args</span>(
+                <span class="string">&quot;nursery&quot;</span>,
+                <span class="bool-val">true</span>,
+                <span class="ident">VMRequest::fixed_extent</span>(<span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">options</span>.<span class="ident">get_max_nursery</span>(), <span class="bool-val">false</span>),
+            ),
             <span class="bool-val">true</span>,
-            <span class="ident">VMRequest::fixed_extent</span>(<span class="ident">options</span>.<span class="ident">get_max_nursery</span>(), <span class="bool-val">false</span>),
-            <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
         );
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonPlan::new</span>(
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">options</span>,
-            <span class="ident">heap</span>,
-            <span class="ident">constraints</span>,
-            <span class="ident">global_metadata_specs</span>,
-        );
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonPlan::new</span>(<span class="ident">args</span>);
 
         <span class="kw">let</span> <span class="ident">full_heap_gc_count</span> <span class="op">=</span> <span class="ident">common</span>.<span class="ident">base</span>.<span class="ident">stats</span>.<span class="ident">new_event_counter</span>(<span class="string">&quot;majorGC&quot;</span>, <span class="bool-val">true</span>, <span class="bool-val">true</span>);
 

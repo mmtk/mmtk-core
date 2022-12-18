@@ -1045,59 +1045,6 @@
 <span id="1043">1043</span>
 <span id="1044">1044</span>
 <span id="1045">1045</span>
-<span id="1046">1046</span>
-<span id="1047">1047</span>
-<span id="1048">1048</span>
-<span id="1049">1049</span>
-<span id="1050">1050</span>
-<span id="1051">1051</span>
-<span id="1052">1052</span>
-<span id="1053">1053</span>
-<span id="1054">1054</span>
-<span id="1055">1055</span>
-<span id="1056">1056</span>
-<span id="1057">1057</span>
-<span id="1058">1058</span>
-<span id="1059">1059</span>
-<span id="1060">1060</span>
-<span id="1061">1061</span>
-<span id="1062">1062</span>
-<span id="1063">1063</span>
-<span id="1064">1064</span>
-<span id="1065">1065</span>
-<span id="1066">1066</span>
-<span id="1067">1067</span>
-<span id="1068">1068</span>
-<span id="1069">1069</span>
-<span id="1070">1070</span>
-<span id="1071">1071</span>
-<span id="1072">1072</span>
-<span id="1073">1073</span>
-<span id="1074">1074</span>
-<span id="1075">1075</span>
-<span id="1076">1076</span>
-<span id="1077">1077</span>
-<span id="1078">1078</span>
-<span id="1079">1079</span>
-<span id="1080">1080</span>
-<span id="1081">1081</span>
-<span id="1082">1082</span>
-<span id="1083">1083</span>
-<span id="1084">1084</span>
-<span id="1085">1085</span>
-<span id="1086">1086</span>
-<span id="1087">1087</span>
-<span id="1088">1088</span>
-<span id="1089">1089</span>
-<span id="1090">1090</span>
-<span id="1091">1091</span>
-<span id="1092">1092</span>
-<span id="1093">1093</span>
-<span id="1094">1094</span>
-<span id="1095">1095</span>
-<span id="1096">1096</span>
-<span id="1097">1097</span>
-<span id="1098">1098</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1108,12 +1055,13 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::immortalspace::ImmortalSpace</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::largeobjectspace::LargeObjectSpace</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">PlanCreateSpaceArgs</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::analysis::AnalysisManager</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::{<span class="ident">CopyConfig</span>, <span class="ident">GCWorkerCopyContext</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
@@ -1168,34 +1116,55 @@
     <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 ) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">CreateGeneralPlanArgs</span> {
+        <span class="ident">vm_map</span>,
+        <span class="ident">mmapper</span>,
+        <span class="ident">heap</span>: <span class="ident">HeapMeta::new</span>(),
+        <span class="ident">gc_trigger</span>: <span class="ident">Arc::new</span>(<span class="ident">GCTrigger::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>)),
+        <span class="ident">options</span>,
+        <span class="ident">scheduler</span>,
+    };
+    <span class="kw">let</span> <span class="ident">gc_trigger</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">gc_trigger</span>.<span class="ident">clone</span>();
+
     <span class="kw">let</span> <span class="ident">plan</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">plan</span> {
-        <span class="ident">PlanSelector::NoGC</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::nogc::NoGC::new</span>(<span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>))
+        <span class="ident">PlanSelector::NoGC</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::nogc::NoGC::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
+        <span class="ident">PlanSelector::SemiSpace</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::semispace::SemiSpace::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
+        <span class="ident">PlanSelector::GenCopy</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::copying::GenCopy::new</span>(<span class="ident">args</span>))
             <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::SemiSpace</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::semispace::SemiSpace::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::GenCopy</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::copying::GenCopy::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::GenImmix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::immix::GenImmix::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::MarkSweep</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::marksweep::MarkSweep::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::Immix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::immix::Immix::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>, <span class="ident">scheduler</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::PageProtect</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::pageprotect::PageProtect::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">PlanSelector::MarkCompact</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::markcompact::MarkCompact::new</span>(
-            <span class="ident">vm_map</span>, <span class="ident">mmapper</span>, <span class="ident">options</span>,
-        )) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">PlanSelector::GenImmix</span> =&gt; <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::generational::immix::GenImmix::new</span>(<span class="ident">args</span>))
+            <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+        <span class="ident">PlanSelector::MarkSweep</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::marksweep::MarkSweep::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
+        <span class="ident">PlanSelector::Immix</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::immix::Immix::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
+        <span class="ident">PlanSelector::PageProtect</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::pageprotect::PageProtect::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
+        <span class="ident">PlanSelector::MarkCompact</span> =&gt; {
+            <span class="ident">Box::new</span>(<span class="ident"><span class="kw">crate</span>::plan::markcompact::MarkCompact::new</span>(<span class="ident">args</span>)) <span class="kw">as</span> <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>
+        }
     };
 
-    <span class="comment">// We have created Plan in the heap, and we won&#39;t explicitly move it. So each space</span>
-    <span class="comment">// now has a fixed address for its lifetime. It is safe now to initialize SFT.</span>
+    <span class="comment">// We have created Plan in the heap, and we won&#39;t explicitly move it.</span>
+
+    <span class="comment">// The plan has a fixed address. Set plan in gc_trigger</span>
+    {
+        <span class="comment">// We haven&#39;t finished creating the plan. No one is using the GC trigger. We cast the arc into a mutable reference.</span>
+        <span class="comment">// TODO: use Arc::get_mut_unchecked() when it is availble.</span>
+        <span class="kw">let</span> <span class="ident">gc_trigger</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;mut</span> <span class="kw-2">*</span>(<span class="ident">Arc::as_ptr</span>(<span class="kw-2">&amp;</span><span class="ident">gc_trigger</span>) <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="kw">_</span>) };
+        <span class="comment">// We know the plan address will not change. Cast it to a static reference.</span>
+        <span class="kw">let</span> <span class="ident">static_plan</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="kw">dyn</span> <span class="ident">Plan</span><span class="op">&lt;</span><span class="ident">VM</span> <span class="op">=</span> <span class="ident">VM</span><span class="op">&gt;</span> <span class="op">=</span> <span class="kw">unsafe</span> { <span class="kw-2">&amp;</span><span class="kw-2">*</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">plan</span> <span class="kw">as</span> <span class="kw-2">*const</span> <span class="kw">_</span>) };
+        <span class="comment">// Set the plan so we can trigger GC and check GC condition without using plan</span>
+        <span class="ident">gc_trigger</span>.<span class="ident">set_plan</span>(<span class="ident">static_plan</span>);
+    }
+
+    <span class="comment">// Each space now has a fixed address for its lifetime. It is safe now to initialize SFT.</span>
     <span class="ident">plan</span>.<span class="ident">get_spaces</span>()
         .<span class="ident">into_iter</span>()
         .<span class="ident">for_each</span>(<span class="op">|</span><span class="ident">s</span><span class="op">|</span> <span class="ident">s</span>.<span class="ident">initialize_sft</span>());
@@ -1310,63 +1279,14 @@
     <span class="doccomment">/// This is invoked once per GC by one worker thread. &#39;tls&#39; is the worker thread that executes this method.</span>
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
 
-    <span class="doccomment">/// This method is called periodically by the allocation subsystem</span>
-    <span class="doccomment">/// (by default, each time a page is consumed), and provides the</span>
-    <span class="doccomment">/// collector with an opportunity to collect.</span>
+    <span class="doccomment">/// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called</span>
+    <span class="doccomment">/// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,</span>
+    <span class="doccomment">/// in which case, this method may not be called. This method returns true to trigger a collection.</span>
     <span class="doccomment">///</span>
-    <span class="doccomment">/// Arguments:</span>
-    <span class="doccomment">/// * `space_full`: Space request failed, must recover pages within &#39;space&#39;.</span>
-    <span class="doccomment">/// * `space`: The space that triggered the poll. This could `None` if the poll is not triggered by a space.</span>
-    <span class="kw">fn</span> <span class="ident">poll</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">collection_required</span>(<span class="ident">space_full</span>, <span class="ident">space</span>) {
-            <span class="comment">// FIXME</span>
-            <span class="comment">/*if space == META_DATA_SPACE {
-                /* In general we must not trigger a GC on metadata allocation since
-                 * this is not, in general, in a GC safe point.  Instead we initiate
-                 * an asynchronous GC, which will occur at the next safe point.
-                 */
-                self.log_poll(space, &quot;Asynchronous collection requested&quot;);
-                self.common().control_collector_context.request();
-                return false;
-            }*/</span>
-            <span class="self">self</span>.<span class="ident">log_poll</span>(<span class="ident">space</span>, <span class="string">&quot;Triggering collection&quot;</span>);
-            <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">gc_requester</span>.<span class="ident">request</span>();
-            <span class="kw">return</span> <span class="bool-val">true</span>;
-        }
-
-        <span class="comment">// FIXME</span>
-        <span class="comment">/*if self.concurrent_collection_required() {
-            // FIXME
-            /*if space == self.common().meta_data_space {
-                self.log_poll(space, &quot;Triggering async concurrent collection&quot;);
-                Self::trigger_internal_collection_request();
-                return false;
-            } else {*/
-            self.log_poll(space, &quot;Triggering concurrent collection&quot;);
-            Self::trigger_internal_collection_request();
-            return true;
-        }*/</span>
-
-        <span class="bool-val">false</span>
-    }
-
-    <span class="kw">fn</span> <span class="ident">log_poll</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">message</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>) {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">space</span>) <span class="op">=</span> <span class="ident">space</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;  [POLL] {}: {}&quot;</span>, <span class="ident">space</span>.<span class="ident">get_name</span>(), <span class="ident">message</span>);
-        } <span class="kw">else</span> {
-            <span class="macro">info!</span>(<span class="string">&quot;  [POLL] {}&quot;</span>, <span class="ident">message</span>);
-        }
-    }
-
-    <span class="doccomment">/**
-     * This method controls the triggering of a GC. It is called periodically
-     * during allocation. Returns &lt;code&gt;true&lt;/code&gt; to trigger a collection.
-     *
-     * @param spaceFull Space request failed, must recover pages within &#39;space&#39;.
-     * @param space TODO
-     * @return &lt;code&gt;true&lt;/code&gt; if a collection is requested by the plan.
-     */</span>
-    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">_space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>;
+    <span class="doccomment">/// # Arguments</span>
+    <span class="doccomment">/// * `space_full`: the allocation to a specific space failed, must recover pages within &#39;space&#39;.</span>
+    <span class="doccomment">/// * `space`: an option to indicate if there is a space that has failed in an allocation.</span>
+    <span class="kw">fn</span> <span class="ident">collection_required</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">space_full</span>: <span class="ident">bool</span>, <span class="ident">space</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="kw">dyn</span> <span class="ident">Space</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span><span class="op">&gt;</span>) -&gt; <span class="ident">bool</span>;
 
     <span class="comment">// Note: The following methods are about page accounting. The default implementation should</span>
     <span class="comment">// work fine for non-copying plans. For copying plans, the plan should override any of these methods</span>
@@ -1380,7 +1300,7 @@
 
     <span class="doccomment">/// Get the total number of pages for the heap.</span>
     <span class="kw">fn</span> <span class="ident">get_total_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">heap</span>.<span class="ident">get_total_pages</span>()
+        <span class="self">self</span>.<span class="ident">base</span>().<span class="ident">gc_trigger</span>.<span class="ident">policy</span>.<span class="ident">get_heap_size_in_pages</span>()
     }
 
     <span class="doccomment">/// Get the number of pages that are still available for use. The available pages</span>
@@ -1489,6 +1409,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="kw">pub</span> <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
     <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
     <span class="kw">pub</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
+    <span class="kw">pub</span> <span class="ident">gc_trigger</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="ident">inside_sanity</span>: <span class="ident">AtomicBool</span>,
     <span class="doccomment">/// A counter for per-mutator stack scanning</span>
@@ -1534,32 +1455,20 @@ BasePlan should contain all plan-related state and functions that are _fundament
 }
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_vm_space</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(
-    <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-    <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-    <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-    <span class="ident">boot_segment_bytes</span>: <span class="ident">usize</span>,
-    <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-    <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-) -&gt; <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">create_vm_space</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>(<span class="ident">args</span>: <span class="kw-2">&amp;mut</span> <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">ImmortalSpace</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
-    <span class="comment">//    let boot_segment_bytes = BOOT_IMAGE_END - BOOT_IMAGE_DATA_START;</span>
+    <span class="kw">let</span> <span class="ident">boot_segment_bytes</span> <span class="op">=</span> <span class="kw-2">*</span><span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">options</span>.<span class="ident">vm_space_size</span>;
     <span class="macro">debug_assert!</span>(<span class="ident">boot_segment_bytes</span> <span class="op">&gt;</span> <span class="number">0</span>);
 
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions::raw_align_up</span>;
     <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK</span>;
     <span class="kw">let</span> <span class="ident">boot_segment_mb</span> <span class="op">=</span> <span class="ident">raw_align_up</span>(<span class="ident">boot_segment_bytes</span>, <span class="ident">BYTES_IN_CHUNK</span>) <span class="op">&gt;</span><span class="op">&gt;</span> <span class="ident">LOG_BYTES_IN_MBYTE</span>;
 
-    <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="ident">ImmortalSpace::new</span>(
+    <span class="kw">let</span> <span class="ident">space</span> <span class="op">=</span> <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
         <span class="string">&quot;boot&quot;</span>,
         <span class="bool-val">false</span>,
         <span class="ident">VMRequest::fixed_size</span>(<span class="ident">boot_segment_mb</span>),
-        <span class="ident">global_side_metadata_specs</span>,
-        <span class="ident">vm_map</span>,
-        <span class="ident">mmapper</span>,
-        <span class="ident">heap</span>,
-        <span class="ident">constraints</span>,
-    );
+    ));
 
     <span class="comment">// The space is mapped externally by the VM. We need to update our mmapper to mark the range as mapped.</span>
     <span class="ident">space</span>.<span class="ident">ensure_mapped</span>();
@@ -1567,65 +1476,79 @@ BasePlan should contain all plan-related state and functions that are _fundament
     <span class="ident">space</span>
 }
 
+<span class="doccomment">/// Args needed for creating any plan. This includes a set of contexts from MMTK or global. This</span>
+<span class="doccomment">/// is passed to each plan&#39;s constructor.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
+    <span class="kw">pub</span> <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
+    <span class="kw">pub</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
+    <span class="kw">pub</span> <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">gc_trigger</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident"><span class="kw">crate</span>::util::heap::gc_trigger::GCTrigger</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
+}
+
+<span class="doccomment">/// Args needed for creating a specific plan. This includes plan-specific args, such as plan constrainst</span>
+<span class="doccomment">/// and their global side metadata specs. This is created in each plan&#39;s constructor, and will be passed</span>
+<span class="doccomment">/// to `CommonPlan` or `BasePlan`. Also you can create `PlanCreateSpaceArg` from this type, and use that</span>
+<span class="doccomment">/// to create spaces.</span>
+<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="ident">global_args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="kw">pub</span> <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
+    <span class="kw">pub</span> <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
+}
+
+<span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="doccomment">/// Get a PlanCreateSpaceArgs that can be used to create a space</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_space_args</span>(
+        <span class="kw-2">&amp;mut</span> <span class="self">self</span>,
+        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
+        <span class="ident">zeroed</span>: <span class="ident">bool</span>,
+        <span class="ident">vmrequest</span>: <span class="ident">VMRequest</span>,
+    ) -&gt; <span class="ident">PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="ident">PlanCreateSpaceArgs</span> {
+            <span class="ident">name</span>,
+            <span class="ident">zeroed</span>,
+            <span class="ident">vmrequest</span>,
+            <span class="ident">global_side_metadata_specs</span>: <span class="self">self</span>.<span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
+            <span class="ident">vm_map</span>: <span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">vm_map</span>,
+            <span class="ident">mmapper</span>: <span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">mmapper</span>,
+            <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">heap</span>,
+            <span class="ident">constraints</span>: <span class="self">self</span>.<span class="ident">constraints</span>,
+            <span class="ident">gc_trigger</span>: <span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">gc_trigger</span>.<span class="ident">clone</span>(),
+            <span class="ident">scheduler</span>: <span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>(),
+            <span class="ident">options</span>: <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">global_args</span>.<span class="ident">options</span>,
+        }
+    }
+}
+
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_mut</span>)]</span> <span class="comment">// &#39;heap&#39; only needs to be mutable for certain features</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_variables</span>)]</span> <span class="comment">// &#39;constraints&#39; is only needed for certain features</span>
-    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::redundant_clone</span>)]</span> <span class="comment">// depends on features, the last clone of side metadata specs is not necessary.</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
-        <span class="kw-2">mut</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">stats</span> <span class="op">=</span> <span class="ident">Stats::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
+    <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">unused_mut</span>)]</span> <span class="comment">// &#39;args&#39; only needs to be mutable for certain features</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="kw-2">mut</span> <span class="ident">args</span>: <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">stats</span> <span class="op">=</span> <span class="ident">Stats::new</span>(<span class="kw-2">&amp;</span><span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">options</span>);
         <span class="comment">// Initializing the analysis manager and routines</span>
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;analysis&quot;</span>)]</span>
         <span class="kw">let</span> <span class="ident">analysis_manager</span> <span class="op">=</span> <span class="ident">AnalysisManager::new</span>(<span class="kw-2">&amp;</span><span class="ident">stats</span>);
         <span class="ident">BasePlan</span> {
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-            <span class="ident">code_space</span>: <span class="ident">ImmortalSpace::new</span>(
+            <span class="ident">code_space</span>: <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
                 <span class="string">&quot;code_space&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-            ),
+            )),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;code_space&quot;</span>)]</span>
-            <span class="ident">code_lo_space</span>: <span class="ident">ImmortalSpace::new</span>(
+            <span class="ident">code_lo_space</span>: <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
                 <span class="string">&quot;code_lo_space&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-            ),
+            )),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;ro_space&quot;</span>)]</span>
-            <span class="ident">ro_space</span>: <span class="ident">ImmortalSpace::new</span>(
+            <span class="ident">ro_space</span>: <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
                 <span class="string">&quot;ro_space&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-            ),
+            )),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;vm_space&quot;</span>)]</span>
-            <span class="ident">vm_space</span>: <span class="ident">create_vm_space</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="kw-2">*</span><span class="ident">options</span>.<span class="ident">vm_space_size</span>,
-                <span class="ident">constraints</span>,
-                <span class="ident">global_side_metadata_specs</span>,
-            ),
+            <span class="ident">vm_space</span>: <span class="ident">create_vm_space</span>(<span class="kw-2">&amp;mut</span> <span class="ident">args</span>),
 
             <span class="ident">initialized</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">trigger_gc_when_heap_is_full</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">true</span>),
@@ -1641,10 +1564,11 @@ BasePlan should contain all plan-related state and functions that are _fundament
             <span class="ident">cur_collection_attempts</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">gc_requester</span>: <span class="ident">Arc::new</span>(<span class="ident">GCRequester::new</span>()),
             <span class="ident">stats</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">heap</span>,
-            <span class="ident">vm_map</span>,
-            <span class="ident">options</span>,
+            <span class="ident">mmapper</span>: <span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">mmapper</span>,
+            <span class="ident">heap</span>: <span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">heap</span>,
+            <span class="ident">gc_trigger</span>: <span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">gc_trigger</span>,
+            <span class="ident">vm_map</span>: <span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">vm_map</span>,
+            <span class="ident">options</span>: <span class="ident">args</span>.<span class="ident">global_args</span>.<span class="ident">options</span>.<span class="ident">clone</span>(),
             <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;sanity&quot;</span>)]</span>
             <span class="ident">inside_sanity</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">scanned_stacks</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
@@ -1800,7 +1724,8 @@ BasePlan should contain all plan-related state and functions that are _fundament
 
         <span class="kw">let</span> <span class="ident">emergency_collection</span> <span class="op">=</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">is_internal_triggered_collection</span>()
             <span class="op">&amp;&amp;</span> <span class="ident">plan</span>.<span class="ident">last_collection_was_exhaustive</span>()
-            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">cur_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&gt;</span> <span class="number">1</span>;
+            <span class="op">&amp;&amp;</span> <span class="self">self</span>.<span class="ident">cur_collection_attempts</span>.<span class="ident">load</span>(<span class="ident">Ordering::Relaxed</span>) <span class="op">&gt;</span> <span class="number">1</span>
+            <span class="op">&amp;&amp;</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">gc_trigger</span>.<span class="ident">policy</span>.<span class="ident">can_heap_size_grow</span>();
         <span class="self">self</span>.<span class="ident">emergency_collection</span>
             .<span class="ident">store</span>(<span class="ident">emergency_collection</span>, <span class="ident">Ordering::Relaxed</span>);
 
@@ -1945,7 +1870,7 @@ BasePlan should contain all plan-related state and functions that are _fundament
         );
         <span class="comment">// Check if we reserved more pages (including the collection copy reserve)</span>
         <span class="comment">// than the heap&#39;s total pages. In that case, we will have to do a GC.</span>
-        <span class="kw">let</span> <span class="ident">heap_full</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>() <span class="op">&gt;</span> <span class="ident">plan</span>.<span class="ident">get_total_pages</span>();
+        <span class="kw">let</span> <span class="ident">heap_full</span> <span class="op">=</span> <span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_trigger</span>.<span class="ident">is_heap_full</span>();
 
         <span class="ident">space_full</span> <span class="op">|</span><span class="op">|</span> <span class="ident">stress_force_gc</span> <span class="op">|</span><span class="op">|</span> <span class="ident">heap_full</span>
     }
@@ -1997,54 +1922,23 @@ CommonPlan is for representing state and features used by _many_ plans, but that
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
-        <span class="kw-2">mut</span> <span class="ident">heap</span>: <span class="ident">HeapMeta</span>,
-        <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">PlanConstraints</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="kw-2">mut</span> <span class="ident">args</span>: <span class="ident">CreateSpecificPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">CommonPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
         <span class="ident">CommonPlan</span> {
-            <span class="ident">immortal</span>: <span class="ident">ImmortalSpace::new</span>(
+            <span class="ident">immortal</span>: <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
                 <span class="string">&quot;immortal&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-            ),
+            )),
             <span class="ident">los</span>: <span class="ident">LargeObjectSpace::new</span>(
-                <span class="string">&quot;los&quot;</span>,
-                <span class="bool-val">true</span>,
-                <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
+                <span class="ident">args</span>.<span class="ident">get_space_args</span>(<span class="string">&quot;los&quot;</span>, <span class="bool-val">true</span>, <span class="ident">VMRequest::discontiguous</span>()),
                 <span class="bool-val">false</span>,
             ),
-            <span class="ident">nonmoving</span>: <span class="ident">ImmortalSpace::new</span>(
+            <span class="ident">nonmoving</span>: <span class="ident">ImmortalSpace::new</span>(<span class="ident">args</span>.<span class="ident">get_space_args</span>(
                 <span class="string">&quot;nonmoving&quot;</span>,
                 <span class="bool-val">true</span>,
                 <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">global_side_metadata_specs</span>.<span class="ident">clone</span>(),
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-            ),
-            <span class="ident">base</span>: <span class="ident">BasePlan::new</span>(
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-                <span class="ident">heap</span>,
-                <span class="ident">constraints</span>,
-                <span class="ident">global_side_metadata_specs</span>,
-            ),
+            )),
+            <span class="ident">base</span>: <span class="ident">BasePlan::new</span>(<span class="ident">args</span>),
         }
     }
 

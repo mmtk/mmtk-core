@@ -256,26 +256,13 @@
 <span id="254">254</span>
 <span id="255">255</span>
 <span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::BasePlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::GcStatus</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::AllocationSemantics</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Plan</span>;
@@ -286,17 +273,13 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorkScheduler</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::allocators::AllocatorSelector</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::Mmapper</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout::VMMap</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::options::Options</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="ident">enum_map::EnumMap</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
-<span class="kw">use</span> <span class="ident">std::sync::Arc</span>;
 
 <span class="kw">use</span> <span class="ident">mmtk_macros::PlanTraceObject</span>;
 
@@ -489,34 +472,21 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GenImmix</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">options</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">Options</span><span class="op">&gt;</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">heap</span> <span class="op">=</span> <span class="ident">HeapMeta::new</span>(<span class="kw-2">&amp;</span><span class="ident">options</span>);
-        <span class="comment">// We have no specific side metadata for copying. So just use the ones from generational.</span>
-        <span class="kw">let</span> <span class="ident">global_metadata_specs</span> <span class="op">=</span>
-            <span class="ident"><span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>();
-        <span class="kw">let</span> <span class="ident">immix_space</span> <span class="op">=</span> <span class="ident">ImmixSpace::new</span>(
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident">CreateGeneralPlanArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">plan_args</span> <span class="op">=</span> <span class="ident">CreateSpecificPlanArgs</span> {
+            <span class="ident">global_args</span>: <span class="ident">args</span>,
+            <span class="ident">constraints</span>: <span class="kw-2">&amp;</span><span class="ident">GENIMMIX_CONSTRAINTS</span>,
+            <span class="ident">global_side_metadata_specs</span>:
+                <span class="ident"><span class="kw">crate</span>::plan::generational::new_generational_global_metadata_specs</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(),
+        };
+        <span class="kw">let</span> <span class="ident">immix_space</span> <span class="op">=</span> <span class="ident">ImmixSpace::new</span>(<span class="ident">plan_args</span>.<span class="ident">get_space_args</span>(
             <span class="string">&quot;immix_mature&quot;</span>,
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="kw-2">&amp;mut</span> <span class="ident">heap</span>,
-            <span class="ident">scheduler</span>,
-            <span class="ident">global_metadata_specs</span>.<span class="ident">clone</span>(),
-        );
+            <span class="bool-val">true</span>,
+            <span class="ident">VMRequest::discontiguous</span>(),
+        ));
 
         <span class="kw">let</span> <span class="ident">genimmix</span> <span class="op">=</span> <span class="ident">GenImmix</span> {
-            <span class="ident">gen</span>: <span class="ident">Gen::new</span>(
-                <span class="ident">heap</span>,
-                <span class="ident">global_metadata_specs</span>,
-                <span class="kw-2">&amp;</span><span class="ident">GENIMMIX_CONSTRAINTS</span>,
-                <span class="ident">vm_map</span>,
-                <span class="ident">mmapper</span>,
-                <span class="ident">options</span>,
-            ),
+            <span class="ident">gen</span>: <span class="ident">Gen::new</span>(<span class="ident">plan_args</span>),
             <span class="ident">immix</span>: <span class="ident">immix_space</span>,
             <span class="ident">last_gc_was_defrag</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),
             <span class="ident">last_gc_was_full_heap</span>: <span class="ident">AtomicBool::new</span>(<span class="bool-val">false</span>),

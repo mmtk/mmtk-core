@@ -815,46 +815,18 @@
 <span id="813">813</span>
 <span id="814">814</span>
 <span id="815">815</span>
-<span id="816">816</span>
-<span id="817">817</span>
-<span id="818">818</span>
-<span id="819">819</span>
-<span id="820">820</span>
-<span id="821">821</span>
-<span id="822">822</span>
-<span id="823">823</span>
-<span id="824">824</span>
-<span id="825">825</span>
-<span id="826">826</span>
-<span id="827">827</span>
-<span id="828">828</span>
-<span id="829">829</span>
-<span id="830">830</span>
-<span id="831">831</span>
-<span id="832">832</span>
-<span id="833">833</span>
-<span id="834">834</span>
-<span id="835">835</span>
-<span id="836">836</span>
-<span id="837">837</span>
-<span id="838">838</span>
-<span id="839">839</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">block</span>::<span class="kw-2">*</span>, <span class="ident">defrag::Defrag</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::GCWorkerMutRef</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::sft::SFT</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::SpaceOptions</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space</span>::{<span class="ident">CommonSpace</span>, <span class="ident">Space</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::copy</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::chunk_map</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::heap_layout</span>::{<span class="ident">Mmapper</span>, <span class="ident">VMMap</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::BlockPageResource</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::HeapMeta</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::PageResource</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::VMRequest</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::linear_scan</span>::{<span class="ident">Region</span>, <span class="ident">RegionIterator</span>};
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata</span>::{<span class="ident">SideMetadataContext</span>, <span class="ident">SideMetadataSpec</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata::side_metadata::SideMetadataSpec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::metadata</span>::{<span class="self">self</span>, <span class="ident">MetadataSpec</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::object_forwarding</span> <span class="kw">as</span> <span class="ident">ForwardingWord</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util</span>::{<span class="ident">Address</span>, <span class="ident">ObjectReference</span>};
@@ -1034,39 +1006,19 @@
         })
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(
-        <span class="ident">name</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>,
-        <span class="ident">vm_map</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">VMMap</span>,
-        <span class="ident">mmapper</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Mmapper</span>,
-        <span class="ident">heap</span>: <span class="kw-2">&amp;mut</span> <span class="ident">HeapMeta</span>,
-        <span class="ident">scheduler</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-        <span class="ident">global_side_metadata_specs</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SideMetadataSpec</span><span class="op">&gt;</span>,
-    ) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">args</span>: <span class="ident"><span class="kw">crate</span>::policy::space::PlanCreateSpaceArgs</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_no_defrag&quot;</span>)]</span>
         <span class="macro">info!</span>(
             <span class="string">&quot;Creating non-moving ImmixSpace: {}. Block size: 2^{}&quot;</span>,
-            <span class="ident">name</span>,
+            <span class="ident">args</span>.<span class="ident">name</span>,
             <span class="ident">Block::LOG_BYTES</span>
         );
 
         <span class="ident"><span class="kw">super</span>::validate_features</span>();
-        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span> <span class="ident">CommonSpace::new</span>(
-            <span class="ident">SpaceOptions</span> {
-                <span class="ident">name</span>,
-                <span class="ident">movable</span>: <span class="bool-val">true</span>,
-                <span class="ident">immortal</span>: <span class="bool-val">false</span>,
-                <span class="ident">zeroed</span>: <span class="bool-val">true</span>,
-                <span class="ident">vmrequest</span>: <span class="ident">VMRequest::discontiguous</span>(),
-                <span class="ident">side_metadata_specs</span>: <span class="ident">SideMetadataContext</span> {
-                    <span class="ident">global</span>: <span class="ident">global_side_metadata_specs</span>,
-                    <span class="ident">local</span>: <span class="ident"><span class="self">Self</span>::side_metadata_specs</span>(),
-                },
-                <span class="ident">needs_log_bit</span>: <span class="bool-val">false</span>,
-            },
-            <span class="ident">vm_map</span>,
-            <span class="ident">mmapper</span>,
-            <span class="ident">heap</span>,
-        );
+        <span class="kw">let</span> <span class="ident">vm_map</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">vm_map</span>;
+        <span class="kw">let</span> <span class="ident">scheduler</span> <span class="op">=</span> <span class="ident">args</span>.<span class="ident">scheduler</span>.<span class="ident">clone</span>();
+        <span class="kw">let</span> <span class="ident">common</span> <span class="op">=</span>
+            <span class="ident">CommonSpace::new</span>(<span class="ident">args</span>.<span class="ident">into_policy_args</span>(<span class="bool-val">true</span>, <span class="bool-val">false</span>, <span class="ident"><span class="self">Self</span>::side_metadata_specs</span>()));
         <span class="ident">ImmixSpace</span> {
             <span class="ident">pr</span>: <span class="kw">if</span> <span class="ident">common</span>.<span class="ident">vmrequest</span>.<span class="ident">is_discontiguous</span>() {
                 <span class="ident">BlockPageResource::new_discontiguous</span>(
@@ -1090,7 +1042,7 @@
             <span class="ident">reusable_blocks</span>: <span class="ident">ReusableBlockPool::new</span>(<span class="ident">scheduler</span>.<span class="ident">num_workers</span>()),
             <span class="ident">defrag</span>: <span class="ident">Defrag::default</span>(),
             <span class="ident">mark_state</span>: <span class="ident"><span class="self">Self</span>::UNMARKED_STATE</span>,
-            <span class="ident">scheduler</span>,
+            <span class="ident">scheduler</span>: <span class="ident">scheduler</span>.<span class="ident">clone</span>(),
         }
     }
 

@@ -220,17 +220,13 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
     options: Arc&lt;UnsafeOptionsWrapper&gt;,
 ) -&gt; Box&lt;dyn Plan&lt;VM = VM&gt;&gt; {
     match plan {
-        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
-        PlanSelector::SemiSpace =&gt; Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options,
-        )),
+        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(args)),
+        PlanSelector::SemiSpace =&gt; Box::new(crate::plan::semispace::SemiSpace::new(args)),
 
         // ...
 
         // Create MyGC plan based on selector
-        PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(
-            vm_map, mmapper, options,
-        ))
+        PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(args))
     }
 }       
 <span class="boring">}</span></code></pre></pre>

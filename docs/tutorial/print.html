@@ -480,17 +480,13 @@ pub fn create_plan&lt;VM: VMBinding&gt;(
     options: Arc&lt;UnsafeOptionsWrapper&gt;,
 ) -&gt; Box&lt;dyn Plan&lt;VM = VM&gt;&gt; {
     match plan {
-        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(vm_map, mmapper, options)),
-        PlanSelector::SemiSpace =&gt; Box::new(crate::plan::semispace::SemiSpace::new(
-            vm_map, mmapper, options,
-        )),
+        PlanSelector::NoGC =&gt; Box::new(crate::plan::nogc::NoGC::new(args)),
+        PlanSelector::SemiSpace =&gt; Box::new(crate::plan::semispace::SemiSpace::new(args)),
 
         // ...
 
         // Create MyGC plan based on selector
-        PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(
-            vm_map, mmapper, options,
-        ))
+        PlanSelector::MyGC =&gt; Box::new(crate::plan::mygc::MyGC::new(args))
     }
 }       
 <span class="boring">}</span></code></pre></pre>
@@ -583,6 +579,7 @@ to be used to store an indicator of which copyspace is the tospace.</li>
 </span>use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
+use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
@@ -641,16 +638,7 @@ Instead, we will define the two copyspaces here.</li>
 </ol>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>            copyspace0: CopySpace::new(
-                &quot;copyspace0&quot;,
-                false,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &amp;mut heap,
-            ),
+</span>            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
 <span class="boring">}</span></code></pre></pre>
 <ol start="3">
 <li>Create another copyspace, called <code>copyspace1</code>, defining it as a fromspace 
@@ -660,38 +648,19 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
 </ol>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>    fn new(
-        vm_map: &amp;'static VMMap,
-        mmapper: &amp;'static Mmapper,
-        options: Arc&lt;Options&gt;,
-    ) -&gt; Self {
+</span>    fn new(args: CreateGeneralPlanArgs&lt;VM&gt;) -&gt; Self {
         // Modify
-        let mut heap = HeapMeta::new(&amp;options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&amp;[]);
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &amp;MYGC_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&amp;[]),
+        };
 
         let res = MyGC {
             hi: AtomicBool::new(false),
-            copyspace0: CopySpace::new(
-                &quot;copyspace0&quot;,
-                false,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &amp;mut heap,
-            ),
-            copyspace1: CopySpace::new(
-                &quot;copyspace1&quot;,
-                true,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &amp;mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &amp;MYGC_CONSTRAINTS, global_metadata_specs.clone()),
+            copyspace0: CopySpace::new(plan_args.get_space_args(&quot;copyspace0&quot;, true, VMRequest::discontiguous()), false),
+            copyspace1: CopySpace::new(plan_args.get_space_args(&quot;copyspace1&quot;, true, VMRequest::discontiguous()), true),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

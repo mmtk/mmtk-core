@@ -132,6 +132,19 @@
 <span id="130">130</span>
 <span id="131">131</span>
 <span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The GC controller thread.</span>
 <span class="doccomment">//!</span>
 <span class="doccomment">//! MMTk has many GC threads.  There are many GC worker threads and one GC controller thread.</span>
@@ -237,6 +250,15 @@
         <span class="comment">// Schedule collection.</span>
         <span class="ident">ScheduleCollection</span>.<span class="ident">do_work_with_stat</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">coordinator_worker</span>, <span class="self">self</span>.<span class="ident">mmtk</span>);
 
+        <span class="comment">// Tell GC trigger that GC started - this happens after ScheduleCollection so we</span>
+        <span class="comment">// will know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)</span>
+        <span class="self">self</span>.<span class="ident">mmtk</span>
+            .<span class="ident">plan</span>
+            .<span class="ident">base</span>()
+            .<span class="ident">gc_trigger</span>
+            .<span class="ident">policy</span>
+            .<span class="ident">on_gc_start</span>(<span class="self">self</span>.<span class="ident">mmtk</span>);
+
         <span class="comment">// Drain the message queue and execute coordinator work.</span>
         <span class="kw">loop</span> {
             <span class="kw">let</span> <span class="ident">message</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">receiver</span>.<span class="ident">recv</span>().<span class="ident">unwrap</span>();
@@ -254,6 +276,10 @@
             }
         }
         <span class="self">self</span>.<span class="ident">scheduler</span>.<span class="ident">deactivate_all</span>();
+
+        <span class="comment">// Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.</span>
+        <span class="self">self</span>.<span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_trigger</span>.<span class="ident">policy</span>.<span class="ident">on_gc_end</span>(<span class="self">self</span>.<span class="ident">mmtk</span>);
+
         <span class="comment">// Finalization: Resume mutators, reset gc states</span>
         <span class="comment">// Note: Resume-mutators must happen after all work buckets are closed.</span>
         <span class="comment">//       Otherwise, for generational GCs, workers will receive and process</span>
