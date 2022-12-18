@@ -21,7 +21,6 @@ use crate::mmtk::SFT_MAP;
 #[cfg(debug_assertions)]
 use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
-use crate::policy::sft_map::SFTMap;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::layout::heap_layout::Mmapper;
@@ -69,8 +68,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
         if should_poll && self.get_gc_trigger().poll(false, Some(self.as_space())) {
             debug!("Collection required");
             assert!(allow_gc, "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
-            pr.clear_request(pages_reserved);
             VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We have checked that this is mutator
+            pr.clear_request(pages_reserved); // clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
             unsafe { Address::zero() }
         } else {
             debug!("Collection not required");
@@ -176,8 +175,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 
                     let gc_performed = self.get_gc_trigger().poll(true, Some(self.as_space()));
                     debug_assert!(gc_performed, "GC not performed when forced.");
-                    pr.clear_request(pages_reserved);
                     VM::VMCollection::block_for_gc(VMMutatorThread(tls)); // We asserted that this is mutator.
+                    pr.clear_request(pages_reserved); // clear the pages after GC. We need those reserved pages so we can compute new heap size properly.
                     unsafe { Address::zero() }
                 }
             }

@@ -6,7 +6,6 @@ use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
 use crate::policy::sft::GCWorkerMutRef;
-use crate::policy::sft_map::SFTMap;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
 use crate::util::metadata::side_metadata::SideMetadataContext;
