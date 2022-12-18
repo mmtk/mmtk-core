@@ -5,11 +5,8 @@ use crate::policy::sft::GCWorkerMutRef;
 use crate::policy::sft::SFT;
 use crate::policy::space::CommonSpace;
 use crate::scheduler::GCWorkScheduler;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
+use crate::util::heap::gc_trigger::GCTrigger;
 use crate::util::heap::PageResource;
-use crate::util::heap::VMRequest;
 use crate::util::malloc::library::{BYTES_IN_MALLOC_PAGE, LOG_BYTES_IN_MALLOC_PAGE};
 use crate::util::malloc::malloc_ms_util::*;
 use crate::util::metadata::side_metadata::{
@@ -47,6 +44,7 @@ pub struct MallocSpace<VM: VMBinding> {
     metadata: SideMetadataContext,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
+    gc_trigger: Arc<GCTrigger<VM>>,
     // Mapping between allocated address and its size - this is used to check correctness.
     // Size will be set to zero when the memory is freed.
     #[cfg(debug_assertions)]
@@ -141,6 +139,10 @@ impl<VM: VMBinding> Space<VM> for MallocSpace<VM> {
 
     fn common(&self) -> &CommonSpace<VM> {
         unreachable!()
+    }
+
+    fn get_gc_trigger(&self) -> &GCTrigger<VM> {
+        self.gc_trigger.as_ref()
     }
 
     fn initialize_sft(&self) {
@@ -252,17 +254,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
         specs.push(ACTIVE_CHUNK_METADATA_SPEC);
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        _name: &'static str,
-        _zeroed: bool,
-        _vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        _vm_map: &'static VMMap,
-        _mmapper: &'static Mmapper,
-        _heap: &mut HeapMeta,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
         MallocSpace {
             phantom: PhantomData,
             active_bytes: AtomicUsize::new(0),
@@ -270,14 +262,15 @@ impl<VM: VMBinding> MallocSpace<VM> {
             chunk_addr_min: AtomicUsize::new(usize::max_value()), // XXX: have to use AtomicUsize to represent an Address
             chunk_addr_max: AtomicUsize::new(0),
             metadata: SideMetadataContext {
-                global: global_side_metadata_specs,
+                global: args.global_side_metadata_specs.clone(),
                 local: metadata::extract_side_metadata(&[
                     MetadataSpec::OnSide(ACTIVE_PAGE_METADATA_SPEC),
                     MetadataSpec::OnSide(OFFSET_MALLOC_METADATA_SPEC),
                     *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
                 ]),
             },
-            scheduler,
+            scheduler: args.scheduler.clone(),
+            gc_trigger: args.gc_trigger,
             #[cfg(debug_assertions)]
             active_mem: Mutex::new(HashMap::new()),
             #[cfg(debug_assertions)]
@@ -338,7 +331,7 @@ impl<VM: VMBinding> MallocSpace<VM> {
 
     pub fn alloc(&self, tls: VMThread, size: usize, align: usize, offset: isize) -> Address {
         // TODO: Should refactor this and Space.acquire()
-        if VM::VMActivePlan::global().poll(false, Some(self)) {
+        if self.get_gc_trigger().poll(false, Some(self)) {
             assert!(VM::VMActivePlan::is_mutator(tls), "Polling in GC worker");
             VM::VMCollection::block_for_gc(VMMutatorThread(tls));
             return unsafe { Address::zero() };

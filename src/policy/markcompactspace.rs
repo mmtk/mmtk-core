@@ -1,5 +1,5 @@
 use super::sft::SFT;
-use super::space::{CommonSpace, Space, SpaceOptions};
+use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
@@ -7,10 +7,8 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::extract_side_metadata;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
@@ -204,36 +202,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         MarkCompactSpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)

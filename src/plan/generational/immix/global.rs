@@ -3,6 +3,8 @@ use super::gc_work::GenImmixNurseryGCWorkContext;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -13,17 +15,13 @@ use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
-use crate::util::options::Options;
+use crate::util::heap::VMRequest;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -216,34 +214,21 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> GenImmix<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        // We have no specific side metadata for copying. So just use the ones from generational.
-        let global_metadata_specs =
-            crate::plan::generational::new_generational_global_metadata_specs::<VM>();
-        let immix_space = ImmixSpace::new(
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &GENIMMIX_CONSTRAINTS,
+            global_side_metadata_specs:
+                crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
+        };
+        let immix_space = ImmixSpace::new(plan_args.get_space_args(
             "immix_mature",
-            vm_map,
-            mmapper,
-            &mut heap,
-            scheduler,
-            global_metadata_specs.clone(),
-        );
+            true,
+            VMRequest::discontiguous(),
+        ));
 
         let genimmix = GenImmix {
-            gen: Gen::new(
-                heap,
-                global_metadata_specs,
-                &GENIMMIX_CONSTRAINTS,
-                vm_map,
-                mmapper,
-                options,
-            ),
+            gen: Gen::new(plan_args),
             immix: immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
             last_gc_was_full_heap: AtomicBool::new(false),
