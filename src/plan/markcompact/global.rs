@@ -3,9 +3,9 @@ use super::gc_work::{
     CalculateForwardingAddress, Compact, ForwardingProcessEdges, MarkingProcessEdges,
     UpdateReferences,
 };
-use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::GcStatus;
+use crate::plan::global::{BasePlan, CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::markcompact::mutator::ALLOCATOR_MAPPING;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -18,17 +18,12 @@ use crate::util::alloc::allocators::AllocatorSelector;
 #[cfg(not(feature = "global_alloc_bit"))]
 use crate::util::alloc_bit::ALLOC_SIDE_METADATA_SPEC;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSanity};
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 
 use enum_map::EnumMap;
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -183,38 +178,29 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
 }
 
 impl<VM: VMBinding> MarkCompact<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         // if global_alloc_bit is enabled, ALLOC_SIDE_METADATA_SPEC will be added to
         // SideMetadataContext by default, so we don't need to add it here.
         #[cfg(feature = "global_alloc_bit")]
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let global_side_metadata_specs = SideMetadataContext::new_global_specs(&[]);
         // if global_alloc_bit is NOT enabled,
         // we need to add ALLOC_SIDE_METADATA_SPEC to SideMetadataContext here.
         #[cfg(not(feature = "global_alloc_bit"))]
-        let global_metadata_specs =
+        let global_side_metadata_specs =
             SideMetadataContext::new_global_specs(&[ALLOC_SIDE_METADATA_SPEC]);
 
-        let mc_space = MarkCompactSpace::new(
-            "mark_compact_space",
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
-        );
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MARKCOMPACT_CONSTRAINTS,
+            global_side_metadata_specs,
+        };
+
+        let mc_space =
+            MarkCompactSpace::new(plan_args.get_space_args("mc", true, VMRequest::discontiguous()));
 
         let res = MarkCompact {
             mc_space,
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &MARKCOMPACT_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

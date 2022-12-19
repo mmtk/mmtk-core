@@ -832,12 +832,9 @@ impl SideMetadataContext {
         #[cfg(feature = "global_alloc_bit")]
         ret.push(ALLOC_SIDE_METADATA_SPEC);
 
-        {
-            use crate::policy::sft_map::SFTMap;
-            if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata() {
-                if spec.is_global {
-                    ret.push(*spec);
-                }
+        if let Some(spec) = crate::mmtk::SFT_MAP.get_side_metadata() {
+            if spec.is_global {
+                ret.push(*spec);
             }
         }
 

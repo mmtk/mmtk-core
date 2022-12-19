@@ -103,6 +103,15 @@ impl<VM: VMBinding> GCController<VM> {
         // Schedule collection.
         ScheduleCollection.do_work_with_stat(&mut self.coordinator_worker, self.mmtk);
 
+        // Tell GC trigger that GC started - this happens after ScheduleCollection so we
+        // will know what kind of GC this is (e.g. nursery vs mature in gen copy, defrag vs fast in Immix)
+        self.mmtk
+            .plan
+            .base()
+            .gc_trigger
+            .policy
+            .on_gc_start(self.mmtk);
+
         // Drain the message queue and execute coordinator work.
         loop {
             let message = self.receiver.recv().unwrap();
@@ -120,6 +129,10 @@ impl<VM: VMBinding> GCController<VM> {
             }
         }
         self.scheduler.deactivate_all();
+
+        // Tell GC trigger that GC ended - this happens before EndOfGC where we resume mutators.
+        self.mmtk.plan.base().gc_trigger.policy.on_gc_end(self.mmtk);
+
         // Finalization: Resume mutators, reset gc states
         // Note: Resume-mutators must happen after all work buckets are closed.
         //       Otherwise, for generational GCs, workers will receive and process

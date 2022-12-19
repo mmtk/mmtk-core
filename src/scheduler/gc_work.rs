@@ -621,7 +621,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
-        use crate::policy::sft_map::SFTMap;
 
         if object.is_null() {
             return object;
