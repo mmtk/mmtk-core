@@ -127,7 +127,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
     }
 }
 
-/// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, https://dl.acm.org/doi/10.1145/3563323)
+/// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, <https://dl.acm.org/doi/10.1145/3563323>)
 /// We use MemBalancer to decide a heap limit between the min heap and the max heap.
 /// The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
 /// and uses a fixed constant instead.

@@ -4,7 +4,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use num_traits::{Unsigned, WrappingAdd, WrappingSub, Zero};
 
 /// Describes bits and log2 bits for the numbers.
-/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/247
+/// If num_traits has this, we do not need our own implementation: <https://github.com/rust-num/num-traits/issues/247>
 pub trait Bits {
     const BITS: u32;
     const LOG2: u32;
@@ -24,7 +24,7 @@ impl_bits_trait!(u64);
 impl_bits_trait!(usize);
 
 /// Describes bitwise operations.
-/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/232
+/// If num_traits has this, we do not need our own implementation: <https://github.com/rust-num/num-traits/issues/232>
 pub trait BitwiseOps {
     fn bitand(self, other: Self) -> Self;
     fn bitor(self, other: Self) -> Self;
