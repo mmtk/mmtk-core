@@ -279,7 +279,7 @@ pub trait Plan: 'static + Sync + Downcast {
 
     /// Return the number of used pages in the mature space. Only
     /// generational plans have to implement this function.
-    fn get_mature_used_pages(&self) -> usize {
+    fn get_mature_reserved_pages(&self) -> usize {
         panic!("This is not a generational plan.")
     }
 

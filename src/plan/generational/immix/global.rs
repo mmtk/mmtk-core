@@ -196,7 +196,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.immix.available_physical_pages()
     }
 
-    fn get_mature_used_pages(&self) -> usize {
+    fn get_mature_reserved_pages(&self) -> usize {
         self.immix.reserved_pages()
     }
 

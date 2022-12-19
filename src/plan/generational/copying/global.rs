@@ -154,7 +154,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         self.tospace().available_physical_pages()
     }
 
-    fn get_mature_used_pages(&self) -> usize {
+    fn get_mature_reserved_pages(&self) -> usize {
         self.tospace().reserved_pages()
     }
 
