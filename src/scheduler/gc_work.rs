@@ -3,14 +3,12 @@ use super::*;
 use crate::plan::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
-use crate::util::metadata::*;
 use crate::util::*;
 use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
@@ -380,11 +378,6 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
     #[inline]
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
-        debug_assert!(
-            !self.nodes.is_empty(),
-            "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
-        );
-
         self.nodes.take()
     }
 }
@@ -460,11 +453,10 @@ pub trait ProcessEdgesWork:
     /// this method will simply return with no work packet created.
     #[cold]
     fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
         let nodes = self.pop_nodes();
-        self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+        if !nodes.is_empty() {
+            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+        }
     }
 
     #[inline]
@@ -523,21 +515,17 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        use crate::policy::space::*;
+        use crate::policy::sft::GCWorkerMutRef;
 
         if object.is_null() {
             return object;
         }
 
-        // Make sure we have valid SFT entries for the object.
-        #[cfg(debug_assertions)]
-        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(object);
-
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
 
         // Invoke trace object on sft
-        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_address::<VM>()) };
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
@@ -767,47 +755,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
         trace!("ScanObjects");
         self.do_work_common(&self.buffer, worker, mmtk);
         trace!("ScanObjects End");
-    }
-}
-
-pub struct ProcessModBuf<E: ProcessEdgesWork> {
-    modbuf: Vec<ObjectReference>,
-    phantom: PhantomData<E>,
-    meta: MetadataSpec,
-}
-
-impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
-        Self {
-            modbuf,
-            meta,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline(always)]
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modbuf.is_empty() {
-            for obj in &self.modbuf {
-                self.meta
-                    .store_atomic::<E::VM, u8>(*obj, 1, None, Ordering::SeqCst);
-            }
-        }
-        if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut modbuf = vec![];
-                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(
-                    &mut ScanObjects::<E>::new(modbuf, false, false),
-                    worker,
-                    mmtk,
-                )
-            }
-        } else {
-            // Do nothing
-        }
     }
 }
 

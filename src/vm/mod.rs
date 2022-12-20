@@ -35,6 +35,9 @@ pub use self::scanning::ObjectTracer;
 pub use self::scanning::RootsWorkFactory;
 pub use self::scanning::Scanning;
 
+const DEFAULT_LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
+const DEFAULT_LOG_MAX_ALIGNMENT: usize = LOG_BYTES_IN_LONG as usize;
+
 /// The `VMBinding` trait associates with each trait, and provides VM-specific constants.
 pub trait VMBinding
 where
@@ -48,22 +51,19 @@ where
 
     /// The type of edges in this VM.
     type VMEdge: edge_shape::Edge;
+    /// The type of heap memory slice in this VM.
+    type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
     const ALIGNMENT_VALUE: usize = 0xdead_beef;
-    /// Allowed minimal alignment.
-    const LOG_MIN_ALIGNMENT: usize = LOG_BYTES_IN_INT as usize;
     /// Allowed minimal alignment in bytes.
-    const MIN_ALIGNMENT: usize = 1 << Self::LOG_MIN_ALIGNMENT;
-    #[cfg(target_arch = "x86")]
-    /// Allowed maximum alignment as shift by min alignment.    
-    const MAX_ALIGNMENT_SHIFT: usize = 1 + LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-    #[cfg(target_arch = "x86_64")]
-    /// Allowed maximum alignment as shift by min alignment.    
-    const MAX_ALIGNMENT_SHIFT: usize = LOG_BYTES_IN_LONG as usize - LOG_BYTES_IN_INT as usize;
-
+    const MIN_ALIGNMENT: usize = 1 << DEFAULT_LOG_MIN_ALIGNMENT;
     /// Allowed maximum alignment in bytes.
-    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
+    const MAX_ALIGNMENT: usize = 1 << DEFAULT_LOG_MAX_ALIGNMENT;
+    /// Does the binding use a non-zero allocation offset? If this is false, we expect the binding
+    /// to always use offset === 0 for allocation, and we are able to do some optimization if we know
+    /// offset === 0.
+    const USE_ALLOCATION_OFFSET: bool = true;
 
     /// This value is used to assert if the cursor is reasonable after allocations.
     /// At the end of an allocation, the allocation cursor should be aligned to this value.

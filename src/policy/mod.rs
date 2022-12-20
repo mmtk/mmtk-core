@@ -17,11 +17,13 @@ pub mod space;
 pub mod copy_context;
 /// Policy specific GC work
 pub mod gc_work;
+pub mod sft;
+pub mod sft_map;
 
 pub mod copyspace;
 pub mod immix;
 pub mod immortalspace;
 pub mod largeobjectspace;
 pub mod lockfreeimmortalspace;
-pub mod mallocspace;
 pub mod markcompactspace;
+pub mod marksweepspace;

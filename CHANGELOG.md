@@ -1,3 +1,96 @@
+0.16.0 (2022-12-006)
+===
+
+Plan
+---
+
+* Refactor `MarkSweep` to work with both our native mark sweep policy and the malloc mark sweep policy backed by malloc libraries.
+
+Allocators
+---
+
+* Add `FreeListAllocator` which is implemented as a `MiMalloc` allocator.
+* Fix a bug in `ImmixAllocator` that alignment is properly taken into consideration when deciding whether to do overflow allocation.
+
+Policies
+---
+
+* Add `MarkSweepSpace`:
+  * It uses our native MiMalloc implementation in MMTk core.
+  * When the feature `malloc_mark_sweep` is enabled, it uses the selected malloc library to back up its allocation.
+* Malloc mark sweep now accounts for memory based on page usage, and each malloc library may use a different page size.
+* The immix space now uses the newly added `BlockPageResource`.
+* Changes to Space Function Table (SFT) to improve our boot time and reduce the memory footprint:
+  * Rename the current SFT map to `SFTSparseChunkMap`, and only use it for 32 bits architectures.
+  * Add `SFTSpaceMap` and by default use it for 64 bits architectures.
+  * Add `SFTDenseChunkMap` and use it when we have no control of the virtual address range for a MMTk space on 64 bits architectures.
+
+API
+---
+
+* Add an option `thread_affinity` to set processor affinity for MMTk GC threads.
+* Add `AllocationSemantics::NonMoving` to allocate objects that are known to be non-moving at allocation time.
+* Add `ReferenceGlue::is_referent_cleared` to allow some bindings to use a special value rather than a normal null reference for a cleared referent.
+* Add `pin`, `unpin`, and `is_pinned` for object pinning. Note that some spaces do not support object pinning, and using these methods may
+  cause panic if the space does not support object pinning.
+* Refactor `ObjectReference`:
+  * MMTk core now pervasively uses `ObjectModel::ref_to_address` to get an address from an object reference for setting per-object side metadata.
+  * Add `ObjectModel::address_to_ref` that does the opposite of `ref_to_address`: getting an object reference from an address that is returned by `ref_to_address`.
+  * Add `ObjectModel::ref_to_header` for the binding to tell us the base header address from an object reference.
+  * Rename `ObjectModel::object_start_ref` to `ObjectModel::ref_to_object_start` (to be consistent with other methods).
+  * Remove `ObjectModel::OBJECT_REF_OFFSET_BEYOND_CELL`, as we no longer use the raw address of an object reference.
+  * Add `ObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS`. If a binding uses the same address for `ObjectReference`, `ref_to_address` and `ref_to_object_start`,
+    they should set this to `true`. MMTk can utilize this information for optimization.
+  * Add `ObjectModel::OBJECT_REF_OFFSET_LOWER_BOUND` to specify the minimam value of the possible offsets between an allocation result and object reference's raw address.
+* `destroy_mutator()` no longer requires a boxed mutator as its argument. Instead, a mutable reference to the mutator is required. It is made clear that the binding should
+  manage the lifetime of the boxed mutator from a `bind_mutator()` call.
+* Remove `VMBinding::LOG_MIN_ALIGNMENT` and `VMBinding::MAX_ALIGNMENT_SHIFT` (so we only keep `VMBinding::MIN_ALIGNMENT` and `VMBinding::MAX_ALIGNMENT`).
+
+Misc
+---
+
+* Add a lock-free `BlockPageResource` that can be used for policies that always allocate memory at the granularity of a fixed sized block.
+  This page resource facilitates block allocation and reclamation, and uses lock-free operations where possible.
+* Fix a race condition in `FreeListPageResource` when multiple threads release pages.
+* Fix a bug in `fetch_and/or` in our metadata implementation.
+* Fix a bug in side metadata bulk zeroing that may zero unrelated bits if the zeroed region cannot be mapped to whole metadata bytes.
+* Remove unused `meta_data_pages_per_region` in page resource implementations.
+* Remove the use of `MaybeUninit::uninit().assume_init()` in `FreeListPageResource` which has undefined behaviors
+  and causes the illegal instruction error with newer Rust toolchains.
+* Remove the trait bound `From<Address>` and `Into<Address>` for `Region`, as we cannot guarantee safe conversion between those two types.
+* Extract `Chunk` and `ChunkMap` from the immix policy, and make it available for all the policies.
+
+0.15.0 (2022-09-20)
+===
+
+GC Plans
+---
+* Generational plans now support bounded nursery size and fixed nursery size.
+* Immix can be used in a non-moving variant (with no defragmentation) to facilitate early porting stages
+  where a non-moving GC is expected by the VM. Enable the feature `immix_no_defrag` to use the variant.
+  Note that this variant performs poorly, compared to normal immix.
+
+API
+---
+* Add `mod build_info` for bindings to get information about the current build.
+* Add `trait Edge`. A binding can implement its own edge type if they need more sophisiticated edges than a simple address slot,
+  e.g. to support compressed pointers, base pointers with offsets, or tagged pointers.
+* Add APIs for implementing write barriers. MMTk provides subusming barriers `object_reference_write()` and pre/post write barriers `object_reference_write_pre/post()`.
+* Add APIs for implementing barriers for memory copying such as `array_copy` in Java. MMTk provides `memory_region_copy()` (subsuming) and `memory_region_copy_pre/post()`.
+* The `ignore_system_g_c` option is renamed to `ignore_system_gc` to be consistent with our naming convention.
+* The `max/min_nursery` option is replaced by `nursery`. Bindings can use `nursery=Fixed:<size>` or `Bounded:<size>` to config the nursery size.
+* Metadata access methods now requires a type parameter for the metadata value.
+* Metadata compare-exchange methods now return a `Result` rather than a boolean, which is more consistent with Rust atomic types.
+* Metadata now supports `fetch_and`, `fetch_or` and `fetch_update`.
+* Header metadata access methods in `ObjectModel` now have default implementations.
+
+Misc
+---
+* Remove all stdout printing in MMTk.
+* Fix a bug that `CopySpace` should not try zeroing alloc bit if there is no allocation in the space.
+* Fix a few issues in documentation.
+
+
 0.14.0 (2022-08-08)
 ===
 

@@ -4,6 +4,8 @@ use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -13,17 +15,12 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -175,42 +172,25 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenCopy<VM> {
-    pub fn new(vm_map: &'static VMMap, mmapper: &'static Mmapper, options: Arc<Options>) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        // We have no specific side metadata for copying. So just use the ones from generational.
-        let global_metadata_specs =
-            crate::plan::generational::new_generational_global_metadata_specs::<VM>();
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &GENCOPY_CONSTRAINTS,
+            global_side_metadata_specs:
+                crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
+        };
 
         let copyspace0 = CopySpace::new(
-            "copyspace0",
+            plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()),
             false,
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
         let copyspace1 = CopySpace::new(
-            "copyspace1",
+            plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()),
             true,
-            true,
-            VMRequest::discontiguous(),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
 
         let res = GenCopy {
-            gen: Gen::new(
-                heap,
-                global_metadata_specs,
-                &GENCOPY_CONSTRAINTS,
-                vm_map,
-                mmapper,
-                options,
-            ),
+            gen: Gen::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,

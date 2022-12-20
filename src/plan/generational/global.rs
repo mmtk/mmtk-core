@@ -1,19 +1,14 @@
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::ObjectQueue;
 use crate::plan::Plan;
-use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::conversions;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::options::Options;
 use crate::util::statistics::counter::EventCounter;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -42,32 +37,16 @@ pub struct Gen<VM: VMBinding> {
 }
 
 impl<VM: VMBinding> Gen<VM> {
-    pub fn new(
-        mut heap: HeapMeta,
-        global_metadata_specs: Vec<SideMetadataSpec>,
-        constraints: &'static PlanConstraints,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-    ) -> Self {
+    pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
         let nursery = CopySpace::new(
-            "nursery",
-            false,
+            args.get_space_args(
+                "nursery",
+                true,
+                VMRequest::fixed_extent(args.global_args.options.get_max_nursery(), false),
+            ),
             true,
-            VMRequest::fixed_extent(options.get_max_nursery(), false),
-            global_metadata_specs.clone(),
-            vm_map,
-            mmapper,
-            &mut heap,
         );
-        let common = CommonPlan::new(
-            vm_map,
-            mmapper,
-            options,
-            heap,
-            constraints,
-            global_metadata_specs,
-        );
+        let common = CommonPlan::new(args);
 
         let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
@@ -262,7 +241,8 @@ impl<VM: VMBinding> Gen<VM> {
     /// Check a plan to see if the next GC should be a full heap GC.
     ///
     /// Note that this function should be called after all spaces have been released. This is
-    /// required as we may get incorrect values since this function uses [`get_available_pages`]
+    /// required as we may get incorrect values since this function uses
+    /// [`get_available_pages`](crate::plan::Plan::get_available_pages)
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
         plan.get_available_pages()

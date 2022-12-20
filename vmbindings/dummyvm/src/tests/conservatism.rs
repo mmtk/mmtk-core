@@ -54,7 +54,7 @@ pub fn null() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         let addr = Address::ZERO;
         assert_filter_fail(addr);
-        assert_invalid_objref(addr, fixture.objref.to_address());
+        assert_invalid_objref(addr, fixture.objref.to_raw_address());
     });
 }
 
@@ -66,7 +66,7 @@ pub fn too_small() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for offset in 1usize..SMALL_OFFSET {
             let addr = Address::ZERO + offset;
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(addr, fixture.objref.to_raw_address());
         }
     });
 }
@@ -75,7 +75,7 @@ pub fn too_small() {
 pub fn max() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         let addr = Address::MAX;
-        assert_invalid_objref(addr, fixture.objref.to_address());
+        assert_invalid_objref(addr, fixture.objref.to_raw_address());
     });
 }
 
@@ -84,7 +84,7 @@ pub fn too_big() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for offset in 1usize..SMALL_OFFSET {
             let addr = Address::MAX - offset;
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(addr, fixture.objref.to_raw_address());
         }
     });
 }
@@ -92,7 +92,7 @@ pub fn too_big() {
 #[test]
 pub fn direct_hit() {
     SINGLE_OBJECT.with_fixture(|fixture| {
-        let addr = fixture.objref.to_address();
+        let addr = fixture.objref.to_raw_address();
         assert_filter_pass(addr);
         assert_valid_objref(addr);
     });
@@ -104,9 +104,9 @@ const SEVERAL_PAGES: usize = 4 * mmtk::util::constants::BYTES_IN_PAGE;
 pub fn small_offsets() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for offset in 1usize..SEVERAL_PAGES {
-            let addr = fixture.objref.to_address() + offset;
+            let addr = fixture.objref.to_raw_address() + offset;
             if basic_filter(addr) {
-                assert_invalid_objref(addr, fixture.objref.to_address());
+                assert_invalid_objref(addr, fixture.objref.to_raw_address());
             }
         }
     });
@@ -117,9 +117,9 @@ pub fn medium_offsets_aligned() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         let alignment = std::mem::align_of::<Address>();
         for offset in (alignment..(alignment * SEVERAL_PAGES)).step_by(alignment) {
-            let addr = fixture.objref.to_address() + offset;
+            let addr = fixture.objref.to_raw_address() + offset;
             assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(addr, fixture.objref.to_raw_address());
         }
     });
 }
@@ -129,12 +129,12 @@ pub fn large_offsets_aligned() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in 12usize..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_address().as_usize().checked_add(offset) {
+            let addr = match fixture.objref.to_raw_address().as_usize().checked_add(offset) {
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
             assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(addr, fixture.objref.to_raw_address());
         }
     });
 }
@@ -144,13 +144,13 @@ pub fn negative_offsets() {
     SINGLE_OBJECT.with_fixture(|fixture| {
         for log_offset in LOG_BITS_IN_WORD..(usize::BITS as usize) {
             let offset = 1usize << log_offset;
-            let addr = match fixture.objref.to_address().as_usize().checked_sub(offset) {
+            let addr = match fixture.objref.to_raw_address().as_usize().checked_sub(offset) {
                 Some(0) => break,
                 Some(n) => unsafe { Address::from_usize(n) },
                 None => break,
             };
             assert_filter_pass(addr);
-            assert_invalid_objref(addr, fixture.objref.to_address());
+            assert_invalid_objref(addr, fixture.objref.to_raw_address());
         }
     });
 }

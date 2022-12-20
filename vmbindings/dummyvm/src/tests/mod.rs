@@ -7,6 +7,7 @@
 mod issue139;
 mod handle_mmap_oom;
 mod handle_mmap_conflict;
+mod allocate_align_offset;
 mod allocate_without_initialize_collection;
 mod allocate_with_initialize_collection;
 mod allocate_with_disable_collection;

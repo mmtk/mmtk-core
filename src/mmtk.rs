@@ -1,6 +1,6 @@
 ///! MMTk instance.
 use crate::plan::Plan;
-use crate::policy::space::SFTMap;
+use crate::policy::sft_map::{create_sft_map, SFTMap};
 use crate::scheduler::GCWorkScheduler;
 
 #[cfg(feature = "extreme_assertions")]
@@ -40,7 +40,7 @@ lazy_static! {
 use crate::util::rust_util::InitializeOnce;
 
 // A global space function table that allows efficient dispatch space specific code for addresses in our heap.
-pub static SFT_MAP: InitializeOnce<SFTMap<'static>> = InitializeOnce::new();
+pub static SFT_MAP: InitializeOnce<Box<dyn SFTMap>> = InitializeOnce::new();
 
 // MMTk builder. This is used to set options before actually creating an MMTk instance.
 pub struct MMTKBuilder {
@@ -99,7 +99,7 @@ impl<VM: VMBinding> MMTK<VM> {
     pub fn new(options: Arc<Options>) -> Self {
         // Initialize SFT first in case we need to use this in the constructor.
         // The first call will initialize SFT map. Other calls will be blocked until SFT map is initialized.
-        SFT_MAP.initialize_once(&SFTMap::new);
+        SFT_MAP.initialize_once(&create_sft_map);
 
         let num_workers = if cfg!(feature = "single_worker") {
             1
@@ -107,7 +107,8 @@ impl<VM: VMBinding> MMTK<VM> {
             *options.threads
         };
 
-        let scheduler = GCWorkScheduler::new(num_workers);
+        let scheduler = GCWorkScheduler::new(num_workers, (*options.thread_affinity).clone());
+
         let plan = crate::plan::create_plan(
             *options.plan,
             &VM_MAP,

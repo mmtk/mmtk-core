@@ -1,3 +1,4 @@
+use crate::scheduler::affinity::{get_total_num_cpus, CoreId};
 use crate::util::constants::DEFAULT_STRESS_FACTOR;
 use crate::util::constants::LOG_BYTES_IN_MBYTE;
 use std::default::Default;
@@ -254,6 +255,100 @@ macro_rules! options {
     ]
 }
 
+#[derive(Clone, Debug, PartialEq)]
+/// AffinityKind describes how to set the affinity of GC threads. Note that we currently assume
+/// that each GC thread is equivalent to an OS or hardware thread.
+pub enum AffinityKind {
+    /// Delegate thread affinity to the OS scheduler
+    OsDefault,
+    /// Assign thread affinities over a list of cores in a round robin fashion. Note that if number
+    /// of threads > number of cores specified, then multiple threads will be assigned the same
+    /// core.
+    // XXX: Maybe using a u128 bitvector with each bit representing a core is more performant?
+    RoundRobin(Vec<CoreId>),
+}
+
+impl AffinityKind {
+    /// Returns an AffinityKind or String containing error. Expects the list of cores to be
+    /// formatted as numbers separated by commas, including ranges. There should be no spaces
+    /// between the cores in the list. For example: 0,5,8-11 specifies that the cores 0,5,8,9,10,11
+    /// should be used for pinning threads. Performs de-duplication of specified cores. Note that
+    /// the core list is sorted as a side-effect whenever a new core is added to the set.
+    fn parse_cpulist(cpulist: &str) -> Result<AffinityKind, String> {
+        let mut cpuset = vec![];
+
+        if cpulist.is_empty() {
+            return Ok(AffinityKind::OsDefault);
+        }
+
+        // Split on ',' first and then split on '-' if there is a range
+        for split in cpulist.split(',') {
+            if !split.contains('-') {
+                if !split.is_empty() {
+                    if let Ok(core) = split.parse::<u16>() {
+                        cpuset.push(core);
+                        cpuset.sort_unstable();
+                        cpuset.dedup();
+                        continue;
+                    }
+                }
+            } else {
+                // Contains a range
+                let range: Vec<&str> = split.split('-').collect();
+                if range.len() == 2 {
+                    if let Ok(start) = range[0].parse::<u16>() {
+                        if let Ok(end) = range[1].parse::<u16>() {
+                            if start >= end {
+                                return Err(
+                                    "Starting core id in range should be less than the end"
+                                        .to_string(),
+                                );
+                            }
+
+                            for cpu in start..=end {
+                                cpuset.push(cpu);
+                                cpuset.sort_unstable();
+                                cpuset.dedup();
+                            }
+
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            return Err("Core ids have been incorrectly specified".to_string());
+        }
+
+        Ok(AffinityKind::RoundRobin(cpuset))
+    }
+
+    /// Return true if the affinity is either OsDefault or the cores in the list do not exceed the
+    /// maximum number of cores allocated to the program. Assumes core ids on the system are
+    /// 0-indexed.
+    pub fn validate(&self) -> bool {
+        let num_cpu = get_total_num_cpus();
+
+        if let AffinityKind::RoundRobin(cpuset) = self {
+            for cpu in cpuset {
+                if cpu >= &num_cpu {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+
+impl FromStr for AffinityKind {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        AffinityKind::parse_cpulist(s)
+    }
+}
+
 #[derive(Copy, Clone, EnumString, Debug)]
 /// Different nursery types.
 pub enum NurseryKind {
@@ -331,6 +426,201 @@ impl Options {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum GCTriggerSelector {
+    FixedHeapSize(usize),
+    DynamicHeapSize(usize, usize),
+    Delegated,
+}
+
+impl GCTriggerSelector {
+    const K: u64 = 1024;
+    const M: u64 = 1024 * Self::K;
+    const G: u64 = 1024 * Self::M;
+    const T: u64 = 1024 * Self::G;
+
+    /// Parse a size representation, which could be a number to represents bytes,
+    /// or a number with the suffix K/k/M/m/G/g. Return the byte number if it can be
+    /// parsed properly, otherwise return an error string.
+    fn parse_size(s: &str) -> Result<usize, String> {
+        let s = s.to_lowercase();
+        if s.ends_with(char::is_alphabetic) {
+            let num = s[0..s.len() - 1]
+                .parse::<u64>()
+                .map_err(|e| e.to_string())?;
+            let size = if s.ends_with('k') {
+                num.checked_mul(Self::K)
+            } else if s.ends_with('m') {
+                num.checked_mul(Self::M)
+            } else if s.ends_with('g') {
+                num.checked_mul(Self::G)
+            } else if s.ends_with('t') {
+                num.checked_mul(Self::T)
+            } else {
+                return Err(format!(
+                    "Unknown size descriptor: {:?}",
+                    &s[(s.len() - 1)..]
+                ));
+            };
+
+            if let Some(size) = size {
+                size.try_into()
+                    .map_err(|_| format!("size overflow: {}", size))
+            } else {
+                Err(format!("size overflow: {}", s))
+            }
+        } else {
+            s.parse::<usize>().map_err(|e| e.to_string())
+        }
+    }
+
+    /// Return true if the gc trigger is valid
+    fn validate(&self) -> bool {
+        match self {
+            Self::FixedHeapSize(size) => *size > 0,
+            Self::DynamicHeapSize(min, max) => min <= max,
+            Self::Delegated => true,
+        }
+    }
+}
+
+impl FromStr for GCTriggerSelector {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use regex::Regex;
+        lazy_static! {
+            static ref FIXED_HEAP_REGEX: Regex =
+                Regex::new(r"^FixedHeapSize:(?P<size>\d+[kKmMgGtT]?)$").unwrap();
+            static ref DYNAMIC_HEAP_REGEX: Regex =
+                Regex::new(r"^DynamicHeapSize:(?P<min>\d+[kKmMgGtT]?),(?P<max>\d+[kKmMgGtT]?)$")
+                    .unwrap();
+        }
+
+        if s.is_empty() {
+            return Err("No GC trigger policy is supplied".to_string());
+        }
+
+        if let Some(captures) = FIXED_HEAP_REGEX.captures(s) {
+            return Self::parse_size(&captures["size"]).map(Self::FixedHeapSize);
+        } else if let Some(captures) = DYNAMIC_HEAP_REGEX.captures(s) {
+            let min = Self::parse_size(&captures["min"])?;
+            let max = Self::parse_size(&captures["max"])?;
+            return Ok(Self::DynamicHeapSize(min, max));
+        } else if s.starts_with("Delegated") {
+            return Ok(Self::Delegated);
+        }
+
+        Err(format!("Failed to parse the GC trigger option: {:?}", s))
+    }
+}
+
+#[cfg(test)]
+mod gc_trigger_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_size() {
+        // correct cases
+        assert_eq!(GCTriggerSelector::parse_size("0"), Ok(0));
+        assert_eq!(GCTriggerSelector::parse_size("1K"), Ok(1024));
+        assert_eq!(GCTriggerSelector::parse_size("1k"), Ok(1024));
+        assert_eq!(GCTriggerSelector::parse_size("2M"), Ok(2 * 1024 * 1024));
+        assert_eq!(GCTriggerSelector::parse_size("2m"), Ok(2 * 1024 * 1024));
+        assert_eq!(
+            GCTriggerSelector::parse_size("2G"),
+            Ok(2 * 1024 * 1024 * 1024)
+        );
+        assert_eq!(
+            GCTriggerSelector::parse_size("2g"),
+            Ok(2 * 1024 * 1024 * 1024)
+        );
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(
+            GCTriggerSelector::parse_size("2T"),
+            Ok(2 * 1024 * 1024 * 1024 * 1024)
+        );
+
+        // empty
+        assert_eq!(
+            GCTriggerSelector::parse_size(""),
+            Err("cannot parse integer from empty string".to_string())
+        );
+
+        // negative number - we dont care about actual error message
+        assert!(GCTriggerSelector::parse_size("-1").is_err());
+
+        // no number
+        assert!(GCTriggerSelector::parse_size("k").is_err());
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "32")]
+    fn test_parse_overflow_size() {
+        assert_eq!(
+            GCTriggerSelector::parse_size("4G"),
+            Err("size overflow: 4294967296".to_string())
+        );
+        assert_eq!(GCTriggerSelector::parse_size("4294967295"), Ok(4294967295));
+    }
+
+    #[test]
+    fn test_parse_fixed_heap() {
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:1024"),
+            Ok(GCTriggerSelector::FixedHeapSize(1024))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:4m"),
+            Ok(GCTriggerSelector::FixedHeapSize(4 * 1024 * 1024))
+        );
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(
+            GCTriggerSelector::from_str("FixedHeapSize:4t"),
+            Ok(GCTriggerSelector::FixedHeapSize(
+                4 * 1024 * 1024 * 1024 * 1024
+            ))
+        );
+
+        // incorrect
+        assert!(GCTriggerSelector::from_str("FixedHeapSize").is_err());
+        assert!(GCTriggerSelector::from_str("FixedHeapSize:").is_err());
+        assert!(GCTriggerSelector::from_str("FixedHeapSize:-1").is_err());
+    }
+
+    #[test]
+    fn test_parse_dynamic_heap() {
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1024,2048"),
+            Ok(GCTriggerSelector::DynamicHeapSize(1024, 2048))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1024,1024"),
+            Ok(GCTriggerSelector::DynamicHeapSize(1024, 1024))
+        );
+        assert_eq!(
+            GCTriggerSelector::from_str("DynamicHeapSize:1m,2m"),
+            Ok(GCTriggerSelector::DynamicHeapSize(
+                1024 * 1024,
+                2 * 1024 * 1024
+            ))
+        );
+
+        // incorrect
+        assert!(GCTriggerSelector::from_str("DynamicHeapSize:1024,1024,").is_err());
+    }
+
+    #[test]
+    fn test_validate() {
+        assert!(GCTriggerSelector::FixedHeapSize(1024).validate());
+        assert!(GCTriggerSelector::DynamicHeapSize(1024, 2048).validate());
+        assert!(GCTriggerSelector::DynamicHeapSize(1024, 1024).validate());
+
+        assert!(!GCTriggerSelector::FixedHeapSize(0).validate());
+        assert!(!GCTriggerSelector::DynamicHeapSize(2048, 1024).validate());
+    }
+}
+
 // Currently we allow all the options to be set by env var for the sake of convenience.
 // At some point, we may disallow this and all the options can only be set by command line.
 options! {
@@ -341,9 +631,6 @@ options! {
     // To allow this as a command-line option, we need to refactor the creation fo the `MMTK` instance.
     // See: https://github.com/mmtk/mmtk-core/issues/532
     threads:               usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = num_cpus::get(),
-    // Heap size. Default to 512MB.
-    // TODO: We should have a default heap size related to the max physical memory.
-    heap_size:             usize                [env_var: true, command_line: true] [|v: &usize| *v > 0]    = 512 << 20,
     // Enable an optimization that only scans the part of the stack that has changed since the last GC (not supported)
     use_short_stack_scans: bool                 [env_var: true, command_line: true]  [always_valid] = false,
     // Enable a return barrier (not supported)
@@ -397,7 +684,24 @@ options! {
     work_perf_events:       PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(all(feature = "perf_counter", feature = "work_packet_stats"))] = PerfEventOptions {events: vec![]},
     // Measuring perf events for GC and mutators
     // TODO: Ideally this option should only be included when the features 'perf_counter' are enabled. The current macro does not allow us to do this.
-    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]}
+    phase_perf_events:      PerfEventOptions     [env_var: true, command_line: true] [|_| cfg!(feature = "perf_counter")] = PerfEventOptions {events: vec![]},
+    // Set how to bind affinity to the GC Workers. Default thread affinity delegates to the OS
+    // scheduler. If a list of cores are specified, cores are allocated to threads in a round-robin
+    // fashion. The core ids should match the ones reported by /proc/cpuinfo. Core ids are
+    // separated by commas and may include ranges. There should be no spaces in the core list. For
+    // example: 0,5,8-11 specifies that cores 0,5,8,9,10,11 should be used for pinning threads.
+    // Note that in the case the program has only been allocated a certain number of cores using
+    // `taskset`, the core ids in the list should be specified by their perceived index as using
+    // `taskset` will essentially re-label the core ids. For example, running the program with
+    // `MMTK_THREAD_AFFINITY="0-4" taskset -c 6-12 <program>` means that the cores 6,7,8,9,10 will
+    // be used to pin threads even though we specified the core ids "0,1,2,3,4".
+    // `MMTK_THREAD_AFFINITY="12" taskset -c 6-12 <program>` will not work, on the other hand, as
+    // there is no core with (perceived) id 12.
+    // XXX: This option is currently only supported on Linux.
+    thread_affinity:        AffinityKind         [env_var: true, command_line: true] [|v: &AffinityKind| v.validate()] = AffinityKind::OsDefault,
+    // Set the GC trigger. This defines the heap size and how MMTk triggers a GC.
+    // Default to a fixed heap size of 0.5x physical memory.
+    gc_trigger     :        GCTriggerSelector    [env_var: true, command_line: true] [|v: &GCTriggerSelector| v.validate()] = GCTriggerSelector::FixedHeapSize((crate::util::memory::get_system_total_memory() as f64 * 0.5f64) as usize)
 }
 
 #[cfg(test)]
@@ -565,6 +869,133 @@ mod tests {
                     std::env::remove_var("MMTK_PHASE_PERF_EVENTS");
                 },
             )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_invalid_option() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_THREAD_AFFINITY", "0-");
+
+                    let options = Options::default();
+                    // invalid value from env var, use default.
+                    assert_eq!(*options.thread_affinity, AffinityKind::OsDefault);
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_single_core() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    std::env::set_var("MMTK_THREAD_AFFINITY", "0");
+
+                    let options = Options::default();
+                    assert_eq!(
+                        *options.thread_affinity,
+                        AffinityKind::RoundRobin(vec![0_u16])
+                    );
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_generate_core_list() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    let mut vec = vec![0_u16];
+                    let mut cpu_list = String::new();
+                    let num_cpus = get_total_num_cpus();
+
+                    cpu_list.push('0');
+                    for cpu in 1..num_cpus {
+                        cpu_list.push_str(format!(",{}", cpu).as_str());
+                        vec.push(cpu as u16);
+                    }
+
+                    std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
+                    let options = Options::default();
+                    assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec));
+                },
+                || {
+                    std::env::remove_var("MMTK_THREAD_AFFINITY");
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_single_range() {
+        serial_test(|| {
+            let affinity = "0-1".parse::<AffinityKind>();
+            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16])));
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_complex_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16, 2_u16, 4_u16]))
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_space_in_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4, 6".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_bad_core_list() {
+        serial_test(|| {
+            let affinity = "0,1-2,4,".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_range_start_greater_than_end() {
+        serial_test(|| {
+            let affinity = "1-0".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Starting core id in range should be less than the end".to_string())
+            );
+        })
+    }
+
+    #[test]
+    fn test_thread_affinity_bad_range_option() {
+        serial_test(|| {
+            let affinity = "0-1-4".parse::<AffinityKind>();
+            assert_eq!(
+                affinity,
+                Err("Core ids have been incorrectly specified".to_string())
+            );
         })
     }
 

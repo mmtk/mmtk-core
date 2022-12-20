@@ -1,13 +1,13 @@
-use super::chunk::Chunk;
 use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::heap::blockpageresource::BlockPool;
+use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
 use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
 use crate::vm::*;
-use spin::{Mutex, MutexGuard};
 use std::sync::atomic::Ordering;
 
 /// The block allocation state.
@@ -64,30 +64,26 @@ impl BlockState {
 }
 
 /// Data structure to reference an immix block.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
-
-impl From<Address> for Block {
-    #[inline(always)]
-    fn from(address: Address) -> Block {
-        debug_assert!(address.is_aligned_to(Self::BYTES));
-        Self(address)
-    }
-}
-
-impl From<Block> for Address {
-    #[inline(always)]
-    fn from(block: Block) -> Address {
-        block.0
-    }
-}
 
 impl Region for Block {
     #[cfg(not(feature = "immix_smaller_block"))]
     const LOG_BYTES: usize = 15;
     #[cfg(feature = "immix_smaller_block")]
     const LOG_BYTES: usize = 13;
+
+    #[inline(always)]
+    fn from_aligned_address(address: Address) -> Self {
+        debug_assert!(address.is_aligned_to(Self::BYTES));
+        Self(address)
+    }
+
+    #[inline(always)]
+    fn start(&self) -> Address {
+        self.0
+    }
 }
 
 impl Block {
@@ -111,7 +107,7 @@ impl Block {
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
-        Chunk::from(Chunk::align(self.0))
+        Chunk::from_unaligned_address(self.0)
     }
 
     /// Get the address range of the block's line mark table.
@@ -190,12 +186,12 @@ impl Block {
 
     #[inline(always)]
     pub fn start_line(&self) -> Line {
-        Line::from(self.start())
+        Line::from_aligned_address(self.start())
     }
 
     #[inline(always)]
     pub fn end_line(&self) -> Line {
-        Line::from(self.end())
+        Line::from_aligned_address(self.end())
     }
 
     /// Get the range of lines within the block.
@@ -275,39 +271,51 @@ impl Block {
 }
 
 /// A non-block single-linked list to store blocks.
-#[derive(Default)]
-pub struct BlockList {
-    queue: Mutex<Vec<Block>>,
+pub struct ReusableBlockPool {
+    queue: BlockPool<Block>,
+    num_workers: usize,
 }
 
-impl BlockList {
+impl ReusableBlockPool {
+    /// Create empty block list
+    pub fn new(num_workers: usize) -> Self {
+        Self {
+            queue: BlockPool::new(num_workers),
+            num_workers,
+        }
+    }
+
     /// Get number of blocks in this list.
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.queue.lock().len()
+        self.queue.len()
     }
 
     /// Add a block to the list.
-    #[inline]
+    #[inline(always)]
     pub fn push(&self, block: Block) {
-        self.queue.lock().push(block)
+        self.queue.push(block)
     }
 
     /// Pop a block out of the list.
-    #[inline]
+    #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.lock().pop()
+        self.queue.pop()
     }
 
     /// Clear the list.
-    #[inline]
-    pub fn reset(&self) {
-        *self.queue.lock() = Vec::new()
+    pub fn reset(&mut self) {
+        self.queue = BlockPool::new(self.num_workers);
     }
 
-    /// Get an array of all reusable blocks stored in this BlockList.
+    /// Iterate all the blocks in the queue. Call the visitor for each reported block.
     #[inline]
-    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
-        self.queue.lock()
+    pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
+        self.queue.iterate_blocks(&mut f);
+    }
+
+    /// Flush the block queue
+    pub fn flush_all(&self) {
+        self.queue.flush_all();
     }
 }

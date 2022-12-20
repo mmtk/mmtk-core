@@ -1,8 +1,10 @@
-use std::fmt::Debug;
 use std::hash::Hash;
+use std::marker::PhantomData;
+use std::{fmt::Debug, ops::Range};
 
 use atomic::Atomic;
 
+use crate::util::constants::{BYTES_IN_ADDRESS, LOG_BYTES_IN_ADDRESS};
 use crate::util::{Address, ObjectReference};
 
 /// An abstract edge.  An edge holds an object reference.  When we load from it, we get an
@@ -22,7 +24,7 @@ use crate::util::{Address, ObjectReference};
 ///     or some arbitrary offset) for some reasons.
 ///
 /// When loading, `Edge::load` shall decode its internal representation to a "regular"
-/// `ObjectReference` which is applicable to `ObjectModel::object_start_ref`.  The implementation
+/// `ObjectReference`.  The implementation
 /// can do this with any appropriate operations, usually shifting and masking bits or subtracting
 /// offset from the address.  By doing this conversion, MMTk can implement GC algorithms in a
 /// VM-neutral way, knowing only `ObjectReference`.
@@ -128,4 +130,141 @@ fn a_simple_edge_should_have_the_same_size_as_a_pointer() {
         std::mem::size_of::<SimpleEdge>(),
         std::mem::size_of::<*mut libc::c_void>()
     );
+}
+
+/// A abstract memory slice represents a piece of **heap** memory.
+pub trait MemorySlice: Send + Debug + PartialEq + Eq + Clone + Hash {
+    type Edge: Edge;
+    type EdgeIterator: Iterator<Item = Self::Edge>;
+    /// Iterate object edges within the slice. If there are non-reference values in the slice, the iterator should skip them.
+    fn iter_edges(&self) -> Self::EdgeIterator;
+    /// Start address of the memory slice
+    fn start(&self) -> Address;
+    /// Size of the memory slice
+    fn bytes(&self) -> usize;
+    /// Memory copy support
+    fn copy(src: &Self, tgt: &Self);
+}
+
+/// Iterate edges within `Range<Address>`.
+pub struct AddressRangeIterator {
+    cursor: Address,
+    limit: Address,
+}
+
+impl Iterator for AddressRangeIterator {
+    type Item = Address;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let edge = self.cursor;
+            self.cursor += BYTES_IN_ADDRESS;
+            Some(edge)
+        }
+    }
+}
+
+impl MemorySlice for Range<Address> {
+    type Edge = Address;
+    type EdgeIterator = AddressRangeIterator;
+
+    #[inline]
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        AddressRangeIterator {
+            cursor: self.start,
+            limit: self.end,
+        }
+    }
+
+    #[inline]
+    fn start(&self) -> Address {
+        self.start
+    }
+
+    #[inline]
+    fn bytes(&self) -> usize {
+        self.end - self.start
+    }
+
+    #[inline]
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        debug_assert_eq!(
+            src.bytes() & ((1 << LOG_BYTES_IN_ADDRESS) - 1),
+            0,
+            "bytes are not a multiple of words"
+        );
+        // Raw memory copy
+        unsafe {
+            let words = tgt.bytes() >> LOG_BYTES_IN_ADDRESS;
+            let src = src.start().to_ptr::<usize>();
+            let tgt = tgt.start().to_mut_ptr::<usize>();
+            std::ptr::copy(src, tgt, words)
+        }
+    }
+}
+
+/// Memory slice type with empty implementations.
+/// For VMs that do not use the memory slice type.
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct UnimplementedMemorySlice<E: Edge = SimpleEdge>(PhantomData<E>);
+
+/// Edge iterator for `UnimplementedMemorySlice`.
+pub struct UnimplementedMemorySliceEdgeIterator<E: Edge>(PhantomData<E>);
+
+impl<E: Edge> Iterator for UnimplementedMemorySliceEdgeIterator<E> {
+    type Item = E;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unimplemented!()
+    }
+}
+
+impl<E: Edge> MemorySlice for UnimplementedMemorySlice<E> {
+    type Edge = E;
+    type EdgeIterator = UnimplementedMemorySliceEdgeIterator<E>;
+
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        unimplemented!()
+    }
+
+    fn start(&self) -> Address {
+        unimplemented!()
+    }
+
+    fn bytes(&self) -> usize {
+        unimplemented!()
+    }
+
+    fn copy(_src: &Self, _tgt: &Self) {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn address_range_iteration() {
+        let src: Vec<usize> = (0..32).collect();
+        let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+        for (i, v) in src_slice.iter_edges().enumerate() {
+            assert_eq!(i, unsafe { v.load::<usize>() })
+        }
+    }
+
+    #[test]
+    fn memory_copy_on_address_ranges() {
+        let src = [1u8; 32];
+        let mut dst = [0u8; 32];
+        let src_slice = Address::from_ptr(&src[0])..Address::from_ptr(&src[0]) + src.len();
+        let dst_slice =
+            Address::from_mut_ptr(&mut dst[0])..Address::from_mut_ptr(&mut dst[0]) + src.len();
+        MemorySlice::copy(&src_slice, &dst_slice);
+        assert_eq!(dst.iter().sum::<u8>(), src.len() as u8);
+    }
 }

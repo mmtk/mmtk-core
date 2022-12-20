@@ -27,9 +27,8 @@ pub trait PageResource<VM: VMBinding>: 'static {
     // XXX: In the original code reserve_pages & clear_request explicitly
     //      acquired a lock.
     fn reserve_pages(&self, pages: usize) -> usize {
-        let adj_pages = self.adjust_for_metadata(pages);
-        self.common().accounting.reserve(adj_pages);
-        adj_pages
+        self.common().accounting.reserve(pages);
+        pages
     }
 
     fn clear_request(&self, reserved_pages: usize) {
@@ -60,8 +59,6 @@ pub trait PageResource<VM: VMBinding>: 'static {
         required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail>;
-
-    fn adjust_for_metadata(&self, pages: usize) -> usize;
 
     /**
      * Commit pages to the page budget.  This is called after

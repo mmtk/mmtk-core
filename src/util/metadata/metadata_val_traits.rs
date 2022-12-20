@@ -1,7 +1,7 @@
 use crate::util::Address;
 use core::sync::atomic::*;
 use num_traits::{FromPrimitive, ToPrimitive};
-use num_traits::{Unsigned, WrappingAdd, WrappingSub};
+use num_traits::{Unsigned, WrappingAdd, WrappingSub, Zero};
 
 /// Describes bits and log2 bits for the numbers.
 /// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/247
@@ -60,6 +60,7 @@ impl_bitwise_ops_trait!(usize);
 /// The methods in this trait are mostly about atomically accessing such types.
 pub trait MetadataValue:
     Unsigned
+    + Zero
     + WrappingAdd
     + WrappingSub
     + Bits

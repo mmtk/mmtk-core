@@ -1,16 +1,16 @@
 use crate::mmtk::SFT_MAP;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
 use crate::util::heap::PageResource;
 use crate::util::ObjectReference;
 
-use crate::policy::space::*;
+use crate::policy::sft::GCWorkerMutRef;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
+use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::opaque_pointer::*;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -48,6 +48,18 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     fn is_live(&self, _object: ObjectReference) -> bool {
         unimplemented!()
     }
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        true
+    }
     fn is_movable(&self) -> bool {
         unimplemented!()
     }
@@ -57,7 +69,12 @@ impl<VM: VMBinding> SFT for LockFreeImmortalSpace<VM> {
     }
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
     fn sft_trace_object(
         &self,
@@ -88,7 +105,7 @@ impl<VM: VMBinding> Space<VM> for LockFreeImmortalSpace<VM> {
     }
 
     fn initialize_sft(&self) {
-        SFT_MAP.update(self.as_sft(), self.start, self.extent);
+        unsafe { SFT_MAP.update(self.as_sft(), self.start, self.extent) };
     }
 
     fn reserved_pages(&self) -> usize {
@@ -149,13 +166,14 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for LockFreeIm
 
 impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
     #[allow(dead_code)] // Only used with certain features.
-    pub fn new(
-        name: &'static str,
-        slow_path_zeroing: bool,
-        options: &Options,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-    ) -> Self {
-        let total_bytes = *options.heap_size;
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let slow_path_zeroing = args.zeroed;
+        // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
+        // https://github.com/mmtk/mmtk-core/issues/314
+        let total_bytes = match *args.options.gc_trigger {
+            crate::util::options::GCTriggerSelector::FixedHeapSize(bytes) => bytes,
+            _ => unimplemented!(),
+        };
         assert!(
             total_bytes <= AVAILABLE_BYTES,
             "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
@@ -166,14 +184,14 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
         // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
-            name,
+            name: args.name,
             cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
             limit: AVAILABLE_START + total_bytes,
             start: AVAILABLE_START,
             extent: total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
-                global: global_side_metadata_specs,
+                global: args.global_side_metadata_specs,
                 local: vec![],
             },
             phantom: PhantomData,

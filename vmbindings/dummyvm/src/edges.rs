@@ -1,7 +1,8 @@
 use atomic::Atomic;
+use mmtk::util::constants::LOG_BYTES_IN_ADDRESS;
 use mmtk::{
     util::{Address, ObjectReference},
-    vm::edge_shape::{Edge, SimpleEdge},
+    vm::edge_shape::{Edge, MemorySlice, SimpleEdge},
 };
 
 /// If a VM supports multiple kinds of edges, we can use tagged union to represent all of them.
@@ -38,6 +39,69 @@ impl Edge for DummyVMEdge {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DummyVMMemorySlice(*mut [ObjectReference]);
+
+unsafe impl Send for DummyVMMemorySlice {}
+
+impl MemorySlice for DummyVMMemorySlice {
+    type Edge = DummyVMEdge;
+    type EdgeIterator = DummyVMMemorySliceIterator;
+
+    fn iter_edges(&self) -> Self::EdgeIterator {
+        DummyVMMemorySliceIterator {
+            cursor: unsafe { (*self.0).as_mut_ptr_range().start },
+            limit: unsafe { (*self.0).as_mut_ptr_range().end },
+        }
+    }
+
+    fn start(&self) -> Address {
+        Address::from_ptr(unsafe { (*self.0).as_ptr_range().start })
+    }
+
+    fn bytes(&self) -> usize {
+        unsafe { (*self.0).len() * std::mem::size_of::<ObjectReference>() }
+    }
+
+    fn copy(src: &Self, tgt: &Self) {
+        debug_assert_eq!(src.bytes(), tgt.bytes());
+        debug_assert_eq!(
+            src.bytes() & ((1 << LOG_BYTES_IN_ADDRESS) - 1),
+            0,
+            "bytes are not a multiple of words"
+        );
+        // Raw memory copy
+        unsafe {
+            let words = tgt.bytes() >> LOG_BYTES_IN_ADDRESS;
+            let src = src.start().to_ptr::<usize>();
+            let tgt = tgt.start().to_mut_ptr::<usize>();
+            std::ptr::copy(src, tgt, words)
+        }
+    }
+}
+
+pub struct DummyVMMemorySliceIterator {
+    cursor: *mut ObjectReference,
+    limit: *mut ObjectReference,
+}
+
+impl Iterator for DummyVMMemorySliceIterator {
+    type Item = DummyVMEdge;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor >= self.limit {
+            None
+        } else {
+            let edge = self.cursor;
+            self.cursor = unsafe { self.cursor.add(1) };
+            Some(DummyVMEdge::Simple(SimpleEdge::from_address(
+                Address::from_ptr(edge),
+            )))
+        }
+    }
+}
+
 /// Compressed OOP edge only makes sense on 64-bit architectures.
 #[cfg(target_pointer_width = "64")]
 pub mod only_64_bit {
@@ -68,11 +132,11 @@ pub mod only_64_bit {
         fn load(&self) -> ObjectReference {
             let compressed = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
             let expanded = (compressed as usize) << 3;
-            unsafe { Address::from_usize(expanded).to_object_reference() }
+            ObjectReference::from_raw_address(unsafe { Address::from_usize(expanded) })
         }
 
         fn store(&self, object: ObjectReference) {
-            let expanded = object.to_address().as_usize();
+            let expanded = object.to_raw_address().as_usize();
             let compressed = (expanded >> 3) as u32;
             unsafe { (*self.slot_addr).store(compressed, atomic::Ordering::Relaxed) }
         }
@@ -118,11 +182,11 @@ impl Edge for OffsetEdge {
     fn load(&self) -> ObjectReference {
         let middle = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let begin = middle - self.offset;
-        unsafe { begin.to_object_reference() }
+        ObjectReference::from_raw_address(begin)
     }
 
     fn store(&self, object: ObjectReference) {
-        let begin = object.to_address();
+        let begin = object.to_raw_address();
         let middle = begin + self.offset;
         unsafe { (*self.slot_addr).store(middle, atomic::Ordering::Relaxed) }
     }
@@ -153,12 +217,12 @@ impl Edge for TaggedEdge {
     fn load(&self) -> ObjectReference {
         let tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
         let untagged = tagged & !Self::TAG_BITS_MASK;
-        unsafe { Address::from_usize(untagged).to_object_reference() }
+        ObjectReference::from_raw_address(unsafe { Address::from_usize(untagged) })
     }
 
     fn store(&self, object: ObjectReference) {
         let old_tagged = unsafe { (*self.slot_addr).load(atomic::Ordering::Relaxed) };
-        let new_untagged = object.to_address().as_usize();
+        let new_untagged = object.to_raw_address().as_usize();
         let new_tagged = new_untagged | (old_tagged & Self::TAG_BITS_MASK);
         unsafe { (*self.slot_addr).store(new_tagged, atomic::Ordering::Relaxed) }
     }

@@ -1,9 +1,10 @@
 use super::stat::SchedulerStat;
 use super::work_bucket::*;
-use super::worker::{GCWorker, GCWorkerShared, WorkerGroup};
+use super::worker::{GCWorker, GCWorkerShared, ThreadId, WorkerGroup};
 use super::*;
 use crate::mmtk::MMTK;
 use crate::util::opaque_pointer::*;
+use crate::util::options::AffinityKind;
 use crate::vm::Collection;
 use crate::vm::{GCThreadContext, VMBinding};
 use crossbeam::deque::{self, Steal};
@@ -44,6 +45,8 @@ pub struct GCWorkScheduler<VM: VMBinding> {
     closure_end: Mutex<Option<Box<dyn Send + Fn() -> bool>>>,
     /// Counter for pending coordinator messages.
     pub(super) pending_coordinator_packets: AtomicUsize,
+    /// How to assign the affinity of each GC thread. Specified by the user.
+    affinity: AffinityKind,
 }
 
 // FIXME: GCWorkScheduler should be naturally Sync, but we cannot remove this `impl` yet.
@@ -52,7 +55,7 @@ pub struct GCWorkScheduler<VM: VMBinding> {
 unsafe impl<VM: VMBinding> Sync for GCWorkScheduler<VM> {}
 
 impl<VM: VMBinding> GCWorkScheduler<VM> {
-    pub fn new(num_workers: usize) -> Arc<Self> {
+    pub fn new(num_workers: usize, affinity: AffinityKind) -> Arc<Self> {
         let worker_monitor: Arc<(Mutex<()>, Condvar)> = Default::default();
         let worker_group = WorkerGroup::new(num_workers);
 
@@ -116,6 +119,7 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             worker_monitor,
             closure_end: Mutex::new(None),
             pending_coordinator_packets: AtomicUsize::new(0),
+            affinity,
         })
     }
 
@@ -149,6 +153,11 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         VM::VMCollection::spawn_gc_thread(tls, GCThreadContext::<VM>::Controller(gc_controller));
 
         self.worker_group.spawn(mmtk, sender, tls)
+    }
+
+    /// Resolve the affinity of a thread.
+    pub fn resolve_affinity(&self, thread: ThreadId) {
+        self.affinity.resolve_affinity(thread);
     }
 
     /// Schedule all the common work packets

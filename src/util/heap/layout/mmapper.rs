@@ -113,7 +113,14 @@ impl MapState {
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Quarantined => Ok(()),
-            MapState::Mapped => panic!("Cannot quarantine mapped memory"),
+            MapState::Mapped => {
+                // If a chunk is mapped by us and we try to quanrantine it, we simply don't do anything.
+                // We allow this as it is possible to have a situation like this:
+                // we have global side metdata S, and space A and B. We quanrantine memory X for S for A, then map
+                // X for A, and then we quanrantine memory Y for S for B. It is possible that X and Y is the same chunk,
+                // so the chunk is already mapped for A, and we try quanrantine it for B. We simply allow this transition.
+                return Ok(());
+            }
             MapState::Protected => panic!("Cannot quarantine protected memory"),
         };
         if res.is_ok() {
