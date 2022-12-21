@@ -45,6 +45,7 @@ impl AffinityKind {
 #[cfg(target_os = "linux")]
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_core(cpu: CoreId) {
+    use std::mem::MaybeUninit;
     unsafe {
         let mut cs = MaybeUninit::zeroed().assume_init();
         CPU_ZERO(&mut cs);
