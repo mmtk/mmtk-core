@@ -768,7 +768,7 @@ use crate::plan::Plan;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 
-/// This provides an implementation of [`ProcessEdgesWork`](scheduler/gc_work/ProcessEdgesWork). A plan that implements
+/// This provides an implementation of [`crate::scheduler::gc_work::ProcessEdgesWork`]. A plan that implements
 /// `PlanTraceObject` can use this work packet for tracing objects.
 pub struct PlanProcessEdges<
     VM: VMBinding,
