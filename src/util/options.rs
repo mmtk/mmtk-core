@@ -331,7 +331,7 @@ impl AffinityKind {
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
-                if *cpu >= num_cpu {
+                if cpu >= &num_cpu {
                     return false;
                 }
             }
