@@ -536,12 +536,6 @@
 <span id="534">534</span>
 <span id="535">535</span>
 <span id="536">536</span>
-<span id="537">537</span>
-<span id="538">538</span>
-<span id="539">539</span>
-<span id="540">540</span>
-<span id="541">541</span>
-<span id="542">542</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="self">self</span>::specs</span>::<span class="kw-2">*</span>;
@@ -601,12 +595,6 @@
 <span class="doccomment">/// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.</span>
 <span class="doccomment">///</span>
 <span class="doccomment">/// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.</span>
-<span class="doccomment">///</span>
-<span class="doccomment">/// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html</span>
-<span class="doccomment">/// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html</span>
-<span class="doccomment">/// [`header_metadata`]:    ../util/metadata/header_metadata/index.html</span>
-<span class="doccomment">/// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html</span>
-<span class="doccomment">/// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectModel</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="comment">// Per-object Metadata Spec definitions go here</span>
     <span class="comment">//</span>

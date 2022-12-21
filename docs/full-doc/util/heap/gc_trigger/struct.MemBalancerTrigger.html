@@ -4,7 +4,7 @@
     min_heap_pages: <a class="primitive" href="https://doc.rust-lang.org/1.59.0/std/primitive.usize.html">usize</a>,
     max_heap_pages: <a class="primitive" href="https://doc.rust-lang.org/1.59.0/std/primitive.usize.html">usize</a>,
     current_heap_pages: <a class="struct" href="https://doc.rust-lang.org/1.59.0/core/sync/atomic/struct.AtomicUsize.html" title="struct core::sync::atomic::AtomicUsize">AtomicUsize</a>,
-}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, https://dl.acm.org/doi/10.1145/3563323)
+}</code></pre></div><details class="rustdoc-toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, <a href="https://dl.acm.org/doi/10.1145/3563323">https://dl.acm.org/doi/10.1145/3563323</a>)
 We use MemBalancer to decide a heap limit between the min heap and the max heap.
 The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
 and uses a fixed constant instead.</p>

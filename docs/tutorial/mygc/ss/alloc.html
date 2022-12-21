@@ -201,17 +201,12 @@ use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
-use crate::util::options::Options;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
-use std::sync::Arc;
 <span class="boring">}</span></code></pre></pre>
 <h3 id="struct-mygc"><a class="header" href="#struct-mygc">Struct MyGC</a></h3>
 <p>Change <code>pub struct MyGC&lt;VM: VMBinding&gt;</code> to add new instance variables.</p>
@@ -237,6 +232,14 @@ pub struct MyGC&lt;VM: VMBinding&gt; {
     #[fallback_trace]
     pub common: CommonPlan&lt;VM&gt;,
 }
+<span class="boring">}</span></code></pre></pre>
+<p>Note that we have attributes on some fields. These attributes tell MMTk's macros on
+how to generate code to trace objects in this plan. Although there are other approaches that
+you can implement object tracing, in this tutorial we use the macros, as it is the simplest.
+Make sure you import the macros. We will discuss on what those attributes mean in later sections.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use mmtk_macros::PlanTraceObject;
 <span class="boring">}</span></code></pre></pre>
 <h3 id="implement-the-plan-trait-for-mygc"><a class="header" href="#implement-the-plan-trait-for-mygc">Implement the Plan trait for MyGC</a></h3>
 <h4 id="constructor"><a class="header" href="#constructor">Constructor</a></h4>
@@ -284,14 +287,6 @@ copyspaces are in <code>src/policy/copyspace.rs</code>.) </li>
         res
     }
 <span class="boring">}</span></code></pre></pre>
-<h4 id="initializer"><a class="header" href="#initializer">Initializer</a></h4>
-<p>Find <code>gc_init()</code>. Change it to initialise the common plan and the two 
-copyspaces, rather than the base plan and mygc_space. The contents of the 
-initializer calls are identical.</p>
-<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
-</span>
-<span class="boring">fn main() {
-</span><span class="boring">}</span></code></pre></pre>
 <h3 id="access-mygc-spaces"><a class="header" href="#access-mygc-spaces">Access MyGC spaces</a></h3>
 <p>Add a new section of methods for MyGC:</p>
 <pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]

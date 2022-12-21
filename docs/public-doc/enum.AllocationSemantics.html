@@ -17,7 +17,7 @@ The actual semantic of the default will depend on the GC plan in use.</p>
 reclaim the objects even if they are dead.</p>
 </div><h3 id="variant.Los" class="variant small-section-header"><a href="#variant.Los" class="anchor field"></a><code>Los</code></h3><div class="docblock"><p>Large objects. It is usually desirable to allocate large objects specially. Large objects
 are allocated with page granularity and will not be moved.
-Each plan provides <code>max_non_los_default_alloc_bytes</code> (see [<code>crate::plan::plan_constraints::PlanConstraints</code>]),
+Each plan provides <code>max_non_los_default_alloc_bytes</code> (see <a href="plan/struct.PlanConstraints.html" title="crate::plan::PlanConstraints"><code>crate::plan::PlanConstraints</code></a>),
 which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
 threshold must be allocated with the <code>Los</code> semantic.
 This semantic may get removed and MMTk will transparently allocate into large object space for large objects.</p>

@@ -38,7 +38,7 @@
 <span class="doccomment">/// mature space is ImmixSpace. When we copy from nursery to mature, ImmixCopyContext should be</span>
 <span class="doccomment">/// used.</span>
 <span class="doccomment">/// Note that this trait should only be implemented with policy specific behaviors. Please</span>
-<span class="doccomment">/// refer to [GCWorkerCopyContext](util/copy/struct.GCWorkerCopyContext.html) which implements common</span>
+<span class="doccomment">/// refer to [`crate::util::copy::GCWorkerCopyContext`] which implements common</span>
 <span class="doccomment">/// behaviors for copying.</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">PolicyCopyContext</span>: <span class="lifetime">&#39;static</span> <span class="op">+</span> <span class="ident">Send</span> {
     <span class="kw">type</span> <span class="ident">VM</span>: <span class="ident">VMBinding</span>;

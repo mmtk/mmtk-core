@@ -113,7 +113,7 @@ but the VM binding will be able to filter out non-reference values on edge itera
 This is called when the VM tries to copy a piece of heap memory to another.
 The data within the slice does not necessarily to be all valid pointers,
 but the VM binding will be able to filter out non-reference values on edge iteration.</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.mmtk_init.html" title="mmtk::memory_manager::mmtk_init fn">mmtk_init</a></div><div class="item-right docblock-short"><p>Initialize an MMTk instance. A VM should call this method after creating an <a href="../mmtk/struct.MMTK.html">MMTK</a>
+</div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.mmtk_init.html" title="mmtk::memory_manager::mmtk_init fn">mmtk_init</a></div><div class="item-right docblock-short"><p>Initialize an MMTk instance. A VM should call this method after creating an <a href="../struct.MMTK.html" title="crate::MMTK"><code>crate::MMTK</code></a>
 instance but before using any of the methods provided in MMTk (except <code>process()</code> and <code>process_bulk()</code>).</p>
 </div></div><div class="item-row"><div class="item-left module-item"><a class="fn" href="fn.modify_check.html" title="mmtk::memory_manager::modify_check fn">modify_check</a></div><div class="item-right docblock-short"><p>Check that if a garbage collection is in progress and if the given
 object is not movable.  If it is movable error messages are

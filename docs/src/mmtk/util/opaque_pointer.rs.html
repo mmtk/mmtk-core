@@ -105,14 +105,14 @@
     <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">UNINITIALIZED</span>: <span class="self">Self</span> <span class="op">=</span> <span class="self">Self</span>(<span class="ident">OpaquePointer::UNINITIALIZED</span>);
 }
 
-<span class="doccomment">/// A VMMutatorThread is a VMThread that associates with a [Mutator](plan/mutator_context/Mutator).</span>
+<span class="doccomment">/// A VMMutatorThread is a VMThread that associates with a [`crate::plan::Mutator`].</span>
 <span class="doccomment">/// When a VMMutatorThread is used as an argument or a field of a type, it generally means</span>
 <span class="doccomment">/// the function or the functions for the type is executed in the context of the mutator thread.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Copy</span>, <span class="ident">Clone</span>, <span class="ident">Debug</span>, <span class="ident">Eq</span>, <span class="ident">PartialEq</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">VMMutatorThread</span>(<span class="kw">pub</span> <span class="ident">VMThread</span>);
 
-<span class="doccomment">/// A VMWorkerThread is a VMThread that is associates with a [GCWorker](scheduler/GCWorker).</span>
+<span class="doccomment">/// A VMWorkerThread is a VMThread that is associates with a [`crate::scheduler::GCWorker`].</span>
 <span class="doccomment">/// When a VMWorkerThread is used as an argument or a field of a type, it generally means</span>
 <span class="doccomment">/// the function or the functions for the type is executed in the context of the mutator thread.</span>
 <span class="attribute">#[<span class="ident">repr</span>(<span class="ident">transparent</span>)]</span>

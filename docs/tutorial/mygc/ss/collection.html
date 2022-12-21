@@ -378,7 +378,7 @@ impl&lt;VM: VMBinding&gt; crate::scheduler::GCWorkContext for MyGCWorkContext2&l
     type ProcessEdgesWorkType = PlanProcessEdges&lt;Self::VM, MyGC&lt;VM&gt;, DEFAULT_TRACE&gt;;
 }
 
-use crate::util::{Address, ObjectReference};
+use crate::util::ObjectReference;
 use crate::util::copy::CopySemantics;
 use crate::MMTK;
 use crate::policy::space::Space;

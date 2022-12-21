@@ -6,7 +6,7 @@
 All the decisions about heap limit and GC triggering should be resolved here.
 Depending on the actual policy, we may either forward the calls either to the plan
 or to the binding/runtime.</p>
-</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.MemBalancerTrigger.html" title="mmtk::util::heap::gc_trigger::MemBalancerTrigger struct">MemBalancerTrigger</a></div><div class="item-right docblock-short"><p>An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, https://dl.acm.org/doi/10.1145/3563323)
+</div></div><div class="item-row"><div class="item-left module-item"><a class="struct" href="struct.MemBalancerTrigger.html" title="mmtk::util::heap::gc_trigger::MemBalancerTrigger struct">MemBalancerTrigger</a></div><div class="item-right docblock-short"><p>An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, <a href="https://dl.acm.org/doi/10.1145/3563323">https://dl.acm.org/doi/10.1145/3563323</a>)
 We use MemBalancer to decide a heap limit between the min heap and the max heap.
 The current implementation is a simplified version of mem balancer and it does not take collection/allocation speed into account,
 and uses a fixed constant instead.</p>

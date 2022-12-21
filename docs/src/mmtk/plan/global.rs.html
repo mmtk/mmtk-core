@@ -2074,7 +2074,7 @@ CommonPlan is for representing state and features used by _many_ plans, but that
     <span class="ident">Immortal</span> <span class="op">=</span> <span class="number">1</span>,
     <span class="doccomment">/// Large objects. It is usually desirable to allocate large objects specially. Large objects</span>
     <span class="doccomment">/// are allocated with page granularity and will not be moved.</span>
-    <span class="doccomment">/// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::plan_constraints::PlanConstraints`]),</span>
+    <span class="doccomment">/// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),</span>
     <span class="doccomment">/// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the</span>
     <span class="doccomment">/// threshold must be allocated with the `Los` semantic.</span>
     <span class="doccomment">/// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.</span>

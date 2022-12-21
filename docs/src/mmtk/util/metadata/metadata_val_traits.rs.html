@@ -215,7 +215,7 @@
 <span class="kw">use</span> <span class="ident">num_traits</span>::{<span class="ident">Unsigned</span>, <span class="ident">WrappingAdd</span>, <span class="ident">WrappingSub</span>, <span class="ident">Zero</span>};
 
 <span class="doccomment">/// Describes bits and log2 bits for the numbers.</span>
-<span class="doccomment">/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/247</span>
+<span class="doccomment">/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/247&gt;</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">Bits</span> {
     <span class="kw">const</span> <span class="ident">BITS</span>: <span class="ident">u32</span>;
     <span class="kw">const</span> <span class="ident">LOG2</span>: <span class="ident">u32</span>;
@@ -235,7 +235,7 @@
 <span class="macro">impl_bits_trait!</span>(<span class="ident">usize</span>);
 
 <span class="doccomment">/// Describes bitwise operations.</span>
-<span class="doccomment">/// If num_traits has this, we do not need our own implementation: https://github.com/rust-num/num-traits/issues/232</span>
+<span class="doccomment">/// If num_traits has this, we do not need our own implementation: &lt;https://github.com/rust-num/num-traits/issues/232&gt;</span>
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">BitwiseOps</span> {
     <span class="kw">fn</span> <span class="ident">bitand</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
     <span class="kw">fn</span> <span class="ident">bitor</span>(<span class="self">self</span>, <span class="ident">other</span>: <span class="self">Self</span>) -&gt; <span class="self">Self</span>;
