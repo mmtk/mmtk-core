@@ -188,11 +188,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for StopMutators<E> {
             mmtk.scheduler.work_buckets[WorkBucketStage::Prepare].add(ScanStackRoot::<E>(mutator));
         });
         trace!("stop_all_mutators end");
-
-        trace!("VM prepare start");
-        <E::VM as VMBinding>::VMCollection::vm_prepare(worker.tls);
-        trace!("VM prepare end");
-
         mmtk.scheduler.notify_mutators_paused(mmtk);
         if <E::VM as VMBinding>::VMScanning::SCAN_MUTATORS_IN_SAFEPOINT {
             // Prepare mutators if necessary

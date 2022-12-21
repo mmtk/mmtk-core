@@ -63,13 +63,6 @@ pub trait Collection<VM: VMBinding> {
     ///   In either case, the `Box` inside should be passed back to the called function.
     fn spawn_gc_thread(tls: VMThread, ctx: GCThreadContext<VM>);
 
-    /// Allow VM-specific behaviors after all the mutators are stopped and before any actual GC
-    /// work (including root scanning) starts.
-    ///
-    /// Arguments:
-    /// * `tls_worker`: The thread pointer for the worker thread performing this call.
-    fn vm_prepare(_tls: VMWorkerThread) {}
-
     /// Allow VM-specific behaviors for a mutator after all the mutators are stopped and before any actual GC work starts.
     ///
     /// Arguments:
