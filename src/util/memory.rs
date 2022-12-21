@@ -146,10 +146,16 @@ pub fn os_is_mapped(start: Address, size: usize) -> bool {
     match region::query_range::<u8>(start.to_ptr(), size) {
         Ok(mut region_iter) => {
             let mut count = 0;
-            let all_mapped = region_iter.all(|r| { count += 1; r.is_ok() && r.as_ref().unwrap().is_readable() });
+            let all_mapped = region_iter.all(|r| {
+                count += 1;
+                r.is_ok() && r.as_ref().unwrap().is_readable()
+            });
             count != 0 && all_mapped
-        },
-        Err(e) => panic!("Query range starting {} for {} bytes failed: {:?}", start, size, e)
+        }
+        Err(e) => panic!(
+            "Query range starting {} for {} bytes failed: {:?}",
+            start, size, e
+        ),
     }
 }
 

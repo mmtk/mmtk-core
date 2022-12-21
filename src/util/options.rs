@@ -285,7 +285,7 @@ impl AffinityKind {
         for split in cpulist.split(',') {
             if !split.contains('-') {
                 if !split.is_empty() {
-                    if let Ok(core) = split.parse::<u16>() {
+                    if let Ok(core) = split.parse::<usize>() {
                         cpuset.push(core);
                         cpuset.sort_unstable();
                         cpuset.dedup();
@@ -296,8 +296,8 @@ impl AffinityKind {
                 // Contains a range
                 let range: Vec<&str> = split.split('-').collect();
                 if range.len() == 2 {
-                    if let Ok(start) = range[0].parse::<u16>() {
-                        if let Ok(end) = range[1].parse::<u16>() {
+                    if let Ok(start) = range[0].parse::<usize>() {
+                        if let Ok(end) = range[1].parse::<usize>() {
                             if start >= end {
                                 return Err(
                                     "Starting core id in range should be less than the end"
@@ -320,7 +320,9 @@ impl AffinityKind {
             return Err("Core ids have been incorrectly specified".to_string());
         }
 
-        Ok(AffinityKind::RoundRobin(cpuset))
+        Ok(AffinityKind::RoundRobin(
+            cpuset.into_iter().map(|id| CoreId { id }).collect(),
+        ))
     }
 
     /// Return true if the affinity is either OsDefault or the cores in the list do not exceed the
@@ -331,7 +333,7 @@ impl AffinityKind {
 
         if let AffinityKind::RoundRobin(cpuset) = self {
             for cpu in cpuset {
-                if cpu >= &num_cpu {
+                if cpu.id >= num_cpu as usize {
                     return false;
                 }
             }
@@ -890,7 +892,6 @@ mod tests {
         })
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
     fn test_thread_affinity_single_core() {
         serial_test(|| {
@@ -901,7 +902,7 @@ mod tests {
                     let options = Options::default();
                     assert_eq!(
                         *options.thread_affinity,
-                        AffinityKind::RoundRobin(vec![0_u16])
+                        AffinityKind::RoundRobin(vec![CoreId { id: 0 }])
                     );
                 },
                 || {
@@ -911,20 +912,19 @@ mod tests {
         })
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
     fn test_thread_affinity_generate_core_list() {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let mut vec = vec![0_u16];
+                    let mut vec = vec![CoreId { id: 0 }];
                     let mut cpu_list = String::new();
                     let num_cpus = get_total_num_cpus();
 
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {
                         cpu_list.push_str(format!(",{}", cpu).as_str());
-                        vec.push(cpu as u16);
+                        vec.push(CoreId { id: cpu });
                     }
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
@@ -942,7 +942,13 @@ mod tests {
     fn test_thread_affinity_single_range() {
         serial_test(|| {
             let affinity = "0-1".parse::<AffinityKind>();
-            assert_eq!(affinity, Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16])));
+            assert_eq!(
+                affinity,
+                Ok(AffinityKind::RoundRobin(vec![
+                    CoreId { id: 0 },
+                    CoreId { id: 1 }
+                ]))
+            );
         })
     }
 
@@ -952,7 +958,12 @@ mod tests {
             let affinity = "0,1-2,4".parse::<AffinityKind>();
             assert_eq!(
                 affinity,
-                Ok(AffinityKind::RoundRobin(vec![0_u16, 1_u16, 2_u16, 4_u16]))
+                Ok(AffinityKind::RoundRobin(vec![
+                    CoreId { id: 0 },
+                    CoreId { id: 1 },
+                    CoreId { id: 2 },
+                    CoreId { id: 4 }
+                ]))
             );
         })
     }
