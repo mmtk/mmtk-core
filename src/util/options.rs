@@ -890,6 +890,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_thread_affinity_single_core() {
         serial_test(|| {
@@ -910,6 +911,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_thread_affinity_generate_core_list() {
         serial_test(|| {
