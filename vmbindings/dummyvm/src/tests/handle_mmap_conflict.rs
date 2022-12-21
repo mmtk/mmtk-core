@@ -5,7 +5,10 @@ use crate::DummyVM;
 
 #[test]
 pub fn test_handle_mmap_conflict() {
-    let start = unsafe { Address::from_usize(0x100_0000 )};
+    #[cfg(target_os = "linux")]
+    let start = unsafe { Address::from_usize(0x100_0000)};
+    #[cfg(target_os = "macos")]
+    let start = unsafe { Address::from_usize(0x2400_0000_0000)};
     let one_megabyte = 1000000;
     let mmap1_res = memory::dzmmap_noreplace(start, one_megabyte);
     assert!(mmap1_res.is_ok());
