@@ -256,7 +256,6 @@ mod tests {
         })
     }
 
-    // #[cfg(target_os = "linux")]
     #[test]
     fn test_mmap_noreplace() {
         serial_test(|| {
@@ -294,7 +293,6 @@ mod tests {
         })
     }
 
-    // #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped() {
@@ -326,7 +324,6 @@ mod tests {
         })
     }
 
-    // #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped_next_to_mapped() {
