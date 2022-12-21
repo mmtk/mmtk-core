@@ -4,23 +4,10 @@ use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use crate::{scheduler::*, Mutator};
 
-use super::scanning::QueuingTracerFactory;
-
 /// Thread context for the spawned GC thread.  It is used by spawn_gc_thread.
 pub enum GCThreadContext<VM: VMBinding> {
     Controller(Box<GCController<VM>>),
     Worker(Box<GCWorker<VM>>),
-}
-
-/// Information related to weak reference processing.  Used by `Collection::process_weak_refs`.
-pub struct ProcessWeakRefsContext {
-    /// `true` if `process_weak_refs` is called during the forwarding phase in MarkCompact.
-    /// Always `false` if the GC is not MarkCompact.
-    pub forwarding: bool,
-
-    /// `true` if the current GC is a nursery GC.
-    /// Always `false` if not using a generationl GC algorithm.
-    pub nursery: bool,
 }
 
 /// VM-specific methods for garbage collection.
@@ -123,61 +110,4 @@ pub trait Collection<VM: VMBinding> {
     /// Arguments:
     /// * `tls_worker`: The thread pointer for the worker thread performing this call.
     fn vm_release(_tls: VMWorkerThread) {}
-
-    /// Process weak references.
-    ///
-    /// This function is called after a transitive closure is completed.
-    ///
-    /// MMTk core enables the VM binding to do the following in this function:
-    ///
-    /// 1.  Query if an object is already reached in this transitive closure.
-    /// 2.  Keep certain objects and their descendents alive.
-    /// 3.  Get the new address of objects that are either
-    ///     -   already alive before this function is called, or
-    ///     -   explicitly kept alive in this function.
-    /// 4.  Request this function to be called again after transitive closure is finished again.
-    ///
-    /// The VM binding can call `ObjectReference::is_reachable()` to query if an object is
-    /// currently reached.
-    ///
-    /// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call
-    /// its `trace_object(object)` method to keep `object` and its decendents alive.
-    ///
-    /// The return value of `ObjectTracer::trace_object(object)` is the new address of the given
-    /// `object` if it is moved by the GC.
-    ///
-    /// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`
-    /// to be called again after the MMTk core finishes transitive closure again from the objects
-    /// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple
-    /// levels of reachabilities (such as Java) or ephemerons.
-    ///
-    /// Implementation-wise, this function is called as the "sentinel" of the `VMRefClosure` work
-    /// bucket, which means it is called when all work packets in that bucket have finished.  The
-    /// `tracer_factory` expands the transitive closure by adding more work packets in the same
-    /// bucket.  This means if `process_weak_refs` returns true, those work packets will have
-    /// finished (completing the transitive closure) by the time `process_weak_refs` is called
-    /// again.  The VM binding can make use of this by adding custom work packets into the
-    /// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.
-    /// See below.
-    ///
-    /// GC algorithms other than mark-compact compute transitive closure only once.  Mark-compact
-    /// GC will compute transive closure twice during each GC.  It will mark objects in the first
-    /// transitive closure, and forward references in the second transitive closure. During the
-    /// second transitive closure, `context.forwarding` will be `true`.
-    ///
-    /// Arguments:
-    /// * `worker`: The current GC worker.
-    /// * `context`: Provides more information of the current trace.
-    /// * `tracer_factory`: Use this to create an `ObjectTracer` and use it to retain and update
-    ///   weak references.
-    ///
-    /// This function shall return true if this function needs to be called again after the GC
-    /// finishes expanding the transitive closure from the objects kept alive.
-    fn process_weak_refs(
-        _worker: &mut GCWorker<VM>,
-        _context: ProcessWeakRefsContext,
-        _tracer_factory: impl QueuingTracerFactory<VM>,
-    ) -> bool {
-        false
-    }
 }

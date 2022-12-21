@@ -144,13 +144,12 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         }
 
         // VM-specific weak ref processing
-        scheduler.work_buckets[WorkBucketStage::VMRefClosure].set_sentinel(Box::new(
-            VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new(false),
-        ));
+        scheduler.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<MarkingProcessEdges<VM>>::new()));
 
         // VM-specific weak ref forwarding
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding].set_sentinel(Box::new(
-            VMProcessWeakRefs::<ForwardingProcessEdges<VM>>::new(true),
+            VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new(),
         ));
 
         // Analysis GC work

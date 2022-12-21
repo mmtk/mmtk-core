@@ -220,15 +220,13 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // processing them together.
 
         // VM-specific weak ref processing
-        self.work_buckets[WorkBucketStage::VMRefClosure].set_sentinel(Box::new(
-            VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(false),
-        ));
+        self.work_buckets[WorkBucketStage::VMRefClosure]
+            .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
-            self.work_buckets[WorkBucketStage::VMRefForwarding].set_sentinel(Box::new(
-                VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new(true),
-            ));
+            self.work_buckets[WorkBucketStage::VMRefForwarding]
+                .set_sentinel(Box::new(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new()));
         }
     }
 
