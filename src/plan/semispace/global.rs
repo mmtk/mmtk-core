@@ -118,6 +118,13 @@ impl<VM: VMBinding> Plan for SemiSpace<VM> {
         self.tospace().reserved_pages() + self.common.get_used_pages()
     }
 
+    fn get_available_pages(&self) -> usize {
+        (self
+            .get_total_pages()
+            .saturating_sub(self.get_reserved_pages()))
+            >> 1
+    }
+
     fn base(&self) -> &BasePlan<VM> {
         &self.common.base
     }
