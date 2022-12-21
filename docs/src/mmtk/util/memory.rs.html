@@ -349,6 +349,22 @@
 <span id="347">347</span>
 <span id="348">348</span>
 <span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::AllocationError</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
@@ -390,13 +406,20 @@
     <span class="ident">ret</span>
 }
 
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
+<span class="comment">// MAP_FIXED_NOREPLACE returns EEXIST if already mapped</span>
+<span class="kw">const</span> <span class="ident">MMAP_FLAGS</span>: <span class="ident">libc::c_int</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;macos&quot;</span>)]</span>
+<span class="comment">// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.</span>
+<span class="kw">const</span> <span class="ident">MMAP_FLAGS</span>: <span class="ident">libc::c_int</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED</span>;
+
 <span class="doccomment">/// Demand-zero mmap (no replace):</span>
 <span class="doccomment">/// This function mmaps the memory and guarantees to zero all mapped memory.</span>
 <span class="doccomment">/// This function will not overwrite existing memory mapping, and it will result Err if there is an existing mapping.</span>
 <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::let_and_return</span>)]</span> <span class="comment">// Zeroing is not neceesary for some OS/s</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">dzmmap_noreplace</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_READ</span> <span class="op">|</span> <span class="ident">PROT_WRITE</span> <span class="op">|</span> <span class="ident">PROT_EXEC</span>;
-    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span>;
+    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">MMAP_FLAGS</span>;
     <span class="kw">let</span> <span class="ident">ret</span> <span class="op">=</span> <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>);
     <span class="comment">// We do not need to explicitly zero for Linux (memory is guaranteed to be zeroed)</span>
     <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>))]</span>
@@ -412,8 +435,7 @@
 <span class="doccomment">/// We can use this to reserve the address range, and then later overwrites the mapping with dzmmap().</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mmap_noreserve</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_NONE</span>;
-    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span>
-        <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span> <span class="op">|</span> <span class="ident">libc::MAP_NORESERVE</span>;
+    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">MMAP_FLAGS</span> <span class="op">|</span> <span class="ident">libc::MAP_NORESERVE</span>;
     <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>)
 }
 
@@ -470,10 +492,10 @@
 <span class="doccomment">/// Checks if the memory has already been mapped. If not, we panic.</span>
 <span class="comment">// Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.</span>
 <span class="comment">// Be very careful about using this function.</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">panic_if_unmapped</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) {
     <span class="kw">let</span> <span class="ident">prot</span> <span class="op">=</span> <span class="ident">PROT_READ</span> <span class="op">|</span> <span class="ident">PROT_WRITE</span>;
-    <span class="comment">// MAP_FIXED_NOREPLACE returns EEXIST if already mapped</span>
-    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">libc::MAP_ANON</span> <span class="op">|</span> <span class="ident">libc::MAP_PRIVATE</span> <span class="op">|</span> <span class="ident">libc::MAP_FIXED_NOREPLACE</span>;
+    <span class="kw">let</span> <span class="ident">flags</span> <span class="op">=</span> <span class="ident">MMAP_FLAGS</span>;
     <span class="kw">match</span> <span class="ident">mmap_fixed</span>(<span class="ident">start</span>, <span class="ident">size</span>, <span class="ident">prot</span>, <span class="ident">flags</span>) {
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="macro">panic!</span>(<span class="string">&quot;{} of size {} is not mapped&quot;</span>, <span class="ident">start</span>, <span class="ident">size</span>),
         <span class="prelude-val">Err</span>(<span class="ident">e</span>) =&gt; {
@@ -484,6 +506,13 @@
             );
         }
     }
+}
+
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">not</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>))]</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">panic_if_unmapped</span>(<span class="ident">_start</span>: <span class="ident">Address</span>, <span class="ident">_size</span>: <span class="ident">usize</span>) {
+    <span class="comment">// This is only used for assertions, so MMTk will still run even if we never panic.</span>
+    <span class="comment">// TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.</span>
+    <span class="comment">// Possibly we can use posix_mem_offset for both OS/s.</span>
 }
 
 <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">munprotect</span>(<span class="ident">start</span>: <span class="ident">Address</span>, <span class="ident">size</span>: <span class="ident">usize</span>) -&gt; <span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
@@ -583,6 +612,7 @@
         })
     }
 
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_mmap_noreplace</span>() {
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
@@ -620,6 +650,7 @@
         })
     }
 
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="attribute">#[<span class="ident">should_panic</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_check_is_mmapped_for_unmapped</span>() {
@@ -651,6 +682,7 @@
         })
     }
 
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="attribute">#[<span class="ident">should_panic</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_check_is_mmapped_for_unmapped_next_to_mapped</span>() {

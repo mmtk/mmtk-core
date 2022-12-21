@@ -78,6 +78,13 @@
 <span id="76">76</span>
 <span id="77">77</span>
 <span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
 </pre><pre class="rust"><code><span class="comment">// Export one of the malloc libraries.</span>
 
 <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;malloc_hoard&quot;</span>)]</span>
@@ -154,7 +161,14 @@
     <span class="comment">// Posix</span>
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">libc::posix_memalign</span>;
     <span class="comment">// GNU</span>
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">libc::malloc_usable_size</span>;
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;macos&quot;</span>)]</span>
+    <span class="kw">extern</span> <span class="string">&quot;C&quot;</span> {
+        <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">malloc_size</span>(<span class="ident">ptr</span>: <span class="kw-2">*const</span> <span class="ident">libc::c_void</span>) -&gt; <span class="ident">usize</span>;
+    }
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;macos&quot;</span>)]</span>
+    <span class="kw">pub</span> <span class="kw">use</span> <span class="ident"><span class="self">self</span>::malloc_size</span> <span class="kw">as</span> <span class="ident">malloc_usable_size</span>;
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>

@@ -1072,6 +1072,8 @@
 <span id="1070">1070</span>
 <span id="1071">1071</span>
 <span id="1072">1072</span>
+<span id="1073">1073</span>
+<span id="1074">1074</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::affinity</span>::{<span class="ident">get_total_num_cpus</span>, <span class="ident">CoreId</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
@@ -1964,6 +1966,7 @@
         })
     }
 
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_thread_affinity_single_core</span>() {
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
@@ -1984,6 +1987,7 @@
         })
     }
 
+    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">target_os</span> <span class="op">=</span> <span class="string">&quot;linux&quot;</span>)]</span>
     <span class="attribute">#[<span class="ident">test</span>]</span>
     <span class="kw">fn</span> <span class="ident">test_thread_affinity_generate_core_list</span>() {
         <span class="ident">serial_test</span>(<span class="op">|</span><span class="op">|</span> {
