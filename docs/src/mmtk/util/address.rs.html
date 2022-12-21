@@ -613,6 +613,8 @@
 <span id="611">611</span>
 <span id="612">612</span>
 <span id="613">613</span>
+<span id="614">614</span>
+<span id="615">615</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic_traits::Atomic</span>;
 <span class="kw">use</span> <span class="ident">std::fmt</span>;
 <span class="kw">use</span> <span class="ident">std::mem</span>;
@@ -852,7 +854,9 @@
     <span class="doccomment">/// This could throw a segment fault if the address is invalid</span>
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">pub</span> <span class="kw">unsafe</span> <span class="kw">fn</span> <span class="ident">store</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span>(<span class="self">self</span>, <span class="ident">value</span>: <span class="ident">T</span>) {
-        <span class="kw-2">*</span>(<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>) <span class="op">=</span> <span class="ident">value</span>;
+        <span class="comment">// We use a ptr.write() operation as directly setting the pointer would drop the old value</span>
+        <span class="comment">// which may result in unexpected behaviour</span>
+        (<span class="self">self</span>.<span class="number">0</span> <span class="kw">as</span> <span class="kw-2">*mut</span> <span class="ident">T</span>).<span class="ident">write</span>(<span class="ident">value</span>);
     }
 
     <span class="doccomment">/// atomic operation: load</span>
