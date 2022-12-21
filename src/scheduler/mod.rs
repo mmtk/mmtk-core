@@ -1,6 +1,6 @@
 //! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
-pub mod affinity;
+pub(crate) mod affinity;
 
 #[allow(clippy::module_inception)]
 mod scheduler;

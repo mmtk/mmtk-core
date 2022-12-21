@@ -2,7 +2,7 @@ use super::worker::ThreadId;
 use crate::util::options::AffinityKind;
 
 /// Represents the ID of a logical CPU on a system.
-pub use core_affinity::CoreId;
+pub type CoreId = usize;
 
 /// Return the total number of cores allocated to the program.
 pub fn get_total_num_cpus() -> usize {
@@ -27,7 +27,7 @@ impl AffinityKind {
 
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_core(cpu: CoreId) {
-    if !core_affinity::set_for_current(cpu) {
+    if !core_affinity::set_for_current(core_affinity::CoreId { id: cpu }) {
         panic!("Failed to bind current thread to {:?}", cpu);
     };
 }
