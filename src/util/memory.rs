@@ -143,7 +143,9 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
 
 #[cfg(not(target_os = "linux"))]
 pub fn panic_if_unmapped(_start: Address, _size: usize) {
-    // do nothing
+    // This is only used for assertions, so MMTk will still run if we never panic.
+    // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
+    // Possibly we can use posix_mem_offset for both OS/s.
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
