@@ -43,7 +43,7 @@ pub unsafe fn dzmmap(start: Address, size: usize) -> Result<()> {
 // MAP_FIXED_NOREPLACE returns EEXIST if already mapped
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED_NOREPLACE;
 #[cfg(target_os = "macos")]
-// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE. We are at the risk of overwriting pre-existing mappings.
+// MAP_FIXED is used instead of MAP_FIXED_NOREPLACE (which is not available on macOS). We are at the risk of overwriting pre-existing mappings.
 const MMAP_FLAGS: libc::c_int = libc::MAP_ANON | libc::MAP_PRIVATE | libc::MAP_FIXED;
 
 /// Demand-zero mmap (no replace):
@@ -143,7 +143,7 @@ pub fn panic_if_unmapped(start: Address, size: usize) {
 
 #[cfg(not(target_os = "linux"))]
 pub fn panic_if_unmapped(_start: Address, _size: usize) {
-    // This is only used for assertions, so MMTk will still run if we never panic.
+    // This is only used for assertions, so MMTk will still run even if we never panic.
     // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
     // Possibly we can use posix_mem_offset for both OS/s.
 }
