@@ -285,7 +285,7 @@ impl AffinityKind {
         for split in cpulist.split(',') {
             if !split.contains('-') {
                 if !split.is_empty() {
-                    if let Ok(core) = split.parse::<usize>() {
+                    if let Ok(core) = split.parse::<u16>() {
                         cpuset.push(core);
                         cpuset.sort_unstable();
                         cpuset.dedup();
@@ -296,8 +296,8 @@ impl AffinityKind {
                 // Contains a range
                 let range: Vec<&str> = split.split('-').collect();
                 if range.len() == 2 {
-                    if let Ok(start) = range[0].parse::<usize>() {
-                        if let Ok(end) = range[1].parse::<usize>() {
+                    if let Ok(start) = range[0].parse::<u16>() {
+                        if let Ok(end) = range[1].parse::<u16>() {
                             if start >= end {
                                 return Err(
                                     "Starting core id in range should be less than the end"
@@ -898,10 +898,7 @@ mod tests {
                     std::env::set_var("MMTK_THREAD_AFFINITY", "0");
 
                     let options = Options::default();
-                    assert_eq!(
-                        *options.thread_affinity,
-                        AffinityKind::RoundRobin(vec![0usize])
-                    );
+                    assert_eq!(*options.thread_affinity, AffinityKind::RoundRobin(vec![0]));
                 },
                 || {
                     std::env::remove_var("MMTK_THREAD_AFFINITY");
@@ -922,7 +919,7 @@ mod tests {
                     cpu_list.push('0');
                     for cpu in 1..num_cpus {
                         cpu_list.push_str(format!(",{}", cpu).as_str());
-                        vec.push(cpu);
+                        vec.push(cpu as u16);
                     }
 
                     std::env::set_var("MMTK_THREAD_AFFINITY", cpu_list);
