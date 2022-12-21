@@ -131,6 +131,7 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 /// Checks if the memory has already been mapped. If not, we panic.
 // Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
 // Be very careful about using this function.
+#[cfg(target_os = "linux")]
 pub fn panic_if_unmapped(start: Address, size: usize) {
     if size == 0 {
         return;
@@ -157,6 +158,13 @@ pub fn os_is_mapped(start: Address, size: usize) -> bool {
             start, size, e
         ),
     }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn panic_if_unmapped(_start: Address, _size: usize) {
+    // This is only used for assertions, so MMTk will still run even if we never panic.
+    // TODO: We need a proper implementation for this. As we do not have MAP_FIXED_NOREPLACE, we cannot use the same implementation as Linux.
+    // Possibly we can use posix_mem_offset for both OS/s.
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
@@ -256,6 +264,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn test_mmap_noreplace() {
         serial_test(|| {
@@ -293,6 +302,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped() {
@@ -324,6 +334,7 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     #[should_panic]
     fn test_check_is_mmapped_for_unmapped_next_to_mapped() {
