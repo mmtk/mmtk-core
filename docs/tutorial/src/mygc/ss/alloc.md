@@ -66,6 +66,15 @@ Finished code (step 2):
 {{#include ../../../code/mygc_semispace/global.rs:plan_def}}
 ```
 
+Note that we have attributes on some fields. These attributes tell MMTk's macros on
+how to generate code to trace objects in this plan. Although there are other approaches that
+you can implement object tracing, in this tutorial we use the macros, as it is the simplest.
+Make sure you import the macros. We will discuss on what those attributes mean in later sections.
+
+```rust
+use mmtk_macros::PlanTraceObject;
+```
+
 ### Implement the Plan trait for MyGC
 
 #### Constructor
@@ -86,16 +95,6 @@ that you just defined.
    4. Finally, replace the old MyGC initializer.
 ```rust
 {{#include ../../../code/mygc_semispace/global.rs:plan_new}}
-```
-
-#### Initializer
-
-Find `gc_init()`. Change it to initialise the common plan and the two 
-copyspaces, rather than the base plan and mygc_space. The contents of the 
-initializer calls are identical.
-
-```rust
-{{#include ../../../code/mygc_semispace/global.rs:gc_init}}
 ```
 
 ### Access MyGC spaces
