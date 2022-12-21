@@ -123,12 +123,9 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         if full_heap {
             self.fromspace().release();
         }
+    }
 
-        // TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker
-        // NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is
-        // called _after_ all spaces have been released (including ones in `gen`) as otherwise we
-        // may get incorrect results since the function uses values such as available pages that
-        // will change dependant on which spaces have been released
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.gen
             .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
     }

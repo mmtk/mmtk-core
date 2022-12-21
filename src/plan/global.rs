@@ -221,16 +221,21 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
-    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn prepare(&mut self, tls: VMWorkerThread);
 
     /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
     /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
     fn prepare_worker(&self, _worker: &mut GCWorker<Self::VM>) {}
 
-    /// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.
-    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
+    /// Release the plan after transitive closure. A plan can implement this method to call each policy's release,
+    /// or create any work packet that should be done in release.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
+
+    /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
 
     /// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called
     /// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,
