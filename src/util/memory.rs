@@ -125,66 +125,25 @@ pub fn handle_mmap_error<VM: VMBinding>(error: Error, tls: VMThread) -> ! {
 /// Checks if the memory has already been mapped. If not, we panic.
 // Note that the checking has a side effect that it will map the memory if it was unmapped. So we panic if it was unmapped.
 // Be very careful about using this function.
+#[cfg(target_os = "linux")]
 pub fn panic_if_unmapped(start: Address, size: usize) {
-    #[cfg(target_os = "linux")]
-    {
-        let prot = PROT_READ | PROT_WRITE;
-        let flags = MMAP_FLAGS;
-        match mmap_fixed(start, size, prot, flags) {
-            Ok(_) => panic!("{} of size {} is not mapped", start, size),
-            Err(e) => {
-                assert!(
-                    e.kind() == std::io::ErrorKind::AlreadyExists,
-                    "Failed to check mapped: {:?}",
-                    e
-                );
-            }
+    let prot = PROT_READ | PROT_WRITE;
+    let flags = MMAP_FLAGS;
+    match mmap_fixed(start, size, prot, flags) {
+        Ok(_) => panic!("{} of size {} is not mapped", start, size),
+        Err(e) => {
+            assert!(
+                e.kind() == std::io::ErrorKind::AlreadyExists,
+                "Failed to check mapped: {:?}",
+                e
+            );
         }
     }
+}
 
-    // #[cfg(target_os = "macos")]
-    // {
-    //     use mach2::vm_region::*;
-    //     use mach2::port::mach_port_name_t;
-    //     use mach2::mach_types::vm_task_entry_t;
-    //     use libc::*;
-    //     use libproc::libproc::proc_pid::regionfilename;
-    //     use std::mem;
-
-    //     let mut count = mem::size_of::<vm_region_basic_info_data_64_t>() as mach_msg_type_number_t;
-    //     let mut object_name: mach_port_t = 0;
-    //     // we need to create new `size` and `info` structs for the function we call to read the data
-    //     // into
-    //     let mut size = unsafe { mem::zeroed::<mach_vm_size_t>() };
-    //     let mut info = unsafe { mem::zeroed::<vm_region_basic_info_data_t>() };
-    //     let result = unsafe {
-    //         // Call the underlying Mach function
-    //         mach2::vm::mach_vm_region(
-    //             target_task as vm_task_entry_t,
-    //             &mut address,
-    //             &mut size,
-    //             VM_REGION_BASIC_INFO,
-    //             &mut info as *mut vm_region_basic_info_data_t as vm_region_info_t,
-    //             &mut count,
-    //             &mut object_name,
-    //         )
-    //     };
-    //     if result != KERN_SUCCESS {
-    //         panic!("Unable to get mach_vm_region")
-    //     }
-    //     // this uses 
-    //     // let filename = match regionfilename(41000, address) {
-    //     //     Ok(x) => Some(x),
-    //     //     _ => None,
-    //     // };
-    //     // Some(Region {
-    //     //     size: size,
-    //     //     info: info,
-    //     //     address: address,
-    //     //     count: count,
-    //     //     filename: filename,
-    //     // })
-    // }
+#[cfg(not(target_os = "linux"))]
+pub fn panic_if_unmapped(_start: Address, _size: usize) {
+    // do nothing
 }
 
 pub fn munprotect(start: Address, size: usize) -> Result<()> {
