@@ -28,6 +28,7 @@ jobs:
         target:
           - { os: ubuntu-18.04, triple: x86_64-unknown-linux-gnu }
           - { os: ubuntu-18.04, triple: i686-unknown-linux-gnu }
+          - { os: macos-12, triple: x86_64-apple-darwin }
         rust: ${{ fromJson(needs.setup-test-matrix.outputs.rust )}}
 
     name: ${{ matrix.target.triple }} / ${{ matrix.rust }}
@@ -53,10 +54,7 @@ jobs:
 
       # Test
       - name: Test
-        run: |
-          sudo apt-get update
-          sudo apt-get install libc6-dev-i386
-          ./.github/scripts/ci-test.sh
+        run: ./.github/scripts/ci-test.sh
 
       # Style checks
       - name: Style checks

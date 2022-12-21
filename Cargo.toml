@@ -25,7 +25,6 @@ mmtk-macros = { version = "0.16.0", path = "macros/" }
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
 mimalloc-sys = { version = "0.1.6", optional = true }
-hoard-sys = { version = "0.1.2", optional = true }
 lazy_static = "1.1"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam = "0.8.1"
@@ -131,7 +130,6 @@ malloc_counted_size = []
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
-malloc_hoard = ["hoard-sys"]
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
 # is not compiled in default builds.
 malloc_native_mimalloc = []
