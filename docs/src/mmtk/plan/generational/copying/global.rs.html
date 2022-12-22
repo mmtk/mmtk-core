@@ -394,7 +394,7 @@
 
     <span class="doccomment">/// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.</span>
     <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
-        <span class="comment">// super.get_pages_avail() / 2 to reserve pages for copying</span>
+        <span class="comment">// super.get_available_pages() / 2 to reserve pages for copying</span>
         (<span class="self">self</span>
             .<span class="ident">get_total_pages</span>()
             .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>()))

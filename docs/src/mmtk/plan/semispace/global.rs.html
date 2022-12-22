@@ -197,6 +197,13 @@
 <span id="195">195</span>
 <span id="196">196</span>
 <span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::SSGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateGeneralPlanArgs</span>;
@@ -315,6 +322,13 @@
 
     <span class="kw">fn</span> <span class="ident">get_used_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">tospace</span>().<span class="ident">reserved_pages</span>() <span class="op">+</span> <span class="self">self</span>.<span class="ident">common</span>.<span class="ident">get_used_pages</span>()
+    }
+
+    <span class="kw">fn</span> <span class="ident">get_available_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        (<span class="self">self</span>
+            .<span class="ident">get_total_pages</span>()
+            .<span class="ident">saturating_sub</span>(<span class="self">self</span>.<span class="ident">get_reserved_pages</span>()))
+            <span class="op">&gt;</span><span class="op">&gt;</span> <span class="number">1</span>
     }
 
     <span class="kw">fn</span> <span class="ident">base</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="ident">BasePlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
