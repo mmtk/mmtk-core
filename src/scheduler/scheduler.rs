@@ -220,13 +220,20 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
         // processing them together.
 
         // VM-specific weak ref processing
+        // The `VMProcessWeakRefs` work packet is set as the sentinel so that it is executed when
+        // the `VMRefClosure` bucket is drained.  The VM binding may spawn new work packets into
+        // the `VMRefClosure` bucket, and request another `VMProcessWeakRefs` work packet to be
+        // executed again after this bucket is drained again.  Strictly speaking, the first
+        // `VMProcessWeakRefs` packet can be an ordinary packet (doesn't have to be a sentinel)
+        // because there are no other packets in the bucket.  We set it as sentinel for
+        // consistency.
         self.work_buckets[WorkBucketStage::VMRefClosure]
             .set_sentinel(Box::new(VMProcessWeakRefs::<C::ProcessEdgesWorkType>::new()));
 
         if plan.constraints().needs_forward_after_liveness {
             // VM-specific weak ref forwarding
             self.work_buckets[WorkBucketStage::VMRefForwarding]
-                .set_sentinel(Box::new(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new()));
+                .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
         }
     }
 
