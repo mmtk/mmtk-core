@@ -5,7 +5,6 @@ use crate::plan::Plan;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
-use crate::util::conversions;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -42,7 +41,7 @@ impl<VM: VMBinding> Gen<VM> {
             args.get_space_args(
                 "nursery",
                 true,
-                VMRequest::fixed_extent(args.global_args.options.get_max_nursery(), false),
+                VMRequest::fixed_extent(args.global_args.options.get_max_nursery_bytes(), false),
             ),
             true,
         );
@@ -111,8 +110,14 @@ impl<VM: VMBinding> Gen<VM> {
         space_full: bool,
         space: Option<&dyn Space<VM>>,
     ) -> bool {
-        let nursery_full = self.nursery.reserved_pages()
-            >= (conversions::bytes_to_pages_up(self.common.base.options.get_max_nursery()));
+        let nursery_full =
+            self.nursery.reserved_pages() >= self.common.base.options.get_max_nursery_pages();
+        trace!(
+            "nursery_full = {:?} (nursery = {}, max_nursery = {})",
+            nursery_full,
+            self.nursery.reserved_pages(),
+            self.common.base.options.get_max_nursery_pages()
+        );
 
         if nursery_full {
             return true;
@@ -151,6 +156,7 @@ impl<VM: VMBinding> Gen<VM> {
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         #[allow(clippy::if_same_then_else)]
         let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
+            trace!("full heap: forced full heap");
             // For barrier overhead measurements, we always do full gc in nursery collections.
             true
         } else if self
@@ -160,6 +166,7 @@ impl<VM: VMBinding> Gen<VM> {
             .load(Ordering::SeqCst)
             && *self.common.base.options.full_heap_system_gc
         {
+            trace!("full heap: user triggered");
             // User triggered collection, and we force full heap for user triggered collection
             true
         } else if self.next_gc_full_heap.load(Ordering::SeqCst)
@@ -170,11 +177,26 @@ impl<VM: VMBinding> Gen<VM> {
                 .load(Ordering::SeqCst)
                 > 1
         {
+            trace!(
+                "full heap: next_gc_full_heap = {}, cur_collection_attempts = {}",
+                self.next_gc_full_heap.load(Ordering::SeqCst),
+                self.common
+                    .base
+                    .cur_collection_attempts
+                    .load(Ordering::SeqCst)
+            );
             // Forces full heap collection
             true
         } else if self.virtual_memory_exhausted(plan) {
+            trace!("full heap: virtual memory exhausted");
             true
         } else {
+            trace!(
+                "full heap: total pages {} <= reserved pages {} (los {})",
+                plan.get_total_pages(),
+                plan.get_reserved_pages(),
+                plan.common().get_los().reserved_pages()
+            );
             plan.get_total_pages() <= plan.get_reserved_pages()
         };
 
@@ -245,8 +267,13 @@ impl<VM: VMBinding> Gen<VM> {
     /// [`get_available_pages`](crate::plan::Plan::get_available_pages)
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
-        plan.get_available_pages()
-            < conversions::bytes_to_pages_up(plan.base().options.get_min_nursery())
+        trace!(
+            "next gc will be full heap? {}, availabe pages = {}, min nursery = {}",
+            plan.get_available_pages() < plan.base().options.get_min_nursery_pages(),
+            plan.get_available_pages(),
+            plan.base().options.get_min_nursery_pages()
+        );
+        plan.get_available_pages() < plan.base().options.get_min_nursery_pages()
     }
 
     /// Set next_gc_full_heap to the given value.
