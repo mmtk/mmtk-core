@@ -326,11 +326,10 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
 
             if mmtk.plan.generational().is_some() {
                 if stats.generational_mem_stats_on_gc_end(mmtk) {
-                    // We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure the copiyng from nursery to mature can be done within the heap size, thus
-                    // it counts the nursery size twice to make sure that objects can all be copied. Thus we have to reserve 2x nursery here.
-                    // For example, max nursery is 3k pages, we will need to reserve 6k pages (2x3k), and the new heap limit could be 8k. When MMTk allocates into nursery
                     self.compute_new_heap_limit(
                         mmtk.plan.get_reserved_pages(),
+                        // We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure there is enough room in the mature space
+                        // to accomodate the copiyng from nursery, thus it counts the nursery size twice to make sure that objects can all be copied.
                         mmtk.plan.get_collection_reserved_pages()
                             + mmtk.options.get_max_nursery_pages() * 2,
                         stats,
@@ -397,10 +396,13 @@ impl MemBalancerTrigger {
         stats: &mut MemBalancerStats,
     ) {
         trace!("compute new heap limit: {:?}", stats);
+
+        // Constants from the original paper
         const ALLOCATION_SMOOTH_FACTOR: f64 = 0.95;
         const COLLECTION_SMOOTH_FACTOR: f64 = 0.5;
         const TUNING_FACTOR: f64 = 0.2;
 
+        // Smooth memory/time for allocation/collection
         let smooth = |prev, cur, factor| {
             if prev == NO_PREV {
                 cur
@@ -439,6 +441,7 @@ impl MemBalancerTrigger {
             gc_time
         );
 
+        // We got the smoothed stats. Now save the current stats as previous stats
         stats.allocation_pages_prev = stats.allocation_pages;
         stats.allocation_pages = 0f64;
         stats.allocation_time_prev = stats.allocation_time;
@@ -448,6 +451,7 @@ impl MemBalancerTrigger {
         stats.collection_time_prev = stats.collection_time;
         stats.collection_time = 0f64;
 
+        // Calculate the square root
         let e: f64 = if gc_mem != 0f64 {
             let mut e = live as f64;
             e *= alloc_mem / alloc_time;
@@ -459,6 +463,7 @@ impl MemBalancerTrigger {
             (live as f64 * 4096f64).sqrt()
         };
 
+        // This is the optimal heap limit due to mem balancer. We will need to clamp the value to the defined min/max range.
         let optimal_heap = live + e as usize + extra_reserve;
         trace!(
             "optimal = live {} + sqrt(live) {} + extra {}",

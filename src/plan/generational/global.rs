@@ -110,13 +110,14 @@ impl<VM: VMBinding> Gen<VM> {
         space_full: bool,
         space: Option<&dyn Space<VM>>,
     ) -> bool {
-        let nursery_full =
-            self.nursery.reserved_pages() >= self.common.base.options.get_max_nursery_pages();
+        let cur_nursery = self.nursery.reserved_pages();
+        let max_nursery = self.common.base.options.get_max_nursery_pages();
+        let nursery_full = cur_nursery >= max_nursery;
         trace!(
             "nursery_full = {:?} (nursery = {}, max_nursery = {})",
             nursery_full,
-            self.nursery.reserved_pages(),
-            self.common.base.options.get_max_nursery_pages()
+            cur_nursery,
+            max_nursery,
         );
 
         if nursery_full {
@@ -192,10 +193,9 @@ impl<VM: VMBinding> Gen<VM> {
             true
         } else {
             trace!(
-                "full heap: total pages {} <= reserved pages {} (los {})",
+                "full heap: total pages {} <= reserved pages {}",
                 plan.get_total_pages(),
                 plan.get_reserved_pages(),
-                plan.common().get_los().reserved_pages()
             );
             plan.get_total_pages() <= plan.get_reserved_pages()
         };
@@ -267,13 +267,16 @@ impl<VM: VMBinding> Gen<VM> {
     /// [`get_available_pages`](crate::plan::Plan::get_available_pages)
     /// whose value depends on which spaces have been released.
     pub fn should_next_gc_be_full_heap(plan: &dyn Plan<VM = VM>) -> bool {
+        let available = plan.get_available_pages();
+        let min_nursery = plan.base().options.get_min_nursery_pages();
+        let next_gc_full_heap = available < min_nursery;
         trace!(
             "next gc will be full heap? {}, availabe pages = {}, min nursery = {}",
-            plan.get_available_pages() < plan.base().options.get_min_nursery_pages(),
-            plan.get_available_pages(),
-            plan.base().options.get_min_nursery_pages()
+            next_gc_full_heap,
+            available,
+            min_nursery
         );
-        plan.get_available_pages() < plan.base().options.get_min_nursery_pages()
+        next_gc_full_heap
     }
 
     /// Set next_gc_full_heap to the given value.
