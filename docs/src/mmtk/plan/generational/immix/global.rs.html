@@ -253,9 +253,6 @@
 <span id="251">251</span>
 <span id="252">252</span>
 <span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixMatureGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenImmixNurseryGCWorkContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
@@ -423,12 +420,9 @@
         }
         <span class="self">self</span>.<span class="ident">last_gc_was_full_heap</span>
             .<span class="ident">store</span>(<span class="ident">full_heap</span>, <span class="ident">Ordering::Relaxed</span>);
+    }
 
-        <span class="comment">// TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker</span>
-        <span class="comment">// NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is</span>
-        <span class="comment">// called _after_ all spaces have been released (including ones in `gen`) as otherwise we</span>
-        <span class="comment">// may get incorrect results since the function uses values such as available pages that</span>
-        <span class="comment">// will change dependant on which spaces have been released</span>
+    <span class="kw">fn</span> <span class="ident">end_of_gc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {
         <span class="self">self</span>.<span class="ident">gen</span>
             .<span class="ident">set_next_gc_full_heap</span>(<span class="ident">Gen::should_next_gc_be_full_heap</span>(<span class="self">self</span>));
     }

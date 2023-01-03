@@ -1045,6 +1045,11 @@
 <span id="1043">1043</span>
 <span id="1044">1044</span>
 <span id="1045">1045</span>
+<span id="1046">1046</span>
+<span id="1047">1047</span>
+<span id="1048">1048</span>
+<span id="1049">1049</span>
+<span id="1050">1050</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The global part of a plan implementation.</span>
 
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_requester::GCRequester</span>;
@@ -1268,16 +1273,21 @@
     }
 
     <span class="doccomment">/// Prepare the plan before a GC. This is invoked in an initial step in the GC.</span>
-    <span class="doccomment">/// This is invoked once per GC by one worker thread. &#39;tls&#39; is the worker thread that executes this method.</span>
+    <span class="doccomment">/// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.</span>
     <span class="kw">fn</span> <span class="ident">prepare</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
 
     <span class="doccomment">/// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific</span>
     <span class="doccomment">/// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.</span>
     <span class="kw">fn</span> <span class="ident">prepare_worker</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident"><span class="self">Self</span>::VM</span><span class="op">&gt;</span>) {}
 
-    <span class="doccomment">/// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.</span>
-    <span class="doccomment">/// This is invoked once per GC by one worker thread. &#39;tls&#39; is the worker thread that executes this method.</span>
+    <span class="doccomment">/// Release the plan after transitive closure. A plan can implement this method to call each policy&#39;s release,</span>
+    <span class="doccomment">/// or create any work packet that should be done in release.</span>
+    <span class="doccomment">/// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.</span>
     <span class="kw">fn</span> <span class="ident">release</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">tls</span>: <span class="ident">VMWorkerThread</span>);
+
+    <span class="doccomment">/// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.</span>
+    <span class="doccomment">/// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.</span>
+    <span class="kw">fn</span> <span class="ident">end_of_gc</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
 
     <span class="doccomment">/// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called</span>
     <span class="doccomment">/// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,</span>
