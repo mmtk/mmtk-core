@@ -1038,7 +1038,7 @@ pub enum AllocationSemantics {
     Immortal = 1,
     /// Large objects. It is usually desirable to allocate large objects specially. Large objects
     /// are allocated with page granularity and will not be moved.
-    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::plan_constraints::PlanConstraints`]),
+    /// Each plan provides `max_non_los_default_alloc_bytes` (see [`crate::plan::PlanConstraints`]),
     /// which defines a threshold for objects that can be allocated with the default semantic. Any object that is larger than the
     /// threshold must be allocated with the `Los` semantic.
     /// This semantic may get removed and MMTk will transparently allocate into large object space for large objects.

@@ -3,6 +3,9 @@
 # rustdoc.yml will copy the docs from respective directories to a directory for publishing.
 # If the output path is changed in this script, we need to update rustdoc.yml as well.
 
+# deny warnings for rustdoc
+export RUSTFLAGS="-D warnings"
+
 # Check cargo doc
 # We generate two versions of docs: one with only public items for binding developers for our API, and
 # the other with both public and private items for MMTk developers (GC implementers).

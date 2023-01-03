@@ -24,7 +24,7 @@ const MAX_IMMIX_COPY_ALLOCATORS: usize = 2;
 type CopySpaceMapping<VM> = Vec<(CopySelector, &'static dyn Space<VM>)>;
 
 /// A configuration for GCWorkerCopyContext.
-/// Similar to [MutatorConfig](plan/mutator_context/struct.MutatorConfig.html),
+/// Similar to a `MutatorConfig`,
 /// We expect each copying plan to provide a CopyConfig.
 pub struct CopyConfig<VM: VMBinding> {
     /// Mapping CopySemantics to the actual copying allocators (CopySelector)

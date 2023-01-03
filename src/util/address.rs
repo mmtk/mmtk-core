@@ -237,7 +237,9 @@ impl Address {
     /// This could throw a segment fault if the address is invalid
     #[inline(always)]
     pub unsafe fn store<T>(self, value: T) {
-        *(self.0 as *mut T) = value;
+        // We use a ptr.write() operation as directly setting the pointer would drop the old value
+        // which may result in unexpected behaviour
+        (self.0 as *mut T).write(value);
     }
 
     /// atomic operation: load
