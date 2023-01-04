@@ -99,30 +99,39 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
     }
 }
 
+/// Estimate the maximum size that can satisfy the alignment and size requirement without any knowledge about
+/// the current alignment. In other words, if an allocator allocates the size returned from this method,
+/// it is guaranteed that they can satisfy the alignment and size requirement for the allocation.
+/// What this method returns is a conservative estimate (which means the size might be larger than necessary).
+/// When the current alignment (e.g. the end alignment of previous allocation, or the alignment of the cell) is known,
+/// it is recommended to use [`get_maximum_aligned_size`].
 #[inline(always)]
-pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize) -> usize {
-    get_maximum_aligned_size_inner::<VM>(size, alignment, VM::MIN_ALIGNMENT)
+pub fn estimate_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize) -> usize {
+    get_maximum_aligned_size(size, alignment, VM::ALLOC_END_ALIGNMENT)
 }
 
+/// Get the maximum size that can satisfy the alignment and size requirement without any knowledge about
+/// the current alignment. In other words, if an allocator allocates the size returned from this method,
+/// it is guaranteed that they can satisfy the alignment and size requirement for the allocation.
+/// Unlike [`estimate_maximum_aligned_size`], this method requires an extra `known_alignment` argument, and can use
+/// the `known_alignment` for a precise size calculation.
+///
+/// # Arguments:
+/// * `size`
+/// * `alignment`
+/// * `known_alignment`: the alignment for the current allocation cursor, e.g. the end alignment of previous allocation,
+///   or the alignment of the cell
 #[inline(always)]
-pub fn get_maximum_aligned_size_inner<VM: VMBinding>(
+pub fn get_maximum_aligned_size(
     size: usize,
     alignment: usize,
     known_alignment: usize,
 ) -> usize {
-    trace!(
-        "size={}, alignment={}, known_alignment={}, MIN_ALIGNMENT={}",
-        size,
-        alignment,
-        known_alignment,
-        VM::MIN_ALIGNMENT
-    );
-    debug_assert!(size == size & !(known_alignment - 1));
-    debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
-
-    if VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT || alignment <= known_alignment {
+    if alignment <= known_alignment {
+        // The known alignment satisfies the required alignment, just return size
         size
     } else {
+        // Otherwise, reserve enough room for alignment
         size + alignment - known_alignment
     }
 }

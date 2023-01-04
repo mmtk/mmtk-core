@@ -148,14 +148,19 @@ pub fn alloc<VM: VMBinding>(
     // their object sizes are all larger than MMTk's min object size, so we simply put an assertion here.
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
-    debug_assert!(size >= MIN_OBJECT_SIZE);
+    debug_assert!(size >= MIN_OBJECT_SIZE, "Size {} is larger than allowed min object size {}", size, MIN_OBJECT_SIZE);
     // Assert alignment
-    debug_assert!(align >= VM::MIN_ALIGNMENT);
-    debug_assert!(align <= VM::MAX_ALIGNMENT);
+    debug_assert!(align >= VM::MIN_ALIGNMENT, "Alignment {} is smaller than specified VM::MIN_ALIGNMENT {}", align, VM::MIN_ALIGNMENT);
+    debug_assert!(align <= VM::MAX_ALIGNMENT, "Alignment {} is larger than the specified VM::MAX_ALIGNMENT {}", align, VM::MAX_ALIGNMENT);
     // Assert offset
-    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0, "Offset {} is used when VM specifies VM::USE_ALLOCATION_OFFSET = false", offset);
 
-    mutator.alloc(size, align, offset, semantics)
+    let addr = mutator.alloc(size, align, offset, semantics);
+
+    debug_assert!((addr + offset).is_aligned_to(align), "Returned address {} (+ offset {}) does not satisfy alignment {}", addr, offset, align);
+    debug_assert!((addr + size).is_aligned_to(VM::ALLOC_END_ALIGNMENT), "End of allocation {} ({} + {}) does not satisfy VM::ALLOC_END_ALIGNMENT {}", addr + size, addr, size, VM::ALLOC_END_ALIGNMENT);
+
+    addr
 }
 
 /// Perform post-allocation actions, usually initializing object metadata. For many allocators none are

@@ -267,7 +267,8 @@ fn mi_wsize_from_size(size: usize) -> usize {
 }
 
 pub fn mi_bin<VM: VMBinding>(size: usize, align: usize) -> usize {
-    let size = allocator::get_maximum_aligned_size::<VM>(size, align);
+    // Every MiMalloc cell is aligned to MI_INTPTR_SIZE
+    let size = allocator::get_maximum_aligned_size(size, align, MI_INTPTR_SIZE);
     mi_bin_from_size(size)
 }
 
