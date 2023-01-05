@@ -269,6 +269,11 @@
 <span id="267">267</span>
 <span id="268">268</span>
 <span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CommonPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::global::CreateSpecificPlanArgs</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::ObjectQueue</span>;
@@ -420,7 +425,7 @@
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">requires_full_heap_collection</span><span class="op">&lt;</span><span class="ident">P</span>: <span class="ident">Plan</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">plan</span>: <span class="kw-2">&amp;</span><span class="ident">P</span>) -&gt; <span class="ident">bool</span> {
         <span class="comment">// Allow the same &#39;true&#39; block for if-else.</span>
         <span class="comment">// The conditions are complex, and it is easier to read if we put them to separate if blocks.</span>
-        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>)]</span>
+        <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::if_same_then_else</span>, <span class="ident">clippy::needless_bool</span>)]</span>
         <span class="kw">let</span> <span class="ident">is_full_heap</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident"><span class="kw">crate</span>::plan::generational::FULL_NURSERY_GC</span> {
             <span class="comment">// For barrier overhead measurements, we always do full gc in nursery collections.</span>
             <span class="bool-val">true</span>
@@ -446,7 +451,12 @@
         } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">virtual_memory_exhausted</span>(<span class="ident">plan</span>) {
             <span class="bool-val">true</span>
         } <span class="kw">else</span> {
-            <span class="ident">plan</span>.<span class="ident">get_total_pages</span>() <span class="op">&lt;</span><span class="op">=</span> <span class="ident">plan</span>.<span class="ident">get_reserved_pages</span>()
+            <span class="comment">// We use an Appel-style nursery. The default GC (even for a &quot;heap-full&quot; collection)</span>
+            <span class="comment">// for generational GCs should be a nursery GC. A full-heap GC should only happen if</span>
+            <span class="comment">// there is not enough memory available for allocating into the nursery (i.e. the</span>
+            <span class="comment">// available pages in the nursery are less than the minimum nursery pages), if the</span>
+            <span class="comment">// virtual memory has been exhausted, or if it is an emergency GC.</span>
+            <span class="bool-val">false</span>
         };
 
         <span class="self">self</span>.<span class="ident">gc_full_heap</span>.<span class="ident">store</span>(<span class="ident">is_full_heap</span>, <span class="ident">Ordering::SeqCst</span>);
