@@ -1,5 +1,6 @@
 name: Public API Check
 
+# Adding a random comment to a file to test if PR runs get canceled
 on:
   pull_request:
     branches:
