@@ -6,6 +6,11 @@ on:
     branches:
       - master
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   # Figure out binding PRs.
   binding-refs:

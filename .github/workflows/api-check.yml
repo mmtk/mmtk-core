@@ -5,6 +5,11 @@ on:
     branches:
       - master
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 # The workflow may fail if we change the public API in a pull request.
 # We allow fail on this action. But we should manually check if the changes are reasonable when we see a failed action.
 # It would be good if the workflow returns a neutral status when we find API changes. But it is currently not

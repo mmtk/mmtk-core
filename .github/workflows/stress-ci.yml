@@ -8,6 +8,11 @@ on:
     branches-ignore:
       - '**'
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   jikesrvm-stress-test:
     runs-on: [self-hosted, Linux, freq-scaling-on]
@@ -28,7 +33,7 @@ jobs:
       - name: Overwrite MMTk core in JikesRVM binding
         run: cp -r mmtk-core mmtk-jikesrvm/repos/
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-jikesrvm/mmtk/Cargo.toml
@@ -112,7 +117,7 @@ jobs:
       - name: Overwrite MMTk core in openjdk binding
         run: cp -r mmtk-core mmtk-openjdk/repos/
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV        
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core/rust-toolchain`" >> $GITHUB_ENV
       - name: Setup
         run: |
           sed -i 's/^mmtk[[:space:]]=/#ci:mmtk=/g' mmtk-openjdk/mmtk/Cargo.toml

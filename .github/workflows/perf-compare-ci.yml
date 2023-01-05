@@ -11,6 +11,11 @@ on:
         description: The pull request number to run the perf tests. The workflow compares the specified pull request with the trunk.
         required: true
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
     # Figure out binding PRs.
     binding-refs:

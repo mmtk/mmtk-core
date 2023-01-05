@@ -13,6 +13,11 @@ on:
     branches-ignore:
       - '**'
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   openjdk-microbm:
     runs-on: [self-hosted, Linux, freq-scaling-off]
@@ -66,7 +71,7 @@ jobs:
           submodules: true
       # Use rust-toolchain in the trunk (it doesnt matter much - if the toolchains defined in the trunk and the branch are different, we cant run anyway)
       - name: Setup Rust Toolchain
-        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV          
+        run: echo "RUSTUP_TOOLCHAIN=`cat mmtk-core-trunk/rust-toolchain`" >> $GITHUB_ENV
       # run compare
       - name: Compare Performance
         id: run
