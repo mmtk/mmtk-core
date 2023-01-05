@@ -175,7 +175,12 @@ impl<VM: VMBinding> Gen<VM> {
         } else if self.virtual_memory_exhausted(plan) {
             true
         } else {
-            plan.get_total_pages() <= plan.get_reserved_pages()
+            // We use an Appel-style nursery. The default GC (even for a "heap-full" collection)
+            // for generational GCs should be a nursery GC. A full-heap GC should only happen if
+            // there is not enough memory available for allocating into the nursery (i.e. the
+            // available pages in the nursery are less than the minimum nursery pages), if the
+            // virtual memory has been exhausted, or if it is an emergency GC.
+            false
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
