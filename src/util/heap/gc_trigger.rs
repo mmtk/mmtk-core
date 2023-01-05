@@ -132,7 +132,7 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for FixedHeapSizeTrigger {
     }
 }
 
-use atomic::Atomic;
+use atomic_refcell::AtomicRefCell;
 use std::time::Instant;
 
 /// An implementation of MemBalancer (Optimal heap limits for reducing browser memory use, <https://dl.acm.org/doi/10.1145/3563323>)
@@ -148,7 +148,7 @@ pub struct MemBalancerTrigger {
     /// The current heap size
     current_heap_pages: AtomicUsize,
     /// Statistics
-    stats: Atomic<MemBalancerStats>,
+    stats: AtomicRefCell<MemBalancerStats>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -376,7 +376,7 @@ impl MemBalancerTrigger {
             max_heap_pages,
             // start with min heap
             current_heap_pages: AtomicUsize::new(min_heap_pages),
-            stats: Atomic::new(Default::default()),
+            stats: AtomicRefCell::new(Default::default()),
         }
     }
 
@@ -384,9 +384,8 @@ impl MemBalancerTrigger {
     where
         F: FnMut(&mut MemBalancerStats),
     {
-        let mut stats = self.stats.load(Ordering::Relaxed);
+        let mut stats = self.stats.borrow_mut();
         f(&mut stats);
-        self.stats.store(stats, Ordering::Relaxed);
     }
 
     fn compute_new_heap_limit(
