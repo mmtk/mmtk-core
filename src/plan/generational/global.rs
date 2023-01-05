@@ -155,7 +155,7 @@ impl<VM: VMBinding> Gen<VM> {
     pub fn requires_full_heap_collection<P: Plan>(&self, plan: &P) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
-        #[allow(clippy::if_same_then_else)]
+        #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
             trace!("full heap: forced full heap");
             // For barrier overhead measurements, we always do full gc in nursery collections.
@@ -192,12 +192,12 @@ impl<VM: VMBinding> Gen<VM> {
             trace!("full heap: virtual memory exhausted");
             true
         } else {
-            trace!(
-                "full heap: total pages {} <= reserved pages {}",
-                plan.get_total_pages(),
-                plan.get_reserved_pages(),
-            );
-            plan.get_total_pages() <= plan.get_reserved_pages()
+            // We use an Appel-style nursery. The default GC (even for a "heap-full" collection)
+            // for generational GCs should be a nursery GC. A full-heap GC should only happen if
+            // there is not enough memory available for allocating into the nursery (i.e. the
+            // available pages in the nursery are less than the minimum nursery pages), if the
+            // virtual memory has been exhausted, or if it is an emergency GC.
+            false
         };
 
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
