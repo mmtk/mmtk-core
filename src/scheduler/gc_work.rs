@@ -302,14 +302,8 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
         } = tracer;
         let next_nodes = process_edges_work.pop_nodes();
         if !next_nodes.is_empty() {
-            // Divide the resulting nodes into appropriately sized packets.
-            let work_packets = next_nodes
-                .chunks(E::CAPACITY)
-                .map(|chunk| {
-                    Box::new(process_edges_work.create_scan_work(chunk.into(), false)) as _
-                })
-                .collect::<Vec<_>>();
-            worker.scheduler().work_buckets[self.stage].bulk_add(work_packets);
+            let work_packet = process_edges_work.create_scan_work(next_nodes, false);
+            worker.scheduler().work_buckets[self.stage].add(work_packet);
         }
 
         result
