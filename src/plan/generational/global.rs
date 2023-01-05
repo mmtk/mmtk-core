@@ -149,7 +149,7 @@ impl<VM: VMBinding> Gen<VM> {
     pub fn requires_full_heap_collection<P: Plan>(&self, plan: &P) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
-        #[allow(clippy::if_same_then_else)]
+        #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         let is_full_heap = if crate::plan::generational::FULL_NURSERY_GC {
             // For barrier overhead measurements, we always do full gc in nursery collections.
             true
