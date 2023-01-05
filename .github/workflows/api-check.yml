@@ -32,6 +32,6 @@ jobs:
 
       # Install cargo-public-api
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api
+        run: cargo install cargo-public-api --version 0.26.0
       - name: API Diff
         run: cargo public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all
