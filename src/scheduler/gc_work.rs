@@ -254,6 +254,7 @@ struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
 }
 
 impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
+    #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         self.process_edges_work.trace_object(object)
     }
