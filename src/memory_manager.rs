@@ -131,14 +131,14 @@ pub fn flush_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
 /// * `mutator`: The mutator to perform this allocation request.
 /// * `size`: The number of bytes required for the object.
 /// * `align`: Required alignment for the object.
-/// * `offset`: Offset associated with the alignment.
+/// * `offset`: Offset associated with the alignment. With an non-zero offset, the returned address with the offset needs to satisfy the alignment requirement.
 /// * `semantics`: The allocation semantic required for the allocation.
 #[inline(always)]
 pub fn alloc<VM: VMBinding>(
     mutator: &mut Mutator<VM>,
     size: usize,
     align: usize,
-    offset: isize,
+    offset: usize,
     semantics: AllocationSemantics,
 ) -> Address {
     // MMTk has assumptions about minimal object size.

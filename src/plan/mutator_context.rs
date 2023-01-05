@@ -86,7 +86,7 @@ impl<VM: VMBinding> MutatorContext<VM> for Mutator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -> Address {
         unsafe {
@@ -163,7 +163,7 @@ pub trait MutatorContext<VM: VMBinding>: Send + 'static {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         allocator: AllocationSemantics,
     ) -> Address;
     fn post_alloc(&mut self, refer: ObjectReference, bytes: usize, allocator: AllocationSemantics);
