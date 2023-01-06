@@ -251,12 +251,39 @@ impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 /// `ProcessEdgesWork` instance.
 struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
     process_edges_work: E,
+    stage: WorkBucketStage,
 }
 
 impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
     #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        self.process_edges_work.trace_object(object)
+        let result = self.process_edges_work.trace_object(object);
+        self.flush_if_full();
+        result
+    }
+}
+
+impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
+    #[inline(always)]
+    fn flush_if_full(&mut self) {
+        if self.process_edges_work.nodes.is_full() {
+            self.flush();
+        }
+    }
+
+    pub fn flush_if_not_empty(&mut self) {
+        if !self.process_edges_work.nodes.is_empty() {
+            self.flush();
+        }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        let next_nodes = self.process_edges_work.pop_nodes();
+        assert!(!next_nodes.is_empty());
+        let work_packet = self.process_edges_work.create_scan_work(next_nodes, false);
+        let worker = self.process_edges_work.worker();
+        worker.scheduler().work_buckets[self.stage].add(work_packet);
     }
 }
 
@@ -291,20 +318,16 @@ impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerC
         process_edges_work.set_worker(worker);
 
         // Cretae the tracer.
-        let mut tracer = ProcessEdgesWorkTracer { process_edges_work };
+        let mut tracer = ProcessEdgesWorkTracer {
+            process_edges_work,
+            stage: self.stage,
+        };
 
         // The caller can use the tracer here.
         let result = func(&mut tracer);
 
         // Flush the queued nodes.
-        let ProcessEdgesWorkTracer {
-            mut process_edges_work,
-        } = tracer;
-        let next_nodes = process_edges_work.pop_nodes();
-        if !next_nodes.is_empty() {
-            let work_packet = process_edges_work.create_scan_work(next_nodes, false);
-            worker.scheduler().work_buckets[self.stage].add(work_packet);
-        }
+        tracer.flush_if_not_empty();
 
         result
     }
