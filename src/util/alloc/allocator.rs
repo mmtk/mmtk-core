@@ -26,7 +26,7 @@ pub fn align_allocation_no_fill<VM: VMBinding>(
     alignment: usize,
     offset: usize,
 ) -> Address {
-    align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, false)
+    align_allocation_at_known_alignment::<VM>(region, alignment, offset, VM::ALLOC_END_ALIGNMENT, false)
 }
 
 #[inline(always)]
@@ -35,11 +35,11 @@ pub fn align_allocation<VM: VMBinding>(
     alignment: usize,
     offset: usize,
 ) -> Address {
-    align_allocation_inner::<VM>(region, alignment, offset, VM::MIN_ALIGNMENT, true)
+    align_allocation_at_known_alignment::<VM>(region, alignment, offset, VM::ALLOC_END_ALIGNMENT, true)
 }
 
 #[inline(always)]
-pub fn align_allocation_inner<VM: VMBinding>(
+pub fn align_allocation_at_known_alignment<VM: VMBinding>(
     region: Address,
     alignment: usize,
     offset: usize,
@@ -103,16 +103,16 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
 /// it is guaranteed that they can satisfy the alignment and size requirement for the allocation.
 /// What this method returns is a conservative estimate (which means the size might be larger than necessary).
 /// When the current alignment (e.g. the end alignment of previous allocation, or the alignment of the cell) is known,
-/// it is recommended to use [`get_maximum_aligned_size`].
+/// it is recommended to use [`get_maximum_aligned_size_at_known_alignment`].
 #[inline(always)]
-pub fn estimate_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize) -> usize {
-    get_maximum_aligned_size(size, alignment, VM::ALLOC_END_ALIGNMENT)
+pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize, offset: usize) -> usize {
+    get_maximum_aligned_size_at_known_alignment(size, alignment, offset, VM::ALLOC_END_ALIGNMENT)
 }
 
 /// Get the maximum size that can satisfy the alignment and size requirement without any knowledge about
 /// the current alignment. In other words, if an allocator allocates the size returned from this method,
 /// it is guaranteed that they can satisfy the alignment and size requirement for the allocation.
-/// Unlike [`estimate_maximum_aligned_size`], this method requires an extra `known_alignment` argument, and can use
+/// Unlike [`get_maximum_aligned_size`], this method requires an extra `known_alignment` argument, and can use
 /// the `known_alignment` for a precise size calculation.
 ///
 /// # Arguments:
@@ -121,9 +121,10 @@ pub fn estimate_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usiz
 /// * `known_alignment`: the alignment for the current allocation cursor, e.g. the end alignment of previous allocation,
 ///   or the alignment of the cell
 #[inline(always)]
-pub fn get_maximum_aligned_size(
+pub fn get_maximum_aligned_size_at_known_alignment(
     size: usize,
     alignment: usize,
+    _offset: usize,
     known_alignment: usize,
 ) -> usize {
     if alignment <= known_alignment {
