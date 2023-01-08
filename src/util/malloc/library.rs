@@ -7,11 +7,14 @@ pub use self::jemalloc::*;
 #[cfg(not(any(
     feature = "malloc_jemalloc",
     feature = "malloc_mimalloc",
+    feature = "malloc_tcmalloc",
     feature = "malloc_hoard",
 )))]
 pub use self::libc_malloc::*;
 #[cfg(feature = "malloc_mimalloc")]
 pub use self::mimalloc::*;
+#[cfg(feature = "malloc_tcmalloc")]
+pub use self::tcmalloc::*;
 
 /// When we count page usage of library malloc, we assume they allocate in pages. For some malloc implementations,
 /// they may use a larger page (e.g. mimalloc's 64K page). For libraries that we are not sure, we assume they use
@@ -60,10 +63,36 @@ mod hoard {
     pub use hoard_sys::malloc_usable_size;
 }
 
+#[cfg(feature = "malloc_tcmalloc")]
+mod tcmalloc {
+    mod internal {
+        use std::os::raw::{c_int, c_void};
+        #[link(name = "tcmalloc")]
+        extern "C" {
+            pub fn tc_malloc(size: usize) -> *mut c_void;
+            pub fn tc_calloc(nmemb: usize, size: usize) -> *mut c_void;
+            pub fn tc_realloc(ptr: *mut c_void, newsize: usize) -> *mut c_void;
+            pub fn tc_posix_memalign(ptr: *mut *mut c_void, alignment: usize, size: usize) -> c_int;
+            pub fn tc_free(ptr: *mut c_void);
+            pub fn tc_malloc_size(ptr: *mut c_void) -> usize;
+        }
+    }
+
+    // ANSI C
+    pub use self::internal::{
+        tc_calloc as calloc, tc_free as free, tc_malloc as malloc, tc_realloc as realloc,
+    };
+    // Posix
+    pub use self::internal::tc_posix_memalign as posix_memalign;
+    // GNU
+    pub use self::internal::tc_malloc_size as malloc_usable_size;
+}
+
 /// If no malloc lib is specified, use the libc implementation
 #[cfg(not(any(
     feature = "malloc_jemalloc",
     feature = "malloc_mimalloc",
+    feature = "malloc_tcmalloc",
     feature = "malloc_hoard",
 )))]
 mod libc_malloc {
