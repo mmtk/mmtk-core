@@ -23,11 +23,9 @@ use crate::policy::sft::EMPTY_SFT_NAME;
 use crate::policy::sft::SFT;
 use crate::util::copy::*;
 use crate::util::heap::gc_trigger::GCTrigger;
+use crate::util::heap::layout::heap_layout::Map;
 use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::layout::map::Map;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::layout::Mmapper as IMmapper;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::heap::HeapMeta;
 use crate::util::memory;
@@ -253,7 +251,6 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
             panic!("failed to mmap meta memory");
         }
 
-        use crate::util::heap::layout::mmapper::Mmapper;
         self.common()
             .mmapper
             .mark_as_mapped(self.common().start, self.common().extent);
@@ -382,8 +379,8 @@ pub struct CommonSpace<VM: VMBinding> {
     pub extent: usize,
     pub head_discontiguous_region: Address,
 
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn Map,
+    pub mmapper: &'static dyn Mmapper,
 
     pub metadata: SideMetadataContext,
 
@@ -413,8 +410,8 @@ pub struct PlanCreateSpaceArgs<'a, VM: VMBinding> {
     pub zeroed: bool,
     pub vmrequest: VMRequest,
     pub global_side_metadata_specs: Vec<SideMetadataSpec>,
-    pub vm_map: &'static VMMap,
-    pub mmapper: &'static Mmapper,
+    pub vm_map: &'static dyn Map,
+    pub mmapper: &'static dyn Mmapper,
     pub heap: &'a mut HeapMeta,
     pub constraints: &'a PlanConstraints,
     pub gc_trigger: Arc<GCTrigger<VM>>,
@@ -551,7 +548,7 @@ impl<VM: VMBinding> CommonSpace<VM> {
         }
     }
 
-    pub fn vm_map(&self) -> &'static VMMap {
+    pub fn vm_map(&self) -> &'static dyn Map {
         self.vm_map
     }
 }

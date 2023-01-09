@@ -69,7 +69,7 @@ pub(crate) mod treadmill;
 // These modules are private. They are only used by other util modules.
 
 /// A very simple, generic malloc-free allocator
-mod generic_freelist;
+mod freelist;
 /// Implementation of GenericFreeList by an int vector.
 mod int_array_freelist;
 /// Implementation of GenericFreeList backed by raw memory, allocated

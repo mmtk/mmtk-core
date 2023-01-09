@@ -1,6 +1,5 @@
 use super::SideMetadataSpec;
 use crate::util::constants::LOG_BYTES_IN_PAGE;
-use crate::util::heap::layout::Mmapper;
 #[cfg(target_pointer_width = "32")]
 use crate::util::metadata::side_metadata::address_to_chunked_meta_address;
 use crate::util::Address;

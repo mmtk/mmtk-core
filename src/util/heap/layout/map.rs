@@ -1,27 +1,19 @@
-use crate::util::generic_freelist::GenericFreeList;
+use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::Address;
 
-pub trait Map: Sized {
-    type FreeList: GenericFreeList;
-
-    fn new() -> Self;
-
+pub trait Map: Sync {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor);
 
     /// Create a free-list for a discontiguous space. Must only be called at boot time.
     /// bind_freelist() must be called by the caller after this method.
-    fn create_freelist(&self, start: Address) -> Box<Self::FreeList>;
+    fn create_freelist(&self, start: Address) -> Box<dyn FreeList>;
 
     /// Create a free-list for a contiguous space. Must only be called at boot time.
     /// bind_freelist() must be called by the caller after this method.
-    fn create_parent_freelist(
-        &self,
-        start: Address,
-        units: usize,
-        grain: i32,
-    ) -> Box<Self::FreeList>;
+    fn create_parent_freelist(&self, start: Address, units: usize, grain: i32)
+        -> Box<dyn FreeList>;
 
     /// Bind a created freelist with the page resource.
     /// This must called after create_freelist() or create_parent_freelist().

@@ -12,7 +12,6 @@ use crate::util::opaque_pointer::*;
 use super::layout::map::Map;
 use super::pageresource::{PRAllocFail, PRAllocResult};
 use super::PageResource;
-use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::vm::VMBinding;
 use std::marker::PhantomData;
@@ -153,7 +152,7 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
 }
 
 impl<VM: VMBinding> MonotonePageResource<VM> {
-    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static VMMap) -> Self {
+    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static dyn Map) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
@@ -172,7 +171,7 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(vm_map: &'static dyn Map) -> Self {
         MonotonePageResource {
             common: CommonPageResource::new(false, true, vm_map),
             sync: Mutex::new(MonotonePageResourceSync {

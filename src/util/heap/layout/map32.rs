@@ -1,7 +1,7 @@
 use super::map::Map;
 use crate::mmtk::SFT_MAP;
 use crate::util::conversions;
-use crate::util::generic_freelist::GenericFreeList;
+use crate::util::freelist::FreeList;
 use crate::util::heap::freelistpageresource::CommonFreeListPageResource;
 use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
@@ -30,10 +30,8 @@ pub struct Map32 {
     cumulative_committed_pages: AtomicUsize,
 }
 
-impl Map for Map32 {
-    type FreeList = IntArrayFreeList;
-
-    fn new() -> Self {
+impl Map32 {
+    pub fn new() -> Self {
         Map32 {
             prev_link: vec![0; MAX_CHUNKS],
             next_link: vec![0; MAX_CHUNKS],
@@ -48,7 +46,9 @@ impl Map for Map32 {
             cumulative_committed_pages: AtomicUsize::new(0),
         }
     }
+}
 
+impl Map for Map32 {
     fn insert(&self, start: Address, extent: usize, descriptor: SpaceDescriptor) {
         // Each space will call this on exclusive address ranges. It is fine to mutate the descriptor map,
         // as each space will update different indices.
@@ -71,7 +71,7 @@ impl Map for Map32 {
         }
     }
 
-    fn create_freelist(&self, _start: Address) -> Box<Self::FreeList> {
+    fn create_freelist(&self, _start: Address) -> Box<dyn FreeList> {
         Box::new(IntArrayFreeList::from_parent(
             &self.global_page_map,
             self.get_discontig_freelist_pr_ordinal() as _,
@@ -83,12 +83,16 @@ impl Map for Map32 {
         _start: Address,
         units: usize,
         grain: i32,
-    ) -> Box<Self::FreeList> {
+    ) -> Box<dyn FreeList> {
         Box::new(IntArrayFreeList::new(units, grain, 1))
     }
 
     fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
-        let ordinal: usize = pr.free_list.get_ordinal() as usize;
+        let ordinal: usize = pr
+            .free_list
+            .downcast_ref::<IntArrayFreeList>()
+            .unwrap()
+            .get_ordinal() as usize;
         let self_mut: &mut Self = unsafe { self.mut_self() };
         self_mut.shared_fl_map[ordinal] = Some(pr);
     }
