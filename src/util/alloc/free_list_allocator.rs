@@ -55,7 +55,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         let bin = mi_bin::<VM>(size, align, offset);
         trace!(
             "Picked bin of size {} for (size = {}, align = {}, offset = {})",
-            self.available_blocks[bin].size, size, align, offset
+            self.available_blocks[bin].size,
+            size,
+            align,
+            offset
         );
         if let Some(block) = self.find_free_block_local(bin) {
             let cell = self.block_alloc(block);
