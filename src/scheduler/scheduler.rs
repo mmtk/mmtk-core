@@ -235,6 +235,8 @@ impl<VM: VMBinding> GCWorkScheduler<VM> {
             self.work_buckets[WorkBucketStage::VMRefForwarding]
                 .add(VMForwardWeakRefs::<C::ProcessEdgesWorkType>::new());
         }
+
+        self.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
     }
 
     fn are_buckets_drained(&self, buckets: &[WorkBucketStage]) -> bool {

@@ -108,9 +108,6 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        trace!("VM release start");
-        <C::VM as VMBinding>::VMCollection::vm_release(worker.tls);
-        trace!("VM release end");
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -383,7 +380,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
 /// VM binding to process weak references.
 ///
 /// NOTE: This will replace `RefForwarding` and `ForwardFinalization` in the future.
-
 pub struct VMForwardWeakRefs<E: ProcessEdgesWork> {
     phantom_data: PhantomData<E>,
 }
@@ -407,6 +403,25 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
             phantom_data: PhantomData,
         };
         <E::VM as VMBinding>::VMScanning::forward_weak_refs(worker, tracer_factory)
+    }
+}
+
+/// This work packet calls `Collection::post_forwarding`.
+///
+/// NOTE: This will replace `RefEnqueue` in the future.
+///
+/// NOTE: Although this work packet runs in parallel with the `Release` work packet, it does not
+/// access the `Plan` instance.
+#[derive(Default)]
+pub struct VMPostForwarding<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        trace!("VMPostForwarding start");
+        <VM as VMBinding>::VMCollection::post_forwarding(worker.tls);
+        trace!("VMPostForwarding end");
     }
 }
 

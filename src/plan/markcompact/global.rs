@@ -151,6 +151,9 @@ impl<VM: VMBinding> Plan for MarkCompact<VM> {
         scheduler.work_buckets[WorkBucketStage::VMRefForwarding]
             .add(VMForwardWeakRefs::<ForwardingProcessEdges<VM>>::new());
 
+        // VM-specific work after forwarding, possible to implement ref enququing.
+        scheduler.work_buckets[WorkBucketStage::Release].add(VMPostForwarding::<VM>::default());
+
         // Analysis GC work
         #[cfg(feature = "analysis")]
         {
