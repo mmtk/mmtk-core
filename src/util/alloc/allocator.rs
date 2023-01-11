@@ -26,7 +26,13 @@ pub fn align_allocation_no_fill<VM: VMBinding>(
     alignment: usize,
     offset: usize,
 ) -> Address {
-    align_allocation_at_known_alignment::<VM>(region, alignment, offset, VM::ALLOC_END_ALIGNMENT, false)
+    align_allocation_at_known_alignment::<VM>(
+        region,
+        alignment,
+        offset,
+        VM::ALLOC_END_ALIGNMENT,
+        false,
+    )
 }
 
 #[inline(always)]
@@ -35,7 +41,13 @@ pub fn align_allocation<VM: VMBinding>(
     alignment: usize,
     offset: usize,
 ) -> Address {
-    align_allocation_at_known_alignment::<VM>(region, alignment, offset, VM::ALLOC_END_ALIGNMENT, true)
+    align_allocation_at_known_alignment::<VM>(
+        region,
+        alignment,
+        offset,
+        VM::ALLOC_END_ALIGNMENT,
+        true,
+    )
 }
 
 #[inline(always)]
@@ -46,7 +58,6 @@ pub fn align_allocation_at_known_alignment<VM: VMBinding>(
     known_alignment: usize,
     fillalignmentgap: bool,
 ) -> Address {
-    debug_assert!(known_alignment >= VM::MIN_ALIGNMENT);
     // Make sure MIN_ALIGNMENT is reasonable.
     #[allow(clippy::assertions_on_constants)]
     {
@@ -54,27 +65,32 @@ pub fn align_allocation_at_known_alignment<VM: VMBinding>(
     }
     debug_assert!(!(fillalignmentgap && region.is_zero()));
     debug_assert!(alignment <= VM::MAX_ALIGNMENT);
-    debug_assert!(region.is_aligned_to(VM::ALLOC_END_ALIGNMENT));
+    debug_assert!(region.is_aligned_to(known_alignment));
     debug_assert!((alignment & (VM::MIN_ALIGNMENT - 1)) == 0);
+    // offset is a multiple of min align.
     debug_assert!((offset & (VM::MIN_ALIGNMENT - 1)) == 0);
 
     // No alignment ever required.
-    if alignment <= known_alignment || VM::MAX_ALIGNMENT <= VM::MIN_ALIGNMENT {
+    if alignment <= known_alignment && offset == 0 {
         return region;
     }
 
     // May require an alignment
-    let region_isize = region.as_usize() as isize;
-
-    let mask = (alignment - 1) as isize; // fromIntSignExtend
-    let neg_off = - (offset as isize); // fromIntSignExtend
-    let delta = (neg_off - region_isize) & mask;
-
+    let delta = get_align_padding(region, alignment, offset);
     if fillalignmentgap && (VM::ALIGNMENT_VALUE != 0) {
         fill_alignment_gap::<VM>(region, region + delta);
     }
 
     region + delta
+}
+
+#[inline(always)]
+pub fn get_align_padding(addr: Address, alignment: usize, offset: usize) -> usize {
+    let mask = alignment as isize - 1; // fromIntSignExtend
+    let neg_off = -(offset as isize); // fromIntSignExtend
+    let delta = (neg_off - addr.as_usize() as isize) & mask;
+    debug_assert!(delta >= 0);
+    delta as usize
 }
 
 #[inline(always)]
@@ -105,7 +121,11 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
 /// When the current alignment (e.g. the end alignment of previous allocation, or the alignment of the cell) is known,
 /// it is recommended to use [`get_maximum_aligned_size_at_known_alignment`].
 #[inline(always)]
-pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize, offset: usize) -> usize {
+pub fn get_maximum_aligned_size<VM: VMBinding>(
+    size: usize,
+    alignment: usize,
+    offset: usize,
+) -> usize {
     get_maximum_aligned_size_at_known_alignment(size, alignment, offset, VM::ALLOC_END_ALIGNMENT)
 }
 
@@ -124,15 +144,279 @@ pub fn get_maximum_aligned_size<VM: VMBinding>(size: usize, alignment: usize, of
 pub fn get_maximum_aligned_size_at_known_alignment(
     size: usize,
     alignment: usize,
-    _offset: usize,
+    offset: usize,
     known_alignment: usize,
 ) -> usize {
+    size + get_maximum_align_padding(alignment, offset, known_alignment)
+}
+
+#[inline(always)]
+pub fn get_maximum_align_padding(alignment: usize, offset: usize, known_alignment: usize) -> usize {
+    debug_assert!(offset <= alignment);
+    debug_assert!(offset % 2 == 0);
     if alignment <= known_alignment {
-        // The known alignment satisfies the required alignment, just return size
-        size
+        // We are aligned, but if offset is present, we still need more space
+        if offset == 0 {
+            // The known alignment satisfies the required alignment, just return size
+            0
+        } else {
+            // The worst case is we need to pad to an address that has a distance of 'offset' from the alignment
+            alignment - offset
+        }
     } else {
-        // Otherwise, reserve enough room for alignment
-        size + alignment - known_alignment
+        // We are not aligned. We need padding.
+        if offset == 0 {
+            alignment - known_alignment
+        } else {
+            alignment - offset.min(known_alignment)
+        }
+    }
+}
+
+#[cfg(test)]
+mod align_tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct Align {
+        align: usize,
+        offset: usize,
+        known_align: usize,
+    }
+
+    #[derive(Debug)]
+    enum ExpectedPadding {
+        Exact(usize),
+        AtLeast(usize),
+    }
+
+    const TEST_CASES: &[(Align, ExpectedPadding)] = &[
+        // align > known_align:
+
+        // align=4, offset=0, known_alignment=1
+        // * addr=0, we are aligned, need 0 extra byte.
+        // * addr=1, we need 3 extra bytes to be 4 bytes aligned.
+        // * addr=2, we need 2 extra bytes to be 4 bytes aligned.
+        // * addr=3, we need 1 extra byte to be 4 bytes aligned.
+        // So worst case: we need 3 extra bytes to make it 4 bytes aligned.
+        (
+            Align {
+                align: 4,
+                offset: 0,
+                known_align: 1,
+            },
+            ExpectedPadding::AtLeast(3),
+        ),
+        // align=4, offset=2, known_alignment=1
+        // * addr=0, we need 2 extra bytes so addr+offset is 4 bytes aligned
+        // * addr=1, we need 1 extra bytes so addr+offset is 4 bytes aligned
+        // * addr=2, aligned
+        // * addr=3, we need 3 extra bytes so addr+offset is 4 bytes aligned
+        // So worst case: we need 3 extra bytes.
+        (
+            Align {
+                align: 4,
+                offset: 2,
+                known_align: 1,
+            },
+            ExpectedPadding::AtLeast(3),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 0,
+                known_align: 1,
+            },
+            ExpectedPadding::AtLeast(7),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 2,
+                known_align: 1,
+            },
+            ExpectedPadding::AtLeast(7),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 0,
+                known_align: 2,
+            },
+            ExpectedPadding::AtLeast(6),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 2,
+                known_align: 2,
+            },
+            ExpectedPadding::AtLeast(6),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 0,
+                known_align: 4,
+            },
+            ExpectedPadding::AtLeast(4),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 2,
+                known_align: 4,
+            },
+            ExpectedPadding::AtLeast(6),
+        ),
+        (
+            Align {
+                align: 16,
+                offset: 0,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(8),
+        ),
+        (
+            Align {
+                align: 16,
+                offset: 2,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(14),
+        ),
+        (
+            Align {
+                align: 32,
+                offset: 2,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(30),
+        ),
+        (
+            Align {
+                align: 32,
+                offset: 8,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(24),
+        ),
+        (
+            Align {
+                align: 32,
+                offset: 16,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(24),
+        ),
+        (
+            Align {
+                align: 32,
+                offset: 0,
+                known_align: 8,
+            },
+            ExpectedPadding::AtLeast(24),
+        ),
+        // align == known_align
+        (
+            Align {
+                align: 8,
+                offset: 2,
+                known_align: 8,
+            },
+            ExpectedPadding::Exact(6),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 0,
+                known_align: 8,
+            },
+            ExpectedPadding::Exact(0),
+        ),
+        // align < known_align
+        (
+            Align {
+                align: 8,
+                offset: 2,
+                known_align: 16,
+            },
+            ExpectedPadding::Exact(6),
+        ),
+        (
+            Align {
+                align: 8,
+                offset: 0,
+                known_align: 16,
+            },
+            ExpectedPadding::Exact(0),
+        ),
+    ];
+
+    #[test]
+    fn test_get_maximum_align_padding() {
+        let test = |r: &Align, p: &ExpectedPadding| {
+            let actual = get_maximum_align_padding(r.align, r.offset, r.known_align);
+            match p {
+                ExpectedPadding::Exact(expect) => assert_eq!(
+                    actual, *expect,
+                    "Expect exactly {} bytes padding for {:?}, found {}",
+                    expect, r, actual
+                ),
+                ExpectedPadding::AtLeast(expect) => assert!(
+                    actual >= *expect,
+                    "Expect at least {} bytes padding for {:?}, found {}",
+                    expect,
+                    r,
+                    actual
+                ),
+            }
+        };
+        TEST_CASES.iter().for_each(|(r, p)| test(r, p));
+    }
+
+    #[test]
+    fn test_get_align_padding() {
+        let test = |addr: Address, r: &Align, p: &ExpectedPadding| {
+            let actual = get_align_padding(addr, r.align, r.offset);
+
+            // actual matches expect
+            let expect = match p {
+                ExpectedPadding::Exact(expect) => *expect,
+                ExpectedPadding::AtLeast(expect) => *expect,
+            };
+            assert!(
+                actual <= expect,
+                "Expect {:?}, found {} (in Test {:?})",
+                p,
+                actual,
+                r
+            );
+
+            // actual also is smaller than estimated maximum
+            let estimate = get_maximum_align_padding(r.align, r.offset, r.known_align);
+            assert!(
+                actual <= estimate,
+                "Estimate with maximum padding {}, found {} (in Test {:?}",
+                estimate,
+                actual,
+                r
+            );
+
+            // The result is actually aligned
+            let result_addr = addr + actual;
+            assert!((result_addr + r.offset).is_aligned_to(r.align));
+        };
+
+        TEST_CASES.iter().for_each(|(t, r)| {
+            // Test every address in this range that matches the known_alignment
+            (0x10000usize..0x20000usize).for_each(|raw| {
+                let addr = unsafe { Address::from_usize(raw) };
+                if addr.is_aligned_to(t.known_align) {
+                    test(addr, t, r);
+                }
+            })
+        })
     }
 }
 

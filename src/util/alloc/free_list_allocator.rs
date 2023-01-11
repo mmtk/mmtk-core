@@ -53,6 +53,10 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
         debug_assert!(align >= VM::MIN_ALIGNMENT);
 
         let bin = mi_bin::<VM>(size, align, offset);
+        trace!(
+            "Picked bin of size {} for (size = {}, align = {}, offset = {})",
+            self.available_blocks[bin].size, size, align, offset
+        );
         if let Some(block) = self.find_free_block_local(bin) {
             let cell = self.block_alloc(block);
             if !cell.is_zero() {
@@ -62,15 +66,21 @@ impl<VM: VMBinding> Allocator<VM> for FreeListAllocator<VM> {
                         && self.plan.base().is_stress_test_gc_enabled())
                 );
 
-                let res = allocator::align_allocation::<VM>(cell, align, offset);
+                let res = allocator::align_allocation_at_known_alignment::<VM>(
+                    cell,
+                    align,
+                    offset,
+                    MI_CELL_ALIGN,
+                    true,
+                );
                 // Make sure that the allocation region is within the cell
                 #[cfg(debug_assertions)]
                 {
                     let cell_size = block.load_block_cell_size();
                     debug_assert!(
                         res + size <= cell + cell_size,
-                        "Allocating (size = {}, align = {}, offset = {}) to the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
-                        size, align, offset, cell, cell_size, res + size, cell + cell_size
+                        "Allocating (size = {}, align = {}, offset = {}) to {} in the cell {} of size {}, but the end of the allocation region {} is beyond the cell end {}",
+                        size, align, offset, res, cell, cell_size, res + size, cell + cell_size
                     );
                 }
                 return res;
@@ -194,12 +204,8 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     // Find an available block from local block lists
     #[inline(always)]
     fn find_free_block_local(&mut self, bin: usize) -> Option<Block> {
-        Self::find_free_block_with(
-            &mut self.available_blocks,
-            &mut self.consumed_blocks,
-            bin,
-        )
-        .or_else(|| self.recycle_local_blocks(bin, false))
+        Self::find_free_block_with(&mut self.available_blocks, &mut self.consumed_blocks, bin)
+            .or_else(|| self.recycle_local_blocks(bin, false))
     }
 
     // Find an available block
@@ -248,11 +254,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
 
     /// Tries to recycle local blocks if there is any. This is a no-op for eager sweeping mark sweep.
     #[inline]
-    fn recycle_local_blocks(
-        &mut self,
-        bin: usize,
-        _stress_test: bool,
-    ) -> Option<Block> {
+    fn recycle_local_blocks(&mut self, bin: usize, _stress_test: bool) -> Option<Block> {
         if cfg!(feature = "eager_sweeping") {
             // We have swept blocks in the last GC. If we run out of available blocks, there is nothing we can do.
             None
@@ -283,11 +285,7 @@ impl<VM: VMBinding> FreeListAllocator<VM> {
     }
 
     /// Get a block from the space.
-    fn acquire_global_block(
-        &mut self,
-        bin: usize,
-        stress_test: bool,
-    ) -> Option<Block> {
+    fn acquire_global_block(&mut self, bin: usize, stress_test: bool) -> Option<Block> {
         loop {
             match self.space.acquire_block(self.tls, bin) {
                 crate::policy::marksweepspace::native_ms::BlockAcquireResult::Exhausted => {
