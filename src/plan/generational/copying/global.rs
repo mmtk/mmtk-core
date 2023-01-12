@@ -1,7 +1,7 @@
 use super::gc_work::GenCopyGCWorkContext;
 use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::plan::generational::global::Gen;
+use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
@@ -28,7 +28,7 @@ use mmtk_macros::PlanTraceObject;
 #[derive(PlanTraceObject)]
 pub struct GenCopy<VM: VMBinding> {
     #[fallback_trace]
-    pub gen: Gen<VM>,
+    pub gen: CommonGenPlan<VM>,
     pub hi: AtomicBool,
     #[trace(CopySemantics::Mature)]
     pub copyspace0: CopySpace<VM>,
@@ -128,7 +128,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 
     fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.gen
-            .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
+            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -162,7 +162,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
-    fn gen(&self) -> &Gen<Self::VM> {
+    fn common_gen(&self) -> &CommonGenPlan<Self::VM> {
         &self.gen
     }
 
@@ -194,7 +194,7 @@ impl<VM: VMBinding> GenCopy<VM> {
         );
 
         let res = GenCopy {
-            gen: Gen::new(plan_args),
+            gen: CommonGenPlan::new(plan_args),
             hi: AtomicBool::new(false),
             copyspace0,
             copyspace1,

@@ -21,7 +21,7 @@ use mmtk_macros::PlanTraceObject;
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
 #[derive(PlanTraceObject)]
-pub struct Gen<VM: VMBinding> {
+pub struct CommonGenPlan<VM: VMBinding> {
     /// The nursery space.
     #[trace(CopySemantics::PromoteToMature)]
     pub nursery: CopySpace<VM>,
@@ -35,7 +35,7 @@ pub struct Gen<VM: VMBinding> {
     pub full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
-impl<VM: VMBinding> Gen<VM> {
+impl<VM: VMBinding> CommonGenPlan<VM> {
     pub fn new(mut args: CreateSpecificPlanArgs<VM>) -> Self {
         let nursery = CopySpace::new(
             args.get_space_args(
@@ -49,7 +49,7 @@ impl<VM: VMBinding> Gen<VM> {
 
         let full_heap_gc_count = common.base.stats.new_event_counter("majorGC", true, true);
 
-        Gen {
+        CommonGenPlan {
             nursery,
             common,
             gc_full_heap: AtomicBool::default(),
@@ -300,8 +300,8 @@ impl<VM: VMBinding> Gen<VM> {
 
 /// This trait include methods that are specific to generational plans.
 pub trait GenerationalPlan: Plan {
-    /// Return the common generational implementation [`crate::plan::generational::global::Gen`].
-    fn gen(&self) -> &Gen<Self::VM>;
+    /// Return the common generational implementation [`crate::plan::generational::global::CommonGenPlan`].
+    fn common_gen(&self) -> &CommonGenPlan<Self::VM>;
 
     /// Return the number of pages available for allocation into the mature space.
     fn get_mature_physical_pages_available(&self) -> usize;
@@ -310,8 +310,9 @@ pub trait GenerationalPlan: Plan {
     fn get_mature_reserved_pages(&self) -> usize;
 }
 
-/// Is current GC only collecting objects allocated since last GC?
+/// Is current GC only collecting objects allocated since last GC? This method can be called
+/// with any plan (generational or not). For non generational plans, it will always return false.
 pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     plan.generational()
-        .map_or(false, |plan| plan.gen().is_current_gc_nursery())
+        .map_or(false, |plan| plan.common_gen().is_current_gc_nursery())
 }

@@ -222,7 +222,7 @@ impl MemBalancerStats {
         &mut self,
         plan: &dyn GenerationalPlan<VM = VM>,
     ) {
-        if !plan.gen().is_current_gc_nursery() {
+        if !plan.common_gen().is_current_gc_nursery() {
             self.gc_release_live_pages = plan.get_mature_reserved_pages();
 
             // Calculate the promoted pages (including pre tentured objects)
@@ -245,7 +245,7 @@ impl MemBalancerStats {
         &mut self,
         plan: &dyn GenerationalPlan<VM = VM>,
     ) -> bool {
-        if !plan.gen().is_current_gc_nursery() {
+        if !plan.common_gen().is_current_gc_nursery() {
             self.gc_end_live_pages = plan.get_mature_reserved_pages();
             self.collection_pages = (self.gc_release_live_pages - self.gc_end_live_pages) as f64;
             trace!(
