@@ -252,6 +252,12 @@ struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
 }
 
 impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
+    /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
+    /// and flush as soon as the underlying buffer of `process_edges_work` is full.
+    ///
+    /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
+    /// If this function is called in small closures, please profile the program and make sure the
+    /// closure is inlined, too.
     #[inline(always)]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         let result = self.process_edges_work.trace_object(object);

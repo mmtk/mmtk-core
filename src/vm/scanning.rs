@@ -22,6 +22,9 @@ impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
 pub trait ObjectTracer {
     /// Call this function for the content of each edge,
     /// and assign the returned value back to the edge.
+    ///
+    /// Note: This function is performance-critical.
+    /// Implementations should consider inlining if necessary.
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference;
 }
 
