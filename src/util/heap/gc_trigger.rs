@@ -155,13 +155,13 @@ pub struct MemBalancerTrigger {
 struct MemBalancerStats {
     // Allocation/collection stats in the previous estimation. We keep this so we can use them to smooth the current value
     /// Previous allocated memory in pages.
-    allocation_pages_prev: f64,
+    allocation_pages_prev: Option<f64>,
     /// Previous allocation duration in secs
-    allocation_time_prev: f64,
+    allocation_time_prev: Option<f64>,
     /// Previous collected memory in pages
-    collection_pages_prev: f64,
+    collection_pages_prev: Option<f64>,
     /// Previous colleciton duration in secs
-    collection_time_prev: f64,
+    collection_time_prev: Option<f64>,
 
     // Allocation/collection stats in this estimation.
     /// Allocated memory in pages
@@ -184,17 +184,14 @@ struct MemBalancerStats {
     gc_end_live_pages: usize,
 }
 
-/// A sentinel value for previous allocation/collection stats to indicate that no previous stats are recorded
-const NO_PREV: f64 = -1f64;
-
 impl std::default::Default for MemBalancerStats {
     fn default() -> Self {
         let now = Instant::now();
         Self {
-            allocation_pages_prev: NO_PREV,
-            allocation_time_prev: NO_PREV,
-            collection_pages_prev: NO_PREV,
-            collection_time_prev: NO_PREV,
+            allocation_pages_prev: None,
+            allocation_time_prev: None,
+            collection_pages_prev: None,
+            collection_time_prev: None,
             allocation_pages: 0f64,
             allocation_time: 0f64,
             collection_pages: 0f64,
@@ -413,12 +410,9 @@ impl MemBalancerTrigger {
         const TUNING_FACTOR: f64 = 0.2;
 
         // Smooth memory/time for allocation/collection
-        let smooth = |prev, cur, factor| {
-            if prev == NO_PREV {
-                cur
-            } else {
-                prev * factor + cur * (1f64 - factor)
-            }
+        let smooth = |prev: Option<f64>, cur, factor| {
+            prev.map(|p| p * factor + cur * (1.0f64 - factor))
+                .unwrap_or(cur)
         };
         let alloc_mem = smooth(
             stats.allocation_pages_prev,
@@ -452,13 +446,13 @@ impl MemBalancerTrigger {
         );
 
         // We got the smoothed stats. Now save the current stats as previous stats
-        stats.allocation_pages_prev = stats.allocation_pages;
+        stats.allocation_pages_prev = Some(stats.allocation_pages);
         stats.allocation_pages = 0f64;
-        stats.allocation_time_prev = stats.allocation_time;
+        stats.allocation_time_prev = Some(stats.allocation_time);
         stats.allocation_time = 0f64;
-        stats.collection_pages_prev = stats.collection_pages;
+        stats.collection_pages_prev = Some(stats.collection_pages);
         stats.collection_pages = 0f64;
-        stats.collection_time_prev = stats.collection_time;
+        stats.collection_time_prev = Some(stats.collection_time);
         stats.collection_time = 0f64;
 
         // Calculate the square root
