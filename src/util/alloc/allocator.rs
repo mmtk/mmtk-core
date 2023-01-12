@@ -110,6 +110,8 @@ pub fn get_align_padding(addr: Address, alignment: usize, offset: usize) -> usiz
 /// Fill the alignment gap with the defined alignment value.
 #[inline(always)]
 pub fn fill_alignment_gap<VM: VMBinding>(start: Address, end: Address) {
+    debug_assert!(std::mem::size_of_val(&VM::ALIGNMENT_VALUE) == BYTES_IN_INT);
+    debug_assert!(VM::MIN_ALIGNMENT >= BYTES_IN_INT);
     if VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
         // At most a single hole
         if end - start != 0 {
@@ -173,7 +175,6 @@ pub fn get_maximum_aligned_size_at_known_alignment(
 #[inline(always)]
 pub fn get_maximum_align_padding(alignment: usize, offset: usize, known_alignment: usize) -> usize {
     debug_assert!(offset <= alignment);
-    debug_assert!(offset % 2 == 0);
     if alignment <= known_alignment {
         // We are aligned, but if offset is present, we still need more space
         if offset == 0 {
