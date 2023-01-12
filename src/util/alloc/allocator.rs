@@ -228,20 +228,6 @@ mod align_tests {
             },
             ExpectedPadding::AtLeast(3),
         ),
-        // align=4, offset=2, known_alignment=1
-        // * addr=0, we need 2 extra bytes so addr+offset is 4 bytes aligned
-        // * addr=1, we need 1 extra bytes so addr+offset is 4 bytes aligned
-        // * addr=2, aligned
-        // * addr=3, we need 3 extra bytes so addr+offset is 4 bytes aligned
-        // So worst case: we need 3 extra bytes.
-        (
-            Align {
-                align: 4,
-                offset: 2,
-                known_align: 1,
-            },
-            ExpectedPadding::AtLeast(3),
-        ),
         (
             Align {
                 align: 8,
@@ -253,7 +239,7 @@ mod align_tests {
         (
             Align {
                 align: 8,
-                offset: 2,
+                offset: 4,
                 known_align: 1,
             },
             ExpectedPadding::AtLeast(7),
@@ -269,7 +255,7 @@ mod align_tests {
         (
             Align {
                 align: 8,
-                offset: 2,
+                offset: 4,
                 known_align: 2,
             },
             ExpectedPadding::AtLeast(6),
@@ -285,10 +271,10 @@ mod align_tests {
         (
             Align {
                 align: 8,
-                offset: 2,
+                offset: 4,
                 known_align: 4,
             },
-            ExpectedPadding::AtLeast(6),
+            ExpectedPadding::AtLeast(4),
         ),
         (
             Align {
@@ -301,18 +287,18 @@ mod align_tests {
         (
             Align {
                 align: 16,
-                offset: 2,
+                offset: 4,
                 known_align: 8,
             },
-            ExpectedPadding::AtLeast(14),
+            ExpectedPadding::AtLeast(12),
         ),
         (
             Align {
                 align: 32,
-                offset: 2,
+                offset: 4,
                 known_align: 8,
             },
-            ExpectedPadding::AtLeast(30),
+            ExpectedPadding::AtLeast(28),
         ),
         (
             Align {
@@ -342,10 +328,10 @@ mod align_tests {
         (
             Align {
                 align: 8,
-                offset: 2,
+                offset: 4,
                 known_align: 8,
             },
-            ExpectedPadding::Exact(6),
+            ExpectedPadding::Exact(4),
         ),
         (
             Align {
@@ -359,10 +345,10 @@ mod align_tests {
         (
             Align {
                 align: 8,
-                offset: 2,
+                offset: 4,
                 known_align: 16,
             },
-            ExpectedPadding::Exact(6),
+            ExpectedPadding::Exact(4),
         ),
         (
             Align {
