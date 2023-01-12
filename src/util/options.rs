@@ -430,7 +430,7 @@ impl Options {
         self.nursery.min
     }
 
-    /// Return lower bound of the nursery size (in number of bytes)
+    /// Return lower bound of the nursery size (in number of pages)
     pub fn get_min_nursery_pages(&self) -> usize {
         crate::util::conversions::bytes_to_pages_up(self.nursery.min)
     }
