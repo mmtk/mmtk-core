@@ -27,7 +27,6 @@ pub trait SFT {
     fn name(&self) -> &str;
 
     /// Get forwarding pointer if the object is forwarded.
-    #[inline(always)]
     fn get_forwarded_object(&self, _object: ObjectReference) -> Option<ObjectReference> {
         None
     }
@@ -37,7 +36,6 @@ pub trait SFT {
 
     /// Is the object reachable, determined by the policy?
     /// Note: Objects in ImmortalSpace may have `is_live = true` but are actually unreachable.
-    #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
         self.is_live(object)
     }
@@ -69,7 +67,6 @@ pub trait SFT {
     /// the object is in the space and managed by MMTk. However, for some spaces, like MallocSpace,
     /// we mark the entire chunk in the SFT table as a malloc space, but only some of the addresses
     /// in the space contain actual MMTk objects. So they need a further check.
-    #[inline(always)]
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         true
     }
@@ -153,12 +150,10 @@ impl SFT for EmptySpaceSFT {
          */
         false
     }
-    #[inline(always)]
     fn is_in_space(&self, _object: ObjectReference) -> bool {
         false
     }
     #[cfg(feature = "is_mmtk_object")]
-    #[inline(always)]
     fn is_mmtk_object(&self, _addr: Address) -> bool {
         false
     }

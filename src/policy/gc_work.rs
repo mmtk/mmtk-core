@@ -30,7 +30,6 @@ pub trait PolicyTraceObject<VM: VMBinding> {
 
     /// Policy-specific post-scan-object hook.  It is called after scanning
     /// each object in this space.
-    #[inline(always)]
     fn post_scan_object(&self, _object: ObjectReference) {
         // Do nothing.
     }

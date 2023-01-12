@@ -38,13 +38,11 @@ impl Defrag {
     }
 
     /// Report back a completed mark histogram
-    #[inline(always)]
     pub fn add_completed_mark_histogram(&self, histogram: Histogram) {
         self.mark_histograms.lock().push(histogram)
     }
 
     /// Check if the current GC is a defrag GC.
-    #[inline(always)]
     pub fn in_defrag(&self) -> bool {
         self.in_defrag_collection.load(Ordering::Acquire)
     }
@@ -76,7 +74,6 @@ impl Defrag {
     }
 
     /// Check if the defrag space is exhausted.
-    #[inline(always)]
     pub fn space_exhausted(&self) -> bool {
         self.defrag_space_exhausted.load(Ordering::Acquire)
     }

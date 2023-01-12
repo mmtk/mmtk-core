@@ -53,7 +53,6 @@ pub(crate) fn generate_trace_object<'a>(
     };
 
     quote! {
-        #[inline(always)]
         fn trace_object<Q: crate::plan::ObjectQueue, const KIND: crate::policy::gc_work::TraceKind>(&self, __mmtk_queue: &mut Q, __mmtk_objref: crate::util::ObjectReference, __mmtk_worker: &mut crate::scheduler::GCWorker<VM>) -> crate::util::ObjectReference {
             use crate::policy::space::Space;
             use crate::policy::gc_work::PolicyTraceObject;
@@ -82,7 +81,6 @@ pub(crate) fn generate_post_scan_object<'a>(
     });
 
     quote! {
-        #[inline(always)]
         fn post_scan_object(&self, __mmtk_objref: crate::util::ObjectReference) {
             #(#scan_field_handler)*
         }
@@ -116,7 +114,6 @@ pub(crate) fn generate_may_move_objects<'a>(
     };
 
     quote! {
-        #[inline(always)]
         fn may_move_objects<const KIND: crate::policy::gc_work::TraceKind>() -> bool {
             use crate::policy::gc_work::PolicyTraceObject;
             use crate::plan::PlanTraceObject;
