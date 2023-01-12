@@ -96,7 +96,7 @@ impl<VM: VMBinding> Gen<VM> {
     ///
     /// Returns `true` if the nursery has grown to the extent that it may not be able to be copied
     /// into the mature space.
-    fn virtual_memory_exhausted<P: Plan>(&self, plan: &P) -> bool {
+    fn virtual_memory_exhausted(plan: &dyn GenerationalPlan<VM = VM>) -> bool {
         ((plan.get_collection_reserved_pages() as f64
             * VM::VMObjectModel::VM_WORST_CASE_COPY_EXPANSION) as usize)
             > plan.get_mature_physical_pages_available()
@@ -104,7 +104,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we need a GC based on the nursery space usage. This method may mark
     /// the following GC as a full heap GC.
-    pub fn collection_required<P: Plan>(
+    pub fn collection_required<P: Plan<VM = VM>>(
         &self,
         plan: &P,
         space_full: bool,
@@ -124,7 +124,7 @@ impl<VM: VMBinding> Gen<VM> {
             return true;
         }
 
-        if self.virtual_memory_exhausted(plan) {
+        if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             return true;
         }
 
@@ -152,7 +152,7 @@ impl<VM: VMBinding> Gen<VM> {
 
     /// Check if we should do a full heap GC. It returns true if we should have a full heap GC.
     /// It also sets gc_full_heap based on the result.
-    pub fn requires_full_heap_collection<P: Plan>(&self, plan: &P) -> bool {
+    pub fn requires_full_heap_collection<P: Plan<VM = VM>>(&self, plan: &P) -> bool {
         // Allow the same 'true' block for if-else.
         // The conditions are complex, and it is easier to read if we put them to separate if blocks.
         #[allow(clippy::if_same_then_else, clippy::needless_bool)]
@@ -188,7 +188,7 @@ impl<VM: VMBinding> Gen<VM> {
             );
             // Forces full heap collection
             true
-        } else if self.virtual_memory_exhausted(plan) {
+        } else if Self::virtual_memory_exhausted(plan.generational().unwrap()) {
             trace!("full heap: virtual memory exhausted");
             true
         } else {
@@ -296,4 +296,22 @@ impl<VM: VMBinding> Gen<VM> {
     pub fn get_used_pages(&self) -> usize {
         self.nursery.reserved_pages() + self.common.get_used_pages()
     }
+}
+
+/// This trait include methods that are specific to generational plans.
+pub trait GenerationalPlan: Plan {
+    /// Return the common generational implementation [`crate::plan::generational::global::Gen`].
+    fn gen(&self) -> &Gen<Self::VM>;
+
+    /// Return the number of pages available for allocation into the mature space.
+    fn get_mature_physical_pages_available(&self) -> usize;
+
+    /// Return the number of used pages in the mature space.
+    fn get_mature_reserved_pages(&self) -> usize;
+}
+
+/// Is current GC only collecting objects allocated since last GC?
+pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
+    plan.generational()
+        .map_or(false, |plan| plan.gen().is_current_gc_nursery())
 }

@@ -1,6 +1,7 @@
 use super::gc_work::GenImmixMatureGCWorkContext;
 use super::gc_work::GenImmixNurseryGCWorkContext;
 use crate::plan::generational::global::Gen;
+use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -147,7 +148,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
             self.immix.prepare(full_heap);
@@ -155,7 +156,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
             let did_defrag = self.immix.release(full_heap);
@@ -189,14 +190,6 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             >> 1
     }
 
-    fn get_mature_physical_pages_available(&self) -> usize {
-        self.immix.available_physical_pages()
-    }
-
-    fn get_mature_reserved_pages(&self) -> usize {
-        self.immix.reserved_pages()
-    }
-
     fn base(&self) -> &BasePlan<VM> {
         &self.gen.common.base
     }
@@ -205,12 +198,22 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> Option<&Gen<VM>> {
-        Some(&self.gen)
+    fn generational(&self) -> Option<&dyn GenerationalPlan<VM = VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
+    fn gen(&self) -> &Gen<Self::VM> {
+        &self.gen
     }
 
-    fn is_current_gc_nursery(&self) -> bool {
-        !self.gen.gc_full_heap.load(Ordering::SeqCst)
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.immix.available_physical_pages()
+    }
+
+    fn get_mature_reserved_pages(&self) -> usize {
+        self.immix.reserved_pages()
     }
 }
 

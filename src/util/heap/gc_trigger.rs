@@ -82,7 +82,7 @@ pub trait GCTriggerPolicy<VM: VMBinding>: Sync + Send {
     /// Inform the triggering policy that a GC starts.
     fn on_gc_start(&self, _mmtk: &'static MMTK<VM>) {}
     /// Inform the triggering policy that a GC is about to start the release work. This is called
-    /// in the global [`scheduler::gc_work::Release`] work packet. This means we assume a plan
+    /// in the global [`crate::scheduler::gc_work::Release`] work packet. This means we assume a plan
     /// do not schedule any work that reclaims memory before the global `Release` work. The current plans
     /// satisfy this assumption: they schedule other release work in `plan.release()`.
     fn on_gc_release(&self, _mmtk: &'static MMTK<VM>) {}
@@ -207,18 +207,26 @@ impl std::default::Default for MemBalancerStats {
     }
 }
 
+use crate::plan::GenerationalPlan;
+
 impl MemBalancerStats {
     // Collect mem stats for generational plans:
     // * We ignore nursery GCs.
     // * allocation = objects in mature space = promoted + pretentured = live pages in mature space before release - live pages at the end of last mature GC
     // * collection = live pages in mature space at the end of GC -  live pages in mature space before release
 
-    fn generational_mem_stats_on_gc_start<VM: VMBinding>(&mut self, _mmtk: &'static MMTK<VM>) {
+    fn generational_mem_stats_on_gc_start<VM: VMBinding>(
+        &mut self,
+        _plan: &dyn GenerationalPlan<VM = VM>,
+    ) {
         // We don't need to do anything
     }
-    fn generational_mem_stats_on_gc_release<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) {
-        if !mmtk.plan.is_current_gc_nursery() {
-            self.gc_release_live_pages = mmtk.plan.get_mature_reserved_pages();
+    fn generational_mem_stats_on_gc_release<VM: VMBinding>(
+        &mut self,
+        plan: &dyn GenerationalPlan<VM = VM>,
+    ) {
+        if !plan.gen().is_current_gc_nursery() {
+            self.gc_release_live_pages = plan.get_mature_reserved_pages();
 
             // Calculate the promoted pages (including pre tentured objects)
             let promoted = self.gc_release_live_pages - self.gc_end_live_pages;
@@ -236,9 +244,12 @@ impl MemBalancerStats {
         }
     }
     /// Return true if we should compute a new heap limit. Only do so at the end of a mature GC
-    fn generational_mem_stats_on_gc_end<VM: VMBinding>(&mut self, mmtk: &'static MMTK<VM>) -> bool {
-        if !mmtk.plan.is_current_gc_nursery() {
-            self.gc_end_live_pages = mmtk.plan.get_mature_reserved_pages();
+    fn generational_mem_stats_on_gc_end<VM: VMBinding>(
+        &mut self,
+        plan: &dyn GenerationalPlan<VM = VM>,
+    ) -> bool {
+        if !plan.gen().is_current_gc_nursery() {
+            self.gc_end_live_pages = plan.get_mature_reserved_pages();
             self.collection_pages = (self.gc_release_live_pages - self.gc_end_live_pages) as f64;
             trace!(
                 "collected pages = mature live at gc end {} - mature live at gc release {} = {}",
@@ -294,8 +305,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 stats.allocation_time
             );
 
-            if mmtk.plan.generational().is_some() {
-                stats.generational_mem_stats_on_gc_start(mmtk);
+            if let Some(plan) = mmtk.plan.generational() {
+                stats.generational_mem_stats_on_gc_start(plan);
             } else {
                 stats.non_generational_mem_stats_on_gc_start(mmtk);
             }
@@ -305,8 +316,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
     fn on_gc_release(&self, mmtk: &'static MMTK<VM>) {
         trace!("=== on_gc_release ===");
         self.access_stats(|stats| {
-            if mmtk.plan.generational().is_some() {
-                stats.generational_mem_stats_on_gc_release(mmtk);
+            if let Some(plan) = mmtk.plan.generational() {
+                stats.generational_mem_stats_on_gc_release(plan);
             } else {
                 stats.non_generational_mem_stats_on_gc_release(mmtk);
             }
@@ -324,8 +335,8 @@ impl<VM: VMBinding> GCTriggerPolicy<VM> for MemBalancerTrigger {
                 stats.collection_time
             );
 
-            if mmtk.plan.generational().is_some() {
-                if stats.generational_mem_stats_on_gc_end(mmtk) {
+            if let Some(plan) = mmtk.plan.generational() {
+                if stats.generational_mem_stats_on_gc_end(plan) {
                     self.compute_new_heap_limit(
                         mmtk.plan.get_reserved_pages(),
                         // We reserve an extra of 2x max nursery: when MMTk triggers a GC, it needs to ensure there is enough room in the mature space

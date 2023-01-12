@@ -2,6 +2,7 @@ use super::gc_work::GenCopyGCWorkContext;
 use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::generational::global::Gen;
+use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -98,7 +99,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
             self.hi
@@ -118,7 +119,7 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
             self.fromspace().release();
@@ -147,14 +148,6 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
             >> 1
     }
 
-    fn get_mature_physical_pages_available(&self) -> usize {
-        self.tospace().available_physical_pages()
-    }
-
-    fn get_mature_reserved_pages(&self) -> usize {
-        self.tospace().reserved_pages()
-    }
-
     fn base(&self) -> &BasePlan<VM> {
         &self.gen.common.base
     }
@@ -163,12 +156,22 @@ impl<VM: VMBinding> Plan for GenCopy<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> Option<&Gen<VM>> {
-        Some(&self.gen)
+    fn generational(&self) -> Option<&dyn GenerationalPlan<VM = Self::VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlan for GenCopy<VM> {
+    fn gen(&self) -> &Gen<Self::VM> {
+        &self.gen
     }
 
-    fn is_current_gc_nursery(&self) -> bool {
-        !self.gen.gc_full_heap.load(Ordering::SeqCst)
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.tospace().available_physical_pages()
+    }
+
+    fn get_mature_reserved_pages(&self) -> usize {
+        self.tospace().reserved_pages()
     }
 }
 

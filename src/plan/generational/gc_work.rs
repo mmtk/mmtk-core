@@ -24,7 +24,7 @@ impl<VM: VMBinding> ProcessEdgesWork for GenNurseryProcessEdges<VM> {
 
     fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
-        let gen = base.plan().generational().unwrap();
+        let gen = base.plan().generational().unwrap().gen();
         Self { gen, base }
     }
     #[inline]
@@ -95,7 +95,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             );
         }
         // scan modbuf only if the current GC is a nursery GC
-        if mmtk.plan.is_current_gc_nursery() {
+        if crate::plan::is_nursery_gc(&*mmtk.plan) {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
@@ -129,7 +129,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
-        if mmtk.plan.is_current_gc_nursery() {
+        if crate::plan::is_nursery_gc(&*mmtk.plan) {
             // Collect all the entries in all the slices
             let mut edges = vec![];
             for slice in &self.modbuf {
