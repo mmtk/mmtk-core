@@ -20,6 +20,7 @@ pub enum AllocationError {
     MmapOutOfMemory,
 }
 
+/// Do alignment allocation without filling the alignment padding, without a known alignment.
 #[inline(always)]
 pub fn align_allocation_no_fill<VM: VMBinding>(
     region: Address,
@@ -35,6 +36,7 @@ pub fn align_allocation_no_fill<VM: VMBinding>(
     )
 }
 
+/// Do alignment allocation and fill the alignment padding, without a known alignment.
 #[inline(always)]
 pub fn align_allocation<VM: VMBinding>(
     region: Address,
@@ -50,6 +52,17 @@ pub fn align_allocation<VM: VMBinding>(
     )
 }
 
+/// Do alignment allocation.
+///
+/// # Arguments
+/// * `region`: the region to allocate into
+/// * `alignment`: the required alignment
+/// * `offset`: the offset to force the alignment
+/// * `known_alignment`: the known alignment of the region. This is useful for free list allocators, for which
+///   each cell's alignment is known. For bump pointer allocators, this should simply be the end of last allocation
+///   `VM::ALLOC_END_ALIGNMENT`.
+/// * `fillalignmentgap`: If true, the alignment gap/padding will be filled with a defined alignment value. Otherwise,
+///   the gap is left as it is (which could be zerored, or any value, depending on the allocator).
 #[inline(always)]
 pub fn align_allocation_at_known_alignment<VM: VMBinding>(
     region: Address,
@@ -84,6 +97,7 @@ pub fn align_allocation_at_known_alignment<VM: VMBinding>(
     region + delta
 }
 
+/// Calculate alignment padding for the allocation.
 #[inline(always)]
 pub fn get_align_padding(addr: Address, alignment: usize, offset: usize) -> usize {
     let mask = alignment as isize - 1; // fromIntSignExtend
@@ -93,10 +107,9 @@ pub fn get_align_padding(addr: Address, alignment: usize, offset: usize) -> usiz
     delta as usize
 }
 
+/// Fill the alignment gap with the defined alignment value.
 #[inline(always)]
-pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
-    let mut start = immut_start;
-
+pub fn fill_alignment_gap<VM: VMBinding>(start: Address, end: Address) {
     if VM::MAX_ALIGNMENT - VM::MIN_ALIGNMENT == BYTES_IN_INT {
         // At most a single hole
         if end - start != 0 {
@@ -105,11 +118,12 @@ pub fn fill_alignment_gap<VM: VMBinding>(immut_start: Address, end: Address) {
             }
         }
     } else {
-        while start < end {
+        let mut cursor = start;
+        while cursor < end {
             unsafe {
-                start.store(VM::ALIGNMENT_VALUE);
+                cursor.store(VM::ALIGNMENT_VALUE);
             }
-            start += BYTES_IN_INT;
+            cursor += BYTES_IN_INT;
         }
     }
 }
@@ -150,6 +164,12 @@ pub fn get_maximum_aligned_size_at_known_alignment(
     size + get_maximum_align_padding(alignment, offset, known_alignment)
 }
 
+/// Calculate maximum alignment padding needed for the allocation. This is called when we need to know a maximum size
+/// that we need to allocate before we actually know which address/region we are going to allocate into.
+/// There can be different correct implementations for this method, as any padding that is larger enough to satisfy
+/// the allocation requirement is a corect return value. For example, we could just return `alignment`, and that would
+/// work fine and fast. But it comes at the cost of space. Another example is that the current implementation, which
+/// tries to allocate less if possible, but the computation is complex. We should seek a balance between space and time.
 #[inline(always)]
 pub fn get_maximum_align_padding(alignment: usize, offset: usize, known_alignment: usize) -> usize {
     debug_assert!(offset <= alignment);
