@@ -1074,6 +1074,16 @@
 <span id="1072">1072</span>
 <span id="1073">1073</span>
 <span id="1074">1074</span>
+<span id="1075">1075</span>
+<span id="1076">1076</span>
+<span id="1077">1077</span>
+<span id="1078">1078</span>
+<span id="1079">1079</span>
+<span id="1080">1080</span>
+<span id="1081">1081</span>
+<span id="1082">1082</span>
+<span id="1083">1083</span>
+<span id="1084">1084</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::affinity</span>::{<span class="ident">get_total_num_cpus</span>, <span class="ident">CoreId</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::DEFAULT_STRESS_FACTOR</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants::LOG_BYTES_IN_MBYTE</span>;
@@ -1492,13 +1502,23 @@
 
 <span class="kw">impl</span> <span class="ident">Options</span> {
     <span class="doccomment">/// Return upper bound of the nursery size (in number of bytes)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_max_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_max_nursery_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">max</span>
     }
 
+    <span class="doccomment">/// Return upper bound of the nursery size (in number of pages)</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_max_nursery_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">max</span>)
+    }
+
     <span class="doccomment">/// Return lower bound of the nursery size (in number of bytes)</span>
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_min_nursery</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_min_nursery_bytes</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
         <span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">min</span>
+    }
+
+    <span class="doccomment">/// Return lower bound of the nursery size (in number of pages)</span>
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">get_min_nursery_pages</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">usize</span> {
+        <span class="ident"><span class="kw">crate</span>::util::conversions::bytes_to_pages_up</span>(<span class="self">self</span>.<span class="ident">nursery</span>.<span class="ident">min</span>)
     }
 }
 

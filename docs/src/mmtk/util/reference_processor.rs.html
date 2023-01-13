@@ -557,18 +557,13 @@
 <span id="555">555</span>
 <span id="556">556</span>
 <span id="557">557</span>
-<span id="558">558</span>
-<span id="559">559</span>
-<span id="560">560</span>
-<span id="561">561</span>
-<span id="562">562</span>
-<span id="563">563</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">std::collections::HashSet</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::AtomicBool</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic::Ordering</span>;
 <span class="kw">use</span> <span class="ident">std::sync::Mutex</span>;
 <span class="kw">use</span> <span class="ident">std::vec::Vec</span>;
 
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::is_nursery_gc</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::ProcessEdgesWork</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
@@ -634,12 +629,9 @@
             <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span>,
             <span class="string">&quot;A plan with needs_forward_after_liveness=false does not need a separate forward step&quot;</span>
         );
-        <span class="self">self</span>.<span class="ident">soft</span>
-            .<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
-        <span class="self">self</span>.<span class="ident">weak</span>
-            .<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
-        <span class="self">self</span>.<span class="ident">phantom</span>
-            .<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="self">self</span>.<span class="ident">soft</span>.<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
+        <span class="self">self</span>.<span class="ident">weak</span>.<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
+        <span class="self">self</span>.<span class="ident">phantom</span>.<span class="ident">forward</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
     }
 
     <span class="comment">// Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft &gt; weak &gt; phantom</span>
@@ -651,18 +643,15 @@
         <span class="kw">if</span> <span class="op">!</span><span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_emergency_collection</span>() {
             <span class="comment">// This step only retains the referents (keep the referents alive), it does not update its addresses.</span>
             <span class="comment">// We will call soft.scan() again with retain=false to update its addresses based on liveness.</span>
-            <span class="self">self</span>.<span class="ident">soft</span>
-                .<span class="ident">retain</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+            <span class="self">self</span>.<span class="ident">soft</span>.<span class="ident">retain</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
         }
         <span class="comment">// This will update the references (and the referents).</span>
-        <span class="self">self</span>.<span class="ident">soft</span>
-            .<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="self">self</span>.<span class="ident">soft</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
     }
 
     <span class="doccomment">/// Scan weak references.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">scan_weak_refs</span><span class="op">&lt;</span><span class="ident">E</span>: <span class="ident">ProcessEdgesWork</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
-        <span class="self">self</span>.<span class="ident">weak</span>
-            .<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="self">self</span>.<span class="ident">weak</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
     }
 
     <span class="doccomment">/// Scan phantom references.</span>
@@ -671,8 +660,7 @@
         <span class="ident">trace</span>: <span class="kw-2">&amp;mut</span> <span class="ident">E</span>,
         <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>,
     ) {
-        <span class="self">self</span>.<span class="ident">phantom</span>
-            .<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>());
+        <span class="self">self</span>.<span class="ident">phantom</span>.<span class="ident">scan</span>::<span class="op">&lt;</span><span class="ident">E</span><span class="op">&gt;</span>(<span class="ident">trace</span>, <span class="ident">is_nursery_gc</span>(<span class="kw-2">&amp;</span><span class="kw-2">*</span><span class="ident">mmtk</span>.<span class="ident">plan</span>));
     }
 }
 

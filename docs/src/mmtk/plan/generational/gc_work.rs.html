@@ -144,9 +144,21 @@
 <span id="142">142</span>
 <span id="143">143</span>
 <span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
+<span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">atomic::Ordering</span>;
 
-<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::Gen</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::generational::global::CommonGenPlan</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::space::Space</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler</span>::{<span class="ident">gc_work</span>::<span class="kw-2">*</span>, <span class="ident">GCWork</span>, <span class="ident">GCWorker</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
@@ -160,7 +172,7 @@
 <span class="doccomment">/// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,</span>
 <span class="doccomment">/// it does not need to use this type.</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenNurseryProcessEdges</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
-    <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">CommonGenPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="ident">base</span>: <span class="ident">ProcessEdgesBase</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
 }
 
@@ -170,7 +182,7 @@
 
     <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">edges</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">EdgeOf</span><span class="op">&lt;</span><span class="self">Self</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">roots</span>: <span class="ident">bool</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">base</span> <span class="op">=</span> <span class="ident">ProcessEdgesBase::new</span>(<span class="ident">edges</span>, <span class="ident">roots</span>, <span class="ident">mmtk</span>);
-        <span class="kw">let</span> <span class="ident">gen</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">plan</span>().<span class="ident">generational</span>();
+        <span class="kw">let</span> <span class="ident">gen</span> <span class="op">=</span> <span class="ident">base</span>.<span class="ident">plan</span>().<span class="ident">generational</span>().<span class="ident">unwrap</span>().<span class="ident">common_gen</span>();
         <span class="self">Self</span> { <span class="ident">gen</span>, <span class="ident">base</span> }
     }
     <span class="attribute">#[<span class="ident">inline</span>]</span>
@@ -241,7 +253,13 @@
             );
         }
         <span class="comment">// scan modbuf only if the current GC is a nursery GC</span>
-        <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>() {
+        <span class="kw">if</span> <span class="ident">mmtk</span>
+            .<span class="ident">plan</span>
+            .<span class="ident">generational</span>()
+            .<span class="ident">unwrap</span>()
+            .<span class="ident">common_gen</span>()
+            .<span class="ident">is_current_gc_nursery</span>()
+        {
             <span class="comment">// Scan objects in the modbuf and forward pointers</span>
             <span class="kw">let</span> <span class="ident">modbuf</span> <span class="op">=</span> <span class="ident">std::mem::take</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>.<span class="ident">modbuf</span>);
             <span class="ident">GCWork::do_work</span>(
@@ -275,7 +293,13 @@
     <span class="attribute">#[<span class="ident">inline</span>(<span class="ident">always</span>)]</span>
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">E::VM</span><span class="op">&gt;</span>) {
         <span class="comment">// Scan modbuf only if the current GC is a nursery GC</span>
-        <span class="kw">if</span> <span class="ident">mmtk</span>.<span class="ident">plan</span>.<span class="ident">is_current_gc_nursery</span>() {
+        <span class="kw">if</span> <span class="ident">mmtk</span>
+            .<span class="ident">plan</span>
+            .<span class="ident">generational</span>()
+            .<span class="ident">unwrap</span>()
+            .<span class="ident">common_gen</span>()
+            .<span class="ident">is_current_gc_nursery</span>()
+        {
             <span class="comment">// Collect all the entries in all the slices</span>
             <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">edges</span> <span class="op">=</span> <span class="macro">vec!</span>[];
             <span class="kw">for</span> <span class="ident">slice</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">modbuf</span> {

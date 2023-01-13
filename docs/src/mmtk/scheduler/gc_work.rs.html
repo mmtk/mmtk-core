@@ -899,6 +899,8 @@
 <span id="897">897</span>
 <span id="898">898</span>
 <span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket::WorkBucketStage</span>;
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::GcStatus</span>;
@@ -1009,6 +1011,8 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">C</span>: <span class="ident">GCWorkContext</span> <span class="op">+</span> <span class="lifetime">&#39;static</span><span class="op">&gt;</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Release</span><span class="op">&lt;</span><span class="ident">C</span><span class="op">&gt;</span> {
     <span class="kw">fn</span> <span class="ident">do_work</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>, <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">C::VM</span><span class="op">&gt;</span>) {
         <span class="macro">trace!</span>(<span class="string">&quot;Release Global&quot;</span>);
+        <span class="self">self</span>.<span class="ident">plan</span>.<span class="ident">base</span>().<span class="ident">gc_trigger</span>.<span class="ident">policy</span>.<span class="ident">on_gc_release</span>(<span class="ident">mmtk</span>);
+
         <span class="op">&lt;</span><span class="ident">C::VM</span> <span class="kw">as</span> <span class="ident">VMBinding</span><span class="op">&gt;</span><span class="ident">::VMCollection::vm_release</span>();
         <span class="comment">// We assume this is the only running work packet that accesses plan at the point of execution</span>
         <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy::cast_ref_to_mut</span>)]</span>

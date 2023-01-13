@@ -109,13 +109,13 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::GenNurseryProcessEdges</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::ProcessModBuf</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::gc_work::ProcessRegionModBuf</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::Gen</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::global::CommonGenPlan</span>;
 
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">GenObjectBarrierSemantics</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> {
     <span class="doccomment">/// MMTk instance</span>
     <span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Generational plan</span>
-    <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">CommonGenPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Object modbuf. Contains a list of objects that may contain pointers to the nursery space.</span>
     <span class="ident">modbuf</span>: <span class="ident">VectorQueue</span><span class="op">&lt;</span><span class="ident">ObjectReference</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Array-copy modbuf. Contains a list of sub-arrays or array slices that may contain pointers to the nursery space.</span>
@@ -123,7 +123,7 @@
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span> <span class="ident">GenObjectBarrierSemantics</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">Gen</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
+    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">mmtk</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">MMTK</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">gen</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">CommonGenPlan</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="self">Self</span> {
         <span class="self">Self</span> {
             <span class="ident">mmtk</span>,
             <span class="ident">gen</span>,
