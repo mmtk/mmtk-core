@@ -3,7 +3,6 @@
 use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
-use crate::plan::generational::global::Gen;
 use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -175,8 +174,10 @@ pub trait Plan: 'static + Sync + Downcast {
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
-    fn generational(&self) -> &Gen<Self::VM> {
-        panic!("This is not a generational plan.")
+    fn generational(
+        &self,
+    ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
+        None
     }
     fn mmapper(&self) -> &'static Mmapper {
         self.base().mmapper
@@ -189,11 +190,6 @@ pub trait Plan: 'static + Sync + Downcast {
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
-
-    /// Is current GC only collecting objects allocated since last GC?
-    fn is_current_gc_nursery(&self) -> bool {
-        false
-    }
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {
@@ -221,16 +217,21 @@ pub trait Plan: 'static + Sync + Downcast {
     }
 
     /// Prepare the plan before a GC. This is invoked in an initial step in the GC.
-    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn prepare(&mut self, tls: VMWorkerThread);
 
     /// Prepare a worker for a GC. Each worker has its own prepare method. This hook is for plan-specific
     /// per-worker preparation. This method is invoked once per worker by the worker thread passed as the argument.
     fn prepare_worker(&self, _worker: &mut GCWorker<Self::VM>) {}
 
-    /// Release the plan after a GC. This is invoked at the end of a GC when most GC work is finished.
-    /// This is invoked once per GC by one worker thread. 'tls' is the worker thread that executes this method.
+    /// Release the plan after transitive closure. A plan can implement this method to call each policy's release,
+    /// or create any work packet that should be done in release.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
     fn release(&mut self, tls: VMWorkerThread);
+
+    /// Inform the plan about the end of a GC. It is guaranteed that there is no further work for this GC.
+    /// This is invoked once per GC by one worker thread. `tls` is the worker thread that executes this method.
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {}
 
     /// Ask the plan if they would trigger a GC. If MMTk is in charge of triggering GCs, this method is called
     /// periodically during allocation. However, MMTk may delegate the GC triggering decision to the runtime,
@@ -269,12 +270,6 @@ pub trait Plan: 'static + Sync + Downcast {
         //    buffers for copy allocators).
         self.get_total_pages()
             .saturating_sub(self.get_reserved_pages())
-    }
-
-    /// Return the number of pages available for allocation into the mature space. Only
-    /// generational plans have to implement this function.
-    fn get_mature_physical_pages_available(&self) -> usize {
-        panic!("This is not a generational plan.")
     }
 
     /// Get the number of pages that are reserved for collection. By default, we return 0.
