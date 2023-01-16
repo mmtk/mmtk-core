@@ -1,1 +1,1 @@
-initSidebarItems({"constant":[["LAST_CLOSURE_BUCKET",""]],"enum":[["WorkBucketStage",""]],"struct":[["BucketQueue",""],["WorkBucket",""]]});
+initSidebarItems({"enum":[["WorkBucketStage",""]],"struct":[["BucketQueue",""],["WorkBucket",""]]});

@@ -106,6 +106,23 @@
 <span id="104">104</span>
 <span id="105">105</span>
 <span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
+<span id="111">111</span>
+<span id="112">112</span>
+<span id="113">113</span>
+<span id="114">114</span>
+<span id="115">115</span>
+<span id="116">116</span>
+<span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
+<span id="122">122</span>
+<span id="123">123</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::MutatorContext</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::alloc::AllocationError</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
@@ -206,11 +223,28 @@
     <span class="doccomment">/// * `tls`: The thread pointer for the current GC thread.</span>
     <span class="kw">fn</span> <span class="ident">schedule_finalization</span>(<span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
 
-    <span class="doccomment">/// Inform the VM to do its VM-specific release work at the end of a GC.</span>
-    <span class="kw">fn</span> <span class="ident">vm_release</span>() {}
-
-    <span class="doccomment">/// Delegate to the VM binding for reference processing.</span>
-    <span class="kw">fn</span> <span class="ident">process_weak_refs</span>(<span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) {} <span class="comment">// FIXME: Add an appropriate factory/callback parameter.</span>
+    <span class="doccomment">/// A hook for the VM to do work after forwarding objects.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function is called after all of the following have finished:</span>
+    <span class="doccomment">/// -   The life and death of objects are determined.  Objects determined to be live will not</span>
+    <span class="doccomment">///     be reclaimed in this GC.</span>
+    <span class="doccomment">/// -   Live objects have been moved to their destinations. (copying GC only)</span>
+    <span class="doccomment">/// -   References in objects have been updated to point to new addresses. (copying GC only)</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// And this function may run concurrently with the release work of GC, i.e. freeing the space</span>
+    <span class="doccomment">/// occupied by dead objects.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// It is safe for the VM to read and write object fields at this time, although GC has not</span>
+    <span class="doccomment">/// finished yet.  GC will be reclaiming spaces of dead objects, but will not damage live</span>
+    <span class="doccomment">/// objects.  However, the VM cannot allocate new objects at this time.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// One possible use of this hook is enqueuing `{Soft,Weak,Phantom}Reference` instances to</span>
+    <span class="doccomment">/// reference queues (for Java).  VMs (including JVM implementations) do not have to handle</span>
+    <span class="doccomment">/// weak references this way, but mmtk-core provides this opportunity.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `tls_worker`: The thread pointer for the worker thread performing this call.</span>
+    <span class="kw">fn</span> <span class="ident">post_forwarding</span>(<span class="ident">_tls</span>: <span class="ident">VMWorkerThread</span>) {}
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>

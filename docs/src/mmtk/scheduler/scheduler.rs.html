@@ -468,9 +468,37 @@
 <span id="466">466</span>
 <span id="467">467</span>
 <span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::stat::SchedulerStat</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::work_bucket</span>::<span class="kw-2">*</span>;
-<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">GCWorkerShared</span>, <span class="ident">ThreadId</span>, <span class="ident">WorkerGroup</span>};
+<span class="kw">use</span> <span class="ident"><span class="kw">super</span>::worker</span>::{<span class="ident">GCWorker</span>, <span class="ident">GCWorkerShared</span>, <span class="ident">ParkingGuard</span>, <span class="ident">ThreadId</span>, <span class="ident">WorkerGroup</span>};
 <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::mmtk::MMTK</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::opaque_pointer</span>::<span class="kw-2">*</span>;
@@ -503,16 +531,6 @@
     <span class="ident">coordinator_worker_shared</span>: <span class="ident">Arc</span><span class="op">&lt;</span><span class="ident">GCWorkerShared</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Condition Variable for worker synchronization</span>
     <span class="kw">pub</span> <span class="ident">worker_monitor</span>: <span class="ident">Arc</span><span class="op">&lt;</span>(<span class="ident">Mutex</span><span class="op">&lt;</span>()<span class="op">&gt;</span>, <span class="ident">Condvar</span>)<span class="op">&gt;</span>,
-    <span class="doccomment">/// A callback to be fired after the `Closure` bucket is drained.</span>
-    <span class="doccomment">/// This callback should return `true` if it adds more work packets to the</span>
-    <span class="doccomment">/// `Closure` bucket. `WorkBucket::can_open` then consult this return value</span>
-    <span class="doccomment">/// to prevent the GC from proceeding to the next stage, if we still have</span>
-    <span class="doccomment">/// `Closure` work to do.</span>
-    <span class="doccomment">///</span>
-    <span class="doccomment">/// We use this callback to process ephemeron objects. `closure_end` can re-enable</span>
-    <span class="doccomment">/// the `Closure` bucket multiple times to iteratively discover and process</span>
-    <span class="doccomment">/// more ephemeron objects.</span>
-    <span class="ident">closure_end</span>: <span class="ident">Mutex</span><span class="op">&lt;</span><span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>,
     <span class="doccomment">/// Counter for pending coordinator messages.</span>
     <span class="kw">pub</span>(<span class="kw">super</span>) <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize</span>,
     <span class="doccomment">/// How to assign the affinity of each GC thread. Specified by the user.</span>
@@ -538,10 +556,12 @@
             <span class="ident">WorkBucketStage::WeakRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::FinalRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::PhantomRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::VMRefClosure</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::CalculateForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::SecondRoots</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::RefForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::FinalizableForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
+            <span class="ident">WorkBucketStage::VMRefForwarding</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Compact</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Release</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
             <span class="ident">WorkBucketStage::Final</span> =&gt; <span class="ident">WorkBucket::new</span>(<span class="bool-val">false</span>, <span class="ident">worker_monitor</span>.<span class="ident">clone</span>(), <span class="ident">worker_group</span>.<span class="ident">clone</span>()),
@@ -560,19 +580,7 @@
                     <span class="kw">let</span> <span class="ident">cur_stages</span> <span class="op">=</span> <span class="ident">open_stages</span>.<span class="ident">clone</span>();
                     <span class="ident">work_buckets</span>[<span class="ident">stage</span>].<span class="ident">set_open_condition</span>(
                         <span class="kw">move</span> <span class="op">|</span><span class="ident">scheduler</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorkScheduler</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">|</span> {
-                            <span class="kw">let</span> <span class="ident">should_open</span> <span class="op">=</span> <span class="ident">scheduler</span>.<span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="ident">cur_stages</span>);
-                            <span class="comment">// Additional check before the `RefClosure` bucket opens.</span>
-                            <span class="kw">if</span> <span class="ident">should_open</span> <span class="op">&amp;&amp;</span> <span class="ident">stage</span> <span class="op">==</span> <span class="ident">LAST_CLOSURE_BUCKET</span> {
-                                <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">closure_end</span>) <span class="op">=</span>
-                                    <span class="ident">scheduler</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>().<span class="ident">as_ref</span>()
-                                {
-                                    <span class="kw">if</span> <span class="ident">closure_end</span>() {
-                                        <span class="comment">// Don&#39;t open `LAST_CLOSURE_BUCKET` if `closure_end` added more works to `Closure`.</span>
-                                        <span class="kw">return</span> <span class="bool-val">false</span>;
-                                    }
-                                }
-                            }
-                            <span class="ident">should_open</span>
+                            <span class="ident">scheduler</span>.<span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="ident">cur_stages</span>)
                         },
                     );
                     <span class="ident">open_stages</span>.<span class="ident">push</span>(<span class="ident">stage</span>);
@@ -587,7 +595,6 @@
             <span class="ident">worker_group</span>,
             <span class="ident">coordinator_worker_shared</span>,
             <span class="ident">worker_monitor</span>,
-            <span class="ident">closure_end</span>: <span class="ident">Mutex::new</span>(<span class="prelude-val">None</span>),
             <span class="ident">pending_coordinator_packets</span>: <span class="ident">AtomicUsize::new</span>(<span class="number">0</span>),
             <span class="ident">affinity</span>,
         })
@@ -674,10 +681,6 @@
             <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::PhantomRefClosure</span>]
                 .<span class="ident">add</span>(<span class="ident">PhantomRefProcessing</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
 
-            <span class="comment">// VM-specific weak ref processing</span>
-            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::WeakRefClosure</span>]
-                .<span class="ident">add</span>(<span class="ident">VMProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
-
             <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::reference_processor::RefForwarding</span>;
             <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span> {
                 <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::RefForwarding</span>]
@@ -700,6 +703,38 @@
                     .<span class="ident">add</span>(<span class="ident">ForwardFinalization</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
             }
         }
+
+        <span class="comment">// We add the VM-specific weak ref processing work regardless of MMTK-side options,</span>
+        <span class="comment">// including Options::no_finalizer and Options::no_reference_types.</span>
+        <span class="comment">//</span>
+        <span class="comment">// VMs need weak reference handling to function properly.  The VM may treat weak references</span>
+        <span class="comment">// as strong references, but it is not appropriate to simply disable weak reference</span>
+        <span class="comment">// handling from MMTk&#39;s side.  The VM, however, may choose to do nothing in</span>
+        <span class="comment">// `Collection::process_weak_refs` if appropriate.</span>
+        <span class="comment">//</span>
+        <span class="comment">// It is also not sound for MMTk core to turn off weak</span>
+        <span class="comment">// reference processing or finalization alone, because (1) not all VMs have the notion of</span>
+        <span class="comment">// weak references or finalizers, so it may not make sence, and (2) the VM may</span>
+        <span class="comment">// processing them together.</span>
+
+        <span class="comment">// VM-specific weak ref processing</span>
+        <span class="comment">// The `VMProcessWeakRefs` work packet is set as the sentinel so that it is executed when</span>
+        <span class="comment">// the `VMRefClosure` bucket is drained.  The VM binding may spawn new work packets into</span>
+        <span class="comment">// the `VMRefClosure` bucket, and request another `VMProcessWeakRefs` work packet to be</span>
+        <span class="comment">// executed again after this bucket is drained again.  Strictly speaking, the first</span>
+        <span class="comment">// `VMProcessWeakRefs` packet can be an ordinary packet (doesn&#39;t have to be a sentinel)</span>
+        <span class="comment">// because there are no other packets in the bucket.  We set it as sentinel for</span>
+        <span class="comment">// consistency.</span>
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::VMRefClosure</span>]
+            .<span class="ident">set_sentinel</span>(<span class="ident">Box::new</span>(<span class="ident">VMProcessWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>()));
+
+        <span class="kw">if</span> <span class="ident">plan</span>.<span class="ident">constraints</span>().<span class="ident">needs_forward_after_liveness</span> {
+            <span class="comment">// VM-specific weak ref forwarding</span>
+            <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::VMRefForwarding</span>]
+                .<span class="ident">add</span>(<span class="ident">VMForwardWeakRefs</span>::<span class="op">&lt;</span><span class="ident">C::ProcessEdgesWorkType</span><span class="op">&gt;</span><span class="ident">::new</span>());
+        }
+
+        <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">WorkBucketStage::Release</span>].<span class="ident">add</span>(<span class="ident">VMPostForwarding</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="ident">::default</span>());
     }
 
     <span class="kw">fn</span> <span class="ident">are_buckets_drained</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">buckets</span>: <span class="kw-2">&amp;</span>[<span class="ident">WorkBucketStage</span>]) -&gt; <span class="ident">bool</span> {
@@ -710,12 +745,20 @@
         <span class="ident">buckets</span>.<span class="ident">iter</span>().<span class="ident">all</span>(<span class="op">|</span><span class="kw-2">&amp;</span><span class="ident">b</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">work_buckets</span>[<span class="ident">b</span>].<span class="ident">is_drained</span>())
     }
 
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">on_closure_end</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">f</span>: <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">Send</span> <span class="op">+</span> <span class="ident">Fn</span>() -&gt; <span class="ident">bool</span><span class="op">&gt;</span>) {
-        <span class="kw-2">*</span><span class="self">self</span>.<span class="ident">closure_end</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>() <span class="op">=</span> <span class="prelude-val">Some</span>(<span class="ident">f</span>);
-    }
-
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">all_buckets_empty</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
         <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">values</span>().<span class="ident">all</span>(<span class="op">|</span><span class="ident">bucket</span><span class="op">|</span> <span class="ident">bucket</span>.<span class="ident">is_empty</span>())
+    }
+
+    <span class="doccomment">/// Schedule &quot;sentinel&quot; work packets for all activated buckets.</span>
+    <span class="kw">fn</span> <span class="ident">schedule_sentinels</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="ident">bool</span> {
+        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">new_packets</span> <span class="op">=</span> <span class="bool-val">false</span>;
+        <span class="kw">for</span> (<span class="ident">id</span>, <span class="ident">work_bucket</span>) <span class="kw">in</span> <span class="self">self</span>.<span class="ident">work_buckets</span>.<span class="ident">iter</span>() {
+            <span class="kw">if</span> <span class="ident">work_bucket</span>.<span class="ident">is_activated</span>() <span class="op">&amp;&amp;</span> <span class="ident">work_bucket</span>.<span class="ident">maybe_schedule_sentinel</span>() {
+                <span class="macro">trace!</span>(<span class="string">&quot;Scheduled sentinel packet into {:?}&quot;</span>, <span class="ident">id</span>);
+                <span class="ident">new_packets</span> <span class="op">=</span> <span class="bool-val">true</span>;
+            }
+        }
+        <span class="ident">new_packets</span>
     }
 
     <span class="doccomment">/// Open buckets if their conditions are met.</span>
@@ -737,8 +780,15 @@
             <span class="ident">buckets_updated</span> <span class="op">=</span> <span class="ident">buckets_updated</span> <span class="op">|</span><span class="op">|</span> <span class="ident">bucket_opened</span>;
             <span class="kw">if</span> <span class="ident">bucket_opened</span> {
                 <span class="ident">new_packets</span> <span class="op">=</span> <span class="ident">new_packets</span> <span class="op">|</span><span class="op">|</span> <span class="op">!</span><span class="ident">bucket</span>.<span class="ident">is_drained</span>();
-                <span class="comment">// Quit the loop. There&#39;are already new packets in the newly opened buckets.</span>
                 <span class="kw">if</span> <span class="ident">new_packets</span> {
+                    <span class="comment">// Quit the loop. There are already new packets in the newly opened buckets.</span>
+                    <span class="macro">trace!</span>(<span class="string">&quot;Found new packets at stage {:?}.  Break.&quot;</span>, <span class="ident">id</span>);
+                    <span class="kw">break</span>;
+                }
+                <span class="ident">new_packets</span> <span class="op">=</span> <span class="ident">new_packets</span> <span class="op">|</span><span class="op">|</span> <span class="ident">bucket</span>.<span class="ident">maybe_schedule_sentinel</span>();
+                <span class="kw">if</span> <span class="ident">new_packets</span> {
+                    <span class="comment">// Quit the loop. A sentinel packet is added to the newly opened buckets.</span>
+                    <span class="macro">trace!</span>(<span class="string">&quot;Sentinel is scheduled at stage {:?}.  Break.&quot;</span>, <span class="ident">id</span>);
                     <span class="kw">break</span>;
                 }
             }
@@ -859,15 +909,15 @@
     <span class="kw">fn</span> <span class="ident">poll_slow</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;</span><span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>) -&gt; <span class="ident">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> <span class="ident">GCWork</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span><span class="op">&gt;</span> {
         <span class="comment">// Note: The lock is released during `wait` in the loop.</span>
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">0</span>.<span class="ident">lock</span>().<span class="ident">unwrap</span>();
-        <span class="kw">loop</span> {
+        <span class="lifetime">&#39;polling_loop</span>: <span class="kw">loop</span> {
             <span class="comment">// Retry polling</span>
             <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">work</span>) <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>) {
                 <span class="kw">return</span> <span class="ident">work</span>;
             }
             <span class="comment">// Prepare to park this worker</span>
-            <span class="kw">let</span> <span class="ident">all_parked</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">inc_parked_workers</span>();
+            <span class="kw">let</span> <span class="ident">parking_guard</span> <span class="op">=</span> <span class="ident">ParkingGuard::new</span>(<span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">as_ref</span>());
             <span class="comment">// If all workers are parked, try activate new buckets</span>
-            <span class="kw">if</span> <span class="ident">all_parked</span> {
+            <span class="kw">if</span> <span class="ident">parking_guard</span>.<span class="ident">all_parked</span>() {
                 <span class="comment">// If there&#39;re any designated work, resume the workers and process them</span>
                 <span class="kw">if</span> <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">has_designated_work</span>() {
                     <span class="macro">assert!</span>(
@@ -877,19 +927,15 @@
                     <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
                     <span class="comment">// The current worker is going to wait, because the designated work is not for it.</span>
                 } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">pending_coordinator_packets</span>.<span class="ident">load</span>(<span class="ident">Ordering::SeqCst</span>) <span class="op">==</span> <span class="number">0</span> {
+                    <span class="comment">// See if any bucket has a sentinel.</span>
+                    <span class="kw">if</span> <span class="self">self</span>.<span class="ident">schedule_sentinels</span>() {
+                        <span class="comment">// We&#39;re not going to sleep since new work packets are just scheduled.</span>
+                        <span class="kw">break</span> <span class="lifetime">&#39;polling_loop</span>;
+                    }
+                    <span class="comment">// Try to open new buckets.</span>
                     <span class="kw">if</span> <span class="self">self</span>.<span class="ident">update_buckets</span>() {
                         <span class="comment">// We&#39;re not going to sleep since a new bucket is just open.</span>
-                        <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
-                        <span class="comment">// We guarantee that we can at least fetch one packet.</span>
-                        <span class="kw">let</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>).<span class="ident">unwrap</span>();
-                        <span class="comment">// Optimize for the case that a newly opened bucket only has one packet.</span>
-                        <span class="comment">// We only notify_all if there&#39;re more than one packets available.</span>
-                        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">all_activated_buckets_are_empty</span>() {
-                            <span class="comment">// Have more jobs in this buckets. Notify other workers.</span>
-                            <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
-                        }
-                        <span class="comment">// Return this packet and execute it.</span>
-                        <span class="kw">return</span> <span class="ident">work</span>;
+                        <span class="kw">break</span> <span class="lifetime">&#39;polling_loop</span>;
                     }
                     <span class="macro">debug_assert!</span>(<span class="op">!</span><span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">has_designated_work</span>());
                     <span class="comment">// The current pause is finished if we can&#39;t open more buckets.</span>
@@ -902,9 +948,19 @@
             }
             <span class="comment">// Wait</span>
             <span class="ident">guard</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">wait</span>(<span class="ident">guard</span>).<span class="ident">unwrap</span>();
-            <span class="comment">// Unpark this worker</span>
-            <span class="self">self</span>.<span class="ident">worker_group</span>.<span class="ident">dec_parked_workers</span>();
+            <span class="comment">// The worker is unparked here where `parking_guard` goes out of scope.</span>
         }
+
+        <span class="comment">// We guarantee that we can at least fetch one packet when we reach here.</span>
+        <span class="kw">let</span> <span class="ident">work</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">poll_schedulable_work</span>(<span class="ident">worker</span>).<span class="ident">unwrap</span>();
+        <span class="comment">// Optimize for the case that a newly opened bucket only has one packet.</span>
+        <span class="comment">// We only notify_all if there&#39;re more than one packets available.</span>
+        <span class="kw">if</span> <span class="op">!</span><span class="self">self</span>.<span class="ident">all_activated_buckets_are_empty</span>() {
+            <span class="comment">// Have more jobs in this buckets. Notify other workers.</span>
+            <span class="self">self</span>.<span class="ident">worker_monitor</span>.<span class="number">1</span>.<span class="ident">notify_all</span>();
+        }
+        <span class="comment">// Return this packet and execute it.</span>
+        <span class="ident">work</span>
     }
 
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">enable_stat</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) {

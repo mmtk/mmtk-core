@@ -182,7 +182,116 @@
 <span id="180">180</span>
 <span id="181">181</span>
 <span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
+<span id="244">244</span>
+<span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
+<span id="265">265</span>
+<span id="266">266</span>
+<span id="267">267</span>
+<span id="268">268</span>
+<span id="269">269</span>
+<span id="270">270</span>
+<span id="271">271</span>
+<span id="272">272</span>
+<span id="273">273</span>
+<span id="274">274</span>
+<span id="275">275</span>
+<span id="276">276</span>
+<span id="277">277</span>
+<span id="278">278</span>
+<span id="279">279</span>
+<span id="280">280</span>
+<span id="281">281</span>
+<span id="282">282</span>
+<span id="283">283</span>
+<span id="284">284</span>
+<span id="285">285</span>
+<span id="286">286</span>
+<span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::plan::Mutator</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::scheduler::GCWorker</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::ObjectReference</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::VMWorkerThread</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::vm::edge_shape::Edge</span>;
@@ -205,6 +314,9 @@
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTracer</span> {
     <span class="doccomment">/// Call this function for the content of each edge,</span>
     <span class="doccomment">/// and assign the returned value back to the edge.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Note: This function is performance-critical.</span>
+    <span class="doccomment">/// Implementations should consider inlining if necessary.</span>
     <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span>;
 }
 
@@ -213,6 +325,44 @@
     <span class="kw">fn</span> <span class="ident">trace_object</span>(<span class="kw-2">&amp;mut</span> <span class="self">self</span>, <span class="ident">object</span>: <span class="ident">ObjectReference</span>) -&gt; <span class="ident">ObjectReference</span> {
         <span class="self">self</span>(<span class="ident">object</span>)
     }
+}
+
+<span class="doccomment">/// An `ObjectTracerContext` gives a GC worker temporary access to an `ObjectTracer`, allowing</span>
+<span class="doccomment">/// the GC worker to trace objects.  This trait is intended to abstract out the implementation</span>
+<span class="doccomment">/// details of tracing objects, enqueuing objects, and creating work packets that expand the</span>
+<span class="doccomment">/// transitive closure, allowing the VM binding to focus on VM-specific parts.</span>
+<span class="doccomment">///</span>
+<span class="doccomment">/// This trait is used during root scanning and binding-side weak reference processing.</span>
+<span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span>: <span class="ident">VMBinding</span><span class="op">&gt;</span>: <span class="ident">Clone</span> <span class="op">+</span> <span class="ident">Send</span> <span class="op">+</span> <span class="lifetime">&#39;static</span> {
+    <span class="doccomment">/// The concrete `ObjectTracer` type.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// FIXME: The current code works because of the unsafe method `ProcessEdgesWork::set_worker`.</span>
+    <span class="doccomment">/// The tracer should borrow the worker passed to `with_queuing_tracer` during its lifetime.</span>
+    <span class="doccomment">/// For this reason, `TracerType` should have a `&lt;&#39;w&gt;` lifetime parameter.</span>
+    <span class="doccomment">/// Generic Associated Types (GAT) is already stablized in Rust 1.65.</span>
+    <span class="doccomment">/// We should update our toolchain version, too.</span>
+    <span class="kw">type</span> <span class="ident">TracerType</span>: <span class="ident">ObjectTracer</span>;
+
+    <span class="doccomment">/// Create a temporary `ObjectTracer` and provide access in the scope of `func`.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// When the `ObjectTracer::trace_object` is called, if the traced object is first visited</span>
+    <span class="doccomment">/// in this transitive closure, it will be enqueued.  After `func` returns, the implememtation</span>
+    <span class="doccomment">/// will create work packets to continue computing the transitive closure from the newly</span>
+    <span class="doccomment">/// enqueued objects.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// API functions that provide `QueuingTracerFactory` should document</span>
+    <span class="doccomment">/// 1.  on which fields the user is supposed to call `ObjectTracer::trace_object`, and</span>
+    <span class="doccomment">/// 2.  which work bucket the generated work packet will be added to.  Sometimes the user needs</span>
+    <span class="doccomment">///     to know when the computing of transitive closure finishes.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// -   `worker`: The current GC worker.</span>
+    <span class="doccomment">/// -   `func`: A caller-supplied closure in which the created `ObjectTracer` can be used.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Returns: The return value of `func`.</span>
+    <span class="kw">fn</span> <span class="ident">with_tracer</span><span class="op">&lt;</span><span class="ident">R</span>, <span class="ident">F</span><span class="op">&gt;</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>, <span class="ident">func</span>: <span class="ident">F</span>) -&gt; <span class="ident">R</span>
+    <span class="kw">where</span>
+        <span class="ident">F</span>: <span class="ident">FnOnce</span>(<span class="kw-2">&amp;mut</span> <span class="ident"><span class="self">Self</span>::TracerType</span>) -&gt; <span class="ident">R</span>;
 }
 
 <span class="doccomment">/// Root-scanning methods use this trait to create work packets for processing roots.</span>
@@ -363,6 +513,72 @@
     <span class="kw">fn</span> <span class="ident">supports_return_barrier</span>() -&gt; <span class="ident">bool</span>;
 
     <span class="kw">fn</span> <span class="ident">prepare_for_roots_re_scanning</span>();
+
+    <span class="doccomment">/// Process weak references.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function is called after a transitive closure is completed.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// MMTk core enables the VM binding to do the following in this function:</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// 1.  Query if an object is already reached in this transitive closure.</span>
+    <span class="doccomment">/// 2.  Keep certain objects and their descendents alive.</span>
+    <span class="doccomment">/// 3.  Get the new address of objects that are either</span>
+    <span class="doccomment">///     -   already alive before this function is called, or</span>
+    <span class="doccomment">///     -   explicitly kept alive in this function.</span>
+    <span class="doccomment">/// 4.  Request this function to be called again after transitive closure is finished again.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM binding can call `ObjectReference::is_reachable()` to query if an object is</span>
+    <span class="doccomment">/// currently reached.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM binding can use `tracer_factory` to get access to an `ObjectTracer`, and call</span>
+    <span class="doccomment">/// its `trace_object(object)` method to keep `object` and its decendents alive.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The return value of `ObjectTracer::trace_object(object)` is the new address of the given</span>
+    <span class="doccomment">/// `object` if it is moved by the GC.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// The VM binding can return `true` from `process_weak_refs` to request `process_weak_refs`</span>
+    <span class="doccomment">/// to be called again after the MMTk core finishes transitive closure again from the objects</span>
+    <span class="doccomment">/// newly visited by `ObjectTracer::trace_object`.  This is useful if a VM supports multiple</span>
+    <span class="doccomment">/// levels of reachabilities (such as Java) or ephemerons.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Implementation-wise, this function is called as the &quot;sentinel&quot; of the `VMRefClosure` work</span>
+    <span class="doccomment">/// bucket, which means it is called when all work packets in that bucket have finished.  The</span>
+    <span class="doccomment">/// `tracer_factory` expands the transitive closure by adding more work packets in the same</span>
+    <span class="doccomment">/// bucket.  This means if `process_weak_refs` returns true, those work packets will have</span>
+    <span class="doccomment">/// finished (completing the transitive closure) by the time `process_weak_refs` is called</span>
+    <span class="doccomment">/// again.  The VM binding can make use of this by adding custom work packets into the</span>
+    <span class="doccomment">/// `VMRefClosure` bucket.  The bucket will be `VMRefForwarding`, instead, when forwarding.</span>
+    <span class="doccomment">/// See below.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `worker`: The current GC worker.</span>
+    <span class="doccomment">/// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to retain and</span>
+    <span class="doccomment">///   update weak references.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function shall return true if this function needs to be called again after the GC</span>
+    <span class="doccomment">/// finishes expanding the transitive closure from the objects kept alive.</span>
+    <span class="kw">fn</span> <span class="ident">process_weak_refs</span>(
+        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+        <span class="ident">_tracer_context</span>: <span class="kw">impl</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    ) -&gt; <span class="ident">bool</span> {
+        <span class="bool-val">false</span>
+    }
+
+    <span class="doccomment">/// Forward weak references.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// This function will only be called in the forwarding stage when using the mark-compact GC</span>
+    <span class="doccomment">/// algorithm.  Mark-compact computes transive closure twice during each GC.  It marks objects</span>
+    <span class="doccomment">/// in the first transitive closure, and forward references in the second transitive closure.</span>
+    <span class="doccomment">///</span>
+    <span class="doccomment">/// Arguments:</span>
+    <span class="doccomment">/// * `worker`: The current GC worker.</span>
+    <span class="doccomment">/// * `tracer_context`: Use this to get access an `ObjectTracer` and use it to update weak</span>
+    <span class="doccomment">///   references.</span>
+    <span class="kw">fn</span> <span class="ident">forward_weak_refs</span>(
+        <span class="ident">_worker</span>: <span class="kw-2">&amp;mut</span> <span class="ident">GCWorker</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+        <span class="ident">_tracer_context</span>: <span class="kw">impl</span> <span class="ident">ObjectTracerContext</span><span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>,
+    ) {
+    }
 }
 </code></pre></div>
 </section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="mmtk" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.59.0 (9d1b2106e 2022-02-23)" ></div>
