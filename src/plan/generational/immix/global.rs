@@ -1,6 +1,7 @@
 use super::gc_work::GenImmixMatureGCWorkContext;
 use super::gc_work::GenImmixNurseryGCWorkContext;
-use crate::plan::generational::global::Gen;
+use crate::plan::generational::global::CommonGenPlan;
+use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -33,7 +34,7 @@ use mmtk_macros::PlanTraceObject;
 pub struct GenImmix<VM: VMBinding> {
     /// Generational plan, which includes a nursery space and operations related with nursery.
     #[fallback_trace]
-    pub gen: Gen<VM>,
+    pub gen: CommonGenPlan<VM>,
     /// An immix space as the mature space.
     #[post_scan]
     #[trace(CopySemantics::Mature)]
@@ -147,7 +148,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn prepare(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.prepare(tls);
         if full_heap {
             self.immix.prepare(full_heap);
@@ -155,7 +156,7 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
     }
 
     fn release(&mut self, tls: VMWorkerThread) {
-        let full_heap = !self.is_current_gc_nursery();
+        let full_heap = !self.gen.is_current_gc_nursery();
         self.gen.release(tls);
         if full_heap {
             let did_defrag = self.immix.release(full_heap);
@@ -165,14 +166,11 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         }
         self.last_gc_was_full_heap
             .store(full_heap, Ordering::Relaxed);
+    }
 
-        // TODO: Refactor so that we set the next_gc_full_heap in gen.release(). Currently have to fight with Rust borrow checker
-        // NOTE: We have to take care that the `Gen::should_next_gc_be_full_heap()` function is
-        // called _after_ all spaces have been released (including ones in `gen`) as otherwise we
-        // may get incorrect results since the function uses values such as available pages that
-        // will change dependant on which spaces have been released
+    fn end_of_gc(&mut self, _tls: VMWorkerThread) {
         self.gen
-            .set_next_gc_full_heap(Gen::should_next_gc_be_full_heap(self));
+            .set_next_gc_full_heap(CommonGenPlan::should_next_gc_be_full_heap(self));
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -183,17 +181,13 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         self.gen.get_used_pages() + self.immix.reserved_pages()
     }
 
-    /// Return the number of pages avilable for allocation. Assuming all future allocations goes to nursery.
+    /// Return the number of pages available for allocation. Assuming all future allocations goes to nursery.
     fn get_available_pages(&self) -> usize {
-        // super.get_pages_avail() / 2 to reserve pages for copying
+        // super.get_available_pages() / 2 to reserve pages for copying
         (self
             .get_total_pages()
             .saturating_sub(self.get_reserved_pages()))
             >> 1
-    }
-
-    fn get_mature_physical_pages_available(&self) -> usize {
-        self.immix.available_physical_pages()
     }
 
     fn base(&self) -> &BasePlan<VM> {
@@ -204,12 +198,22 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
         &self.gen.common
     }
 
-    fn generational(&self) -> &Gen<VM> {
+    fn generational(&self) -> Option<&dyn GenerationalPlan<VM = VM>> {
+        Some(self)
+    }
+}
+
+impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
+    fn common_gen(&self) -> &CommonGenPlan<Self::VM> {
         &self.gen
     }
 
-    fn is_current_gc_nursery(&self) -> bool {
-        !self.gen.gc_full_heap.load(Ordering::SeqCst)
+    fn get_mature_physical_pages_available(&self) -> usize {
+        self.immix.available_physical_pages()
+    }
+
+    fn get_mature_reserved_pages(&self) -> usize {
+        self.immix.reserved_pages()
     }
 }
 
@@ -228,7 +232,7 @@ impl<VM: VMBinding> GenImmix<VM> {
         ));
 
         let genimmix = GenImmix {
-            gen: Gen::new(plan_args),
+            gen: CommonGenPlan::new(plan_args),
             immix: immix_space,
             last_gc_was_defrag: AtomicBool::new(false),
             last_gc_was_full_heap: AtomicBool::new(false),

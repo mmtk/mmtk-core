@@ -5,6 +5,11 @@ on:
     branches:
       - master
 
+concurrency:
+  # Cancels pending runs when a PR gets updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 # The workflow may fail if we change the public API in a pull request.
 # We allow fail on this action. But we should manually check if the changes are reasonable when we see a failed action.
 # It would be good if the workflow returns a neutral status when we find API changes. But it is currently not
@@ -22,7 +27,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           # We need nightly for cargo-public-api to get the API output.
-          toolchain: nightly
+          toolchain: nightly-2023-01-04
           profile: minimal
           # It is not necessary to use nightly as default (which is used to install cargo-public-api and compile our code).
           # However, our current toolchain is 1.59.0, and cargo-public-api requires 1.60 at least. To make it simple,
@@ -32,6 +37,6 @@ jobs:
 
       # Install cargo-public-api
       - name: Install cargo-public-api
-        run: cargo install cargo-public-api
+        run: cargo install cargo-public-api --version 0.26.0
       - name: API Diff
-        run: cargo public-api --diff-git-checkouts origin/${GITHUB_BASE_REF} ${{ github.event.pull_request.head.sha }} --deny=all
+        run: cargo public-api diff origin/${GITHUB_BASE_REF}..${{ github.event.pull_request.head.sha }} --deny=all

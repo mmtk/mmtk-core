@@ -2,7 +2,6 @@ use super::worker::ThreadId;
 use crate::util::options::AffinityKind;
 #[cfg(target_os = "linux")]
 use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_SET, CPU_ZERO};
-use std::mem::MaybeUninit;
 
 /// Represents the ID of a logical CPU on a system.
 pub type CoreId = u16;
@@ -12,6 +11,7 @@ pub type CoreId = u16;
 #[cfg(target_os = "linux")]
 /// Return the total number of cores allocated to the program.
 pub fn get_total_num_cpus() -> u16 {
+    use std::mem::MaybeUninit;
     unsafe {
         let mut cs = MaybeUninit::zeroed().assume_init();
         CPU_ZERO(&mut cs);
@@ -45,6 +45,7 @@ impl AffinityKind {
 #[cfg(target_os = "linux")]
 /// Bind the current thread to the specified core.
 fn bind_current_thread_to_core(cpu: CoreId) {
+    use std::mem::MaybeUninit;
     unsafe {
         let mut cs = MaybeUninit::zeroed().assume_init();
         CPU_ZERO(&mut cs);
@@ -55,6 +56,6 @@ fn bind_current_thread_to_core(cpu: CoreId) {
 
 #[cfg(not(target_os = "linux"))]
 /// Bind the current thread to the specified core.
-fn bind_current_thread_to_core(cpu: CoreId) {
+fn bind_current_thread_to_core(_cpu: CoreId) {
     unimplemented!()
 }
