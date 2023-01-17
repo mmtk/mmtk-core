@@ -97,15 +97,14 @@ impl Mmapper for FragmentedMapper {
 
             let mapped = self.get_or_allocate_slab_table(start);
 
-            /* Iterate over the chunks within the slab */
-            for (chunk, entry) in mapped.iter().enumerate().take(end_chunk).skip(start_chunk) {
-                if matches!(entry.load(Ordering::Relaxed), MapState::Quarantined) {
-                    continue;
-                }
-
-                let mmap_start = Self::chunk_index_to_address(base, chunk);
+            // Transition the chunks in bulk.
+            {
+                let mmap_start = Self::chunk_index_to_address(base, start_chunk);
                 let _guard = self.lock.lock().unwrap();
-                MapState::transition_to_quarantined(entry, mmap_start).unwrap();
+                MapState::bulk_transition_to_quarantined(
+                    &mapped[start_chunk..end_chunk],
+                    mmap_start,
+                )?;
             }
             start = high;
         }

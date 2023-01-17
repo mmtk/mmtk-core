@@ -2,6 +2,7 @@ use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::memory::*;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
+use itertools::Itertools;
 use std::io::Result;
 
 /// Generic mmap and protection functionality
@@ -127,6 +128,46 @@ impl MapState {
             state.store(MapState::Quarantined, Ordering::Relaxed);
         }
         res
+    }
+
+    /// Equivalent to calling `transition_to_quarantined` on each element of `states`, but faster.
+    /// The caller should hold a lock before invoking this method.
+    pub(super) fn bulk_transition_to_quarantined(
+        states: &[Atomic<MapState>],
+        mmap_start: Address,
+    ) -> Result<()> {
+        trace!(
+            "Trying to bulk-quarantine {} - {}",
+            mmap_start,
+            mmap_start + MMAP_CHUNK_BYTES * states.len(),
+        );
+
+        for (state_value, mut group) in
+            &(0..states.len()).group_by(|i| states[*i].load(Ordering::Relaxed))
+        {
+            match state_value {
+                MapState::Unmapped => {
+                    let start_index = group.next().expect("Empty group?"); // A group must have at least one element.
+                    let end_index = group.last().unwrap_or(start_index) + 1; // A one-element group covers only one chunk.
+                    let start_addr = mmap_start + MMAP_CHUNK_BYTES * start_index;
+                    let end_addr = mmap_start + MMAP_CHUNK_BYTES * end_index;
+
+                    trace!("Trying to quarantine {} - {}", start_addr, end_addr);
+                    mmap_noreserve(start_addr, end_addr - start_addr)?;
+
+                    for i in start_index..end_index {
+                        states[i].store(MapState::Quarantined, Ordering::Relaxed);
+                    }
+                }
+                MapState::Quarantined => {}
+                MapState::Mapped => {}
+                MapState::Protected => {
+                    panic!("Cannot quarantine protected memory")
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Check the current MapState of the chunk, and transition the chunk to MapState::Protected.
