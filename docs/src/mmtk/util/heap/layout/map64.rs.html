@@ -245,6 +245,12 @@
 <span id="243">243</span>
 <span id="244">244</span>
 <span id="245">245</span>
+<span id="246">246</span>
+<span id="247">247</span>
+<span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::map::Map</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::conversions</span>;
@@ -254,6 +260,7 @@
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::layout::vm_layout_constants</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::heap::space_descriptor::SpaceDescriptor</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::raw_memory_freelist::RawMemoryFreeList</span>;
+<span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::rust_util::zeroed_alloc::new_zeroed_vec</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::util::Address</span>;
 <span class="kw">use</span> <span class="ident">std::sync::atomic</span>::{<span class="ident">AtomicUsize</span>, <span class="ident">Ordering</span>};
 
@@ -288,7 +295,12 @@
         }
 
         <span class="self">Self</span> {
-            <span class="ident">descriptor_map</span>: <span class="macro">vec!</span>[<span class="ident">SpaceDescriptor::UNINITIALIZED</span>; <span class="ident">MAX_CHUNKS</span>],
+            <span class="comment">// Note: descriptor_map is very large. Although it is initialized to</span>
+            <span class="comment">// SpaceDescriptor(0), the compiler and the standard library are not smart enough to</span>
+            <span class="comment">// elide the storing of 0 for each of the element.  Using standard vector creation,</span>
+            <span class="comment">// such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe</span>
+            <span class="comment">// slowdown during start-up.</span>
+            <span class="ident">descriptor_map</span>: <span class="kw">unsafe</span> { <span class="ident">new_zeroed_vec</span>::<span class="op">&lt;</span><span class="ident">SpaceDescriptor</span><span class="op">&gt;</span>(<span class="ident">MAX_CHUNKS</span>) },
             <span class="ident">high_water</span>,
             <span class="ident">base_address</span>,
             <span class="ident">fl_page_resources</span>: <span class="macro">vec!</span>[<span class="prelude-val">None</span>; <span class="ident">MAX_SPACES</span>],

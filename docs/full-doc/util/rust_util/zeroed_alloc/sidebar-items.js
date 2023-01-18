@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["new_zeroed_vec","Allocate a `Vec<T>` of all-zero values."]]});
