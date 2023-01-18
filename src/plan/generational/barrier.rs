@@ -14,10 +14,10 @@ use crate::MMTK;
 use super::gc_work::GenNurseryProcessEdges;
 use super::gc_work::ProcessModBuf;
 use super::gc_work::ProcessRegionModBuf;
-use super::global::Gen;
-use super::global::GenerationalPlan;
+use super::global::HasNursery;
+use super::global::CommonGenPlan;
 
-pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> {
+pub struct GenObjectBarrierSemantics<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> {
     /// MMTk instance
     mmtk: &'static MMTK<VM>,
     /// Generational plan
@@ -28,7 +28,7 @@ pub struct GenObjectBarrierSemantics<VM: VMBinding, P: GenerationalPlan<VM> + Pl
     region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
-impl<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> GenObjectBarrierSemantics<VM, P> {
     pub fn new(mmtk: &'static MMTK<VM>, plan: &'static P) -> Self {
         Self {
             mmtk,
@@ -58,7 +58,7 @@ impl<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> GenObjectBarr
     }
 }
 
-impl<VM: VMBinding, P: GenerationalPlan<VM> + PlanTraceObject<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
     type VM = VM;
 
     #[cold]

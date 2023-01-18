@@ -57,12 +57,6 @@ use crate::vm::VMBinding;
 /// and for a third SideMetadataSpec (`LS3`), the `offset` will be `BASE(LS2) + required_metadata_space_per_chunk(LS2)`.
 ///
 /// For all other policies, the `offset` starts from zero. This is safe because no two policies ever manage one chunk, so there will be no overlap.
-///
-/// [`HeaderMetadataSpec`]: ../util/metadata/header_metadata/struct.HeaderMetadataSpec.html
-/// [`SideMetadataSpec`]:   ../util/metadata/side_metadata/strutc.SideMetadataSpec.html
-/// [`header_metadata`]:    ../util/metadata/header_metadata/index.html
-/// [`GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS`]: ../util/metadata/side_metadata/constant.GLOBAL_SIDE_METADATA_VM_BASE_ADDRESS.html
-/// [`LOCAL_SIDE_METADATA_VM_BASE_ADDRESS`]:  ../util/metadata/side_metadata/constant.LOCAL_SIDE_METADATA_VM_BASE_ADDRESS.html
 pub trait ObjectModel<VM: VMBinding> {
     // Per-object Metadata Spec definitions go here
     //
@@ -81,6 +75,9 @@ pub trait ObjectModel<VM: VMBinding> {
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec;
     /// The metadata specification for the mark bit, used by most plans that need to mark live objects. 1 bit.
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec;
+    #[cfg(feature = "object_pinning")]
+    /// The metadata specification for the pinning bit, used by most plans that need to pin objects. 1 bit.
+    const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec;
     /// The metadata specification for the mark-and-nursery bits, used by most plans that has large object allocation. 2 bits.
     const LOCAL_LOS_MARK_NURSERY_SPEC: VMLocalLOSMarkNurserySpec;
 
@@ -379,6 +376,24 @@ pub trait ObjectModel<VM: VMBinding> {
     /// mature space for generational plans.
     const VM_WORST_CASE_COPY_EXPANSION: f64 = 1.5;
 
+    /// If this is true, the binding guarantees that an object reference's raw address is always equal to the return value of the `ref_to_address` method
+    /// and the return value of the `ref_to_object_start` method. This is a very strong guarantee, but it is also helpful for MMTk to
+    /// make some assumptions and optimize for this case.
+    /// If a binding sets this to true, and the related methods return inconsistent results, this is an undefined behavior. MMTk may panic
+    /// if any assertion catches this error, but may also fail silently.
+    const UNIFIED_OBJECT_REFERENCE_ADDRESS: bool = false;
+
+    /// For our allocation result (object_start), the binding may have an offset between the allocation result
+    /// and the raw address of their object reference, i.e. object ref's raw address = object_start + offset.
+    /// The offset could be zero. The offset is not necessary to be
+    /// constant for all the objects. This constant defines the smallest possible offset.
+    ///
+    /// This is used as an indication for MMTk to predict where object references may point to in some algorithms.
+    ///
+    /// We should have the invariant:
+    /// * object ref >= object_start + OBJECT_REF_OFFSET_LOWER_BOUND
+    const OBJECT_REF_OFFSET_LOWER_BOUND: isize;
+
     /// Return the lowest address of the storage associated with an object. This should be
     /// the address that a binding gets by an allocation call ([`crate::memory_manager::alloc`]).
     ///
@@ -400,12 +415,10 @@ pub trait ObjectModel<VM: VMBinding> {
     /// for an given object. For a given object, the returned address
     /// should be a constant offset from the object reference address.
     ///
-    /// If a binding enables the `is_mmtk_object` feature, MMTk may forge the queried address
+    /// Note that MMTk may forge an arbitrary address
     /// directly into a potential object reference, and call this method on the 'object reference'.
     /// In that case, the argument `object` may not be a valid object reference,
     /// and the implementation of this method should not use any object metadata.
-    /// However, if a binding, does not use the`is_mmtk_object` feature, they can expect
-    /// the `object` to be valid.
     ///
     /// MMTk uses this method more frequently than [`crate::vm::ObjectModel::ref_to_object_start`].
     ///
@@ -516,6 +529,8 @@ pub mod specs {
     define_vm_metadata_spec!(VMLocalForwardingBitsSpec, false, 1, LOG_MIN_OBJECT_SIZE);
     // Mark bit: 1 bit per object, local
     define_vm_metadata_spec!(VMLocalMarkBitSpec, false, 0, LOG_MIN_OBJECT_SIZE);
+    // Pinning bit: 1 bit per object, local
+    define_vm_metadata_spec!(VMLocalPinningBitSpec, false, 0, LOG_MIN_OBJECT_SIZE);
     // Mark&nursery bits for LOS: 2 bit per page, local
     define_vm_metadata_spec!(VMLocalLOSMarkNurserySpec, false, 1, LOG_BYTES_IN_PAGE);
 }

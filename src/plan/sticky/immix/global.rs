@@ -20,6 +20,7 @@ use crate::util::heap::layout::heap_layout::VMMap;
 use crate::util::options::Options;
 use crate::policy::sft::SFT;
 use crate::vm::ObjectModel;
+use crate::plan::global::CreateGeneralPlanArgs;
 
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
@@ -42,7 +43,7 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..immix::IMMIX_CONSTRAINTS
 };
 
-impl<VM: VMBinding> GenerationalPlan<VM> for StickyImmix<VM> {
+impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for StickyImmix<VM> {
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
         self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked_with_current_mark_state(object)
     }
@@ -108,10 +109,6 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.next_gc_full_heap.store(true, Ordering::SeqCst);
     }
 
-    fn is_current_gc_nursery(&self) -> bool {
-        !self.gc_full_heap.load(Ordering::SeqCst)
-    }
-
     fn last_collection_full_heap(&self) -> bool {
         self.gc_full_heap.load(Ordering::SeqCst)
     }
@@ -154,12 +151,12 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             return;
         } else {
             self.immix.release(tls);
-            self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery(), Ordering::Relaxed);
+            self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery_pages(), Ordering::Relaxed);
         }
     }
 
     fn collection_required(&self, space_full: bool, space: Option<&dyn crate::policy::space::Space<Self::VM>>) -> bool {
-        let nursery_full = (self.immix.immix_space.get_pages_allocated() << LOG_BYTES_IN_PAGE) > self.options().get_max_nursery();
+        let nursery_full = self.immix.immix_space.get_pages_allocated() > self.options().get_max_nursery_pages();
         if space_full && space.is_some() && space.unwrap().name() == self.immix.immix_space.name() {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
@@ -176,42 +173,16 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 }
 
 impl<VM: VMBinding> StickyImmix<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
-
-        let space = {
-            // Customize the immix space a bit -- add nursery bit if it is on the side
-            let mut space = ImmixSpace::new(
-                "immix",
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-                global_metadata_specs.clone(),
-            );
-
-            // If the nursery bit is on the side, add it for immix space
-            // match VM::VMObjectModel::LOCAL_NURSERY_BIT_SPEC.as_spec() {
-            //     MetadataSpec::OnSide(spec) => {
-            //         space.common.metadata.local.push(*spec);
-            //     }
-            //     _ => {}
-            // }
-
-            space
-        };
-
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         Self {
-            immix: immix::Immix::new_with_immix_space(heap, global_metadata_specs, space, vm_map, mmapper, options),
+            immix: immix::Immix::new(args),
             gc_full_heap: AtomicBool::new(false),
             next_gc_full_heap: AtomicBool::new(false),
         }
+    }
+
+    fn is_current_gc_nursery(&self) -> bool {
+        !self.gc_full_heap.load(Ordering::SeqCst)
     }
 
     fn requires_full_heap_collection(&self) -> bool {

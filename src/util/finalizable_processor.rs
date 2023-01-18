@@ -1,3 +1,4 @@
+use crate::plan::is_nursery_gc;
 use crate::scheduler::gc_work::ProcessEdgesWork;
 use crate::scheduler::{GCWork, GCWorker};
 use crate::util::ObjectReference;
@@ -140,7 +141,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for Finalization<E> {
 
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.scan(worker.tls, &mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.scan(worker.tls, &mut w, is_nursery_gc(&*mmtk.plan));
         debug!(
             "Finished finalization, {} objects in candidates, {} objects ready to finalize",
             finalizable_processor.candidates.len(),
@@ -163,9 +164,9 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ForwardFinalization<E> {
         let mut finalizable_processor = mmtk.finalizable_processor.lock().unwrap();
         let mut w = E::new(vec![], false, mmtk);
         w.set_worker(worker);
-        finalizable_processor.forward_candidate(&mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.forward_candidate(&mut w, is_nursery_gc(&*mmtk.plan));
 
-        finalizable_processor.forward_finalizable(&mut w, mmtk.plan.is_current_gc_nursery());
+        finalizable_processor.forward_finalizable(&mut w, is_nursery_gc(&*mmtk.plan));
         trace!("Finished forwarding finlizable");
     }
 }

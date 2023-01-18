@@ -108,6 +108,8 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
+        self.plan.base().gc_trigger.policy.on_gc_release(mmtk);
+
         <C::VM as VMBinding>::VMCollection::vm_release();
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
@@ -222,6 +224,11 @@ pub struct EndOfGC;
 impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("End of GC");
+
+        // We assume this is the only running work packet that accesses plan at the point of execution
+        #[allow(clippy::cast_ref_to_mut)]
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { &mut *(&*mmtk.plan as *const _ as *mut _) };
+        plan_mut.end_of_gc(worker.tls);
 
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
@@ -516,7 +523,6 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
         use crate::policy::sft::GCWorkerMutRef;
-        use crate::policy::sft_map::SFTMap;
 
         if object.is_null() {
             return object;
@@ -764,7 +770,7 @@ use crate::plan::Plan;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 
-/// This provides an implementation of [`ProcessEdgesWork`](scheduler/gc_work/ProcessEdgesWork). A plan that implements
+/// This provides an implementation of [`crate::scheduler::gc_work::ProcessEdgesWork`]. A plan that implements
 /// `PlanTraceObject` can use this work packet for tracing objects.
 pub struct PlanProcessEdges<
     VM: VMBinding,

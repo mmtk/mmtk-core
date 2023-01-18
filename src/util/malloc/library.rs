@@ -74,5 +74,12 @@ mod libc_malloc {
     // Posix
     pub use libc::posix_memalign;
     // GNU
+    #[cfg(target_os = "linux")]
     pub use libc::malloc_usable_size;
+    #[cfg(target_os = "macos")]
+    extern "C" {
+        pub fn malloc_size(ptr: *const libc::c_void) -> usize;
+    }
+    #[cfg(target_os = "macos")]
+    pub use self::malloc_size as malloc_usable_size;
 }

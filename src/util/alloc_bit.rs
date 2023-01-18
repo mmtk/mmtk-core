@@ -27,6 +27,11 @@ pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
     ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address::<VM>(), 0, Ordering::SeqCst);
 }
 
+/// Atomically unset the alloc bit for an object, regardless whether the bit is set or not.
+pub fn unset_alloc_bit_nocheck<VM: VMBinding>(object: ObjectReference) {
+    ALLOC_SIDE_METADATA_SPEC.store_atomic::<u8>(object.to_address::<VM>(), 0, Ordering::SeqCst);
+}
+
 /// Non-atomically unset the alloc bit for an object. The caller needs to ensure the side
 /// metadata for the alloc bit for the object is accessed by only one thread.
 ///

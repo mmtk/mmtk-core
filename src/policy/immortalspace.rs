@@ -3,18 +3,13 @@ use atomic::Ordering;
 use crate::policy::sft::SFT;
 use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
-use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource};
 
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 
-use crate::plan::PlanConstraints;
 use crate::policy::sft::GCWorkerMutRef;
-use crate::policy::space::SpaceOptions;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
@@ -44,6 +39,18 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
             Ordering::SeqCst,
         );
         old_value == self.mark_state
+    }
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        true
     }
     fn is_movable(&self) -> bool {
         false
@@ -132,39 +139,17 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
-    ) -> Self {
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: false,
-                immortal: true,
-                needs_log_bit: constraints.needs_log_bit,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: metadata::extract_side_metadata(&[
-                        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                    ]),
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(
+            false,
+            true,
+            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+        ));
         ImmortalSpace {
             mark_state: 0,
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)

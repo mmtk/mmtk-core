@@ -1,4 +1,4 @@
-use crate::policy::mallocspace::MallocSpace;
+use crate::policy::marksweepspace::malloc_ms::MallocSpace;
 use crate::policy::space::Space;
 use crate::util::alloc::Allocator;
 use crate::util::opaque_pointer::*;

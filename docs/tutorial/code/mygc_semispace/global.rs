@@ -2,6 +2,7 @@
 use crate::plan::global::BasePlan; //Modify
 use crate::plan::global::CommonPlan; // Add
 use crate::plan::global::GcStatus; // Add
+use crate::plan::global::{CreateGeneralPlanArgs, CreateSpecificPlanArgs};
 use crate::plan::mygc::mutator::ALLOCATOR_MAPPING;
 use crate::plan::mygc::gc_work::MyGCWorkContext;
 use crate::plan::AllocationSemantics;
@@ -12,17 +13,12 @@ use crate::policy::space::Space;
 use crate::scheduler::*; // Modify
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::{SideMetadataSanity, SideMetadataContext};
-use crate::util::options::Options;
 use crate::util::opaque_pointer::*;
 use crate::vm::VMBinding;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering}; // Add
-use std::sync::Arc;
 // ANCHOR_END: imports_no_gc_work
 
 // Remove #[allow(unused_imports)].
@@ -171,40 +167,21 @@ impl<VM: VMBinding> Plan for MyGC<VM> {
 // Add
 impl<VM: VMBinding> MyGC<VM> {
     // ANCHOR: plan_new
-    fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-    ) -> Self {
+    fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
         // Modify
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &MYGC_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
 
         let res = MyGC {
             hi: AtomicBool::new(false),
             // ANCHOR: copyspace_new
-            copyspace0: CopySpace::new(
-                "copyspace0",
-                false,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
+            copyspace0: CopySpace::new(plan_args.get_space_args("copyspace0", true, VMRequest::discontiguous()), false),
             // ANCHOR_END: copyspace_new
-            copyspace1: CopySpace::new(
-                "copyspace1",
-                true,
-                true,
-                VMRequest::discontiguous(),
-                global_metadata_specs.clone(),
-                vm_map,
-                mmapper,
-                &mut heap,
-            ),
-            common: CommonPlan::new(vm_map, mmapper, options, heap, &MYGC_CONSTRAINTS, global_metadata_specs.clone()),
+            copyspace1: CopySpace::new(plan_args.get_space_args("copyspace1", true, VMRequest::discontiguous()), true),
+            common: CommonPlan::new(plan_args),
         };
 
         // Use SideMetadataSanity to check if each spec is valid. This is also needed for check

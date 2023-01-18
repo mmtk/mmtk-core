@@ -580,4 +580,157 @@ mod tests {
             );
         });
     }
+
+    #[test]
+    fn test_side_metadata_bzero_by_bytes() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    let data_addr = vm_layout_constants::HEAP_START;
+
+                    // 1 bit per 8 bytes
+                    let spec = SideMetadataSpec {
+                        name: "test spec",
+                        is_global: true,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: 0,
+                        log_bytes_in_region: 3,
+                    };
+                    let region_size: usize = 1 << spec.log_bytes_in_region;
+
+                    let metadata = SideMetadataContext {
+                        global: vec![spec],
+                        local: vec![],
+                    };
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
+
+                    assert!(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    // First 9 regions
+                    let regions = (0..9)
+                        .map(|i| data_addr + (region_size * i) as usize)
+                        .collect::<Vec<Address>>();
+                    // Set metadata for the regions
+                    regions
+                        .iter()
+                        .for_each(|addr| unsafe { spec.store::<u8>(*addr, 1) });
+                    regions
+                        .iter()
+                        .for_each(|addr| assert!(unsafe { spec.load::<u8>(*addr) } == 1));
+
+                    // bulk zero the 8 regions (1 bit for each, in total 1 byte)
+                    spec.bzero_metadata(regions[0], region_size * 8);
+                    // Check if the first 8 regions are set to 0
+                    regions[0..8]
+                        .iter()
+                        .for_each(|addr| assert!(unsafe { spec.load::<u8>(*addr) } == 0));
+                    // Check if the 9th region is still 1
+                    assert!(unsafe { spec.load::<u8>(regions[8]) } == 1);
+                },
+                || {
+                    sanity::reset();
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_side_metadata_bzero_by_fraction_of_bytes() {
+        serial_test(|| {
+            with_cleanup(
+                || {
+                    let data_addr = vm_layout_constants::HEAP_START;
+
+                    // 1 bit per 8 bytes
+                    let spec = SideMetadataSpec {
+                        name: "test spec",
+                        is_global: true,
+                        offset: SideMetadataOffset::addr(GLOBAL_SIDE_METADATA_BASE_ADDRESS),
+                        log_num_of_bits: 0,
+                        log_bytes_in_region: 3,
+                    };
+                    let region_size: usize = 1 << spec.log_bytes_in_region;
+
+                    let metadata = SideMetadataContext {
+                        global: vec![spec],
+                        local: vec![],
+                    };
+
+                    let mut metadata_sanity = SideMetadataSanity::new();
+                    metadata_sanity.verify_metadata_context("NoPolicy", &metadata);
+
+                    assert!(metadata
+                        .try_map_metadata_space(data_addr, constants::BYTES_IN_PAGE,)
+                        .is_ok());
+
+                    // First 9 regions
+                    let regions = (0..9)
+                        .map(|i| data_addr + (region_size * i) as usize)
+                        .collect::<Vec<Address>>();
+                    // Set metadata for the regions
+                    regions
+                        .iter()
+                        .for_each(|addr| unsafe { spec.store::<u8>(*addr, 1) });
+                    regions
+                        .iter()
+                        .for_each(|addr| assert!(unsafe { spec.load::<u8>(*addr) } == 1));
+
+                    // bulk zero the first 4 regions (1 bit for each, in total 4 bits)
+                    spec.bzero_metadata(regions[0], region_size * 4);
+                    // Check if the first 4 regions are set to 0
+                    regions[0..4]
+                        .iter()
+                        .for_each(|addr| assert!(unsafe { spec.load::<u8>(*addr) } == 0));
+                    // Check if the rest regions is still 1
+                    regions[4..9]
+                        .iter()
+                        .for_each(|addr| assert!(unsafe { spec.load::<u8>(*addr) } == 1));
+                },
+                || {
+                    sanity::reset();
+                },
+            )
+        })
+    }
+
+    #[test]
+    fn test_side_metadata_zero_meta_bits() {
+        let size = 4usize;
+        let allocate_u32 = || -> Address {
+            let ptr = unsafe {
+                std::alloc::alloc_zeroed(std::alloc::Layout::from_size_align(size, 4).unwrap())
+            };
+            Address::from_mut_ptr(ptr)
+        };
+        let fill_1 = |addr: Address| unsafe {
+            addr.store(u32::MAX);
+        };
+
+        let start = allocate_u32();
+        let end = start + size;
+
+        fill_1(start);
+        // zero the word
+        SideMetadataSpec::zero_meta_bits(start, 0, end, 0);
+        assert_eq!(unsafe { start.load::<u32>() }, 0);
+
+        fill_1(start);
+        // zero first 2 bits
+        SideMetadataSpec::zero_meta_bits(start, 0, start, 2);
+        assert_eq!(unsafe { start.load::<u32>() }, 0xFFFF_FFFC); // ....1100
+
+        fill_1(start);
+        // zero last 2 bits
+        SideMetadataSpec::zero_meta_bits(end - 1, 6, end, 0);
+        assert_eq!(unsafe { start.load::<u32>() }, 0x3FFF_FFFF); // 0011....
+
+        fill_1(start);
+        // zero everything except first 2 bits and last 2 bits
+        SideMetadataSpec::zero_meta_bits(start, 2, end - 1, 6);
+        assert_eq!(unsafe { start.load::<u32>() }, 0xC000_0003); // 1100....0011
+    }
 }

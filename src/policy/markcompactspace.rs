@@ -1,5 +1,5 @@
 use super::sft::SFT;
-use super::space::{CommonSpace, Space, SpaceOptions};
+use super::space::{CommonSpace, Space};
 use crate::plan::VectorObjectQueue;
 use crate::policy::gc_work::TraceKind;
 use crate::policy::sft::GCWorkerMutRef;
@@ -7,10 +7,8 @@ use crate::scheduler::GCWorker;
 use crate::util::alloc::allocator::align_allocation_no_fill;
 use crate::util::constants::LOG_BYTES_IN_WORD;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::{HeapMeta, MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource};
 use crate::util::metadata::extract_side_metadata;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
 use crate::util::{alloc_bit, Address, ObjectReference};
 use crate::{vm::*, ObjectQueue};
 use atomic::Ordering;
@@ -50,6 +48,21 @@ impl<VM: VMBinding> SFT for MarkCompactSpace<VM> {
         // Sanity checker cannot use this method to do the verification
         // since the mark bit will be cleared during the second trace(update forwarding pointer)
         Self::is_marked(object)
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of MarkCompactSpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        false
     }
 
     fn is_movable(&self) -> bool {
@@ -159,7 +172,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
     /// Get the address for header forwarding pointer
     #[inline(always)]
     fn header_forwarding_pointer_address(object: ObjectReference) -> Address {
-        VM::VMObjectModel::ref_to_object_start(object) - GC_EXTRA_HEADER_BYTES
+        object.to_object_start::<VM>() - GC_EXTRA_HEADER_BYTES
     }
 
     /// Get header forwarding pointer for an object
@@ -189,36 +202,13 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
         );
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
         let local_specs = extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+        let common = CommonSpace::new(args.into_policy_args(true, false, local_specs));
         MarkCompactSpace {
-            pr: if vmrequest.is_discontiguous() {
+            pr: if is_discontiguous {
                 MonotonePageResource::new_discontiguous(vm_map)
             } else {
                 MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
@@ -398,7 +388,7 @@ impl<VM: VMBinding> MarkCompactSpace<VM> {
                 let end_of_new_object = VM::VMObjectModel::copy_to(obj, new_object, Address::ZERO);
                 // update alloc_bit,
                 alloc_bit::set_alloc_bit::<VM>(new_object);
-                to = VM::VMObjectModel::ref_to_object_start(new_object) + copied_size;
+                to = new_object.to_object_start::<VM>() + copied_size;
                 debug_assert_eq!(end_of_new_object, to);
             }
         }
