@@ -65,8 +65,6 @@ pub(crate) mod statistics;
 pub(crate) mod test_util;
 /// A treadmill implementation.
 pub(crate) mod treadmill;
-/// Fast allocation of large zeroed arrays
-pub(crate) mod zeroed_alloc;
 
 // These modules are private. They are only used by other util modules.
 

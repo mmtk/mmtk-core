@@ -7,7 +7,7 @@ use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
-use crate::util::zeroed_alloc::new_zeroed_vec;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
