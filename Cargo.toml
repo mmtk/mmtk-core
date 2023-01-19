@@ -95,6 +95,8 @@ object_pinning = []
 immix_no_defrag = []
 # Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
 immix_smaller_block = []
+# Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
+immix_zero_on_release = []
 
 # Run sanity GC
 sanity = []

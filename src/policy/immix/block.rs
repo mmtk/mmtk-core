@@ -240,6 +240,10 @@ impl Block {
                     if prev_line_is_marked {
                         holes += 1;
                     }
+
+                    #[cfg(feature = "immix_zero_on_release")]
+                    crate::util::memory::zero(line.start(), Line::BYTES);
+
                     prev_line_is_marked = false;
                 }
             }
