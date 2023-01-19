@@ -321,6 +321,10 @@
 <span id="319">319</span>
 <span id="320">320</span>
 <span id="321">321</span>
+<span id="322">322</span>
+<span id="323">323</span>
+<span id="324">324</span>
+<span id="325">325</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::defrag::Histogram</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line::Line</span>;
 <span class="kw">use</span> <span class="ident"><span class="kw">super</span>::ImmixSpace</span>;
@@ -563,6 +567,10 @@
                     <span class="kw">if</span> <span class="ident">prev_line_is_marked</span> {
                         <span class="ident">holes</span> <span class="op">+</span><span class="op">=</span> <span class="number">1</span>;
                     }
+
+                    <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;immix_zero_on_release&quot;</span>)]</span>
+                    <span class="ident"><span class="kw">crate</span>::util::memory::zero</span>(<span class="ident">line</span>.<span class="ident">start</span>(), <span class="ident">Line::BYTES</span>);
+
                     <span class="ident">prev_line_is_marked</span> <span class="op">=</span> <span class="bool-val">false</span>;
                 }
             }
