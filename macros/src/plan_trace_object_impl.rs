@@ -66,6 +66,7 @@ pub(crate) fn generate_trace_object<'a>(
 
 pub(crate) fn generate_post_scan_object<'a>(
     post_scan_object_fields: &[&'a Field],
+    parent_field: &Option<&'a Field>,
     ty_generics: &TypeGenerics,
 ) -> TokenStream2 {
     let scan_field_handler = post_scan_object_fields.iter().map(|f| {
@@ -81,10 +82,23 @@ pub(crate) fn generate_post_scan_object<'a>(
         }
     });
 
+    // Generate a fallback to the parent plan
+    let parent_field_delegator = if let Some(f) = parent_field {
+        let f_ident = f.ident.as_ref().unwrap();
+        let ref f_ty = f.ty;
+        quote! {
+            <#f_ty as PlanTraceObject #ty_generics>::post_scan_object(&self.#f_ident, __mmtk_objref)
+        }
+    } else {
+        TokenStream2::new()
+    };
+
     quote! {
         #[inline(always)]
         fn post_scan_object(&self, __mmtk_objref: crate::util::ObjectReference) {
+            use crate::plan::PlanTraceObject;
             #(#scan_field_handler)*
+            #parent_field_delegator
         }
     }
 }

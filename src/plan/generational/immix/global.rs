@@ -227,8 +227,8 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 }
 
 impl<VM: VMBinding> GenerationalPlan for GenImmix<VM> {
-    fn common_gen(&self) -> &CommonGenPlan<Self::VM> {
-        &self.gen
+    fn is_current_gc_nursery(&self) -> bool {
+        self.gen.is_current_gc_nursery()
     }
 
     fn get_mature_physical_pages_available(&self) -> usize {

@@ -231,7 +231,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             nursery_collection: false,
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
-            mark_state: Self::UNMARKED_STATE,
+            mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
         }
     }
@@ -428,7 +428,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         trace: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        self.trace_object_without_moving(trace, object)
+        self.trace_object_without_moving(trace, object).0
     }
 
     /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
@@ -448,9 +448,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         if Block::containing::<VM>(object).is_defrag_source() {
             debug_assert!(self.in_defrag());
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false)
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false).0
         } else {
-            self.trace_object_without_moving(trace, object)
+            self.trace_object_without_moving(trace, object).0
         }
     }
 
@@ -460,7 +460,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
-    ) -> ObjectReference {
+    ) -> (ObjectReference, bool) {
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -472,8 +472,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             // Visit node
             queue.enqueue(object);
+            return (object, true);
         }
-        object
+        (object, false)
     }
 
     /// Trace object and do evacuation if required.
@@ -486,7 +487,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
         nursery_collection: bool,
-    ) -> ObjectReference {
+    ) -> (ObjectReference, bool) {
         debug_assert!(nursery_collection == self.nursery_collection);
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
@@ -516,7 +517,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     );
                 }
             }
-            new_object
+            (new_object, false)
         } else if self.is_marked(object, self.mark_state) {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
@@ -526,7 +527,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 object,
             );
             ForwardingWord::clear_forwarding_bits::<VM>(object);
-            object
+            (object, false)
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
@@ -538,7 +539,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 #[cfg(feature = "global_alloc_bit")]
                 crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
-                ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
+                let new_object = ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
+                Block::containing::<VM>(new_object).set_state(BlockState::Marked);
+                new_object
             };
             debug_assert_eq!(
                 Block::containing::<VM>(new_object).get_state(),
@@ -546,7 +549,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             );
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
-            new_object
+            (new_object, true)
         }
     }
 

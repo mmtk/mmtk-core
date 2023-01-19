@@ -313,8 +313,10 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
 
 /// This trait include methods that are specific to generational plans.
 pub trait GenerationalPlan: Plan {
-    /// Return the common generational implementation [`crate::plan::generational::global::CommonGenPlan`].
-    fn common_gen(&self) -> &CommonGenPlan<Self::VM>;
+    // /// Return the common generational implementation [`crate::plan::generational::global::CommonGenPlan`].
+    // fn common_gen(&self) -> &CommonGenPlan<Self::VM>;
+
+    fn is_current_gc_nursery(&self) -> bool;
 
     /// Return the number of pages available for allocation into the mature space.
     fn get_mature_physical_pages_available(&self) -> usize;
@@ -327,5 +329,5 @@ pub trait GenerationalPlan: Plan {
 /// with any plan (generational or not). For non generational plans, it will always return false.
 pub fn is_nursery_gc<VM: VMBinding>(plan: &dyn Plan<VM = VM>) -> bool {
     plan.generational()
-        .map_or(false, |plan| plan.common_gen().is_current_gc_nursery())
+        .map_or(false, |plan| plan.is_current_gc_nursery())
 }

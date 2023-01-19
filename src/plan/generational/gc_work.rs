@@ -104,7 +104,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             .plan
             .generational()
             .unwrap()
-            .common_gen()
             .is_current_gc_nursery()
         {
             // Scan objects in the modbuf and forward pointers
@@ -144,7 +143,6 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
             .plan
             .generational()
             .unwrap()
-            .common_gen()
             .is_current_gc_nursery()
         {
             // Collect all the entries in all the slices

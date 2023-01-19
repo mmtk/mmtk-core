@@ -16,6 +16,7 @@ use crate::util::copy::*;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::metadata::side_metadata::SideMetadataSpec;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
@@ -133,10 +134,14 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
 impl<VM: VMBinding> Immix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        Self::new_with_global_specs(args, vec![])
+    }
+
+    pub fn new_with_global_specs(args: CreateGeneralPlanArgs<VM>, specs: Vec<SideMetadataSpec>) -> Self {
         let mut plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&specs),
         };
         let immix = Immix {
             immix_space: ImmixSpace::new(plan_args.get_space_args(
