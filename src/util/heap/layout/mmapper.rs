@@ -1,8 +1,8 @@
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::memory::*;
+use crate::util::rust_util::sos_util;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
-use itertools::Itertools;
 use std::io::Result;
 
 /// Generic mmap and protection functionality
@@ -132,35 +132,52 @@ impl MapState {
 
     /// Equivalent to calling `transition_to_quarantined` on each element of `states`, but faster.
     /// The caller should hold a lock before invoking this method.
+    ///
+    /// The memory region to transition starts from `mmap_start`. The size is the chunk size
+    /// multiplied by the total number of `Atomic<MapState>` in the nested slice of slices.
+    ///
+    /// This function is introduced to speed up initialization of MMTk.  MMTk tries to quarantine
+    /// very large amount of memory during start-up.  If we quarantine one chunk at a time, it will
+    /// require thousands of `mmap` calls to cover gigabytes of quarantined memory, introducing a
+    /// noticeable delay.
+    ///
+    /// Arguments:
+    ///
+    /// * `state_slices`: A slice of slices. Each inner slice is a part of a `Slab`.
+    /// * `mmap_start`: The start of the region to transition.
     pub(super) fn bulk_transition_to_quarantined(
-        states: &[Atomic<MapState>],
+        state_slices: &[&[Atomic<MapState>]],
         mmap_start: Address,
     ) -> Result<()> {
         trace!(
             "Trying to bulk-quarantine {} - {}",
             mmap_start,
-            mmap_start + MMAP_CHUNK_BYTES * states.len(),
+            mmap_start + MMAP_CHUNK_BYTES * state_slices.iter().map(|s| s.len()).sum::<usize>(),
         );
 
-        for (state_value, mut group) in
-            &(0..states.len()).group_by(|i| states[*i].load(Ordering::Relaxed))
+        for group in
+            sos_util::SliceOfSlicesGrouper::new(state_slices, |s| s.load(Ordering::Relaxed))
         {
-            match state_value {
-                MapState::Unmapped => {
-                    let start_index = group.next().expect("Empty group?"); // A group must have at least one element.
-                    let end_index = group.last().unwrap_or(start_index) + 1; // A one-element group covers only one chunk.
-                    let start_addr = mmap_start + MMAP_CHUNK_BYTES * start_index;
-                    let end_addr = mmap_start + MMAP_CHUNK_BYTES * end_index;
+            let start_index = group.start_total;
+            let end_index = group.end_total;
+            let start_addr = mmap_start + MMAP_CHUNK_BYTES * start_index;
+            let end_addr = mmap_start + MMAP_CHUNK_BYTES * end_index;
 
+            match group.key {
+                MapState::Unmapped => {
                     trace!("Trying to quarantine {} - {}", start_addr, end_addr);
                     mmap_noreserve(start_addr, end_addr - start_addr)?;
 
-                    for i in start_index..end_index {
-                        states[i].store(MapState::Quarantined, Ordering::Relaxed);
+                    for state in group.iter() {
+                        state.store(MapState::Quarantined, Ordering::Relaxed);
                     }
                 }
-                MapState::Quarantined => {}
-                MapState::Mapped => {}
+                MapState::Quarantined => {
+                    trace!("Already quarantine {} - {}", start_addr, end_addr);
+                }
+                MapState::Mapped => {
+                    trace!("Already mapped {} - {}", start_addr, end_addr);
+                }
                 MapState::Protected => {
                     panic!("Cannot quarantine protected memory")
                 }

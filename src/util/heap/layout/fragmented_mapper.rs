@@ -1,5 +1,6 @@
 use super::mmapper::MapState;
 use super::Mmapper;
+use crate::util::constants::BYTES_IN_PAGE;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::Address;
@@ -81,10 +82,19 @@ impl Mmapper for FragmentedMapper {
     }
 
     fn quarantine_address_range(&self, mut start: Address, pages: usize) -> Result<()> {
+        debug_assert!(start.is_aligned_to(BYTES_IN_PAGE));
+
         let end = start + conversions::pages_to_bytes(pages);
+
+        // Each `MapState` entry governs a chunk.
+        // Align down to the chunk start because we only mmap multiples of whole chunks.
+        let mmap_start = conversions::mmap_chunk_align_down(start);
+
+        // We collect the chunk states from slabs to process them in bulk.
+        let mut state_slices = vec![];
+
         // Iterate over the slabs covered
         while start < end {
-            let base = Self::slab_align_down(start);
             let high = if end > Self::slab_limit(start) && !Self::slab_limit(start).is_zero() {
                 Self::slab_limit(start)
             } else {
@@ -96,18 +106,26 @@ impl Mmapper for FragmentedMapper {
             let end_chunk = Self::chunk_index(slab, conversions::mmap_chunk_align_up(high));
 
             let mapped = self.get_or_allocate_slab_table(start);
+            state_slices.push(&mapped[start_chunk..end_chunk]);
 
-            // Transition the chunks in bulk.
-            {
-                let mmap_start = Self::chunk_index_to_address(base, start_chunk);
-                let _guard = self.lock.lock().unwrap();
-                MapState::bulk_transition_to_quarantined(
-                    &mapped[start_chunk..end_chunk],
-                    mmap_start,
-                )?;
-            }
             start = high;
         }
+
+        #[cfg(debug_assertions)]
+        {
+            // Check if the number of entries are normal.
+            let mmap_end = conversions::mmap_chunk_align_up(end);
+            let num_slices = state_slices.iter().map(|s| s.len()).sum::<usize>();
+
+            debug_assert_eq!(mmap_start + BYTES_IN_CHUNK * num_slices, mmap_end);
+        }
+
+        // Transition the chunks in bulk.
+        {
+            let _guard = self.lock.lock().unwrap();
+            MapState::bulk_transition_to_quarantined(state_slices.as_slice(), mmap_start)?;
+        }
+
         Ok(())
     }
 
