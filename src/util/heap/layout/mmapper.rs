@@ -1,6 +1,6 @@
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::memory::*;
-use crate::util::rust_util::sos_util;
+use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::io::Result;
@@ -155,11 +155,15 @@ impl MapState {
             mmap_start + MMAP_CHUNK_BYTES * state_slices.iter().map(|s| s.len()).sum::<usize>(),
         );
 
-        for group in
-            sos_util::SliceOfSlicesGrouper::new(state_slices, |s| s.load(Ordering::Relaxed))
+        let mut start_index = 0;
+
+        for group in state_slices
+            .iter()
+            .copied()
+            .flatten()
+            .revisitable_group_by(|s| s.load(Ordering::Relaxed))
         {
-            let start_index = group.start_total;
-            let end_index = group.end_total;
+            let end_index = start_index + group.len;
             let start_addr = mmap_start + MMAP_CHUNK_BYTES * start_index;
             let end_addr = mmap_start + MMAP_CHUNK_BYTES * end_index;
 
@@ -168,7 +172,7 @@ impl MapState {
                     trace!("Trying to quarantine {} - {}", start_addr, end_addr);
                     mmap_noreserve(start_addr, end_addr - start_addr)?;
 
-                    for state in group.iter() {
+                    for state in group {
                         state.store(MapState::Quarantined, Ordering::Relaxed);
                     }
                 }
@@ -182,6 +186,8 @@ impl MapState {
                     panic!("Cannot quarantine protected memory")
                 }
             }
+
+            start_index = end_index;
         }
 
         Ok(())

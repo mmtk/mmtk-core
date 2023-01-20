@@ -2,7 +2,7 @@
 //! functionalities that we may expect the Rust programming language and its standard libraries
 //! to provide.
 
-pub mod sos_util;
+pub mod rev_group;
 pub mod zeroed_alloc;
 
 /// Const function for min value of two usize numbers.
