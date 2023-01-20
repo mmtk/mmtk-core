@@ -195,80 +195,85 @@ where
     }
 }
 
-#[test]
-fn test_empty_outer_slice() {
-    let slice_of_slices: &[&[i32]] = &[];
-    for _group in SliceOfSlicesGrouper::new(slice_of_slices, |_| 42) {
-        panic!("There is no element!");
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_outer_slice() {
+        let slice_of_slices: &[&[i32]] = &[];
+        for _group in SliceOfSlicesGrouper::new(slice_of_slices, |_| 42) {
+            panic!("There is no element!");
+        }
     }
-}
 
-// Note: Empty inner slices are not allowed.
+    // Note: Empty inner slices are not allowed.
 
-#[test]
-fn test_single_element() {
-    let slice_of_slices: &[&[i32]] = &[&[1]];
-    for group in SliceOfSlicesGrouper::new(slice_of_slices, |_| 42) {
-        assert_eq!(group.key, 42);
+    #[test]
+    fn test_single_element() {
+        let slice_of_slices: &[&[i32]] = &[&[1]];
+        for group in SliceOfSlicesGrouper::new(slice_of_slices, |_| 42) {
+            assert_eq!(group.key, 42);
+        }
     }
-}
 
-#[test]
-fn test_single_slice_multi_element() {
-    let slice_of_slices: &[&[i32]] = &[&[1, 3, 5, 2, 4, 6, 7]];
-    let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 2)
-        .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        result,
-        vec![(1, vec![1, 3, 5]), (0, vec![2, 4, 6]), (1, vec![7])]
-    );
-}
+    #[test]
+    fn test_single_slice_multi_element() {
+        let slice_of_slices: &[&[i32]] = &[&[1, 3, 5, 2, 4, 6, 7]];
+        let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 2)
+            .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result,
+            vec![(1, vec![1, 3, 5]), (0, vec![2, 4, 6]), (1, vec![7])]
+        );
+    }
 
-#[test]
-fn test_multi_slice_multi_element() {
-    let slice_of_slices: &[&[i32]] = &[&[10, 20], &[11, 21, 31], &[12, 22, 32, 42]];
-    let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
-        .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        result,
-        vec![
-            (0, vec![10, 20]),
-            (1, vec![11, 21, 31]),
-            (2, vec![12, 22, 32, 42])
-        ]
-    );
-}
+    #[test]
+    fn test_multi_slice_multi_element() {
+        let slice_of_slices: &[&[i32]] = &[&[10, 20], &[11, 21, 31], &[12, 22, 32, 42]];
+        let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
+            .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result,
+            vec![
+                (0, vec![10, 20]),
+                (1, vec![11, 21, 31]),
+                (2, vec![12, 22, 32, 42])
+            ]
+        );
+    }
 
-#[test]
-fn test_cross_slice_groups() {
-    let slice_of_slices: &[&[i32]] = &[&[10, 20], &[30, 40, 11, 21], &[31, 12, 22]];
-    let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
-        .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        result,
-        vec![
-            (0, vec![10, 20, 30, 40]),
-            (1, vec![11, 21, 31]),
-            (2, vec![12, 22])
-        ]
-    );
-}
+    #[test]
+    fn test_cross_slice_groups() {
+        let slice_of_slices: &[&[i32]] = &[&[10, 20], &[30, 40, 11, 21], &[31, 12, 22]];
+        let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
+            .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result,
+            vec![
+                (0, vec![10, 20, 30, 40]),
+                (1, vec![11, 21, 31]),
+                (2, vec![12, 22])
+            ]
+        );
+    }
 
-#[test]
-fn test_cross_slice_groups2() {
-    let slice_of_slices: &[&[i32]] = &[&[10, 20, 11], &[21, 31, 41], &[51, 61], &[71, 12, 22]];
-    let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
-        .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        result,
-        vec![
-            (0, vec![10, 20]),
-            (1, vec![11, 21, 31, 41, 51, 61, 71]),
-            (2, vec![12, 22])
-        ]
-    );
+    #[test]
+    fn test_cross_slice_groups2() {
+        let slice_of_slices: &[&[i32]] = &[&[10, 20, 11], &[21, 31, 41], &[51, 61], &[71, 12, 22]];
+        let result = SliceOfSlicesGrouper::new(slice_of_slices, |x| x % 10)
+            .map(|group| (group.key, group.iter().copied().collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result,
+            vec![
+                (0, vec![10, 20]),
+                (1, vec![11, 21, 31, 41, 51, 61, 71]),
+                (2, vec![12, 22])
+            ]
+        );
+    }
 }
