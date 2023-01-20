@@ -68,7 +68,7 @@
 <span class="kw">pub</span> <span class="kw">const</span> <span class="ident">MMTK_FEATURES</span>: <span class="kw-2">&amp;</span><span class="ident">str</span> <span class="op">=</span> <span class="ident">raw::FEATURES_STR</span>;
 
 <span class="macro">lazy_static!</span> {
-    <span class="doccomment">/// Git version as short commit hash, such as a96e8f9, or a96e8f9, or unknown-git-version if MMTk</span>
+    <span class="doccomment">/// Git version as short commit hash, such as a96e8f9, or a96e8f9-dirty, or unknown-git-version if MMTk</span>
     <span class="doccomment">/// is not built from a git repo.</span>
     <span class="kw">pub</span> <span class="kw">static</span> <span class="kw-2">ref</span> <span class="ident">MMTK_GIT_VERSION</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span> <span class="op">=</span> <span class="kw-2">&amp;</span><span class="ident">MMTK_GIT_VERSION_STRING</span>;
     <span class="comment">// Owned string</span>
