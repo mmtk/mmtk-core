@@ -1,5 +1,6 @@
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::memory::*;
+use crate::util::rust_util::rev_group::RevisitableGroupByForIterator;
 use crate::util::Address;
 use atomic::{Atomic, Ordering};
 use std::io::Result;
@@ -113,13 +114,83 @@ impl MapState {
         let res = match state.load(Ordering::Relaxed) {
             MapState::Unmapped => mmap_noreserve(mmap_start, MMAP_CHUNK_BYTES),
             MapState::Quarantined => Ok(()),
-            MapState::Mapped => panic!("Cannot quarantine mapped memory"),
+            MapState::Mapped => {
+                // If a chunk is mapped by us and we try to quanrantine it, we simply don't do anything.
+                // We allow this as it is possible to have a situation like this:
+                // we have global side metdata S, and space A and B. We quanrantine memory X for S for A, then map
+                // X for A, and then we quanrantine memory Y for S for B. It is possible that X and Y is the same chunk,
+                // so the chunk is already mapped for A, and we try quanrantine it for B. We simply allow this transition.
+                return Ok(());
+            }
             MapState::Protected => panic!("Cannot quarantine protected memory"),
         };
         if res.is_ok() {
             state.store(MapState::Quarantined, Ordering::Relaxed);
         }
         res
+    }
+
+    /// Equivalent to calling `transition_to_quarantined` on each element of `states`, but faster.
+    /// The caller should hold a lock before invoking this method.
+    ///
+    /// The memory region to transition starts from `mmap_start`. The size is the chunk size
+    /// multiplied by the total number of `Atomic<MapState>` in the nested slice of slices.
+    ///
+    /// This function is introduced to speed up initialization of MMTk.  MMTk tries to quarantine
+    /// very large amount of memory during start-up.  If we quarantine one chunk at a time, it will
+    /// require thousands of `mmap` calls to cover gigabytes of quarantined memory, introducing a
+    /// noticeable delay.
+    ///
+    /// Arguments:
+    ///
+    /// * `state_slices`: A slice of slices. Each inner slice is a part of a `Slab`.
+    /// * `mmap_start`: The start of the region to transition.
+    pub(super) fn bulk_transition_to_quarantined(
+        state_slices: &[&[Atomic<MapState>]],
+        mmap_start: Address,
+    ) -> Result<()> {
+        trace!(
+            "Trying to bulk-quarantine {} - {}",
+            mmap_start,
+            mmap_start + MMAP_CHUNK_BYTES * state_slices.iter().map(|s| s.len()).sum::<usize>(),
+        );
+
+        let mut start_index = 0;
+
+        for group in state_slices
+            .iter()
+            .copied()
+            .flatten()
+            .revisitable_group_by(|s| s.load(Ordering::Relaxed))
+        {
+            let end_index = start_index + group.len;
+            let start_addr = mmap_start + MMAP_CHUNK_BYTES * start_index;
+            let end_addr = mmap_start + MMAP_CHUNK_BYTES * end_index;
+
+            match group.key {
+                MapState::Unmapped => {
+                    trace!("Trying to quarantine {} - {}", start_addr, end_addr);
+                    mmap_noreserve(start_addr, end_addr - start_addr)?;
+
+                    for state in group {
+                        state.store(MapState::Quarantined, Ordering::Relaxed);
+                    }
+                }
+                MapState::Quarantined => {
+                    trace!("Already quarantine {} - {}", start_addr, end_addr);
+                }
+                MapState::Mapped => {
+                    trace!("Already mapped {} - {}", start_addr, end_addr);
+                }
+                MapState::Protected => {
+                    panic!("Cannot quarantine protected memory")
+                }
+            }
+
+            start_index = end_index;
+        }
+
+        Ok(())
     }
 
     /// Check the current MapState of the chunk, and transition the chunk to MapState::Protected.

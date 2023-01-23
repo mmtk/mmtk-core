@@ -11,7 +11,7 @@ pub const MMTK_PKG_VERSION: &str = raw::PKG_VERSION;
 pub const MMTK_FEATURES: &str = raw::FEATURES_STR;
 
 lazy_static! {
-    /// Git version as short commit hash, such as a96e8f9, or a96e8f9, or unknown-git-version if MMTk
+    /// Git version as short commit hash, such as a96e8f9, or a96e8f9-dirty, or unknown-git-version if MMTk
     /// is not built from a git repo.
     pub static ref MMTK_GIT_VERSION: &'static str = &MMTK_GIT_VERSION_STRING;
     // Owned string

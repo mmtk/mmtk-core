@@ -86,7 +86,7 @@ impl FixtureContent for SingleObject {
         let addr = mmtk_alloc(handle, size, 8, 0, semantics);
         assert!(!addr.is_zero());
 
-        let objref = unsafe { addr.add(OBJECT_REF_OFFSET).to_object_reference() };
+        let objref = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
         mmtk_post_alloc(handle, objref, size, semantics);
 
         SingleObject { objref }
@@ -106,6 +106,61 @@ impl FixtureContent for MMTKSingleton {
 
         MMTKSingleton {
             mmtk: &crate::SINGLETON,
+        }
+    }
+}
+
+pub struct TwoObjects {
+    pub objref1: ObjectReference,
+    pub objref2: ObjectReference,
+}
+
+impl FixtureContent for TwoObjects {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        let size = 128;
+        let semantics = AllocationSemantics::Default;
+
+        let addr = mmtk_alloc(handle, size, 8, 0, semantics);
+        assert!(!addr.is_zero());
+
+        let objref1 = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
+        mmtk_post_alloc(handle, objref1, size, semantics);
+
+        let objref2 = ObjectReference::from_raw_address(addr.add(OBJECT_REF_OFFSET));
+        mmtk_post_alloc(handle, objref2, size, semantics);
+
+        TwoObjects { objref1, objref2 }
+    }
+}
+
+use mmtk::plan::Mutator;
+
+pub struct MutatorFixture {
+    pub mmtk: &'static MMTK<DummyVM>,
+    pub mutator: *mut Mutator<DummyVM>,
+}
+
+impl FixtureContent for MutatorFixture {
+    fn create() -> Self {
+        const MB: usize = 1024 * 1024;
+        // 1MB heap
+        mmtk_init(MB);
+        mmtk_initialize_collection(VMThread::UNINITIALIZED);
+        // Make sure GC does not run during test.
+        mmtk_disable_collection();
+        let handle = mmtk_bind_mutator(VMMutatorThread(VMThread::UNINITIALIZED));
+
+        MutatorFixture {
+            mmtk: &crate::SINGLETON,
+            mutator: handle,
         }
     }
 }

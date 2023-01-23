@@ -6,7 +6,9 @@
 // There are also helpers for creating fixtures in `fixture/mod.rs`.
 mod issue139;
 mod handle_mmap_oom;
+#[cfg(target_os = "linux")]
 mod handle_mmap_conflict;
+mod allocate_align_offset;
 mod allocate_without_initialize_collection;
 mod allocate_with_initialize_collection;
 mod allocate_with_disable_collection;
@@ -20,3 +22,4 @@ mod malloc_ms;
 mod conservatism;
 mod is_in_mmtk_spaces;
 mod fixtures;
+mod edges_test;

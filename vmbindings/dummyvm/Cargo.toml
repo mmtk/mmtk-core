@@ -17,8 +17,11 @@ mmtk = { path = "../../", version = "*" }
 libc = "0.2"
 lazy_static = "1.1"
 atomic_refcell = "0.1.7"
+atomic = "0.4.6"
+log = "0.4"
 
 [features]
 default = []
 is_mmtk_object = ["mmtk/is_mmtk_object"]
 malloc_counted_size = ["mmtk/malloc_counted_size"]
+malloc_mark_sweep = ["mmtk/malloc_mark_sweep"]

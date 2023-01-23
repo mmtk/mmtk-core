@@ -1,5 +1,7 @@
 //! A general scheduler implementation. MMTk uses it to schedule GC-related work.
 
+pub mod affinity;
+
 #[allow(clippy::module_inception)]
 mod scheduler;
 pub(crate) use scheduler::CoordinatorMessage;
@@ -17,6 +19,7 @@ mod work_bucket;
 pub use work_bucket::WorkBucketStage;
 
 mod worker;
+pub(crate) use worker::current_worker_ordinal;
 pub use worker::GCWorker;
 
 mod controller;

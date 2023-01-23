@@ -215,6 +215,10 @@ impl Address {
         Address(self.0 - size)
     }
 
+    pub const fn and(self, mask: usize) -> usize {
+        self.0 & mask
+    }
+
     // Perform a saturating subtract on the Address
     pub const fn saturating_sub(self, size: usize) -> Address {
         Address(self.0.saturating_sub(size))
@@ -233,12 +237,15 @@ impl Address {
     /// This could throw a segment fault if the address is invalid
     #[inline(always)]
     pub unsafe fn store<T>(self, value: T) {
-        *(self.0 as *mut T) = value;
+        // We use a ptr.write() operation as directly setting the pointer would drop the old value
+        // which may result in unexpected behaviour
+        (self.0 as *mut T).write(value);
     }
 
     /// atomic operation: load
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_load<T: Atomic>(self, order: Ordering) -> T::Type {
         let loc = &*(self.0 as *const T);
         loc.load(order)
@@ -247,6 +254,7 @@ impl Address {
     /// atomic operation: store
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn atomic_store<T: Atomic>(self, val: T::Type, order: Ordering) {
         let loc = &*(self.0 as *const T);
         loc.store(val, order)
@@ -255,6 +263,7 @@ impl Address {
     /// atomic operation: compare and exchange usize
     /// # Safety
     /// This could throw a segment fault if the address is invalid
+    #[inline(always)]
     pub unsafe fn compare_exchange<T: Atomic>(
         self,
         old: T::Type,
@@ -292,16 +301,6 @@ impl Address {
         conversions::raw_is_aligned(self.0, align)
     }
 
-    /// converts the Address into an ObjectReference
-    /// # Safety
-    /// We would expect ObjectReferences point to valid objects,
-    /// but an arbitrary Address may not reside an object. This conversion is unsafe,
-    /// and it is the user's responsibility to ensure the safety.
-    #[inline(always)]
-    pub unsafe fn to_object_reference(self) -> ObjectReference {
-        mem::transmute(self.0)
-    }
-
     /// converts the Address to a pointer
     #[inline(always)]
     pub fn to_ptr<T>(self) -> *const T {
@@ -312,6 +311,15 @@ impl Address {
     #[inline(always)]
     pub fn to_mut_ptr<T>(self) -> *mut T {
         self.0 as *mut T
+    }
+
+    /// converts the Address to a Rust reference
+    ///
+    /// # Safety
+    /// The caller must guarantee the address actually points to a Rust object.
+    #[inline(always)]
+    pub unsafe fn as_ref<'a, T>(self) -> &'a T {
+        &*self.to_mut_ptr()
     }
 
     /// converts the Address to a pointer-sized integer
@@ -444,10 +452,23 @@ mod tests {
     }
 }
 
+use crate::vm::VMBinding;
+
 /// ObjectReference represents address for an object. Compared with Address,
 /// operations allowed on ObjectReference are very limited. No address arithmetics
 /// are allowed for ObjectReference. The idea is from the paper
 /// High-level Low-level Programming (VEE09) and JikesRVM.
+///
+/// A runtime may define its "object references" differently. It may define an object reference as
+/// the address of an object, a handle that points to an indirection table entry where a pointer to
+/// the object is held, or anything else. Regardless, MMTk expects each object reference to have a
+/// pointer to the object (an address) in each object reference, and that address should be used
+/// for this `ObjectReference` type.
+///
+/// We currently do not allow an opaque `ObjectReference` type for which a binding can define
+/// their layout. We now only allow a binding to define their semantics through a set of
+/// methods in [`crate::vm::ObjectModel`]. Major refactoring is needed in MMTk to allow
+/// the opaque `ObjectReference` type, and we haven't seen a use case for now.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, Hash, PartialOrd, PartialEq)]
 pub struct ObjectReference(usize);
@@ -455,10 +476,63 @@ pub struct ObjectReference(usize);
 impl ObjectReference {
     pub const NULL: ObjectReference = ObjectReference(0);
 
-    /// converts the ObjectReference to an Address
+    /// Cast the object reference to its raw address. This method is mostly for the convinience of a binding.
+    ///
+    /// MMTk should not make any assumption on the actual location of the address with the object reference.
+    /// MMTk should not assume the address returned by this method is in our allocation. For the purposes of
+    /// setting object metadata, MMTk should use [`crate::vm::ObjectModel::ref_to_address()`] or [`crate::vm::ObjectModel::ref_to_header()`].
     #[inline(always)]
-    pub fn to_address(self) -> Address {
+    pub fn to_raw_address(self) -> Address {
         Address(self.0)
+    }
+
+    /// Cast a raw address to an object reference. This method is mostly for the convinience of a binding.
+    /// This is how a binding creates `ObjectReference` instances.
+    ///
+    /// MMTk should not assume an arbitrary address can be turned into an object reference. MMTk can use [`crate::vm::ObjectModel::address_to_ref()`]
+    /// to turn addresses that are from [`crate::vm::ObjectModel::ref_to_address()`] back to object.
+    #[inline(always)]
+    pub fn from_raw_address(addr: Address) -> ObjectReference {
+        ObjectReference(addr.0)
+    }
+
+    /// Get the in-heap address from an object reference. This method is used by MMTk to get an in-heap address
+    /// for an object reference. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_address`]. See the
+    /// comments on [`crate::vm::ObjectModel::ref_to_address`].
+    #[inline(always)]
+    pub fn to_address<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        let to_address = VM::VMObjectModel::ref_to_address(self);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || to_address == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, to_address);
+        to_address
+    }
+
+    /// Get the header base address from an object reference. This method is used by MMTk to get a base address for the
+    /// object header, and access the object header. This method is syntactic sugar for [`crate::vm::ObjectModel::ref_to_header`].
+    /// See the comments on [`crate::vm::ObjectModel::ref_to_header`].
+    #[inline(always)]
+    pub fn to_header<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        VM::VMObjectModel::ref_to_header(self)
+    }
+
+    #[inline(always)]
+    pub fn to_object_start<VM: VMBinding>(self) -> Address {
+        use crate::vm::ObjectModel;
+        let object_start = VM::VMObjectModel::ref_to_object_start(self);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || object_start == self.to_raw_address(), "The binding claims unified object reference address, but for object reference {}, ref_to_address() returns {}", self, object_start);
+        object_start
+    }
+
+    /// Get the object reference from an address that is returned from [`crate::util::address::ObjectReference::to_address`]
+    /// or [`crate::vm::ObjectModel::ref_to_address`]. This method is syntactic sugar for [`crate::vm::ObjectModel::address_to_ref`].
+    /// See the comments on [`crate::vm::ObjectModel::address_to_ref`].
+    #[inline(always)]
+    pub fn from_address<VM: VMBinding>(addr: Address) -> ObjectReference {
+        use crate::vm::ObjectModel;
+        let obj = VM::VMObjectModel::address_to_ref(addr);
+        debug_assert!(!VM::VMObjectModel::UNIFIED_OBJECT_REFERENCE_ADDRESS || addr == obj.to_raw_address(), "The binding claims unified object reference address, but for address {}, address_to_ref() returns {}", addr, obj);
+        obj
     }
 
     /// is this object reference null reference?
@@ -479,7 +553,7 @@ impl ObjectReference {
         if self.is_null() {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_reachable(self)
+            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_reachable(self)
         }
     }
 
@@ -488,27 +562,27 @@ impl ObjectReference {
         if self.0 == 0 {
             false
         } else {
-            SFT_MAP.get(Address(self.0)).is_live(self)
+            unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_live(self)
         }
     }
 
     pub fn is_movable(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_movable()
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_movable()
     }
 
     /// Get forwarding pointer if the object is forwarded.
     #[inline(always)]
     pub fn get_forwarded_object(self) -> Option<Self> {
-        SFT_MAP.get(Address(self.0)).get_forwarded_object(self)
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.get_forwarded_object(self)
     }
 
     pub fn is_in_any_space(self) -> bool {
-        SFT_MAP.is_in_any_space(self)
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_in_space(self)
     }
 
     #[cfg(feature = "sanity")]
     pub fn is_sane(self) -> bool {
-        SFT_MAP.get(Address(self.0)).is_sane()
+        unsafe { SFT_MAP.get_unchecked(Address(self.0)) }.is_sane()
     }
 }
 

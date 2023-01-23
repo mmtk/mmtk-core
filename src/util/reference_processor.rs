@@ -4,6 +4,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 use std::vec::Vec;
 
+use crate::plan::is_nursery_gc;
 use crate::scheduler::ProcessEdgesWork;
 use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
@@ -69,12 +70,9 @@ impl ReferenceProcessors {
             mmtk.plan.constraints().needs_forward_after_liveness,
             "A plan with needs_forward_after_liveness=false does not need a separate forward step"
         );
-        self.soft
-            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
-        self.weak
-            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
-        self.phantom
-            .forward::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.soft.forward::<E>(trace, is_nursery_gc(&*mmtk.plan));
+        self.weak.forward::<E>(trace, is_nursery_gc(&*mmtk.plan));
+        self.phantom.forward::<E>(trace, is_nursery_gc(&*mmtk.plan));
     }
 
     // Methods for scanning weak references. It needs to be called in a decreasing order of reference strengths, i.e. soft > weak > phantom
@@ -86,18 +84,15 @@ impl ReferenceProcessors {
         if !mmtk.plan.is_emergency_collection() {
             // This step only retains the referents (keep the referents alive), it does not update its addresses.
             // We will call soft.scan() again with retain=false to update its addresses based on liveness.
-            self.soft
-                .retain::<E>(trace, mmtk.plan.is_current_gc_nursery());
+            self.soft.retain::<E>(trace, is_nursery_gc(&*mmtk.plan));
         }
         // This will update the references (and the referents).
-        self.soft
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.soft.scan::<E>(trace, is_nursery_gc(&*mmtk.plan));
     }
 
     /// Scan weak references.
     pub fn scan_weak_refs<E: ProcessEdgesWork>(&self, trace: &mut E, mmtk: &'static MMTK<E::VM>) {
-        self.weak
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.weak.scan::<E>(trace, is_nursery_gc(&*mmtk.plan));
     }
 
     /// Scan phantom references.
@@ -106,8 +101,7 @@ impl ReferenceProcessors {
         trace: &mut E,
         mmtk: &'static MMTK<E::VM>,
     ) {
-        self.phantom
-            .scan::<E>(trace, mmtk.plan.is_current_gc_nursery());
+        self.phantom.scan::<E>(trace, is_nursery_gc(&*mmtk.plan));
     }
 }
 
@@ -250,7 +244,7 @@ impl ReferenceProcessor {
                 debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space());
                 let referent = VM::VMReferenceGlue::get_referent(*reff);
-                if !referent.is_null() {
+                if !VM::VMReferenceGlue::is_referent_cleared(referent) {
                     debug_assert!(
                         referent.is_in_any_space(),
                         "Referent {:?} (of reference {:?}) is not in any space",
@@ -264,7 +258,7 @@ impl ReferenceProcessor {
                 debug_assert!(!reff.is_null());
                 debug_assert!(reff.is_in_any_space());
                 let referent = VM::VMReferenceGlue::get_referent(*reff);
-                debug_assert!(referent.is_null());
+                debug_assert!(VM::VMReferenceGlue::is_referent_cleared(referent));
             });
         }
 
@@ -402,10 +396,10 @@ impl ReferenceProcessor {
 
             // Reference is definitely reachable.  Retain the referent.
             let referent = <E::VM as VMBinding>::VMReferenceGlue::get_referent(*reference);
-            if !referent.is_null() {
+            if !<E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(referent) {
                 Self::keep_referent_alive(trace, referent);
             }
-            trace!(" ~> {:?} (retained)", referent.to_address());
+            trace!(" ~> {:?} (retained)", referent);
         }
 
         debug!("Ending ReferenceProcessor.retain({:?})", self.semantics);
@@ -446,8 +440,8 @@ impl ReferenceProcessor {
         // this does not cause the Reference object to be enqueued. We
         // simply allow the Reference object to fall out of our
         // waiting list.
-        if old_referent.is_null() {
-            trace!(" (null referent) ");
+        if <E::VM as VMBinding>::VMReferenceGlue::is_referent_cleared(old_referent) {
+            trace!(" (cleared referent) ");
             return None;
         }
 

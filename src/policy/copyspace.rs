@@ -1,26 +1,19 @@
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 use crate::policy::copy_context::PolicyCopyContext;
-use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::GCWorkerMutRef;
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::scheduler::GCWorker;
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
 #[cfg(feature = "global_alloc_bit")]
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::heap::HeapMeta;
-use crate::util::heap::VMRequest;
 use crate::util::heap::{MonotonePageResource, PageResource};
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
-use crate::util::metadata::{extract_side_metadata, side_metadata, MetadataSpec};
+use crate::util::metadata::{extract_side_metadata, MetadataSpec};
 use crate::util::object_forwarding;
 use crate::util::{Address, ObjectReference};
 use crate::vm::*;
 use libc::{mprotect, PROT_EXEC, PROT_NONE, PROT_READ, PROT_WRITE};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
 
 /// This type implements a simple copying space.
 pub struct CopySpace<VM: VMBinding> {
@@ -38,6 +31,21 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         !self.is_from_space() || object_forwarding::is_forwarded::<VM>(object)
     }
 
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of CopySpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        panic!("Cannot pin/unpin objects of CopySpace.")
+    }
+
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        false
+    }
+
     fn is_movable(&self) -> bool {
         true
     }
@@ -49,7 +57,7 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
 
     fn initialize_object_metadata(&self, _object: ObjectReference, _alloc: bool) {
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(_object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(_object);
     }
 
     #[inline(always)]
@@ -63,6 +71,12 @@ impl<VM: VMBinding> SFT for CopySpace<VM> {
         } else {
             None
         }
+    }
+
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
 
     #[inline(always)]
@@ -126,48 +140,22 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for CopySpace<
 }
 
 impl<VM: VMBinding> CopySpace<VM> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        from_space: bool,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-    ) -> Self {
-        let local_specs = extract_side_metadata(&[
-            *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
-            *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
-        ]);
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: true,
-                immortal: false,
-                needs_log_bit: false,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: local_specs,
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>, from_space: bool) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(
+            true,
+            false,
+            extract_side_metadata(&[
+                *VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                *VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
+            ]),
+        ));
         CopySpace {
-            pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+            pr: if is_discontiguous {
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(
-                    common.start,
-                    common.extent,
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
             from_space: AtomicBool::new(from_space),
@@ -182,11 +170,8 @@ impl<VM: VMBinding> CopySpace<VM> {
         if let MetadataSpec::OnSide(side_forwarding_status_table) =
             *<VM::VMObjectModel as ObjectModel<VM>>::LOCAL_FORWARDING_BITS_SPEC
         {
-            side_metadata::bzero_metadata(
-                &side_forwarding_status_table,
-                self.common.start,
-                self.pr.cursor() - self.common.start,
-            );
+            side_forwarding_status_table
+                .bzero_metadata(self.common.start, self.pr.cursor() - self.common.start);
         }
     }
 
@@ -241,7 +226,7 @@ impl<VM: VMBinding> CopySpace<VM> {
 
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );

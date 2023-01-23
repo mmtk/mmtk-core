@@ -19,9 +19,6 @@ use std::marker::PhantomData;
 
 pub struct MonotonePageResource<VM: VMBinding> {
     common: CommonPageResource,
-
-    /** Number of pages to reserve at the start of every allocation */
-    meta_data_pages_per_region: usize,
     sync: Mutex<MonotonePageResourceSync>,
     _p: PhantomData<VM>,
 }
@@ -72,14 +69,13 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
         &self,
         space_descriptor: SpaceDescriptor,
         reserved_pages: usize,
-        immut_required_pages: usize,
+        required_pages: usize,
         tls: VMThread,
     ) -> Result<PRAllocResult, PRAllocFail> {
         debug!(
             "In MonotonePageResource, reserved_pages = {}, required_pages = {}",
-            reserved_pages, immut_required_pages
+            reserved_pages, required_pages
         );
-        let mut required_pages = immut_required_pages;
         let mut new_chunk = false;
         let mut sync = self.sync.lock().unwrap();
         let mut rtn = sync.cursor;
@@ -108,17 +104,6 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             );
         }
 
-        if self.meta_data_pages_per_region != 0 {
-            /* adjust allocation for metadata */
-            let region_start = Self::get_region_start(sync.cursor + pages_to_bytes(required_pages));
-            let region_delta = region_start.get_offset(sync.cursor);
-            if region_delta >= 0 {
-                /* start new region, so adjust pages and return address accordingly */
-                required_pages +=
-                    bytes_to_pages(region_delta as usize) + self.meta_data_pages_per_region;
-                rtn = region_start + pages_to_bytes(self.meta_data_pages_per_region);
-            }
-        }
         let bytes = pages_to_bytes(required_pages);
         debug!("bytes={}", bytes);
         let mut tmp = sync.cursor + bytes;
@@ -165,27 +150,14 @@ impl<VM: VMBinding> PageResource<VM> for MonotonePageResource<VM> {
             })
         }
     }
-
-    fn adjust_for_metadata(&self, pages: usize) -> usize {
-        pages
-            + ((pages + PAGES_IN_REGION - 1) >> LOG_PAGES_IN_REGION)
-                * self.meta_data_pages_per_region
-    }
 }
 
 impl<VM: VMBinding> MonotonePageResource<VM> {
-    pub fn new_contiguous(
-        start: Address,
-        bytes: usize,
-        meta_data_pages_per_region: usize,
-        vm_map: &'static VMMap,
-    ) -> Self {
+    pub fn new_contiguous(start: Address, bytes: usize, vm_map: &'static VMMap) -> Self {
         let sentinel = start + bytes;
 
         MonotonePageResource {
             common: CommonPageResource::new(true, cfg!(target_pointer_width = "64"), vm_map),
-
-            meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
                 cursor: start,
                 current_chunk: chunk_align_down(start),
@@ -200,11 +172,9 @@ impl<VM: VMBinding> MonotonePageResource<VM> {
         }
     }
 
-    pub fn new_discontiguous(meta_data_pages_per_region: usize, vm_map: &'static VMMap) -> Self {
+    pub fn new_discontiguous(vm_map: &'static VMMap) -> Self {
         MonotonePageResource {
             common: CommonPageResource::new(false, true, vm_map),
-
-            meta_data_pages_per_region,
             sync: Mutex::new(MonotonePageResourceSync {
                 cursor: unsafe { Address::zero() },
                 current_chunk: unsafe { Address::zero() },

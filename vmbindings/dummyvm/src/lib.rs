@@ -1,19 +1,20 @@
-extern crate mmtk;
 extern crate libc;
+extern crate mmtk;
 #[macro_use]
 extern crate lazy_static;
 
 use mmtk::vm::VMBinding;
-use mmtk::MMTK;
 use mmtk::MMTKBuilder;
+use mmtk::MMTK;
 
-pub mod scanning;
+pub mod active_plan;
+pub mod api;
 pub mod collection;
 pub mod object_model;
-pub mod active_plan;
 pub mod reference_glue;
-pub mod api;
+pub mod scanning;
 
+mod edges;
 #[cfg(test)]
 mod tests;
 
@@ -26,12 +27,11 @@ impl VMBinding for DummyVM {
     type VMCollection = collection::VMCollection;
     type VMActivePlan = active_plan::VMActivePlan;
     type VMReferenceGlue = reference_glue::VMReferenceGlue;
-
-    /// Allowed maximum alignment as shift by min alignment.
-    const MAX_ALIGNMENT_SHIFT: usize = 6_usize - Self::LOG_MIN_ALIGNMENT as usize;
+    type VMEdge = edges::DummyVMEdge;
+    type VMMemorySlice = edges::DummyVMMemorySlice;
 
     /// Allowed maximum alignment in bytes.
-    const MAX_ALIGNMENT: usize = Self::MIN_ALIGNMENT << Self::MAX_ALIGNMENT_SHIFT;
+    const MAX_ALIGNMENT: usize = 1 << 6;
 }
 
 use std::sync::atomic::{AtomicBool, Ordering};

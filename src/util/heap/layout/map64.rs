@@ -7,6 +7,7 @@ use crate::util::heap::layout::heap_parameters::*;
 use crate::util::heap::layout::vm_layout_constants::*;
 use crate::util::heap::space_descriptor::SpaceDescriptor;
 use crate::util::raw_memory_freelist::RawMemoryFreeList;
+use crate::util::rust_util::zeroed_alloc::new_zeroed_vec;
 use crate::util::Address;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -41,7 +42,12 @@ impl Map for Map64 {
         }
 
         Self {
-            descriptor_map: vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS],
+            // Note: descriptor_map is very large. Although it is initialized to
+            // SpaceDescriptor(0), the compiler and the standard library are not smart enough to
+            // elide the storing of 0 for each of the element.  Using standard vector creation,
+            // such as `vec![SpaceDescriptor::UNINITIALIZED; MAX_CHUNKS]`, will cause severe
+            // slowdown during start-up.
+            descriptor_map: unsafe { new_zeroed_vec::<SpaceDescriptor>(MAX_CHUNKS) },
             high_water,
             base_address,
             fl_page_resources: vec![None; MAX_SPACES],
@@ -61,20 +67,19 @@ impl Map for Map64 {
         self_mut.descriptor_map[index] = descriptor;
     }
 
-    fn create_freelist(&self, pr: &CommonFreeListPageResource) -> Box<Self::FreeList> {
+    fn create_freelist(&self, start: Address) -> Box<Self::FreeList> {
         let units = SPACE_SIZE_64 >> LOG_BYTES_IN_PAGE;
-        self.create_parent_freelist(pr, units, units as _)
+        self.create_parent_freelist(start, units, units as _)
     }
 
     fn create_parent_freelist(
         &self,
-        pr: &CommonFreeListPageResource,
+        start: Address,
         mut units: usize,
         grain: i32,
     ) -> Box<Self::FreeList> {
         // This is only called during creating a page resource/space/plan/mmtk instance, which is single threaded.
         let self_mut = unsafe { self.mut_self() };
-        let start = pr.get_start();
         let index = Self::space_index(start).unwrap();
 
         units = (units as f64 * NON_MAP_FRACTION) as _;
@@ -92,11 +97,6 @@ impl Map for Map64 {
             heads,
         ));
 
-        // `CommonFreeListPageResource` lives as a member in space instances.
-        // Since `Space` instances are always stored as global variables, so it is safe here
-        // to turn `&CommonFreeListPageResource` into `&'static CommonFreeListPageResource`
-        self_mut.fl_page_resources[index] =
-            Some(unsafe { &*(pr as *const CommonFreeListPageResource) });
         self_mut.fl_map[index] =
             Some(unsafe { &*(&list as &RawMemoryFreeList as *const RawMemoryFreeList) });
 
@@ -106,6 +106,12 @@ impl Map for Map64 {
         self_mut.high_water[index] = base;
         self_mut.base_address[index] = base;
         list
+    }
+
+    fn bind_freelist(&self, pr: &'static CommonFreeListPageResource) {
+        let index = Self::space_index(pr.get_start()).unwrap();
+        let self_mut = unsafe { self.mut_self() };
+        self_mut.fl_page_resources[index] = Some(pr);
     }
 
     fn allocate_contiguous_chunks(
@@ -200,10 +206,6 @@ impl Map for Map64 {
 
     fn is_finalized(&self) -> bool {
         self.finalized
-    }
-
-    fn get_discontig_freelist_pr_ordinal(&self, _pr: &CommonFreeListPageResource) -> usize {
-        unreachable!()
     }
 
     #[inline]

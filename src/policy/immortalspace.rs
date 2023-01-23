@@ -1,21 +1,15 @@
 use atomic::Ordering;
 
-use crate::policy::space::{CommonSpace, Space, SFT};
+use crate::policy::sft::SFT;
+use crate::policy::space::{CommonSpace, Space};
 use crate::util::address::Address;
-use crate::util::heap::{MonotonePageResource, PageResource, VMRequest};
+use crate::util::heap::{MonotonePageResource, PageResource};
 
-use crate::util::constants::CARD_META_PAGES_PER_REGION;
-use crate::util::metadata::{compare_exchange_metadata, load_metadata, store_metadata};
 use crate::util::{metadata, ObjectReference};
 
 use crate::plan::{ObjectQueue, VectorObjectQueue};
 
-use crate::plan::PlanConstraints;
-use crate::policy::space::SpaceOptions;
-use crate::policy::space::*;
-use crate::util::heap::layout::heap_layout::{Mmapper, VMMap};
-use crate::util::heap::HeapMeta;
-use crate::util::metadata::side_metadata::{SideMetadataContext, SideMetadataSpec};
+use crate::policy::sft::GCWorkerMutRef;
 use crate::vm::{ObjectModel, VMBinding};
 
 /// This type implements a simple immortal collection
@@ -23,13 +17,12 @@ use crate::vm::{ObjectModel, VMBinding};
 /// "collector" to propagate marks in a liveness trace.  It does not
 /// actually collect.
 pub struct ImmortalSpace<VM: VMBinding> {
-    mark_state: usize,
+    mark_state: u8,
     common: CommonSpace<VM>,
     pr: MonotonePageResource<VM>,
 }
 
-const GC_MARK_BIT_MASK: usize = 1;
-const META_DATA_PAGES_PER_REGION: usize = CARD_META_PAGES_PER_REGION;
+const GC_MARK_BIT_MASK: u8 = 1;
 
 impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     fn name(&self) -> &str {
@@ -40,13 +33,24 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
     }
     #[inline(always)]
     fn is_reachable(&self, object: ObjectReference) -> bool {
-        let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         old_value == self.mark_state
+    }
+    #[cfg(feature = "object_pinning")]
+    fn pin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn unpin_object(&self, _object: ObjectReference) -> bool {
+        false
+    }
+    #[cfg(feature = "object_pinning")]
+    fn is_object_pinned(&self, _object: ObjectReference) -> bool {
+        true
     }
     fn is_movable(&self) -> bool {
         false
@@ -56,26 +60,29 @@ impl<VM: VMBinding> SFT for ImmortalSpace<VM> {
         true
     }
     fn initialize_object_metadata(&self, object: ObjectReference, _alloc: bool) {
-        let old_value = load_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
             object,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
         let new_value = (old_value & GC_MARK_BIT_MASK) | self.mark_state;
-        store_metadata::<VM>(
-            &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+        VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(
             object,
             new_value,
             None,
-            Some(Ordering::SeqCst),
+            Ordering::SeqCst,
         );
 
         if self.common.needs_log_bit {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
         #[cfg(feature = "global_alloc_bit")]
-        crate::util::alloc_bit::set_alloc_bit(object);
+        crate::util::alloc_bit::set_alloc_bit::<VM>(object);
+    }
+    #[cfg(feature = "is_mmtk_object")]
+    #[inline(always)]
+    fn is_mmtk_object(&self, addr: Address) -> bool {
+        crate::util::alloc_bit::is_alloced_object::<VM>(addr).is_some()
     }
     #[inline(always)]
     fn sft_trace_object(
@@ -132,73 +139,47 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmortalSp
 }
 
 impl<VM: VMBinding> ImmortalSpace<VM> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        name: &'static str,
-        zeroed: bool,
-        vmrequest: VMRequest,
-        global_side_metadata_specs: Vec<SideMetadataSpec>,
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        heap: &mut HeapMeta,
-        constraints: &'static PlanConstraints,
-    ) -> Self {
-        let common = CommonSpace::new(
-            SpaceOptions {
-                name,
-                movable: false,
-                immortal: true,
-                needs_log_bit: constraints.needs_log_bit,
-                zeroed,
-                vmrequest,
-                side_metadata_specs: SideMetadataContext {
-                    global: global_side_metadata_specs,
-                    local: metadata::extract_side_metadata(&[
-                        *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                    ]),
-                },
-            },
-            vm_map,
-            mmapper,
-            heap,
-        );
+    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+        let vm_map = args.vm_map;
+        let is_discontiguous = args.vmrequest.is_discontiguous();
+        let common = CommonSpace::new(args.into_policy_args(
+            false,
+            true,
+            metadata::extract_side_metadata(&[*VM::VMObjectModel::LOCAL_MARK_BIT_SPEC]),
+        ));
         ImmortalSpace {
             mark_state: 0,
-            pr: if vmrequest.is_discontiguous() {
-                MonotonePageResource::new_discontiguous(META_DATA_PAGES_PER_REGION, vm_map)
+            pr: if is_discontiguous {
+                MonotonePageResource::new_discontiguous(vm_map)
             } else {
-                MonotonePageResource::new_contiguous(
-                    common.start,
-                    common.extent,
-                    META_DATA_PAGES_PER_REGION,
-                    vm_map,
-                )
+                MonotonePageResource::new_contiguous(common.start, common.extent, vm_map)
             },
             common,
         }
     }
 
-    fn test_and_mark(object: ObjectReference, value: usize) -> bool {
+    fn test_and_mark(object: ObjectReference, value: u8) -> bool {
         loop {
-            let old_value = load_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+            let old_value = VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(
                 object,
                 None,
-                Some(Ordering::SeqCst),
+                Ordering::SeqCst,
             );
             if old_value == value {
                 return false;
             }
 
-            if compare_exchange_metadata::<VM>(
-                &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-                object,
-                old_value,
-                old_value ^ GC_MARK_BIT_MASK,
-                None,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC
+                .compare_exchange_metadata::<VM, u8>(
+                    object,
+                    old_value,
+                    old_value ^ GC_MARK_BIT_MASK,
+                    None,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .is_ok()
+            {
                 break;
             }
         }
@@ -218,7 +199,7 @@ impl<VM: VMBinding> ImmortalSpace<VM> {
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
-            crate::util::alloc_bit::is_alloced(object),
+            crate::util::alloc_bit::is_alloced::<VM>(object),
             "{:x}: alloc bit not set",
             object
         );

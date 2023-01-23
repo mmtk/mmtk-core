@@ -2,6 +2,8 @@ use super::gc_work::ImmixGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
+use crate::plan::global::CreateGeneralPlanArgs;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
@@ -11,16 +13,12 @@ use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::heap::HeapMeta;
+use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
-use crate::util::options::Options;
 use crate::vm::VMBinding;
 use crate::{policy::immix::ImmixSpace, util::opaque_pointer::VMWorkerThread};
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use atomic::Ordering;
 use enum_map::EnumMap;
@@ -38,7 +36,7 @@ pub struct Immix<VM: VMBinding> {
 }
 
 pub const IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
+    moves_objects: crate::policy::immix::DEFRAG,
     gc_header_bits: 2,
     gc_header_words: 0,
     num_specialized_scans: 1,
@@ -134,31 +132,19 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 }
 
 impl<VM: VMBinding> Immix<VM> {
-    pub fn new(
-        vm_map: &'static VMMap,
-        mmapper: &'static Mmapper,
-        options: Arc<Options>,
-        scheduler: Arc<GCWorkScheduler<VM>>,
-    ) -> Self {
-        let mut heap = HeapMeta::new(&options);
-        let global_metadata_specs = SideMetadataContext::new_global_specs(&[]);
+    pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let mut plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &IMMIX_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
+        };
         let immix = Immix {
-            immix_space: ImmixSpace::new(
+            immix_space: ImmixSpace::new(plan_args.get_space_args(
                 "immix",
-                vm_map,
-                mmapper,
-                &mut heap,
-                scheduler,
-                global_metadata_specs.clone(),
-            ),
-            common: CommonPlan::new(
-                vm_map,
-                mmapper,
-                options,
-                heap,
-                &IMMIX_CONSTRAINTS,
-                global_metadata_specs,
-            ),
+                true,
+                VMRequest::discontiguous(),
+            )),
+            common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
 

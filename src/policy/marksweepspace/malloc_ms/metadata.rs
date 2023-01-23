@@ -1,11 +1,9 @@
 use crate::util::alloc_bit;
 use crate::util::conversions;
 use crate::util::heap::layout::vm_layout_constants::BYTES_IN_CHUNK;
-use crate::util::metadata::load_metadata;
 use crate::util::metadata::side_metadata;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSpec;
-use crate::util::metadata::store_metadata;
 use crate::util::Address;
 use crate::util::ObjectReference;
 use crate::vm::{ObjectModel, VMBinding};
@@ -50,7 +48,7 @@ pub(crate) const ACTIVE_CHUNK_METADATA_SPEC: SideMetadataSpec =
 // XXX: This metadata spec is currently unused as we need to add a performant way to calculate
 // how many pages are active in this metadata spec. Explore SIMD vectorization with 8-bit integers
 pub(crate) const ACTIVE_PAGE_METADATA_SPEC: SideMetadataSpec =
-    crate::util::metadata::side_metadata::spec_defs::MS_ACTIVE_PAGE;
+    crate::util::metadata::side_metadata::spec_defs::MALLOC_MS_ACTIVE_PAGE;
 
 pub(crate) const OFFSET_MALLOC_METADATA_SPEC: SideMetadataSpec =
     crate::util::metadata::side_metadata::spec_defs::MS_OFFSET_MALLOC;
@@ -155,35 +153,48 @@ pub fn map_meta_space(metadata: &SideMetadataContext, addr: Address, size: usize
 }
 
 /// Check if a given object was allocated by malloc
-pub fn is_alloced_by_malloc(object: ObjectReference) -> bool {
-    has_object_alloced_by_malloc(object.to_address())
+pub fn is_alloced_by_malloc<VM: VMBinding>(object: ObjectReference) -> bool {
+    is_meta_space_mapped_for_address(object.to_address::<VM>())
+        && alloc_bit::is_alloced::<VM>(object)
 }
 
 /// Check if there is an object allocated by malloc at the address.
 ///
 /// This function doesn't check if `addr` is aligned.
 /// If not, it will try to load the alloc bit for the address rounded down to the metadata's granularity.
-pub fn has_object_alloced_by_malloc(addr: Address) -> bool {
-    is_meta_space_mapped_for_address(addr) && alloc_bit::is_alloced_object(addr)
+#[cfg(feature = "is_mmtk_object")]
+pub fn has_object_alloced_by_malloc<VM: VMBinding>(addr: Address) -> Option<ObjectReference> {
+    if !is_meta_space_mapped_for_address(addr) {
+        return None;
+    }
+    alloc_bit::is_alloced_object::<VM>(addr)
 }
 
-pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) -> bool {
-    load_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        None,
-        ordering,
-    ) == 1
+pub fn is_marked<VM: VMBinding>(object: ObjectReference, ordering: Ordering) -> bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load_atomic::<VM, u8>(object, None, ordering) == 1
+}
+
+pub unsafe fn is_marked_unsafe<VM: VMBinding>(object: ObjectReference) -> bool {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.load::<VM, u8>(object, None) == 1
+}
+
+/// Set the page mark from 0 to 1. Return true if we set it successfully in this call.
+pub(super) fn compare_exchange_set_page_mark(page_addr: Address) -> bool {
+    // The spec has 1 byte per each page. So it won't be the case that other threads may race and access other bits for the spec.
+    // If the compare-exchange fails, we know the byte was set to 1 before this call.
+    ACTIVE_PAGE_METADATA_SPEC
+        .compare_exchange_atomic::<u8>(page_addr, 0, 1, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
 }
 
 #[allow(unused)]
 pub(super) fn is_page_marked(page_addr: Address) -> bool {
-    side_metadata::load_atomic(&ACTIVE_PAGE_METADATA_SPEC, page_addr, Ordering::SeqCst) == 1
+    ACTIVE_PAGE_METADATA_SPEC.load_atomic::<u8>(page_addr, Ordering::SeqCst) == 1
 }
 
 #[allow(unused)]
 pub(super) unsafe fn is_page_marked_unsafe(page_addr: Address) -> bool {
-    side_metadata::load(&ACTIVE_PAGE_METADATA_SPEC, page_addr) == 1
+    ACTIVE_PAGE_METADATA_SPEC.load::<u8>(page_addr) == 1
 }
 
 pub fn is_chunk_mapped(chunk_start: Address) -> bool {
@@ -200,78 +211,66 @@ pub fn is_chunk_mapped(chunk_start: Address) -> bool {
 }
 
 pub fn is_chunk_marked(chunk_start: Address) -> bool {
-    side_metadata::load_atomic(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, Ordering::SeqCst) == 1
+    ACTIVE_CHUNK_METADATA_SPEC.load_atomic::<u8>(chunk_start, Ordering::SeqCst) == 1
 }
 
 pub unsafe fn is_chunk_marked_unsafe(chunk_start: Address) -> bool {
-    side_metadata::load(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start) == 1
+    ACTIVE_CHUNK_METADATA_SPEC.load::<u8>(chunk_start) == 1
 }
 
-pub fn set_alloc_bit(object: ObjectReference) {
-    alloc_bit::set_alloc_bit(object);
+pub fn set_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::set_alloc_bit::<VM>(object);
 }
 
-pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        1,
-        None,
-        ordering,
-    );
+pub fn set_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Ordering) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store_atomic::<VM, u8>(object, 1, None, ordering);
 }
 
 #[allow(unused)]
-pub fn unset_alloc_bit(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit(object);
+pub fn unset_alloc_bit<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit::<VM>(object);
 }
 
+#[allow(unused)]
 pub(super) fn set_page_mark(page_addr: Address) {
-    side_metadata::store_atomic(&ACTIVE_PAGE_METADATA_SPEC, page_addr, 1, Ordering::SeqCst);
+    ACTIVE_PAGE_METADATA_SPEC.store_atomic::<u8>(page_addr, 1, Ordering::SeqCst);
 }
 
 pub(super) fn set_chunk_mark(chunk_start: Address) {
-    side_metadata::store_atomic(
-        &ACTIVE_CHUNK_METADATA_SPEC,
-        chunk_start,
-        1,
-        Ordering::SeqCst,
-    );
+    ACTIVE_CHUNK_METADATA_SPEC.store_atomic::<u8>(chunk_start, 1, Ordering::SeqCst);
 }
 
+/// Is this allocation an offset malloc? The argument address should be the allocation address (object start)
 pub(super) fn is_offset_malloc(address: Address) -> bool {
-    unsafe { side_metadata::load(&OFFSET_MALLOC_METADATA_SPEC, address) == 1 }
+    unsafe { OFFSET_MALLOC_METADATA_SPEC.load::<u8>(address) == 1 }
 }
 
+/// Set the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) fn set_offset_malloc_bit(address: Address) {
-    side_metadata::store_atomic(&OFFSET_MALLOC_METADATA_SPEC, address, 1, Ordering::SeqCst);
+    OFFSET_MALLOC_METADATA_SPEC.store_atomic::<u8>(address, 1, Ordering::SeqCst);
 }
 
+/// Unset the offset bit for the allocation. The argument address should be the allocation address (object start)
 pub(super) unsafe fn unset_offset_malloc_bit_unsafe(address: Address) {
-    side_metadata::store(&OFFSET_MALLOC_METADATA_SPEC, address, 0);
+    OFFSET_MALLOC_METADATA_SPEC.store::<u8>(address, 0);
 }
 
-pub unsafe fn unset_alloc_bit_unsafe(object: ObjectReference) {
-    alloc_bit::unset_alloc_bit_unsafe(object);
+pub unsafe fn unset_alloc_bit_unsafe<VM: VMBinding>(object: ObjectReference) {
+    alloc_bit::unset_alloc_bit_unsafe::<VM>(object);
 }
 
 #[allow(unused)]
-pub fn unset_mark_bit<VM: VMBinding>(object: ObjectReference, ordering: Option<Ordering>) {
-    store_metadata::<VM>(
-        &VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
-        object,
-        0,
-        None,
-        ordering,
-    );
+pub unsafe fn unset_mark_bit<VM: VMBinding>(object: ObjectReference) {
+    VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.store::<VM, u8>(object, 0, None);
 }
 
+#[allow(unused)]
 pub(super) unsafe fn unset_page_mark_unsafe(page_addr: Address) {
-    side_metadata::store(&ACTIVE_PAGE_METADATA_SPEC, page_addr, 0);
+    ACTIVE_PAGE_METADATA_SPEC.store::<u8>(page_addr, 0)
 }
 
 pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
-    side_metadata::store(&ACTIVE_CHUNK_METADATA_SPEC, chunk_start, 0);
+    ACTIVE_CHUNK_METADATA_SPEC.store::<u8>(chunk_start, 0)
 }
 
 /// Load u128 bits of side metadata
@@ -280,9 +279,9 @@ pub(super) unsafe fn unset_chunk_mark_unsafe(chunk_start: Address) {
 /// unsafe as it can segfault if one tries to read outside the bounds of the mapped side metadata
 pub(super) unsafe fn load128(metadata_spec: &SideMetadataSpec, data_addr: Address) -> u128 {
     let meta_addr = side_metadata::address_to_meta_address(metadata_spec, data_addr);
-    if cfg!(debug_assertions) {
-        side_metadata::ensure_metadata_is_mapped(metadata_spec, data_addr);
-    }
+
+    #[cfg(debug_assertions)]
+    metadata_spec.assert_metadata_mapped(data_addr);
 
     meta_addr.load::<u128>() as u128
 }

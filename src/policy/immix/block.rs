@@ -1,13 +1,13 @@
-use super::chunk::Chunk;
 use super::defrag::Histogram;
 use super::line::Line;
 use super::ImmixSpace;
 use crate::util::constants::*;
+use crate::util::heap::blockpageresource::BlockPool;
+use crate::util::heap::chunk_map::Chunk;
 use crate::util::linear_scan::{Region, RegionIterator};
-use crate::util::metadata::side_metadata::{self, *};
+use crate::util::metadata::side_metadata::{MetadataByteArrayRef, SideMetadataSpec};
 use crate::util::Address;
 use crate::vm::*;
-use spin::{Mutex, MutexGuard};
 use std::sync::atomic::Ordering;
 
 /// The block allocation state.
@@ -64,27 +64,26 @@ impl BlockState {
 }
 
 /// Data structure to reference an immix block.
-#[repr(C)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
 pub struct Block(Address);
 
-impl From<Address> for Block {
+impl Region for Block {
+    #[cfg(not(feature = "immix_smaller_block"))]
+    const LOG_BYTES: usize = 15;
+    #[cfg(feature = "immix_smaller_block")]
+    const LOG_BYTES: usize = 13;
+
     #[inline(always)]
-    fn from(address: Address) -> Block {
+    fn from_aligned_address(address: Address) -> Self {
         debug_assert!(address.is_aligned_to(Self::BYTES));
         Self(address)
     }
-}
 
-impl From<Block> for Address {
     #[inline(always)]
-    fn from(block: Block) -> Address {
-        block.0
+    fn start(&self) -> Address {
+        self.0
     }
-}
-
-impl Region for Block {
-    const LOG_BYTES: usize = 15;
 }
 
 impl Block {
@@ -108,7 +107,7 @@ impl Block {
     /// Get the chunk containing the block.
     #[inline(always)]
     pub fn chunk(&self) -> Chunk {
-        Chunk::from(Chunk::align(self.0))
+        Chunk::from_unaligned_address(self.0)
     }
 
     /// Get the address range of the block's line mark table.
@@ -122,16 +121,15 @@ impl Block {
     /// Get block mark state.
     #[inline(always)]
     pub fn get_state(&self) -> BlockState {
-        let byte =
-            side_metadata::load_atomic(&Self::MARK_TABLE, self.start(), Ordering::SeqCst) as u8;
+        let byte = Self::MARK_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         byte.into()
     }
 
     /// Set block mark state.
     #[inline(always)]
     pub fn set_state(&self, state: BlockState) {
-        let state = u8::from(state) as usize;
-        side_metadata::store_atomic(&Self::MARK_TABLE, self.start(), state, Ordering::SeqCst);
+        let state = u8::from(state);
+        Self::MARK_TABLE.store_atomic::<u8>(self.start(), state, Ordering::SeqCst);
     }
 
     // Defrag byte
@@ -141,9 +139,7 @@ impl Block {
     /// Test if the block is marked for defragmentation.
     #[inline(always)]
     pub fn is_defrag_source(&self) -> bool {
-        let byte =
-            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
-                as u8;
+        let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         debug_assert!(byte == 0 || byte == Self::DEFRAG_SOURCE_STATE);
         byte == Self::DEFRAG_SOURCE_STATE
     }
@@ -152,31 +148,19 @@ impl Block {
     #[inline(always)]
     pub fn set_as_defrag_source(&self, defrag: bool) {
         let byte = if defrag { Self::DEFRAG_SOURCE_STATE } else { 0 };
-        side_metadata::store_atomic(
-            &Self::DEFRAG_STATE_TABLE,
-            self.start(),
-            byte as usize,
-            Ordering::SeqCst,
-        );
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), byte, Ordering::SeqCst);
     }
 
     /// Record the number of holes in the block.
     #[inline(always)]
     pub fn set_holes(&self, holes: usize) {
-        side_metadata::store_atomic(
-            &Self::DEFRAG_STATE_TABLE,
-            self.start(),
-            holes,
-            Ordering::SeqCst,
-        );
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), holes as u8, Ordering::SeqCst);
     }
 
     /// Get the number of holes.
     #[inline(always)]
     pub fn get_holes(&self) -> usize {
-        let byte =
-            side_metadata::load_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), Ordering::SeqCst)
-                as u8;
+        let byte = Self::DEFRAG_STATE_TABLE.load_atomic::<u8>(self.start(), Ordering::SeqCst);
         debug_assert_ne!(byte, Self::DEFRAG_SOURCE_STATE);
         byte as usize
     }
@@ -189,7 +173,7 @@ impl Block {
         } else {
             BlockState::Unmarked
         });
-        side_metadata::store_atomic(&Self::DEFRAG_STATE_TABLE, self.start(), 0, Ordering::SeqCst);
+        Self::DEFRAG_STATE_TABLE.store_atomic::<u8>(self.start(), 0, Ordering::SeqCst);
     }
 
     /// Deinitalize a block before releasing.
@@ -202,12 +186,12 @@ impl Block {
 
     #[inline(always)]
     pub fn start_line(&self) -> Line {
-        Line::from(self.start())
+        Line::from_aligned_address(self.start())
     }
 
     #[inline(always)]
     pub fn end_line(&self) -> Line {
-        Line::from(self.end())
+        Line::from_aligned_address(self.end())
     }
 
     /// Get the range of lines within the block.
@@ -256,6 +240,10 @@ impl Block {
                     if prev_line_is_marked {
                         holes += 1;
                     }
+
+                    #[cfg(feature = "immix_zero_on_release")]
+                    crate::util::memory::zero(line.start(), Line::BYTES);
+
                     prev_line_is_marked = false;
                 }
             }
@@ -287,39 +275,51 @@ impl Block {
 }
 
 /// A non-block single-linked list to store blocks.
-#[derive(Default)]
-pub struct BlockList {
-    queue: Mutex<Vec<Block>>,
+pub struct ReusableBlockPool {
+    queue: BlockPool<Block>,
+    num_workers: usize,
 }
 
-impl BlockList {
+impl ReusableBlockPool {
+    /// Create empty block list
+    pub fn new(num_workers: usize) -> Self {
+        Self {
+            queue: BlockPool::new(num_workers),
+            num_workers,
+        }
+    }
+
     /// Get number of blocks in this list.
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.queue.lock().len()
+        self.queue.len()
     }
 
     /// Add a block to the list.
-    #[inline]
+    #[inline(always)]
     pub fn push(&self, block: Block) {
-        self.queue.lock().push(block)
+        self.queue.push(block)
     }
 
     /// Pop a block out of the list.
-    #[inline]
+    #[inline(always)]
     pub fn pop(&self) -> Option<Block> {
-        self.queue.lock().pop()
+        self.queue.pop()
     }
 
     /// Clear the list.
-    #[inline]
-    pub fn reset(&self) {
-        *self.queue.lock() = Vec::new()
+    pub fn reset(&mut self) {
+        self.queue = BlockPool::new(self.num_workers);
     }
 
-    /// Get an array of all reusable blocks stored in this BlockList.
+    /// Iterate all the blocks in the queue. Call the visitor for each reported block.
     #[inline]
-    pub fn get_blocks(&self) -> MutexGuard<Vec<Block>> {
-        self.queue.lock()
+    pub fn iterate_blocks(&self, mut f: impl FnMut(Block)) {
+        self.queue.iterate_blocks(&mut f);
+    }
+
+    /// Flush the block queue
+    pub fn flush_all(&self) {
+        self.queue.flush_all();
     }
 }

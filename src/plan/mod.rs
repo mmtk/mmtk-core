@@ -14,9 +14,7 @@
 //! For more about implementing a plan, it is recommended to read the [MMTk tutorial](/docs/tutorial/Tutorial.md).
 
 mod barriers;
-pub use barriers::Barrier;
 pub use barriers::BarrierSelector;
-pub use barriers::BarrierWriteTarget;
 
 pub(crate) mod gc_requester;
 
@@ -38,7 +36,7 @@ pub use plan_constraints::PlanConstraints;
 pub use plan_constraints::DEFAULT_PLAN_CONSTRAINTS;
 
 mod tracing;
-pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue};
+pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};
 
 mod generational;
 mod immix;
@@ -47,6 +45,9 @@ mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
+
+pub(crate) use generational::global::is_nursery_gc;
+pub(crate) use generational::global::GenerationalPlan;
 
 // Expose plan constraints as public. Though a binding can get them from plan.constraints(),
 // it is possible for performance reasons that they want the constraints as constants.

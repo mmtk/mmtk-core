@@ -1,6 +1,6 @@
 [package]
 name = "mmtk"
-version = "0.14.0"
+version = "0.16.0"
 authors = ["The MMTk Developers <>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -20,12 +20,11 @@ doctest = false
 
 [dependencies]
 # MMTk macros
-mmtk-macros = { version = "0.14.0", path = "macros/" }
+mmtk-macros = { version = "0.16.0", path = "macros/" }
 
 libc = "0.2"
 jemalloc-sys = { version = "0.3.2", features = ["disable_initial_exec_tls"], optional = true }
 mimalloc-sys = { version = "0.1.6", optional = true }
-hoard-sys = { version = "0.1.2", optional = true }
 lazy_static = "1.1"
 log = { version = "0.4", features = ["max_level_trace", "release_max_level_off"] }
 crossbeam = "0.8.1"
@@ -33,16 +32,22 @@ num_cpus = "1.8"
 enum-map = "=2.1"
 downcast-rs = "1.1.1"
 atomic-traits = "0.2.0"
-atomic = "0.4.6"
+atomic = "0.5.1"
+num-traits = "0.2"
 spin = "0.5.2"
 env_logger = "0.8.2"
 pfm = { version = "0.1.0-beta.1", optional = true }
 atomic_refcell = "0.1.7"
 strum = "0.24"
 strum_macros = "0.24"
+cfg-if = "1.0"
+itertools = "0.10.5"
+sys-info = "0.9"
+regex = "1.7.0"
 
 [dev-dependencies]
 rand = "0.7.3"
+paste = "1.0.8"
 
 [build-dependencies]
 built = { version = "0.5.1", features = ["git2"] }
@@ -81,6 +86,18 @@ global_alloc_bit = []
 # conservative garbage collection support
 is_mmtk_object = ["global_alloc_bit"]
 
+# Enable object pinning, in particular, enable pinning/unpinning, and its metadata
+object_pinning = []
+
+# The following two features are useful for using Immix for VMs that do not support moving GC.
+
+# Disable defragmentation for ImmixSpace.  This makes Immix a non-moving plan.
+immix_no_defrag = []
+# Reduce block size for ImmixSpace.  This mitigates fragmentation when defrag is disabled.
+immix_smaller_block = []
+# Zero the unmarked lines after a GC cycle in immix. This helps debug untraced objects.
+immix_zero_on_release = []
+
 # Run sanity GC
 sanity = []
 # Run analysis
@@ -116,5 +133,18 @@ malloc_counted_size = []
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
 
+# Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
+# is not compiled in default builds.
+malloc_native_mimalloc = []
+
 # If there are more groups, they should be inserted above this line
+# Group:end
+
+# Group:marksweepallocation
+# default is native allocator with lazy sweeping
+eager_sweeping = []
+# Use library malloc as the freelist allocator for mark sweep. This will makes mark sweep slower. As malloc may return addresses outside our
+# normal heap range, we will have to use chunk-based SFT table. Turning on this feature will use a different SFT map implementation on 64bits,
+# and will affect all the plans in the build. Please be aware of the consequence, and this is only meant to be experimental use.
+malloc_mark_sweep = []
 # Group:end

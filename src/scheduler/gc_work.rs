@@ -3,13 +3,12 @@ use super::*;
 use crate::plan::GcStatus;
 use crate::plan::ObjectsClosure;
 use crate::plan::VectorObjectQueue;
-use crate::util::metadata::*;
 use crate::util::*;
+use crate::vm::edge_shape::Edge;
 use crate::vm::*;
 use crate::*;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::Ordering;
 
 pub struct ScheduleCollection;
 
@@ -109,7 +108,9 @@ impl<C: GCWorkContext> Release<C> {
 impl<C: GCWorkContext + 'static> GCWork<C::VM> for Release<C> {
     fn do_work(&mut self, worker: &mut GCWorker<C::VM>, mmtk: &'static MMTK<C::VM>) {
         trace!("Release Global");
-        <C::VM as VMBinding>::VMCollection::vm_release();
+
+        self.plan.base().gc_trigger.policy.on_gc_release(mmtk);
+
         // We assume this is the only running work packet that accesses plan at the point of execution
         #[allow(clippy::cast_ref_to_mut)]
         let plan_mut: &mut C::PlanType = unsafe { &mut *(self.plan as *const _ as *mut _) };
@@ -224,10 +225,15 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
     fn do_work(&mut self, worker: &mut GCWorker<VM>, mmtk: &'static MMTK<VM>) {
         info!("End of GC");
 
+        // We assume this is the only running work packet that accesses plan at the point of execution
+        #[allow(clippy::cast_ref_to_mut)]
+        let plan_mut: &mut dyn Plan<VM = VM> = unsafe { &mut *(&*mmtk.plan as *const _ as *mut _) };
+        plan_mut.end_of_gc(worker.tls);
+
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             // reset the logging info at the end of each GC
-            crate::util::edge_logger::reset();
+            mmtk.edge_logger.reset();
         }
 
         if <VM as VMBinding>::VMCollection::COORDINATOR_ONLY_STW {
@@ -246,24 +252,190 @@ impl<VM: VMBinding> GCWork<VM> for EndOfGC {
 
 impl<VM: VMBinding> CoordinatorWork<VM> for EndOfGC {}
 
-/// Delegate to the VM binding for reference processing.
+/// This implements `ObjectTracer` by forwarding the `trace_object` calls to the wrapped
+/// `ProcessEdgesWork` instance.
+struct ProcessEdgesWorkTracer<E: ProcessEdgesWork> {
+    process_edges_work: E,
+    stage: WorkBucketStage,
+}
+
+impl<E: ProcessEdgesWork> ObjectTracer for ProcessEdgesWorkTracer<E> {
+    /// Forward the `trace_object` call to the underlying `ProcessEdgesWork`,
+    /// and flush as soon as the underlying buffer of `process_edges_work` is full.
+    ///
+    /// This function is inlined because `trace_object` is probably the hottest function in MMTk.
+    /// If this function is called in small closures, please profile the program and make sure the
+    /// closure is inlined, too.
+    #[inline(always)]
+    fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
+        let result = self.process_edges_work.trace_object(object);
+        self.flush_if_full();
+        result
+    }
+}
+
+impl<E: ProcessEdgesWork> ProcessEdgesWorkTracer<E> {
+    #[inline(always)]
+    fn flush_if_full(&mut self) {
+        if self.process_edges_work.nodes.is_full() {
+            self.flush();
+        }
+    }
+
+    pub fn flush_if_not_empty(&mut self) {
+        if !self.process_edges_work.nodes.is_empty() {
+            self.flush();
+        }
+    }
+
+    #[cold]
+    fn flush(&mut self) {
+        let next_nodes = self.process_edges_work.pop_nodes();
+        assert!(!next_nodes.is_empty());
+        let work_packet = self.process_edges_work.create_scan_work(next_nodes, false);
+        let worker = self.process_edges_work.worker();
+        worker.scheduler().work_buckets[self.stage].add(work_packet);
+    }
+}
+
+/// This type implements `ObjectTracerContext` by creating a temporary `ProcessEdgesWork` during
+/// the call to `with_tracer`, making use of its `trace_object` method.  It then creates work
+/// packets using the methods of the `ProcessEdgesWork` and add the work packet into the given
+/// `stage`.
+struct ProcessEdgesWorkTracerContext<E: ProcessEdgesWork> {
+    stage: WorkBucketStage,
+    phantom_data: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork> Clone for ProcessEdgesWorkTracerContext<E> {
+    fn clone(&self) -> Self {
+        Self { ..*self }
+    }
+}
+
+impl<E: ProcessEdgesWork> ObjectTracerContext<E::VM> for ProcessEdgesWorkTracerContext<E> {
+    type TracerType = ProcessEdgesWorkTracer<E>;
+
+    fn with_tracer<R, F>(&self, worker: &mut GCWorker<E::VM>, func: F) -> R
+    where
+        F: FnOnce(&mut Self::TracerType) -> R,
+    {
+        let mmtk = worker.mmtk;
+
+        // Prepare the underlying ProcessEdgesWork
+        let mut process_edges_work = E::new(vec![], false, mmtk);
+        // FIXME: This line allows us to omit the borrowing lifetime of worker.
+        // We should refactor ProcessEdgesWork so that it uses `worker` locally, not as a member.
+        process_edges_work.set_worker(worker);
+
+        // Cretae the tracer.
+        let mut tracer = ProcessEdgesWorkTracer {
+            process_edges_work,
+            stage: self.stage,
+        };
+
+        // The caller can use the tracer here.
+        let result = func(&mut tracer);
+
+        // Flush the queued nodes.
+        tracer.flush_if_not_empty();
+
+        result
+    }
+}
+
+/// Delegate to the VM binding for weak reference processing.
 ///
 /// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
 /// processing of those weakrefs may be more complex. For such case, we delegate to the
 /// VM binding to process weak references.
-#[derive(Default)]
-pub struct VMProcessWeakRefs<E: ProcessEdgesWork>(PhantomData<E>);
+///
+/// NOTE: This will replace `{Soft,Weak,Phantom}RefProcessing` and `Finalization` in the future.
+pub struct VMProcessWeakRefs<E: ProcessEdgesWork> {
+    phantom_data: PhantomData<E>,
+}
 
 impl<E: ProcessEdgesWork> VMProcessWeakRefs<E> {
     pub fn new() -> Self {
-        Self(PhantomData)
+        Self {
+            phantom_data: PhantomData,
+        }
     }
 }
 
 impl<E: ProcessEdgesWork> GCWork<E::VM> for VMProcessWeakRefs<E> {
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
-        trace!("ProcessWeakRefs");
-        <E::VM as VMBinding>::VMCollection::process_weak_refs(worker); // TODO: Pass a factory/callback to decide what work packet to create.
+        trace!("VMProcessWeakRefs");
+
+        let stage = WorkBucketStage::VMRefClosure;
+
+        let need_to_repeat = {
+            let tracer_factory = ProcessEdgesWorkTracerContext::<E> {
+                stage,
+                phantom_data: PhantomData,
+            };
+            <E::VM as VMBinding>::VMScanning::process_weak_refs(worker, tracer_factory)
+        };
+
+        if need_to_repeat {
+            // Schedule Self as the new sentinel so we'll call `process_weak_refs` again after the
+            // current transitive closure.
+            let new_self = Box::new(Self::new());
+
+            worker.scheduler().work_buckets[stage].set_sentinel(new_self);
+        }
+    }
+}
+
+/// Delegate to the VM binding for forwarding weak references.
+///
+/// Some VMs (e.g. v8) do not have a Java-like global weak reference storage, and the
+/// processing of those weakrefs may be more complex. For such case, we delegate to the
+/// VM binding to process weak references.
+///
+/// NOTE: This will replace `RefForwarding` and `ForwardFinalization` in the future.
+pub struct VMForwardWeakRefs<E: ProcessEdgesWork> {
+    phantom_data: PhantomData<E>,
+}
+
+impl<E: ProcessEdgesWork> VMForwardWeakRefs<E> {
+    pub fn new() -> Self {
+        Self {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<E: ProcessEdgesWork> GCWork<E::VM> for VMForwardWeakRefs<E> {
+    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, _mmtk: &'static MMTK<E::VM>) {
+        trace!("VMForwardWeakRefs");
+
+        let stage = WorkBucketStage::VMRefForwarding;
+
+        let tracer_factory = ProcessEdgesWorkTracerContext::<E> {
+            stage,
+            phantom_data: PhantomData,
+        };
+        <E::VM as VMBinding>::VMScanning::forward_weak_refs(worker, tracer_factory)
+    }
+}
+
+/// This work packet calls `Collection::post_forwarding`.
+///
+/// NOTE: This will replace `RefEnqueue` in the future.
+///
+/// NOTE: Although this work packet runs in parallel with the `Release` work packet, it does not
+/// access the `Plan` instance.
+#[derive(Default)]
+pub struct VMPostForwarding<VM: VMBinding> {
+    phantom_data: PhantomData<VM>,
+}
+
+impl<VM: VMBinding> GCWork<VM> for VMPostForwarding<VM> {
+    fn do_work(&mut self, worker: &mut GCWorker<VM>, _mmtk: &'static MMTK<VM>) {
+        trace!("VMPostForwarding start");
+        <VM as VMBinding>::VMCollection::post_forwarding(worker.tls);
+        trace!("VMPostForwarding end");
     }
 }
 
@@ -331,7 +503,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanVMSpecificRoots<E> {
 }
 
 pub struct ProcessEdgesBase<VM: VMBinding> {
-    pub edges: Vec<Address>,
+    pub edges: Vec<VM::VMEdge>,
     pub nodes: VectorObjectQueue,
     mmtk: &'static MMTK<VM>,
     // Use raw pointer for fast pointer dereferencing, instead of using `Option<&'static mut GCWorker<E::VM>>`.
@@ -345,12 +517,12 @@ unsafe impl<VM: VMBinding> Send for ProcessEdgesBase<VM> {}
 impl<VM: VMBinding> ProcessEdgesBase<VM> {
     // Requires an MMTk reference. Each plan-specific type that uses ProcessEdgesBase can get a static plan reference
     // at creation. This avoids overhead for dynamic dispatch or downcasting plan for each object traced.
-    pub fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    pub fn new(edges: Vec<VM::VMEdge>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         #[cfg(feature = "extreme_assertions")]
         if crate::util::edge_logger::should_check_duplicate_edges(&*mmtk.plan) {
             for edge in &edges {
                 // log edge, panic if already logged
-                crate::util::edge_logger::log_edge(*edge);
+                mmtk.edge_logger.log_edge(*edge);
             }
         }
         Self {
@@ -379,14 +551,12 @@ impl<VM: VMBinding> ProcessEdgesBase<VM> {
     /// Pop all nodes from nodes, and clear nodes to an empty vector.
     #[inline]
     pub fn pop_nodes(&mut self) -> Vec<ObjectReference> {
-        debug_assert!(
-            !self.nodes.is_empty(),
-            "Attempted to flush nodes in ProcessEdgesWork while nodes set is empty."
-        );
-
         self.nodes.take()
     }
 }
+
+/// A short-hand for `<E::VM as VMBinding>::VMEdge`.
+pub type EdgeOf<E> = <<E as ProcessEdgesWork>::VM as VMBinding>::VMEdge;
 
 /// Scan & update a list of object slots
 //
@@ -407,7 +577,8 @@ pub trait ProcessEdgesWork:
     const CAPACITY: usize = 4096;
     const OVERWRITE_REFERENCE: bool = true;
     const SCAN_OBJECTS_IMMEDIATELY: bool = true;
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
+
+    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<Self::VM>) -> Self;
 
     /// Trace an MMTk object. The implementation should forward this call to the policy-specific
     /// `trace_object()` methods, depending on which space this object is in.
@@ -455,19 +626,18 @@ pub trait ProcessEdgesWork:
     /// this method will simply return with no work packet created.
     #[cold]
     fn flush(&mut self) {
-        if self.nodes.is_empty() {
-            return;
-        }
         let nodes = self.pop_nodes();
-        self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+        if !nodes.is_empty() {
+            self.start_or_dispatch_scan_work(self.create_scan_work(nodes, false));
+        }
     }
 
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
+    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+        let object = slot.load();
         let new_object = self.trace_object(object);
         if Self::OVERWRITE_REFERENCE {
-            unsafe { slot.store(new_object) };
+            slot.store(new_object);
         }
     }
 
@@ -511,28 +681,24 @@ impl<VM: VMBinding> ProcessEdgesWork for SFTProcessEdges<VM> {
     type VM = VM;
     type ScanObjectsWorkType = ScanObjects<Self>;
 
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         Self { base }
     }
 
     #[inline]
     fn trace_object(&mut self, object: ObjectReference) -> ObjectReference {
-        use crate::policy::space::*;
+        use crate::policy::sft::GCWorkerMutRef;
 
         if object.is_null() {
             return object;
         }
 
-        // Make sure we have valid SFT entries for the object.
-        #[cfg(debug_assertions)]
-        crate::mmtk::SFT_MAP.assert_valid_entries_for_object::<VM>(object);
-
         // Erase <VM> type parameter
         let worker = GCWorkerMutRef::new(self.worker());
 
         // Invoke trace object on sft
-        let sft = crate::mmtk::SFT_MAP.get(object.to_address());
+        let sft = unsafe { crate::mmtk::SFT_MAP.get_unchecked(object.to_address::<VM>()) };
         sft.sft_trace_object(&mut self.base.nodes, object, worker)
     }
 
@@ -552,8 +718,8 @@ impl<E: ProcessEdgesWork> Clone for ProcessEdgesWorkRootsWorkFactory<E> {
     }
 }
 
-impl<E: ProcessEdgesWork> RootsWorkFactory for ProcessEdgesWorkRootsWorkFactory<E> {
-    fn create_process_edge_roots_work(&mut self, edges: Vec<Address>) {
+impl<E: ProcessEdgesWork> RootsWorkFactory<EdgeOf<E>> for ProcessEdgesWorkRootsWorkFactory<E> {
+    fn create_process_edge_roots_work(&mut self, edges: Vec<EdgeOf<E>>) {
         crate::memory_manager::add_work_packet(
             self.mmtk,
             WorkBucketStage::Closure,
@@ -678,38 +844,22 @@ pub trait ScanObjectsWork<VM: VMBinding>: GCWork<VM> + Sized {
 
         // If any object does not support edge-enqueuing, we process them now.
         if !scan_later.is_empty() {
-            // We create an instance of E to use its `trace_object` method and its object queue.
-            let mut process_edges_work = Self::E::new(vec![], false, mmtk);
-            let mut closure = |object| process_edges_work.trace_object(object);
+            let object_tracer_context = ProcessEdgesWorkTracerContext::<Self::E> {
+                stage: WorkBucketStage::Closure,
+                phantom_data: PhantomData,
+            };
 
-            // Scan objects and trace their edges at the same time.
-            for object in scan_later.iter().copied() {
-                <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
-                    tls,
-                    object,
-                    &mut closure,
-                );
-                self.post_scan_object(object);
-            }
-
-            // Create work packets to scan adjacent objects.  We skip ProcessEdgesWork and create
-            // object-scanning packets directly, because the edges are already traced.
-            if !process_edges_work.nodes.is_empty() {
-                let next_nodes = process_edges_work.nodes.take();
-                let make_packet = |nodes| {
-                    let work_packet = self.make_another(nodes);
-                    memory_manager::add_work_packet(mmtk, WorkBucketStage::Closure, work_packet);
-                };
-
-                // Divide the resulting nodes into appropriately sized packets.
-                if next_nodes.len() <= Self::E::CAPACITY {
-                    make_packet(next_nodes);
-                } else {
-                    for chunk in next_nodes.chunks(Self::E::CAPACITY) {
-                        make_packet(chunk.into());
-                    }
+            object_tracer_context.with_tracer(worker, |object_tracer| {
+                // Scan objects and trace their edges at the same time.
+                for object in scan_later.iter().copied() {
+                    <VM as VMBinding>::VMScanning::scan_object_and_trace_edges(
+                        tls,
+                        object,
+                        object_tracer,
+                    );
+                    self.post_scan_object(object);
                 }
-            }
+            });
         }
     }
 }
@@ -765,52 +915,12 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ScanObjects<E> {
     }
 }
 
-pub struct ProcessModBuf<E: ProcessEdgesWork> {
-    modbuf: Vec<ObjectReference>,
-    phantom: PhantomData<E>,
-    meta: MetadataSpec,
-}
-
-impl<E: ProcessEdgesWork> ProcessModBuf<E> {
-    pub fn new(modbuf: Vec<ObjectReference>, meta: MetadataSpec) -> Self {
-        Self {
-            modbuf,
-            meta,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
-    #[inline(always)]
-    fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
-        if !self.modbuf.is_empty() {
-            for obj in &self.modbuf {
-                store_metadata::<E::VM>(&self.meta, *obj, 1, None, Some(Ordering::SeqCst));
-            }
-        }
-        if mmtk.plan.is_current_gc_nursery() {
-            if !self.modbuf.is_empty() {
-                let mut modbuf = vec![];
-                ::std::mem::swap(&mut modbuf, &mut self.modbuf);
-                GCWork::do_work(
-                    &mut ScanObjects::<E>::new(modbuf, false, false),
-                    worker,
-                    mmtk,
-                )
-            }
-        } else {
-            // Do nothing
-        }
-    }
-}
-
 use crate::mmtk::MMTK;
 use crate::plan::Plan;
 use crate::plan::PlanTraceObject;
 use crate::policy::gc_work::TraceKind;
 
-/// This provides an implementation of [`ProcessEdgesWork`](scheduler/gc_work/ProcessEdgesWork). A plan that implements
+/// This provides an implementation of [`crate::scheduler::gc_work::ProcessEdgesWork`]. A plan that implements
 /// `PlanTraceObject` can use this work packet for tracing objects.
 pub struct PlanProcessEdges<
     VM: VMBinding,
@@ -827,7 +937,7 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     type VM = VM;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
-    fn new(edges: Vec<Address>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
+    fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
         let plan = base.plan().downcast_ref::<P>().unwrap();
         Self { plan, base }
@@ -854,11 +964,11 @@ impl<VM: VMBinding, P: PlanTraceObject<VM> + Plan<VM = VM>, const KIND: TraceKin
     }
 
     #[inline]
-    fn process_edge(&mut self, slot: Address) {
-        let object = unsafe { slot.load::<ObjectReference>() };
+    fn process_edge(&mut self, slot: EdgeOf<Self>) {
+        let object = slot.load();
         let new_object = self.trace_object(object);
         if P::may_move_objects::<KIND>() {
-            unsafe { slot.store(new_object) };
+            slot.store(new_object);
         }
     }
 }

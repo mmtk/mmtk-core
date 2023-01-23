@@ -14,7 +14,6 @@
 use crate::mmtk::MMTKBuilder;
 use crate::mmtk::MMTK;
 use crate::plan::AllocationSemantics;
-use crate::plan::BarrierWriteTarget;
 use crate::plan::{Mutator, MutatorContext};
 use crate::scheduler::WorkBucketStage;
 use crate::scheduler::{GCController, GCWork, GCWorker};
@@ -24,21 +23,22 @@ use crate::util::heap::layout::vm_layout_constants::HEAP_END;
 use crate::util::heap::layout::vm_layout_constants::HEAP_START;
 use crate::util::opaque_pointer::*;
 use crate::util::{Address, ObjectReference};
+use crate::vm::edge_shape::MemorySlice;
 use crate::vm::ReferenceGlue;
 use crate::vm::VMBinding;
 use std::sync::atomic::Ordering;
 
-/// Initialize an MMTk instance. A VM should call this method after creating an [MMTK](../mmtk/struct.MMTK.html)
+/// Initialize an MMTk instance. A VM should call this method after creating an [`crate::MMTK`]
 /// instance but before using any of the methods provided in MMTk (except `process()` and `process_bulk()`).
 ///
 /// We expect a binding to ininitialize MMTk in the following steps:
 ///
-/// 1. Create an [MMTKBuilder](../mmtk/struct.MMTKBuilder.html) instance.
-/// 2. Set command line options for MMTKBuilder by [process()](./fn.process.html) or [process_bulk()](./fn.process_bulk.html).
+/// 1. Create an [`crate::MMTKBuilder`] instance.
+/// 2. Set command line options for MMTKBuilder by [`crate::memory_manager::process`] or [`crate::memory_manager::process_bulk`].
 /// 3. Initialize MMTk by calling this function, `mmtk_init()`, and pass the builder earlier. This call will return an MMTK instance.
 ///    Usually a binding store the MMTK instance statically as a singleton. We plan to allow multiple instances, but this is not yet fully
 ///    supported. Currently we assume a binding will only need one MMTk instance.
-/// 4. Enable garbage collection in MMTk by [enable_collection()](./fn.enable_collection.html). A binding should only call this once its
+/// 4. Enable garbage collection in MMTk by [`crate::memory_manager::enable_collection`]. A binding should only call this once its
 ///    thread system is ready. MMTk will not trigger garbage collection before this call.
 ///
 /// Note that this method will attempt to initialize a logger. If the VM would like to use its own logger, it should initialize the logger before calling this method.
@@ -84,8 +84,11 @@ pub fn mmtk_init<VM: VMBinding>(builder: &MMTKBuilder) -> Box<MMTK<VM>> {
     Box::new(mmtk)
 }
 
-/// Request MMTk to create a mutator for the given thread. For performance reasons, A VM should
-/// store the returned mutator in a thread local storage that can be accessed efficiently.
+/// Request MMTk to create a mutator for the given thread. The ownership
+/// of returned boxed mutator is transferred to the binding, and the binding needs to take care of its
+/// lifetime. For performance reasons, A VM should store the returned mutator in a thread local storage
+/// that can be accessed efficiently. A VM may also copy and embed the mutator stucture to a thread-local data
+/// structure, and use that as a reference to the mutator (it is okay to drop the box once the content is copied).
 ///
 /// Arguments:
 /// * `mmtk`: A reference to an MMTk instance.
@@ -94,15 +97,23 @@ pub fn bind_mutator<VM: VMBinding>(
     mmtk: &'static MMTK<VM>,
     tls: VMMutatorThread,
 ) -> Box<Mutator<VM>> {
-    crate::plan::create_mutator(tls, mmtk)
+    let mutator = crate::plan::create_mutator(tls, mmtk);
+
+    const LOG_ALLOCATOR_MAPPING: bool = false;
+    if LOG_ALLOCATOR_MAPPING {
+        info!("{:?}", mutator.config);
+    }
+    mutator
 }
 
-/// Reclaim a mutator that is no longer needed.
+/// Report to MMTk that a mutator is no longer needed. A binding should not attempt
+/// to use the mutator after this call. MMTk will not attempt to reclaim the memory for the
+/// mutator, so a binding should properly reclaim the memory for the mutator after this call.
 ///
 /// Arguments:
 /// * `mutator`: A reference to the mutator to be destroyed.
-pub fn destroy_mutator<VM: VMBinding>(mutator: Box<Mutator<VM>>) {
-    drop(mutator);
+pub fn destroy_mutator<VM: VMBinding>(mutator: &mut Mutator<VM>) {
+    mutator.on_destroy();
 }
 
 /// Flush the mutator's local states.
@@ -138,6 +149,12 @@ pub fn alloc<VM: VMBinding>(
     // If you plan to use MMTk with a VM with its object size smaller than MMTk's min object size, you should
     // meet the min object size in the fastpath.
     debug_assert!(size >= MIN_OBJECT_SIZE);
+    // Assert alignment
+    debug_assert!(align >= VM::MIN_ALIGNMENT);
+    debug_assert!(align <= VM::MAX_ALIGNMENT);
+    // Assert offset
+    debug_assert!(VM::USE_ALLOCATION_OFFSET || offset == 0);
+
     mutator.alloc(size, align, offset, semantics)
 }
 
@@ -160,18 +177,159 @@ pub fn post_alloc<VM: VMBinding>(
     mutator.post_alloc(refer, bytes, semantics);
 }
 
-/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
-/// *after* they modify an object. For performance reasons, a VM should implement the write barrier
+/// The *subsuming* write barrier by MMTk. For performance reasons, a VM should implement the write barrier
 /// fast-path on their side rather than just calling this function.
 ///
-/// TODO: We plan to replace this API with a subsuming barrier API.
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
 ///
 /// Arguments:
 /// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
 /// * `target`: The target for the write operation.
 #[inline(always)]
-pub fn post_write_barrier<VM: VMBinding>(mutator: &mut Mutator<VM>, target: BarrierWriteTarget) {
-    mutator.barrier().post_write_barrier(target)
+pub fn object_reference_write<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator.barrier().object_reference_write(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *pre* write barrier, which we expect a binding to call
+/// *before* it modifies an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_pre<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_pre(src, slot, target);
+}
+
+/// The write barrier by MMTk. This is a *post* write barrier, which we expect a binding to call
+/// *after* it modifies an object. For performance reasons, a VM should implement the write barrier
+/// fast-path on their side rather than just calling this function.
+///
+/// For a correct barrier implementation, a VM binding needs to choose one of the following options:
+/// * Use subsuming barrier `object_reference_write`
+/// * Use both `object_reference_write_pre` and `object_reference_write_post`, or both, if the binding has difficulty delegating the store to mmtk-core with the subsuming barrier.
+/// * Implement fast-path on the VM side, and call the generic api `object_reference_slow` as barrier slow-path call.
+/// * Implement fast-path on the VM side, and do a specialized slow-path call.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: The modified source object.
+/// * `slot`: The location of the field to be modified.
+/// * `target`: The target for the write operation.
+#[inline(always)]
+pub fn object_reference_write_post<VM: VMBinding>(
+    mutator: &mut Mutator<VM>,
+    src: ObjectReference,
+    slot: VM::VMEdge,
+    target: ObjectReference,
+) {
+    mutator
+        .barrier()
+        .object_reference_write_post(src, slot, target);
+}
+
+/// The *subsuming* memory region copy barrier by MMTk.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy(src, dst);
+}
+
+/// The *generic* memory region copy *pre* barrier by MMTk, which we expect a binding to call
+/// *before* it performs memory copy.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy_pre<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_pre(src, dst);
+}
+
+/// The *generic* memory region copy *post* barrier by MMTk, which we expect a binding to call
+/// *after* it performs memory copy.
+/// This is called when the VM tries to copy a piece of heap memory to another.
+/// The data within the slice does not necessarily to be all valid pointers,
+/// but the VM binding will be able to filter out non-reference values on edge iteration.
+///
+/// For VMs that performs a heap memory copy operation, for example OpenJDK's array copy operation, the binding needs to
+/// call `memory_region_copy*` APIs. Same as `object_reference_write*`, the binding can choose either the subsuming barrier,
+/// or the pre/post barrier.
+///
+/// Arguments:
+/// * `mutator`: The mutator for the current thread.
+/// * `src`: Source memory slice to copy from.
+/// * `dst`: Destination memory slice to copy to.
+///
+/// The size of `src` and `dst` shoule be equal
+#[inline(always)]
+pub fn memory_region_copy_post<VM: VMBinding>(
+    mutator: &'static mut Mutator<VM>,
+    src: VM::VMMemorySlice,
+    dst: VM::VMMemorySlice,
+) {
+    debug_assert_eq!(src.bytes(), dst.bytes());
+    mutator.barrier().memory_region_copy_post(src, dst);
 }
 
 /// Return an AllocatorSelector for the given allocation semantic. This method is provided
@@ -258,7 +416,7 @@ pub fn gc_poll<VM: VMBinding>(mmtk: &MMTK<VM>, tls: VMMutatorThread) {
     );
 
     let plan = mmtk.get_plan();
-    if plan.should_trigger_gc_when_heap_is_full() && plan.poll(false, None) {
+    if plan.should_trigger_gc_when_heap_is_full() && plan.base().gc_trigger.poll(false, None) {
         debug!("Collection required");
         assert!(plan.is_initialized(), "GC is not allowed here: collection is not initialized (did you call initialize_collection()?).");
         VM::VMCollection::block_for_gc(tls);
@@ -460,13 +618,14 @@ pub fn is_live_object(object: ObjectReference) -> bool {
 /// word is really a reference.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Argument:
 /// * `addr`: An arbitrary address.
 #[cfg(feature = "is_mmtk_object")]
 pub fn is_mmtk_object(addr: Address) -> bool {
-    crate::util::is_mmtk_object::is_mmtk_object(addr)
+    use crate::mmtk::SFT_MAP;
+    SFT_MAP.get_checked(addr).is_mmtk_object(addr)
 }
 
 /// Return true if the `object` lies in a region of memory where
@@ -493,12 +652,18 @@ pub fn is_mmtk_object(addr: Address) -> bool {
 /// function can distinguish between MMTk-allocated objects and other objects.
 ///
 /// Note: This function has special behaviors if the VM space (enabled by the `vm_space` feature)
-/// is present.  See [`crate::plan::global::BasePlan::vm_space`].
+/// is present.  See `crate::plan::global::BasePlan::vm_space`.
 ///
 /// Arguments:
 /// * `object`: The object reference to query.
-pub fn is_in_mmtk_spaces(object: ObjectReference) -> bool {
-    object.is_in_any_space()
+pub fn is_in_mmtk_spaces<VM: VMBinding>(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    if object.is_null() {
+        return false;
+    }
+    SFT_MAP
+        .get_checked(object.to_address::<VM>())
+        .is_in_space(object)
 }
 
 /// Is the address in the mapped memory? The runtime can use this function to check
@@ -592,6 +757,47 @@ pub fn add_finalizer<VM: VMBinding>(
     }
 
     mmtk.finalizable_processor.lock().unwrap().add(object);
+}
+
+/// Pin an object. MMTk will make sure that the object does not move
+/// during GC. Note that action cannot happen in some plans, eg, semispace.
+/// It returns true if the pinning operation has been performed, i.e.,
+/// the object status changed from non-pinned to pinned
+///
+/// Arguments:
+/// * `object`: The object to be pinned
+#[cfg(feature = "object_pinning")]
+pub fn pin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    SFT_MAP
+        .get_checked(object.to_address::<VM>())
+        .pin_object(object)
+}
+
+/// Unpin an object.
+/// Returns true if the unpinning operation has been performed, i.e.,
+/// the object status changed from pinned to non-pinned
+///
+/// Arguments:
+/// * `object`: The object to be pinned
+#[cfg(feature = "object_pinning")]
+pub fn unpin_object<VM: VMBinding>(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    SFT_MAP
+        .get_checked(object.to_address::<VM>())
+        .unpin_object(object)
+}
+
+/// Check whether an object is currently pinned
+///
+/// Arguments:
+/// * `object`: The object to be checked
+#[cfg(feature = "object_pinning")]
+pub fn is_pinned<VM: VMBinding>(object: ObjectReference) -> bool {
+    use crate::mmtk::SFT_MAP;
+    SFT_MAP
+        .get_checked(object.to_address::<VM>())
+        .is_object_pinned(object)
 }
 
 /// Get an object that is ready for finalization. After each GC, if any registered object is not
@@ -693,10 +899,4 @@ pub fn add_work_packets<VM: VMBinding>(
     packets: Vec<Box<dyn GCWork<VM>>>,
 ) {
     mmtk.scheduler.work_buckets[bucket].bulk_add(packets)
-}
-
-/// Add a callback to be notified after the transitive closure is finished.
-/// The callback should return true if it add more work packets to the closure bucket.
-pub fn on_closure_end<VM: VMBinding>(mmtk: &'static MMTK<VM>, f: Box<dyn Send + Fn() -> bool>) {
-    mmtk.scheduler.on_closure_end(f)
 }

@@ -66,7 +66,10 @@ pub fn serial_test<F>(f: F)
 where
     F: FnOnce(),
 {
-    let _lock = SERIAL_TEST_LOCK.lock();
+    // If one test fails, the lock will become poisoned. We would want to continue for other tests anyway.
+    let _guard = SERIAL_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     f();
 }
 
