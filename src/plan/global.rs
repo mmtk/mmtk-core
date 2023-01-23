@@ -272,6 +272,7 @@ pub trait Plan: 'static + Sync + Downcast {
         //    the reserved pages is larger than total pages after the copying GC (the reserved pages after a GC
         //    may be larger than the reserved pages before a GC, as we may end up using more memory for thread local
         //    buffers for copy allocators).
+        trace!("Total pages = {}, reserved pages = {}, available pages = {}", self.get_total_pages(), self.get_reserved_pages(), self.get_reserved_pages().saturating_sub(self.get_reserved_pages()));
         self.get_total_pages()
             .saturating_sub(self.get_reserved_pages())
     }

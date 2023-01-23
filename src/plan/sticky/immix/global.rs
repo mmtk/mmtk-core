@@ -29,6 +29,7 @@ use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
+use super::gc_work::StickyImmixMatureGCWorkContext;
 use super::gc_work::StickyImmixNurseryGCWorkContext;
 
 #[derive(PlanTraceObject)]
@@ -137,17 +138,21 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn schedule_collection(&'static self, scheduler: &crate::scheduler::GCWorkScheduler<Self::VM>) {
+        self.base().set_collection_kind::<Self>(self);
+        self.base().set_gc_status(GcStatus::GcPrepare);
+
         let is_full_heap = self.requires_full_heap_collection();
         self.gc_full_heap.store(is_full_heap, Ordering::SeqCst);
 
         if !is_full_heap {
             info!("Nursery GC");
-            self.base().set_collection_kind::<Self>(self);
-            self.base().set_gc_status(GcStatus::GcPrepare);
             // nursery GC -- we schedule it
             scheduler.schedule_common_work::<StickyImmixNurseryGCWorkContext<VM>>(self);
         } else {
-            self.immix.schedule_collection(scheduler);
+            use crate::plan::immix::Immix;
+            use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
+            // self.immix.schedule_collection(scheduler);
+            Immix::schedule_immix_collection::<StickyImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>, StickyImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self, self, &self.immix.immix_space, scheduler);
         }
     }
 
@@ -177,12 +182,15 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             let was_defrag = self.immix.immix_space.release(false);
             self.immix.last_gc_was_defrag.store(was_defrag, Ordering::Relaxed);
             self.immix.common.los.release(false);
-            return;
         } else {
             info!("Release full heap");
             self.immix.release(tls);
-            self.next_gc_full_heap.store(self.get_available_pages() < self.options().get_min_nursery_pages(), Ordering::Relaxed);
         }
+    }
+
+    fn end_of_gc(&mut self, _tls: crate::util::opaque_pointer::VMWorkerThread) {
+        let next_gc_full_heap = crate::plan::generational::global::CommonGenPlan::should_next_gc_be_full_heap(self);
+        self.next_gc_full_heap.store(next_gc_full_heap, Ordering::Relaxed);
     }
 
     fn collection_required(&self, space_full: bool, space: Option<&dyn crate::policy::space::Space<Self::VM>>) -> bool {
@@ -202,33 +210,35 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     }
 
     fn sanity_check_object(&self, object: crate::util::ObjectReference) {
-        if self.immix.immix_space.in_space(object) {
-            // Every object should be logged
-            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
-                self.get_spaces().iter().for_each(|s| {
-                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                });
-                panic!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
-            }
-            if !self.immix.immix_space.is_marked_with_current_mark_state(object) {
-                self.get_spaces().iter().for_each(|s| {
-                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                });
-                panic!("Object {} is not marked (all objects that have been traced should be marked)", object);
-            }
-        } else if self.immix.common.los.in_space(object) {
-            // Every object should be logged
-            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
-                self.get_spaces().iter().for_each(|s| {
-                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                });
-                panic!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
-            }
-            if !self.immix.common.los.is_live(object) {
-                self.get_spaces().iter().for_each(|s| {
-                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                });
-                panic!("LOS Object {} is not marked", object);
+        if self.is_current_gc_nursery() {
+            if self.immix.immix_space.in_space(object) {
+                // Every object should be logged
+                if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+                    self.get_spaces().iter().for_each(|s| {
+                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                    });
+                    panic!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                }
+                if !self.immix.immix_space.is_marked_with_current_mark_state(object) {
+                    self.get_spaces().iter().for_each(|s| {
+                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                    });
+                    panic!("Object {} is not marked (all objects that have been traced should be marked)", object);
+                }
+            } else if self.immix.common.los.in_space(object) {
+                // Every object should be logged
+                if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+                    self.get_spaces().iter().for_each(|s| {
+                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                    });
+                    panic!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                }
+                if !self.immix.common.los.is_live(object) {
+                    self.get_spaces().iter().for_each(|s| {
+                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                    });
+                    panic!("LOS Object {} is not marked", object);
+                }
             }
         }
     }
@@ -263,6 +273,12 @@ impl<VM: VMBinding> StickyImmix<VM> {
     }
 
     fn requires_full_heap_collection(&self) -> bool {
+        // This is used for testing.
+        const FORCE_FULL_HEAP: bool = true;
+        if FORCE_FULL_HEAP {
+            return true;
+        }
+
         if self.immix
             .common
             .base
