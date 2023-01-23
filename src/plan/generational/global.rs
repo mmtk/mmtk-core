@@ -6,7 +6,6 @@ use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
 use crate::util::Address;
-use crate::util::conversions;
 use crate::util::copy::CopySemantics;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
@@ -19,17 +18,6 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 
 use mmtk_macros::PlanTraceObject;
-
-pub trait HasNursery<VM: VMBinding>: Plan<VM = VM> {
-    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
-    fn is_address_in_nursery(&self, addr: Address) -> bool;
-    fn trace_object_nursery<Q: ObjectQueue>(
-        &self,
-        queue: &mut Q,
-        object: ObjectReference,
-        worker: &mut GCWorker<VM>,
-    ) -> ObjectReference;
-}
 
 /// Common implementation for generational plans. Each generational plan
 /// should include this type, and forward calls to it where possible.
@@ -228,6 +216,7 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 
     /// Trace objects for spaces in generational and common plans for a full heap GC.
+    #[allow(unused)] // We now use `PlanTraceObject`, and this mehtod is not used.
     pub fn trace_object_full_heap<Q: ObjectQueue>(
         &self,
         queue: &mut Q,
@@ -311,11 +300,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
     }
 }
 
-/// This trait include methods that are specific to generational plans.
+/// This trait includes methods that are specific to generational plans.
 pub trait GenerationalPlan: Plan {
-    // /// Return the common generational implementation [`crate::plan::generational::global::CommonGenPlan`].
-    // fn common_gen(&self) -> &CommonGenPlan<Self::VM>;
-
     fn is_current_gc_nursery(&self) -> bool;
 
     /// Return the number of pages available for allocation into the mature space.
@@ -323,6 +309,20 @@ pub trait GenerationalPlan: Plan {
 
     /// Return the number of used pages in the mature space.
     fn get_mature_reserved_pages(&self) -> usize;
+}
+
+/// This trait includes methods to support nursery GC. It is separated from [`GenerationalPlan`] as we use
+/// type parameters in its method, thus it is not object safe. We would like to keep [`GenerationalPlan`]
+/// object safe, so we introduce this trait.
+pub trait SupportNurseryGC<VM: VMBinding>: Plan<VM = VM> {
+    fn is_object_in_nursery(&self, object: ObjectReference) -> bool;
+    fn is_address_in_nursery(&self, addr: Address) -> bool;
+    fn trace_object_nursery<Q: ObjectQueue>(
+        &self,
+        queue: &mut Q,
+        object: ObjectReference,
+        worker: &mut GCWorker<VM>,
+    ) -> ObjectReference;
 }
 
 /// Is current GC only collecting objects allocated since last GC? This method can be called

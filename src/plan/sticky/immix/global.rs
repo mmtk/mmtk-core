@@ -4,29 +4,19 @@ use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
 use crate::policy::space::Space;
-use crate::scheduler::GCWorkScheduler;
-use crate::util::constants::LOG_BYTES_IN_PAGE;
 use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
-use crate::util::heap::HeapMeta;
-use crate::util::metadata::MetadataSpec;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::vm::VMBinding;
 use crate::plan::global::CommonPlan;
-use crate::policy::immix::ImmixSpace;
 use crate::plan::PlanConstraints;
 use crate::util::copy::CopySemantics;
-use crate::util::heap::layout::heap_layout::Mmapper;
-use crate::util::heap::layout::heap_layout::VMMap;
-use crate::util::options::Options;
 use crate::policy::sft::SFT;
 use crate::vm::ObjectModel;
 use crate::plan::global::CreateGeneralPlanArgs;
 
 use atomic::Ordering;
-use atomic_traits::Atomic;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 use mmtk_macros::PlanTraceObject;
 
@@ -48,12 +38,17 @@ pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..immix::IMMIX_CONSTRAINTS
 };
 
-impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for StickyImmix<VM> {
+impl<VM: VMBinding> crate::plan::generational::global::SupportNurseryGC<VM> for StickyImmix<VM> {
     fn is_object_in_nursery(&self, object: crate::util::ObjectReference) -> bool {
         self.immix.immix_space.in_space(object) && !self.immix.immix_space.is_marked_with_current_mark_state(object)
     }
 
-    fn is_address_in_nursery(&self, addr: crate::util::Address) -> bool {
+    // This check is used for memory slice copying barrier, where we only know addresses instead of objects.
+    // As sticky immix needs object metadata to know if an object is an nursery object or not, we cannot really tell
+    // whether an address is in nursery or not. In this case, we just return false -- this is a conservative return value
+    // for the memory slice copying barrier. It means we will treat the object as if it is in mature space, and will
+    // push it to the remembered set.
+    fn is_address_in_nursery(&self, _addr: crate::util::Address) -> bool {
         false
     }
 

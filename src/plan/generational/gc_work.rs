@@ -1,8 +1,6 @@
 use atomic::Ordering;
 
 use crate::plan::PlanTraceObject;
-use crate::plan::generational::global::CommonGenPlan;
-use crate::policy::space::Space;
 use crate::scheduler::{gc_work::*, GCWork, GCWorker};
 use crate::util::ObjectReference;
 use crate::vm::edge_shape::{Edge, MemorySlice};
@@ -11,17 +9,17 @@ use crate::MMTK;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-use super::global::{GenerationalPlan, HasNursery};
+use super::global::SupportNurseryGC;
 
 /// Process edges for a nursery GC. This type is provided if a generational plan does not use
 /// [`crate::scheduler::gc_work::SFTProcessEdges`]. If a plan uses `SFTProcessEdges`,
 /// it does not need to use this type.
-pub struct GenNurseryProcessEdges<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> {
+pub struct GenNurseryProcessEdges<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> {
     plan: &'static P,
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> ProcessEdgesWork for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesWork for GenNurseryProcessEdges<VM, P> {
     type VM = VM;
     // type ScanObjectsWorkType = ScanObjects<Self>;
     type ScanObjectsWorkType =  PlanScanObjects<Self, P>;
@@ -51,19 +49,18 @@ impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> ProcessEdgesWork fo
 
     #[inline(always)]
     fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> Self::ScanObjectsWorkType {
-        // ScanObjects::<Self>::new(nodes, false, roots)
-        PlanScanObjects::new(self.plan, nodes, false, false)
+        PlanScanObjects::new(self.plan, nodes, false, roots)
     }
 }
 
-impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> Deref for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> Deref for GenNurseryProcessEdges<VM, P> {
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding, P: HasNursery<VM> + PlanTraceObject<VM>> DerefMut for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> DerefMut for GenNurseryProcessEdges<VM, P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }

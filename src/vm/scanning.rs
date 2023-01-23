@@ -15,10 +15,7 @@ pub trait EdgeVisitor<ES: Edge> {
 impl<ES: Edge, F: FnMut(ES)> EdgeVisitor<ES> for F {
     fn visit_edge(&mut self, edge: ES) {
         #[cfg(debug_assertions)]
-        {
-            use crate::vm::edge_shape::Edge;
-            trace!("(FunctionClosure) Visit edge {:?} (pointing to {})", edge, edge.load());
-        }
+        trace!("(FunctionClosure) Visit edge {:?} (pointing to {})", edge, edge.load());
         self(edge)
     }
 }

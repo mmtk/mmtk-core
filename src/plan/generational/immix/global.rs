@@ -63,7 +63,7 @@ pub const GENIMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
     ..crate::plan::generational::GEN_CONSTRAINTS
 };
 
-impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for GenImmix<VM> {
+impl<VM: VMBinding> crate::plan::generational::global::SupportNurseryGC<VM> for GenImmix<VM> {
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
         self.gen.nursery.in_space(object)
     }

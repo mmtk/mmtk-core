@@ -167,6 +167,7 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
 }
 
 impl<VM: VMBinding> ImmixSpace<VM> {
+    #[allow(unused)]
     const UNMARKED_STATE: u8 = 0;
     const MARKED_STATE: u8 = 1;
 
@@ -680,7 +681,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
     }
 
-    #[inline(always)]
+    /// The generic test of whether an object is live in immix
+    #[allow(unused)]
     pub(crate) fn is_live(&self, object: ObjectReference) -> bool {
         if self.defrag.in_defrag() && Block::containing::<VM>(object).is_defrag_source() {
             ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
@@ -689,12 +691,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         }
     }
 
-    #[inline(always)]
+    /// The liveness test when copy is allowed
+    #[allow(unused)]
     pub(crate) fn copy_nursery_is_live(&self, object: ObjectReference) -> bool {
         ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
     }
 
-    #[inline(always)]
+    /// The liveness test when copy is not allowed
+    #[allow(unused)]
     pub(crate) fn fast_is_live(&self, object: ObjectReference) -> bool {
         debug_assert!(!self.defrag.in_defrag());
         self.is_marked(object, self.mark_state)

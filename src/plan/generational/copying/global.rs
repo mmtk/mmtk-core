@@ -4,7 +4,7 @@ use super::mutator::ALLOCATOR_MAPPING;
 use crate::ObjectQueue;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
-use crate::plan::generational::global::HasNursery;
+use crate::plan::generational::global::SupportNurseryGC;
 use crate::plan::global::BasePlan;
 use crate::plan::global::CommonPlan;
 use crate::plan::global::CreateGeneralPlanArgs;
@@ -42,7 +42,7 @@ pub struct GenCopy<VM: VMBinding> {
 
 pub const GENCOPY_CONSTRAINTS: PlanConstraints = crate::plan::generational::GEN_CONSTRAINTS;
 
-impl<VM: VMBinding> HasNursery<VM> for GenCopy<VM> {
+impl<VM: VMBinding> SupportNurseryGC<VM> for GenCopy<VM> {
     fn is_object_in_nursery(&self, object: ObjectReference) -> bool {
         self.gen.nursery.in_space(object)
     }
