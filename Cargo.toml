@@ -132,6 +132,7 @@ malloc_counted_size = []
 # this does not replace the global Rust allocator, but provides these libraries for GC implementation
 malloc_mimalloc = ["mimalloc-sys"]
 malloc_jemalloc = ["jemalloc-sys"]
+
 # Use the native mimalloc allocator for malloc. This is not tested by me (Yi) yet, and it is only used to make sure that some code
 # is not compiled in default builds.
 malloc_native_mimalloc = []
