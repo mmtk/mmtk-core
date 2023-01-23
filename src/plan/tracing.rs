@@ -102,6 +102,11 @@ impl<'a, E: ProcessEdgesWork> ObjectsClosure<'a, E> {
 impl<'a, E: ProcessEdgesWork> EdgeVisitor<EdgeOf<E>> for ObjectsClosure<'a, E> {
     #[inline(always)]
     fn visit_edge(&mut self, slot: EdgeOf<E>) {
+        #[cfg(debug_assertions)]
+        {
+            use crate::vm::edge_shape::Edge;
+            trace!("(ObjectsClosure) Visit edge {:?} (pointing to {})", slot, slot.load());
+        }
         self.buffer.push(slot);
         if self.buffer.is_full() {
             self.flush();

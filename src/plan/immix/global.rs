@@ -134,15 +134,15 @@ impl<VM: VMBinding> Plan for Immix<VM> {
 
 impl<VM: VMBinding> Immix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
-        Self::new_with_global_specs(args, vec![])
-    }
-
-    pub fn new_with_global_specs(args: CreateGeneralPlanArgs<VM>, specs: Vec<SideMetadataSpec>) -> Self {
-        let mut plan_args = CreateSpecificPlanArgs {
+        let plan_args = CreateSpecificPlanArgs {
             global_args: args,
             constraints: &IMMIX_CONSTRAINTS,
-            global_side_metadata_specs: SideMetadataContext::new_global_specs(&specs),
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&vec![]),
         };
+        Self::new_with_plan_args(plan_args)
+    }
+
+    pub fn new_with_plan_args(mut plan_args: CreateSpecificPlanArgs<VM>) -> Self {
         let immix = Immix {
             immix_space: ImmixSpace::new(plan_args.get_space_args(
                 "immix",

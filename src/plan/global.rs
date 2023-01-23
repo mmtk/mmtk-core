@@ -322,6 +322,8 @@ pub trait Plan: 'static + Sync + Downcast {
             object
         );
     }
+
+    fn sanity_check_object(&self, _object: ObjectReference) {}
 }
 
 impl_downcast!(Plan assoc VM);

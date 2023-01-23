@@ -1,6 +1,7 @@
 use crate::Plan;
 use crate::plan::GcStatus;
 use crate::plan::generational::global::GenerationalPlan;
+use crate::plan::global::CreateSpecificPlanArgs;
 use crate::plan::immix;
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -67,8 +68,9 @@ impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for Sticky
                 return object;
             } else {
                 let (object, newly_enqueued) = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
-                    trace!("Immix nursery object {} is being traced with opportunistic copy", object);
-                    self.immix.immix_space.trace_object_with_opportunistic_copy(queue, object, CopySemantics::DefaultCopy, worker, true)
+                    let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(queue, object, CopySemantics::DefaultCopy, worker, true);
+                    trace!("Immix nursery object {} is being traced with opportunistic copy {}", object, if ret.0 == object { "".to_string() } else { format!(" -> new object {}", ret.0)});
+                    ret
                 } else {
                     trace!("Immix nursery object {} is being traced without moving", object);
                     self.immix.immix_space.trace_object_without_moving(queue, object)
@@ -87,7 +89,7 @@ impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for Sticky
             return self.immix.common().get_los().trace_object::<Q>(queue, object);
         }
 
-        warn!("Object {} is not in nursery and not in LOS, it is not traced!", object);
+        warn!("Object {} is not in nursery or in LOS, it is not traced!", object);
         object
     }
 }
@@ -160,7 +162,9 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn prepare(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
             info!("Prepare nursery");
+            // Prepare both large object space and immix space
             self.immix.immix_space.prepare(false);
+            self.immix.common.los.prepare(false);
         } else {
             info!("Prepare full heap");
             self.immix.prepare(tls);
@@ -172,6 +176,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             info!("Release nursery");
             let was_defrag = self.immix.immix_space.release(false);
             self.immix.last_gc_was_defrag.store(was_defrag, Ordering::Relaxed);
+            self.immix.common.los.release(false);
             return;
         } else {
             info!("Release full heap");
@@ -195,6 +200,38 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
     fn get_used_pages(&self) -> usize {
         self.immix.get_used_pages()
     }
+
+    fn sanity_check_object(&self, object: crate::util::ObjectReference) {
+        if self.immix.immix_space.in_space(object) {
+            // Every object should be logged
+            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+                self.get_spaces().iter().for_each(|s| {
+                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                });
+                panic!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+            }
+            if !self.immix.immix_space.is_marked_with_current_mark_state(object) {
+                self.get_spaces().iter().for_each(|s| {
+                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                });
+                panic!("Object {} is not marked (all objects that have been traced should be marked)", object);
+            }
+        } else if self.immix.common.los.in_space(object) {
+            // Every object should be logged
+            if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.is_unlogged::<VM>(object, Ordering::SeqCst) {
+                self.get_spaces().iter().for_each(|s| {
+                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                });
+                panic!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+            }
+            if !self.immix.common.los.is_live(object) {
+                self.get_spaces().iter().for_each(|s| {
+                    crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
+                });
+                panic!("LOS Object {} is not marked", object);
+            }
+        }
+    }
 }
 
 impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
@@ -213,8 +250,13 @@ impl<VM: VMBinding> GenerationalPlan for StickyImmix<VM> {
 
 impl<VM: VMBinding> StickyImmix<VM> {
     pub fn new(args: CreateGeneralPlanArgs<VM>) -> Self {
+        let plan_args = CreateSpecificPlanArgs {
+            global_args: args,
+            constraints: &STICKY_IMMIX_CONSTRAINTS,
+            global_side_metadata_specs: SideMetadataContext::new_global_specs(&crate::plan::generational::new_generational_global_metadata_specs::<VM>()),
+        };
         Self {
-            immix: immix::Immix::new_with_global_specs(args, crate::plan::generational::new_generational_global_metadata_specs::<VM>()),
+            immix: immix::Immix::new_with_plan_args(plan_args),
             gc_full_heap: AtomicBool::new(false),
             next_gc_full_heap: AtomicBool::new(false),
         }
