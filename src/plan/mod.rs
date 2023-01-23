@@ -39,13 +39,14 @@ mod tracing;
 pub use tracing::{ObjectQueue, ObjectsClosure, VectorObjectQueue, VectorQueue};
 
 mod generational;
+mod sticky;
+
 mod immix;
 mod markcompact;
 mod marksweep;
 mod nogc;
 mod pageprotect;
 mod semispace;
-mod sticky;
 
 pub(crate) use generational::global::is_nursery_gc;
 pub(crate) use generational::global::GenerationalPlan;
@@ -55,6 +56,7 @@ pub(crate) use generational::global::GenerationalPlan;
 
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use generational::immix::GENIMMIX_CONSTRAINTS;
+pub use sticky::immix::STICKY_IMMIX_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
 pub use markcompact::MARKCOMPACT_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;

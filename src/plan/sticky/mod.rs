@@ -1,2 +1,1 @@
-pub(in crate::plan) mod immix;
-mod global;
+pub mod immix;
