@@ -428,7 +428,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         trace: &mut impl ObjectQueue,
         object: ObjectReference,
     ) -> ObjectReference {
-        self.trace_object_without_moving(trace, object).0
+        self.trace_object_without_moving(trace, object)
     }
 
     /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
@@ -448,9 +448,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         );
         if Block::containing::<VM>(object).is_defrag_source() {
             debug_assert!(self.in_defrag());
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false).0
+            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false)
         } else {
-            self.trace_object_without_moving(trace, object).0
+            self.trace_object_without_moving(trace, object)
         }
     }
 
@@ -460,7 +460,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         &self,
         queue: &mut impl ObjectQueue,
         object: ObjectReference,
-    ) -> (ObjectReference, bool) {
+    ) -> ObjectReference {
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -472,9 +472,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
             // Visit node
             queue.enqueue(object);
-            return (object, true);
+            self.unlog_object_if_needed(object);
+            return object;
         }
-        (object, false)
+        object
     }
 
     /// Trace object and do evacuation if required.
@@ -487,7 +488,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         semantics: CopySemantics,
         worker: &mut GCWorker<VM>,
         nursery_collection: bool,
-    ) -> (ObjectReference, bool) {
+    ) -> ObjectReference {
         debug_assert!(nursery_collection == self.nursery_collection);
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
@@ -517,7 +518,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                     );
                 }
             }
-            (new_object, false)
+            new_object
         } else if self.is_marked(object, self.mark_state) {
             // We won the forwarding race but the object is already marked so we clear the
             // forwarding status and return the unmoved object
@@ -527,7 +528,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 object,
             );
             ForwardingWord::clear_forwarding_bits::<VM>(object);
-            (object, false)
+            object
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
@@ -549,7 +550,14 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             );
             queue.enqueue(new_object);
             debug_assert!(new_object.is_live());
-            (new_object, true)
+            self.unlog_object_if_needed(new_object);
+            new_object
+        }
+    }
+
+    fn unlog_object_if_needed(&self, object: ObjectReference) {
+        if self.common.needs_log_bit {
+            VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
     }
 
@@ -709,6 +717,17 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
         if !self.space.nursery_collection {
             if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
                 side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+            }
+            if self.space.common.needs_log_bit {
+                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                    // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
+                    side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+                } else {
+                    // If the log bit is not in side metadata, we cannot bulk zero. We can either
+                    // clear the bit for dead objects in major GC, or clear the log bit for new
+                    // objects. In both cases, we do not need to set log bit at tracing.
+                    unimplemented!("We cannot bulk zero unlogged bit.")
+                }
             }
         }
     }

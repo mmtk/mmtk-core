@@ -24,6 +24,7 @@ use crate::vm::ObjectModel;
 use crate::plan::global::CreateGeneralPlanArgs;
 
 use atomic::Ordering;
+use atomic_traits::Atomic;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -68,19 +69,14 @@ impl<VM: VMBinding> crate::plan::generational::global::HasNursery<VM> for Sticky
                 trace!("Immix mature object {}, skip", object);
                 return object;
             } else {
-                let (object, newly_enqueued) = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
+                let object = if crate::policy::immix::PREFER_COPY_ON_NURSERY_GC {
                     let ret = self.immix.immix_space.trace_object_with_opportunistic_copy(queue, object, CopySemantics::DefaultCopy, worker, true);
-                    trace!("Immix nursery object {} is being traced with opportunistic copy {}", object, if ret.0 == object { "".to_string() } else { format!(" -> new object {}", ret.0)});
+                    trace!("Immix nursery object {} is being traced with opportunistic copy {}", object, if ret == object { "".to_string() } else { format!(" -> new object {}", ret)});
                     ret
                 } else {
                     trace!("Immix nursery object {} is being traced without moving", object);
                     self.immix.immix_space.trace_object_without_moving(queue, object)
                 };
-
-                // unlog object
-                if newly_enqueued {
-                    VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
-                }
 
                 return object;
             }
@@ -273,12 +269,6 @@ impl<VM: VMBinding> StickyImmix<VM> {
     }
 
     fn requires_full_heap_collection(&self) -> bool {
-        // This is used for testing.
-        const FORCE_FULL_HEAP: bool = true;
-        if FORCE_FULL_HEAP {
-            return true;
-        }
-
         if self.immix
             .common
             .base
