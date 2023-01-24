@@ -225,14 +225,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             Block::LOG_BYTES
         );
 
-        assert!(
-            !args.constraints.needs_log_bit || space_args.log_object_when_traced,
-            "log_object_when_traced should not be true if the plan does not use log bit"
-        );
-        assert!(
-            !args.constraints.needs_log_bit || space_args.reset_log_bit_in_major_gc,
-            "reset_log_bit_in_major_gc should not be true if the plan does not use log bit"
-        );
+        if space_args.log_object_when_traced || space_args.reset_log_bit_in_major_gc {
+            assert!(
+                args.constraints.needs_log_bit,
+                "Invalid args when the plan does not use log bit"
+            );
+        }
 
         super::validate_features();
         let vm_map = args.vm_map;
