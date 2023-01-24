@@ -57,8 +57,8 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
     fn is_live(&self, object: ObjectReference) -> bool {
-        if !super::DEFRAG {
-            // If defrag is disabled, we won't forward objects.
+        if super::NEVER_MOVE_OBJECTS {
+            // We won't forward objects.
             self.is_marked(object, self.mark_state)
         } else {
             self.is_marked(object, self.mark_state) || ForwardingWord::is_forwarded::<VM>(object)
@@ -77,7 +77,7 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC.is_object_pinned::<VM>(object)
     }
     fn is_movable(&self) -> bool {
-        super::DEFRAG
+        !super::NEVER_MOVE_OBJECTS
     }
 
     #[cfg(feature = "sanity")]
@@ -680,29 +680,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     pub(crate) fn get_pages_allocated(&self) -> usize {
         self.lines_consumed.load(Ordering::SeqCst) >> (LOG_BYTES_IN_PAGE - Line::LOG_BYTES as u8)
-    }
-
-    /// The generic test of whether an object is live in immix
-    #[allow(unused)]
-    pub(crate) fn is_live(&self, object: ObjectReference) -> bool {
-        if self.defrag.in_defrag() && Block::containing::<VM>(object).is_defrag_source() {
-            ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
-        } else {
-            self.is_marked(object, self.mark_state)
-        }
-    }
-
-    /// The liveness test when copy is allowed
-    #[allow(unused)]
-    pub(crate) fn copy_nursery_is_live(&self, object: ObjectReference) -> bool {
-        ForwardingWord::is_forwarded::<VM>(object) || self.is_marked(object, self.mark_state)
-    }
-
-    /// The liveness test when copy is not allowed
-    #[allow(unused)]
-    pub(crate) fn fast_is_live(&self, object: ObjectReference) -> bool {
-        debug_assert!(!self.defrag.in_defrag());
-        self.is_marked(object, self.mark_state)
     }
 }
 

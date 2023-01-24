@@ -32,7 +32,7 @@ pub struct StickyImmix<VM: VMBinding> {
 }
 
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
-    moves_objects: true,
+    moves_objects: crate::policy::immix::DEFRAG || crate::policy::immix::PREFER_COPY_ON_NURSERY_GC,
     needs_log_bit: true,
     barrier: crate::plan::BarrierSelector::ObjectBarrier,
     ..immix::IMMIX_CONSTRAINTS
