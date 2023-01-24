@@ -1,7 +1,7 @@
 //! Generational read/write barrier implementations.
 
-use crate::plan::PlanTraceObject;
 use crate::plan::barriers::BarrierSemantics;
+use crate::plan::PlanTraceObject;
 use crate::plan::VectorQueue;
 use crate::scheduler::WorkBucketStage;
 use crate::util::constants::BYTES_IN_ADDRESS;
@@ -26,7 +26,9 @@ pub struct GenObjectBarrierSemantics<VM: VMBinding, P: SupportNurseryGC<VM> + Pl
     region_modbuf: VectorQueue<VM::VMMemorySlice>,
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>>
+    GenObjectBarrierSemantics<VM, P>
+{
     pub fn new(mmtk: &'static MMTK<VM>, plan: &'static P) -> Self {
         Self {
             mmtk,
@@ -50,13 +52,16 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> GenObjectBarr
         let buf = self.region_modbuf.take();
         if !buf.is_empty() {
             debug_assert!(!buf.is_empty());
-            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure]
-                .add(ProcessRegionModBuf::<GenNurseryProcessEdges<VM, P>>::new(buf));
+            self.mmtk.scheduler.work_buckets[WorkBucketStage::Closure].add(ProcessRegionModBuf::<
+                GenNurseryProcessEdges<VM, P>,
+            >::new(buf));
         }
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> BarrierSemantics for GenObjectBarrierSemantics<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> BarrierSemantics
+    for GenObjectBarrierSemantics<VM, P>
+{
     type VM = VM;
 
     #[cold]

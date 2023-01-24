@@ -96,7 +96,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
         // } else {
         //     scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_FAST>>(self);
         // }
-        Self::schedule_immix_collection::<ImmixGCWorkContext<VM, TRACE_KIND_FAST>, ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self, self, &self.immix_space, scheduler)
+        Self::schedule_immix_collection::<
+            ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
+            ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+        >(self, self, &self.immix_space, scheduler)
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -167,7 +170,15 @@ impl<VM: VMBinding> Immix<VM> {
     }
 
     /// A plan must call set_collection_kind and set_gc_status before this call.
-    pub(crate) fn schedule_immix_collection<FastContext: 'static + GCWorkContext<VM=VM>, DefragContext: 'static + GCWorkContext<VM=VM>>(defrag_plan: &'static DefragContext::PlanType, fast_plan: &'static FastContext::PlanType, immix_space: &ImmixSpace<VM>, scheduler: &GCWorkScheduler<VM>) {
+    pub(crate) fn schedule_immix_collection<
+        FastContext: 'static + GCWorkContext<VM = VM>,
+        DefragContext: 'static + GCWorkContext<VM = VM>,
+    >(
+        defrag_plan: &'static DefragContext::PlanType,
+        fast_plan: &'static FastContext::PlanType,
+        immix_space: &ImmixSpace<VM>,
+        scheduler: &GCWorkScheduler<VM>,
+    ) {
         let plan = defrag_plan;
 
         let in_defrag = immix_space.decide_whether_to_defrag(

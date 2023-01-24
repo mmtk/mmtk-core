@@ -1,7 +1,6 @@
 use super::gc_work::GenCopyGCWorkContext;
 use super::gc_work::GenCopyNurseryGCWorkContext;
 use super::mutator::ALLOCATOR_MAPPING;
-use crate::ObjectQueue;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::generational::global::SupportNurseryGC;
@@ -16,14 +15,15 @@ use crate::plan::PlanConstraints;
 use crate::policy::copyspace::CopySpace;
 use crate::policy::space::Space;
 use crate::scheduler::*;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::ObjectQueue;
 use enum_map::EnumMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 

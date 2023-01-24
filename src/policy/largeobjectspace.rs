@@ -200,7 +200,11 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
             object
         );
         let nursery_object = self.is_in_nursery(object);
-        trace!("LOS object {} {} a nursery object", object, if nursery_object { "is" } else { "is not "});
+        trace!(
+            "LOS object {} {} a nursery object",
+            object,
+            if nursery_object { "is" } else { "is not " }
+        );
         if !self.in_nursery_gc || nursery_object {
             // Note that test_and_mark() has side effects
             if self.test_and_mark(object, self.mark_state) {
@@ -214,7 +218,10 @@ impl<VM: VMBinding> LargeObjectSpace<VM> {
                 }
                 queue.enqueue(object);
             } else {
-                trace!("LOS object {} is not being marked now, it was marked before", object);
+                trace!(
+                    "LOS object {} is not being marked now, it was marked before",
+                    object
+                );
             }
         }
         object

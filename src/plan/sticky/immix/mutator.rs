@@ -1,14 +1,14 @@
 use crate::plan::barriers::ObjectBarrier;
 use crate::plan::generational::barrier::GenObjectBarrierSemantics;
-use crate::plan::mutator_context::{MutatorConfig, create_space_mapping};
-use crate::util::VMMutatorThread;
-use crate::util::alloc::AllocatorSelector;
+use crate::plan::immix;
+use crate::plan::mutator_context::{create_space_mapping, MutatorConfig};
+use crate::plan::sticky::immix::global::StickyImmix;
 use crate::util::alloc::allocators::Allocators;
+use crate::util::alloc::AllocatorSelector;
+use crate::util::opaque_pointer::VMWorkerThread;
+use crate::util::VMMutatorThread;
 use crate::vm::VMBinding;
 use crate::{Mutator, MMTK};
-use crate::util::opaque_pointer::VMWorkerThread;
-use crate::plan::sticky::immix::global::StickyImmix;
-use crate::plan::immix;
 
 pub fn stickyimmix_mutator_prepare<VM: VMBinding>(mutator: &mut Mutator<VM>, tls: VMWorkerThread) {
     immix::mutator::immix_mutator_prepare(mutator, tls)
@@ -28,7 +28,8 @@ pub fn create_stickyimmix_mutator<VM: VMBinding>(
     let config = MutatorConfig {
         allocator_mapping: &ALLOCATOR_MAPPING,
         space_mapping: Box::new({
-            let mut vec = create_space_mapping(immix::mutator::RESERVED_ALLOCATORS, true, &*mmtk.plan);
+            let mut vec =
+                create_space_mapping(immix::mutator::RESERVED_ALLOCATORS, true, &*mmtk.plan);
             vec.push((AllocatorSelector::Immix(0), &stickyimmix.immix.immix_space));
             vec
         }),

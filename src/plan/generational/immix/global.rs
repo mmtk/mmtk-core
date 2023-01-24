@@ -1,6 +1,5 @@
 use super::gc_work::GenImmixMatureGCWorkContext;
 use super::gc_work::GenImmixNurseryGCWorkContext;
-use crate::ObjectQueue;
 use crate::plan::generational::global::CommonGenPlan;
 use crate::plan::generational::global::GenerationalPlan;
 use crate::plan::global::BasePlan;
@@ -16,13 +15,14 @@ use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
 use crate::scheduler::GCWorker;
-use crate::util::Address;
-use crate::util::ObjectReference;
 use crate::util::alloc::allocators::AllocatorSelector;
 use crate::util::copy::*;
 use crate::util::heap::VMRequest;
+use crate::util::Address;
+use crate::util::ObjectReference;
 use crate::util::VMWorkerThread;
 use crate::vm::*;
+use crate::ObjectQueue;
 
 use enum_map::EnumMap;
 use std::sync::atomic::AtomicBool;

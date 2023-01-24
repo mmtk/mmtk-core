@@ -56,10 +56,10 @@ pub(crate) use generational::global::GenerationalPlan;
 
 pub use generational::copying::GENCOPY_CONSTRAINTS;
 pub use generational::immix::GENIMMIX_CONSTRAINTS;
-pub use sticky::immix::STICKY_IMMIX_CONSTRAINTS;
 pub use immix::IMMIX_CONSTRAINTS;
 pub use markcompact::MARKCOMPACT_CONSTRAINTS;
 pub use marksweep::MS_CONSTRAINTS;
 pub use nogc::NOGC_CONSTRAINTS;
 pub use pageprotect::PP_CONSTRAINTS;
 pub use semispace::SS_CONSTRAINTS;
+pub use sticky::immix::STICKY_IMMIX_CONSTRAINTS;

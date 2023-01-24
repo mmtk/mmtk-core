@@ -19,10 +19,12 @@ pub struct GenNurseryProcessEdges<VM: VMBinding, P: SupportNurseryGC<VM> + PlanT
     base: ProcessEdgesBase<VM>,
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesWork for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesWork
+    for GenNurseryProcessEdges<VM, P>
+{
     type VM = VM;
     // type ScanObjectsWorkType = ScanObjects<Self>;
-    type ScanObjectsWorkType =  PlanScanObjects<Self, P>;
+    type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {
         let base = ProcessEdgesBase::new(edges, roots, mmtk);
@@ -48,19 +50,27 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesW
     }
 
     #[inline(always)]
-    fn create_scan_work(&self, nodes: Vec<ObjectReference>, roots: bool) -> Self::ScanObjectsWorkType {
+    fn create_scan_work(
+        &self,
+        nodes: Vec<ObjectReference>,
+        roots: bool,
+    ) -> Self::ScanObjectsWorkType {
         PlanScanObjects::new(self.plan, nodes, false, roots)
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> Deref for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> Deref
+    for GenNurseryProcessEdges<VM, P>
+{
     type Target = ProcessEdgesBase<VM>;
     fn deref(&self) -> &Self::Target {
         &self.base
     }
 }
 
-impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> DerefMut for GenNurseryProcessEdges<VM, P> {
+impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> DerefMut
+    for GenNurseryProcessEdges<VM, P>
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
     }
@@ -97,12 +107,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessModBuf<E> {
             );
         }
         // scan modbuf only if the current GC is a nursery GC
-        if mmtk
-            .plan
-            .generational()
-            .unwrap()
-            .is_current_gc_nursery()
-        {
+        if mmtk.plan.generational().unwrap().is_current_gc_nursery() {
             // Scan objects in the modbuf and forward pointers
             let modbuf = std::mem::take(&mut self.modbuf);
             GCWork::do_work(
@@ -136,12 +141,7 @@ impl<E: ProcessEdgesWork> GCWork<E::VM> for ProcessRegionModBuf<E> {
     #[inline(always)]
     fn do_work(&mut self, worker: &mut GCWorker<E::VM>, mmtk: &'static MMTK<E::VM>) {
         // Scan modbuf only if the current GC is a nursery GC
-        if mmtk
-            .plan
-            .generational()
-            .unwrap()
-            .is_current_gc_nursery()
-        {
+        if mmtk.plan.generational().unwrap().is_current_gc_nursery() {
             // Collect all the entries in all the slices
             let mut edges = vec![];
             for slice in &self.modbuf {

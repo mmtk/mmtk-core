@@ -293,7 +293,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             }
         }
 
-
         // Prepare defrag info
         if super::DEFRAG {
             self.defrag.prepare(self);
@@ -393,7 +392,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         let block = Block::from_aligned_address(block_address);
         block.init(copy);
         self.chunk_map.set(block.chunk(), ChunkState::Allocated);
-        self.lines_consumed.fetch_add(Block::LINES, Ordering::SeqCst);
+        self.lines_consumed
+            .fetch_add(Block::LINES, Ordering::SeqCst);
         Some(block)
     }
 
@@ -410,7 +410,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 }
                 // Get available lines. Do this before block.init which will reset block state.
                 if let BlockState::Reusable { unavailable_lines } = block.get_state() {
-                    self.lines_consumed.fetch_add(Block::LINES - unavailable_lines as usize, Ordering::SeqCst);
+                    self.lines_consumed
+                        .fetch_add(Block::LINES - unavailable_lines as usize, Ordering::SeqCst);
                 } else {
                     unreachable!();
                 }
@@ -533,7 +534,9 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         } else {
             // We won the forwarding race; actually forward and copy the object if it is not pinned
             // and we have sufficient space in our copy allocator
-            let new_object = if self.is_pinned(object) || (!nursery_collection && self.defrag.space_exhausted()) {
+            let new_object = if self.is_pinned(object)
+                || (!nursery_collection && self.defrag.space_exhausted())
+            {
                 self.attempt_mark(object, self.mark_state);
                 ForwardingWord::clear_forwarding_bits::<VM>(object);
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
@@ -541,7 +544,8 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             } else {
                 #[cfg(feature = "global_alloc_bit")]
                 crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
-                let new_object = ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
+                let new_object =
+                    ForwardingWord::forward_object::<VM>(object, semantics, copy_context);
                 Block::containing::<VM>(new_object).set_state(BlockState::Marked);
                 new_object
             };
@@ -703,7 +707,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         debug_assert!(!self.defrag.in_defrag());
         self.is_marked(object, self.mark_state)
     }
-
 }
 
 /// A work packet to prepare each block for GC.

@@ -11,8 +11,12 @@ impl<VM: VMBinding> crate::scheduler::GCWorkContext for StickyImmixNurseryGCWork
     type ProcessEdgesWorkType = GenNurseryProcessEdges<VM, Self::PlanType>;
 }
 
-pub struct StickyImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(std::marker::PhantomData<VM>);
-impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext for StickyImmixMatureGCWorkContext<VM, KIND> {
+pub struct StickyImmixMatureGCWorkContext<VM: VMBinding, const KIND: TraceKind>(
+    std::marker::PhantomData<VM>,
+);
+impl<VM: VMBinding, const KIND: TraceKind> crate::scheduler::GCWorkContext
+    for StickyImmixMatureGCWorkContext<VM, KIND>
+{
     type VM = VM;
     type PlanType = StickyImmix<VM>;
     type ProcessEdgesWorkType = PlanProcessEdges<VM, Self::PlanType, KIND>;
