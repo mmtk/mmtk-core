@@ -54,7 +54,7 @@ jobs:
           .github/scripts/ci-style.sh
 
   openjdk-binding-test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
@@ -85,7 +85,7 @@ jobs:
           ./.github/scripts/ci-style.sh
 
   jikesrvm-binding-test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     needs: binding-refs
     if: contains(github.event.pull_request.labels.*.name, 'PR-testing')
     steps:
