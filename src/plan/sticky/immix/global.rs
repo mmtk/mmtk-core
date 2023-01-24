@@ -170,6 +170,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             // nursery GC -- we schedule it
             scheduler.schedule_common_work::<StickyImmixNurseryGCWorkContext<VM>>(self);
         } else {
+            info!("Full heap GC");
             use crate::plan::immix::Immix;
             use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
             // self.immix.schedule_collection(scheduler);
@@ -193,26 +194,22 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
 
     fn prepare(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            info!("Prepare nursery");
             // Prepare both large object space and immix space
             self.immix.immix_space.prepare(false);
             self.immix.common.los.prepare(false);
         } else {
-            info!("Prepare full heap");
             self.immix.prepare(tls);
         }
     }
 
     fn release(&mut self, tls: crate::util::VMWorkerThread) {
         if self.is_current_gc_nursery() {
-            info!("Release nursery");
             let was_defrag = self.immix.immix_space.release(false);
             self.immix
                 .last_gc_was_defrag
                 .store(was_defrag, Ordering::Relaxed);
             self.immix.common.los.release(false);
         } else {
-            info!("Release full heap");
             self.immix.release(tls);
         }
     }

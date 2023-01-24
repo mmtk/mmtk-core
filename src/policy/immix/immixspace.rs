@@ -319,6 +319,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
 
+            // Prepare defrag info
+            if super::DEFRAG {
+                self.defrag.prepare(self);
+            }
+
             // Prepare each block for GC
             let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
             // # Safety: ImmixSpace reference is always valid within this collection cycle.
@@ -339,11 +344,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
             }
-        }
-
-        // Prepare defrag info
-        if super::DEFRAG {
-            self.defrag.prepare(self);
         }
     }
 
@@ -432,13 +432,17 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 if copy && block.is_defrag_source() {
                     continue;
                 }
+
                 // Get available lines. Do this before block.init which will reset block state.
-                if let BlockState::Reusable { unavailable_lines } = block.get_state() {
-                    self.lines_consumed
-                        .fetch_add(Block::LINES - unavailable_lines as usize, Ordering::SeqCst);
-                } else {
-                    unreachable!();
-                }
+                let lines_delta = match block.get_state() {
+                    BlockState::Reusable { unavailable_lines } => {
+                        Block::LINES - unavailable_lines as usize
+                    }
+                    BlockState::Unmarked => Block::LINES,
+                    _ => unreachable!("{:?} {:?}", block, block.get_state()),
+                };
+                self.lines_consumed.fetch_add(lines_delta, Ordering::SeqCst);
+
                 block.init(copy);
                 return Some(block);
             } else {
