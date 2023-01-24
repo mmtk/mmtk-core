@@ -47,7 +47,26 @@ pub struct ImmixSpace<VM: VMBinding> {
     mark_state: u8,
     /// Work packet scheduler
     scheduler: Arc<GCWorkScheduler<VM>>,
-    nursery_collection: bool,
+    /// Some settings for this space
+    space_args: ImmixSpaceArgs,
+}
+
+/// Some arguments for Immix Space.
+pub struct ImmixSpaceArgs {
+    /// Mark an object as unlogged when we trace an object.
+    /// Normally we set the log bit when we copy an object with [`crate::util::copy::CopySemantics::PromoteToMature`].
+    /// In sticky immix, we may not copy an object but 'promote' an
+    /// object to mature. So we do not use `PromoteToMature`, and instead
+    /// just set the log bit in the space when an object is traced.
+    pub log_object_when_traced: bool,
+    /// Reset log bit at the start of a major GC.
+    /// Normally we do not need to do this. When immix is used as the mature space,
+    /// any object should be set as unlogged, and that bit does not need to be cleared
+    /// even if the object is dead. But in sticky Immix, the mature object and
+    /// the nursery object are in the same space, we will have to use the
+    /// bit to differentiate them. So we reset all the log bits in major GCs,
+    /// and unlogged the objects when they are traced (alive).
+    pub reset_log_bit_in_major_gc: bool,
 }
 
 unsafe impl<VM: VMBinding> Sync for ImmixSpace<VM> {}
@@ -195,12 +214,24 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         })
     }
 
-    pub fn new(args: crate::policy::space::PlanCreateSpaceArgs<VM>) -> Self {
+    pub fn new(
+        args: crate::policy::space::PlanCreateSpaceArgs<VM>,
+        space_args: ImmixSpaceArgs,
+    ) -> Self {
         #[cfg(feature = "immix_no_defrag")]
         info!(
             "Creating non-moving ImmixSpace: {}. Block size: 2^{}",
             args.name,
             Block::LOG_BYTES
+        );
+
+        assert!(
+            !args.constraints.needs_log_bit || space_args.log_object_when_traced,
+            "log_object_when_traced should not be true if the plan does not use log bit"
+        );
+        assert!(
+            !args.constraints.needs_log_bit || space_args.reset_log_bit_in_major_gc,
+            "reset_log_bit_in_major_gc should not be true if the plan does not use log bit"
         );
 
         super::validate_features();
@@ -229,11 +260,11 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             line_mark_state: AtomicU8::new(Line::RESET_MARK_STATE),
             line_unavail_state: AtomicU8::new(Line::RESET_MARK_STATE),
             lines_consumed: AtomicUsize::new(0),
-            nursery_collection: false,
             reusable_blocks: ReusableBlockPool::new(scheduler.num_workers()),
             defrag: Defrag::default(),
             mark_state: Self::MARKED_STATE,
             scheduler: scheduler.clone(),
+            space_args,
         }
     }
 
@@ -281,8 +312,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     pub fn prepare(&mut self, major_gc: bool) {
-        self.nursery_collection = !major_gc;
-
         if major_gc {
             // Update mark_state
             if VM::VMObjectModel::LOCAL_MARK_BIT_SPEC.is_on_side() {
@@ -488,7 +517,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         worker: &mut GCWorker<VM>,
         nursery_collection: bool,
     ) -> ObjectReference {
-        debug_assert!(nursery_collection == self.nursery_collection);
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
@@ -558,7 +586,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 
     fn unlog_object_if_needed(&self, object: ObjectReference) {
-        if self.common.needs_log_bit {
+        if self.space_args.log_object_when_traced {
             VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC.mark_as_unlogged::<VM>(object, Ordering::SeqCst);
         }
     }
@@ -683,7 +711,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     }
 }
 
-/// A work packet to prepare each block for GC.
+/// A work packet to prepare each block for a major GC.
 /// Performs the action on a range of chunks.
 pub struct PrepareBlockState<VM: VMBinding> {
     pub space: &'static ImmixSpace<VM>,
@@ -695,20 +723,18 @@ impl<VM: VMBinding> PrepareBlockState<VM> {
     /// Clear object mark table
     #[inline(always)]
     fn reset_object_mark(&self) {
-        if !self.space.nursery_collection {
-            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+            side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
+        }
+        if self.space.space_args.reset_log_bit_in_major_gc {
+            if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
+                // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
                 side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-            }
-            if self.space.common.needs_log_bit {
-                if let MetadataSpec::OnSide(side) = *VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC {
-                    // We zero all the log bits in major GC, and for every object we trace, we will mark the log bit again.
-                    side.bzero_metadata(self.chunk.start(), Chunk::BYTES);
-                } else {
-                    // If the log bit is not in side metadata, we cannot bulk zero. We can either
-                    // clear the bit for dead objects in major GC, or clear the log bit for new
-                    // objects. In both cases, we do not need to set log bit at tracing.
-                    unimplemented!("We cannot bulk zero unlogged bit.")
-                }
+            } else {
+                // If the log bit is not in side metadata, we cannot bulk zero. We can either
+                // clear the bit for dead objects in major GC, or clear the log bit for new
+                // objects. In both cases, we do not need to set log bit at tracing.
+                unimplemented!("We cannot bulk zero unlogged bit.")
             }
         }
     }

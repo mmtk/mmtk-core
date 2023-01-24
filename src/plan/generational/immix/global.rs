@@ -11,6 +11,7 @@ use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
 use crate::policy::immix::ImmixSpace;
+use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::GCWorkScheduler;
@@ -248,11 +249,13 @@ impl<VM: VMBinding> GenImmix<VM> {
             global_side_metadata_specs:
                 crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
         };
-        let immix_space = ImmixSpace::new(plan_args.get_space_args(
-            "immix_mature",
-            true,
-            VMRequest::discontiguous(),
-        ));
+        let immix_space = ImmixSpace::new(
+            plan_args.get_space_args("immix_mature", true, VMRequest::discontiguous()),
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: false,
+                log_object_when_traced: false,
+            },
+        );
 
         let genimmix = GenImmix {
             gen: CommonGenPlan::new(plan_args),

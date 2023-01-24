@@ -312,7 +312,13 @@ impl<VM: VMBinding> StickyImmix<VM> {
             ),
         };
         Self {
-            immix: immix::Immix::new_with_plan_args(plan_args),
+            immix: immix::Immix::new_with_args(
+                plan_args,
+                crate::policy::immix::ImmixSpaceArgs {
+                    log_object_when_traced: true,
+                    reset_log_bit_in_major_gc: true,
+                },
+            ),
             gc_full_heap: AtomicBool::new(false),
             next_gc_full_heap: AtomicBool::new(false),
         }

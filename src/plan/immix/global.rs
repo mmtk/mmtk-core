@@ -8,6 +8,7 @@ use crate::plan::global::GcStatus;
 use crate::plan::AllocationSemantics;
 use crate::plan::Plan;
 use crate::plan::PlanConstraints;
+use crate::policy::immix::ImmixSpaceArgs;
 use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
 use crate::policy::space::Space;
 use crate::scheduler::*;
@@ -142,16 +143,24 @@ impl<VM: VMBinding> Immix<VM> {
             constraints: &IMMIX_CONSTRAINTS,
             global_side_metadata_specs: SideMetadataContext::new_global_specs(&[]),
         };
-        Self::new_with_plan_args(plan_args)
+        Self::new_with_args(
+            plan_args,
+            ImmixSpaceArgs {
+                reset_log_bit_in_major_gc: false,
+                log_object_when_traced: false,
+            },
+        )
     }
 
-    pub fn new_with_plan_args(mut plan_args: CreateSpecificPlanArgs<VM>) -> Self {
+    pub fn new_with_args(
+        mut plan_args: CreateSpecificPlanArgs<VM>,
+        space_args: ImmixSpaceArgs,
+    ) -> Self {
         let immix = Immix {
-            immix_space: ImmixSpace::new(plan_args.get_space_args(
-                "immix",
-                true,
-                VMRequest::discontiguous(),
-            )),
+            immix_space: ImmixSpace::new(
+                plan_args.get_space_args("immix", true, VMRequest::discontiguous()),
+                space_args,
+            ),
             common: CommonPlan::new(plan_args),
             last_gc_was_defrag: AtomicBool::new(false),
         };
