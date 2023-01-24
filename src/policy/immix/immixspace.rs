@@ -291,13 +291,7 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 // For header metadata, we use cyclic mark bits.
                 unimplemented!("cyclic mark bits is not supported at the moment");
             }
-        }
 
-        // Prepare defrag info
-        if super::DEFRAG {
-            self.defrag.prepare(self);
-        }
-        if major_gc {
             // Prepare each block for GC
             let threshold = self.defrag.defrag_spill_threshold.load(Ordering::Acquire);
             // # Safety: ImmixSpace reference is always valid within this collection cycle.
@@ -314,12 +308,15 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 })
             });
             self.scheduler().work_buckets[WorkBucketStage::Prepare].bulk_add(work_packets);
-        }
-        // Update line mark state
-        if major_gc {
+
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
             }
+        }
+
+        // Prepare defrag info
+        if super::DEFRAG {
+            self.defrag.prepare(self);
         }
     }
 

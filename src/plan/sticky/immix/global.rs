@@ -234,7 +234,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         if space_full && space.is_some() && space.unwrap().name() == self.immix.immix_space.name() {
             self.next_gc_full_heap.store(true, Ordering::SeqCst);
         }
-        return self.immix.collection_required(space_full, space) || nursery_full;
+        self.immix.collection_required(space_full, space) || nursery_full
     }
 
     fn get_collection_reserved_pages(&self) -> usize {
@@ -319,6 +319,8 @@ impl<VM: VMBinding> StickyImmix<VM> {
     }
 
     fn requires_full_heap_collection(&self) -> bool {
+        // Separate each condition so the code is clear
+        #[allow(clippy::if_same_then_else, clippy::needless_bool)]
         if self
             .immix
             .common
