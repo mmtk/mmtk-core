@@ -52,7 +52,7 @@ on:
 
 jobs:
   binding-refs:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     outputs:
         openjdk_binding_repo: ${{ steps.print.outputs.openjdk_binding_repo }}
         openjdk_binding_ref: ${{ steps.print.outputs.openjdk_binding_ref }}

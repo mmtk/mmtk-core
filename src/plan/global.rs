@@ -3,7 +3,6 @@
 use super::gc_requester::GCRequester;
 use super::PlanConstraints;
 use crate::mmtk::MMTK;
-use crate::plan::generational::global::Gen;
 use crate::plan::tracing::ObjectQueue;
 use crate::plan::Mutator;
 use crate::policy::immortalspace::ImmortalSpace;
@@ -175,8 +174,10 @@ pub trait Plan: 'static + Sync + Downcast {
     fn common(&self) -> &CommonPlan<Self::VM> {
         panic!("Common Plan not handled!")
     }
-    fn generational(&self) -> &Gen<Self::VM> {
-        panic!("This is not a generational plan.")
+    fn generational(
+        &self,
+    ) -> Option<&dyn crate::plan::generational::global::GenerationalPlan<VM = Self::VM>> {
+        None
     }
     fn mmapper(&self) -> &'static dyn Mmapper {
         self.base().mmapper
@@ -189,11 +190,6 @@ pub trait Plan: 'static + Sync + Downcast {
     fn get_spaces(&self) -> Vec<&dyn Space<Self::VM>>;
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector>;
-
-    /// Is current GC only collecting objects allocated since last GC?
-    fn is_current_gc_nursery(&self) -> bool {
-        false
-    }
 
     #[cfg(feature = "sanity")]
     fn enter_sanity(&self) {
@@ -274,12 +270,6 @@ pub trait Plan: 'static + Sync + Downcast {
         //    buffers for copy allocators).
         self.get_total_pages()
             .saturating_sub(self.get_reserved_pages())
-    }
-
-    /// Return the number of pages available for allocation into the mature space. Only
-    /// generational plans have to implement this function.
-    fn get_mature_physical_pages_available(&self) -> usize {
-        panic!("This is not a generational plan.")
     }
 
     /// Get the number of pages that are reserved for collection. By default, we return 0.
