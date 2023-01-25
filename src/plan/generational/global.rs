@@ -302,6 +302,8 @@ impl<VM: VMBinding> CommonGenPlan<VM> {
 
 /// This trait includes methods that are specific to generational plans.
 pub trait GenerationalPlan: Plan {
+    /// Is the current GC a nursery GC? If a GC is not a nursery GC, it will be a full heap GC.
+    /// This should only be called during GC.
     fn is_current_gc_nursery(&self) -> bool;
 
     /// Return the number of pages available for allocation into the mature space.
@@ -311,7 +313,8 @@ pub trait GenerationalPlan: Plan {
     fn get_mature_reserved_pages(&self) -> usize;
 }
 
-/// This trait includes methods to support nursery GC. It is separated from [`GenerationalPlan`] as we use
+/// This trait includes methods to support nursery GC. A plan that uses [``]generational barriers, or
+/// nursery tracing work is required to implement this. It is separated from [`GenerationalPlan`] as we use
 /// type parameters in its method, thus it is not object safe. We would like to keep [`GenerationalPlan`]
 /// object safe, so we introduce this trait.
 pub trait SupportNurseryGC<VM: VMBinding>: Plan<VM = VM> {

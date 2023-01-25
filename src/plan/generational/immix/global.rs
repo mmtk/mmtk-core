@@ -141,29 +141,15 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
 
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        let defrag = if is_full_heap {
-            self.immix.decide_whether_to_defrag(
-                self.is_emergency_collection(),
-                true,
-                self.base().cur_collection_attempts.load(Ordering::SeqCst),
-                self.base().is_user_triggered_collection(),
-                *self.base().options.full_heap_system_gc,
-            )
-        } else {
-            false
-        };
 
         if !is_full_heap {
             debug!("Nursery GC");
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
-        } else if defrag {
-            debug!("Full heap GC Defrag");
-            scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self);
         } else {
-            debug!("Full heap GC Fast");
-            scheduler
-                .schedule_common_work::<GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>>(self);
+            crate::plan::immix::Immix::schedule_immix_full_heap_collection::<
+                GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
+                GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
+            >(self, &self.immix, scheduler);
         }
     }
 

@@ -82,25 +82,10 @@ impl<VM: VMBinding> Plan for Immix<VM> {
     fn schedule_collection(&'static self, scheduler: &GCWorkScheduler<VM>) {
         self.base().set_collection_kind::<Self>(self);
         self.base().set_gc_status(GcStatus::GcPrepare);
-        // let in_defrag = self.immix_space.decide_whether_to_defrag(
-        //     self.is_emergency_collection(),
-        //     true,
-        //     self.base().cur_collection_attempts.load(Ordering::SeqCst),
-        //     self.base().is_user_triggered_collection(),
-        //     *self.base().options.full_heap_system_gc,
-        // );
-
-        // // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        // #[allow(clippy::if_same_then_else)]
-        // if in_defrag {
-        //     scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>>(self);
-        // } else {
-        //     scheduler.schedule_common_work::<ImmixGCWorkContext<VM, TRACE_KIND_FAST>>(self);
-        // }
-        Self::schedule_immix_collection::<
+        Self::schedule_immix_full_heap_collection::<
             ImmixGCWorkContext<VM, TRACE_KIND_FAST>,
             ImmixGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-        >(self, self, &self.immix_space, scheduler)
+        >(self, &self.immix_space, scheduler)
     }
 
     fn get_allocator_mapping(&self) -> &'static EnumMap<AllocationSemantics, AllocatorSelector> {
@@ -178,18 +163,16 @@ impl<VM: VMBinding> Immix<VM> {
         immix
     }
 
-    /// A plan must call set_collection_kind and set_gc_status before this call.
-    pub(crate) fn schedule_immix_collection<
+    /// Schedule a full heap immix collection. This method is used by immix/gen immix/sticky immix
+    /// to schedule a full heap collection. A plan must call set_collection_kind and set_gc_status before this method.
+    pub(crate) fn schedule_immix_full_heap_collection<
         FastContext: 'static + GCWorkContext<VM = VM>,
         DefragContext: 'static + GCWorkContext<VM = VM>,
     >(
-        defrag_plan: &'static DefragContext::PlanType,
-        fast_plan: &'static FastContext::PlanType,
+        plan: &'static DefragContext::PlanType,
         immix_space: &ImmixSpace<VM>,
         scheduler: &GCWorkScheduler<VM>,
     ) {
-        let plan = defrag_plan;
-
         let in_defrag = immix_space.decide_whether_to_defrag(
             plan.is_emergency_collection(),
             true,
@@ -198,11 +181,13 @@ impl<VM: VMBinding> Immix<VM> {
             *plan.base().options.full_heap_system_gc,
         );
 
-        // The blocks are not identical, clippy is wrong. Probably it does not recognize the constant type parameter.
-        #[allow(clippy::if_same_then_else)]
         if in_defrag {
-            scheduler.schedule_common_work::<DefragContext>(defrag_plan);
+            scheduler.schedule_common_work::<DefragContext>(plan);
         } else {
+            // The type of plan is `DefragContext::PlanType`, and we need it as `FastContext::PlanType`.
+            // They should be the same plan. But I don't find a way to tell Rust compiler that
+            // those PlanTypes are the same. So just do a unsafe transmute here.
+            let fast_plan = unsafe { std::mem::transmute(plan) };
             scheduler.schedule_common_work::<FastContext>(fast_plan);
         }
     }

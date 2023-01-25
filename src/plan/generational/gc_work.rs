@@ -23,7 +23,6 @@ impl<VM: VMBinding, P: SupportNurseryGC<VM> + PlanTraceObject<VM>> ProcessEdgesW
     for GenNurseryProcessEdges<VM, P>
 {
     type VM = VM;
-    // type ScanObjectsWorkType = ScanObjects<Self>;
     type ScanObjectsWorkType = PlanScanObjects<Self, P>;
 
     fn new(edges: Vec<EdgeOf<Self>>, roots: bool, mmtk: &'static MMTK<VM>) -> Self {

@@ -55,8 +55,8 @@ pub struct ImmixSpace<VM: VMBinding> {
 pub struct ImmixSpaceArgs {
     /// Mark an object as unlogged when we trace an object.
     /// Normally we set the log bit when we copy an object with [`crate::util::copy::CopySemantics::PromoteToMature`].
-    /// In sticky immix, we may not copy an object but 'promote' an
-    /// object to mature. So we do not use `PromoteToMature`, and instead
+    /// In sticky immix, we 'promote' an object to mature when we trace the object
+    /// (no matter we copy an object or not). So we have to use `PromoteToMature`, and instead
     /// just set the log bit in the space when an object is traced.
     pub log_object_when_traced: bool,
     /// Reset log bit at the start of a major GC.

@@ -175,11 +175,10 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             info!("Full heap GC");
             use crate::plan::immix::Immix;
             use crate::policy::immix::{TRACE_KIND_DEFRAG, TRACE_KIND_FAST};
-            // self.immix.schedule_collection(scheduler);
-            Immix::schedule_immix_collection::<
+            Immix::schedule_immix_full_heap_collection::<
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
                 StickyImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
-            >(self, self, &self.immix.immix_space, scheduler);
+            >(self, &self.immix.immix_space, scheduler);
         }
     }
 
