@@ -204,25 +204,27 @@ pub(crate) fn get_system_total_memory() -> usize {
 mod tests {
     use super::*;
     use crate::util::constants::BYTES_IN_PAGE;
-    use crate::util::test_util::MEMORY_TEST_REGION;
+    use crate::util::test_util::memory_test_region;
     use crate::util::test_util::{serial_test, with_cleanup};
 
     // In the tests, we will mmap this address. This address should not be in our heap (in case we mess up with other tests)
-    const START: Address = MEMORY_TEST_REGION.start;
+    lazy_static! {
+        static ref START: Address = memory_test_region().start;
+    }
 
     #[test]
     fn test_mmap() {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE) };
+                    let res = unsafe { dzmmap(*START, BYTES_IN_PAGE) };
                     assert!(res.is_ok());
                     // We can overwrite with dzmmap
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE) };
+                    let res = unsafe { dzmmap(*START, BYTES_IN_PAGE) };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             );
         });
@@ -233,13 +235,13 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE);
+                    let res = dzmmap_noreplace(*START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
-                    let res = munmap(START, BYTES_IN_PAGE);
+                    let res = munmap(*START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -252,14 +254,14 @@ mod tests {
             with_cleanup(
                 || {
                     // Make sure we mmapped the memory
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE) };
+                    let res = unsafe { dzmmap(*START, BYTES_IN_PAGE) };
                     assert!(res.is_ok());
                     // Use dzmmap_noreplace will fail
-                    let res = dzmmap_noreplace(START, BYTES_IN_PAGE);
+                    let res = dzmmap_noreplace(*START, BYTES_IN_PAGE);
                     assert!(res.is_err());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             )
         });
@@ -270,14 +272,14 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    let res = mmap_noreserve(START, BYTES_IN_PAGE);
+                    let res = mmap_noreserve(*START, BYTES_IN_PAGE);
                     assert!(res.is_ok());
                     // Try reserve it
-                    let res = unsafe { dzmmap(START, BYTES_IN_PAGE) };
+                    let res = unsafe { dzmmap(*START, BYTES_IN_PAGE) };
                     assert!(res.is_ok());
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -291,10 +293,10 @@ mod tests {
             with_cleanup(
                 || {
                     // We expect this call to panic
-                    panic_if_unmapped(START, BYTES_IN_PAGE);
+                    panic_if_unmapped(*START, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -305,11 +307,11 @@ mod tests {
         serial_test(|| {
             with_cleanup(
                 || {
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
-                    panic_if_unmapped(START, BYTES_IN_PAGE);
+                    assert!(dzmmap_noreplace(*START, BYTES_IN_PAGE).is_ok());
+                    panic_if_unmapped(*START, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE).is_ok());
                 },
             )
         })
@@ -323,13 +325,13 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
+                    assert!(dzmmap_noreplace(*START, BYTES_IN_PAGE).is_ok());
 
                     // check if the next page is mapped - which should panic
-                    panic_if_unmapped(START + BYTES_IN_PAGE, BYTES_IN_PAGE);
+                    panic_if_unmapped(*START + BYTES_IN_PAGE, BYTES_IN_PAGE);
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })
@@ -345,13 +347,13 @@ mod tests {
             with_cleanup(
                 || {
                     // map 1 page from START
-                    assert!(dzmmap_noreplace(START, BYTES_IN_PAGE).is_ok());
+                    assert!(dzmmap_noreplace(*START, BYTES_IN_PAGE).is_ok());
 
                     // check if the 2 pages from START are mapped. The second page is unmapped, so it should panic.
-                    panic_if_unmapped(START, BYTES_IN_PAGE * 2);
+                    panic_if_unmapped(*START, BYTES_IN_PAGE * 2);
                 },
                 || {
-                    assert!(munmap(START, BYTES_IN_PAGE * 2).is_ok());
+                    assert!(munmap(*START, BYTES_IN_PAGE * 2).is_ok());
                 },
             )
         })

@@ -26,14 +26,17 @@ impl MmapTestRegion {
 }
 
 // util::heap::layout::fragmented_mmapper
-pub(crate) const FRAGMENTED_MMAPPER_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before_address(HEAP_START, MMAP_CHUNK_BYTES * 2);
+pub(crate) fn fragmented_mmapper_test_region() -> MmapTestRegion {
+    MmapTestRegion::reserve_before_address(VM_LAYOUT_CONSTANTS.heap_start, MMAP_CHUNK_BYTES * 2)
+}
 // util::heap::layout::byte_map_mmaper
-pub(crate) const BYTE_MAP_MMAPPER_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before(FRAGMENTED_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES * 2);
+pub(crate) fn byte_map_mmapper_test_region() -> MmapTestRegion {
+    MmapTestRegion::reserve_before(fragmented_mmapper_test_region(), MMAP_CHUNK_BYTES * 2)
+}
 // util::memory
-pub(crate) const MEMORY_TEST_REGION: MmapTestRegion =
-    MmapTestRegion::reserve_before(BYTE_MAP_MMAPPER_TEST_REGION, MMAP_CHUNK_BYTES);
+pub(crate) fn memory_test_region() -> MmapTestRegion {
+    MmapTestRegion::reserve_before(byte_map_mmapper_test_region(), MMAP_CHUNK_BYTES)
+}
 
 // https://github.com/rust-lang/rfcs/issues/2798#issuecomment-552949300
 pub fn panic_after<T, F>(millis: u64, f: F) -> T

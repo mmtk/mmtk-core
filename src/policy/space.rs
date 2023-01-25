@@ -7,8 +7,7 @@ use crate::util::metadata::side_metadata::{
 use crate::util::Address;
 use crate::util::ObjectReference;
 
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, LOG_BYTES_IN_CHUNK};
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_END, AVAILABLE_START};
+use crate::util::heap::layout::vm_layout_constants::{LOG_BYTES_IN_CHUNK, VM_LAYOUT_CONSTANTS};
 use crate::util::heap::{PageResource, VMRequest};
 use crate::util::options::Options;
 use crate::vm::{ActivePlan, Collection};
@@ -554,10 +553,15 @@ impl<VM: VMBinding> CommonSpace<VM> {
 }
 
 fn get_frac_available(frac: f32) -> usize {
-    trace!("AVAILABLE_START={}", AVAILABLE_START);
-    trace!("AVAILABLE_END={}", AVAILABLE_END);
-    let bytes = (frac * AVAILABLE_BYTES as f32) as usize;
-    trace!("bytes={}*{}={}", frac, AVAILABLE_BYTES, bytes);
+    trace!("AVAILABLE_START={}", VM_LAYOUT_CONSTANTS.available_start());
+    trace!("AVAILABLE_END={}", VM_LAYOUT_CONSTANTS.available_end());
+    let bytes = (frac * VM_LAYOUT_CONSTANTS.available_bytes() as f32) as usize;
+    trace!(
+        "bytes={}*{}={}",
+        frac,
+        VM_LAYOUT_CONSTANTS.available_bytes(),
+        bytes
+    );
     let mb = bytes >> LOG_BYTES_IN_MBYTE;
     let rtn = mb << LOG_BYTES_IN_MBYTE;
     trace!("rtn={}", rtn);

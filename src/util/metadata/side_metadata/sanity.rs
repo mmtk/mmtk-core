@@ -7,9 +7,9 @@ use super::constants::{
     LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO, LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO,
 };
 use super::{SideMetadataContext, SideMetadataSpec};
-use crate::util::heap::layout::vm_layout_constants::LOG_ADDRESS_SPACE;
 #[cfg(target_pointer_width = "32")]
 use crate::util::heap::layout::vm_layout_constants::LOG_BYTES_IN_CHUNK;
+use crate::util::heap::layout::vm_layout_constants::{VMLayoutConstants, VM_LAYOUT_CONSTANTS};
 
 /// An internal enum to enhance code style for add/sub
 #[cfg(feature = "extreme_assertions")]
@@ -63,7 +63,11 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
         total_size += super::metadata_address_range_size(spec);
     }
 
-    if total_size <= 1usize << (LOG_ADDRESS_SPACE - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO) {
+    if total_size
+        <= 1usize
+            << (VMLayoutConstants::LOG_ARCH_ADDRESS_SPACE
+                - LOG_GLOBAL_SIDE_METADATA_WORST_CASE_RATIO)
+    {
         Ok(())
     } else {
         Err(Error::new(
@@ -84,7 +88,9 @@ fn verify_global_specs_total_size(g_specs: &[SideMetadataSpec]) -> Result<()> {
 fn verify_local_specs_size(l_specs: &[SideMetadataSpec]) -> Result<()> {
     for spec in l_specs {
         if super::metadata_address_range_size(spec)
-            > 1usize << (LOG_ADDRESS_SPACE - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
+            > 1usize
+                << (VM_LAYOUT_CONSTANTS.log_address_space
+                    - LOG_LOCAL_SIDE_METADATA_WORST_CASE_RATIO)
         {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -371,8 +377,8 @@ fn verify_metadata_address_bound(spec: &SideMetadataSpec, data_addr: Address) {
     #[cfg(target_pointer_width = "32")]
     let data_addr_in_address_space = true;
     #[cfg(target_pointer_width = "64")]
-    let data_addr_in_address_space =
-        data_addr <= unsafe { Address::from_usize(1usize << LOG_ADDRESS_SPACE) };
+    let data_addr_in_address_space = data_addr
+        <= unsafe { Address::from_usize(1usize << VM_LAYOUT_CONSTANTS.log_address_space) };
 
     if !data_addr_in_address_space {
         warn!(

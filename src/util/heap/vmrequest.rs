@@ -27,20 +27,20 @@ impl VMRequest {
 
     pub fn common64bit(top: bool) -> Self {
         VMRequest::Extent {
-            extent: MAX_SPACE_EXTENT,
+            extent: VM_LAYOUT_CONSTANTS.max_space_extent(),
             top,
         }
     }
 
     pub fn discontiguous() -> Self {
-        if cfg!(target_pointer_width = "64") {
+        if cfg!(target_pointer_width = "64") && VM_LAYOUT_CONSTANTS.log_address_space > 35 {
             return Self::common64bit(false);
         }
         VMRequest::Discontiguous
     }
 
     pub fn fixed_size(mb: usize) -> Self {
-        if cfg!(target_pointer_width = "64") {
+        if cfg!(target_pointer_width = "64") && VM_LAYOUT_CONSTANTS.log_address_space > 35 {
             return Self::common64bit(false);
         }
         VMRequest::Extent {
@@ -50,14 +50,14 @@ impl VMRequest {
     }
 
     pub fn fraction(frac: f32) -> Self {
-        if cfg!(target_pointer_width = "64") {
+        if cfg!(target_pointer_width = "64") && VM_LAYOUT_CONSTANTS.log_address_space > 35 {
             return Self::common64bit(false);
         }
         VMRequest::Fraction { frac, top: false }
     }
 
     pub fn high_fixed_size(mb: usize) -> Self {
-        if cfg!(target_pointer_width = "64") {
+        if cfg!(target_pointer_width = "64") && VM_LAYOUT_CONSTANTS.log_address_space > 35 {
             return Self::common64bit(true);
         }
         VMRequest::Extent {
@@ -67,7 +67,7 @@ impl VMRequest {
     }
 
     pub fn fixed_extent(extent: usize, top: bool) -> Self {
-        if cfg!(target_pointer_width = "64") {
+        if cfg!(target_pointer_width = "64") && VM_LAYOUT_CONSTANTS.log_address_space > 35 {
             return Self::common64bit(top);
         }
         VMRequest::Extent { extent, top }

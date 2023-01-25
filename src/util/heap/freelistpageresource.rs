@@ -177,7 +177,7 @@ impl<VM: VMBinding> FreeListPageResource<VM> {
 
     pub fn new_discontiguous(vm_map: &'static dyn Map) -> Self {
         let common_flpr = {
-            let start = AVAILABLE_START;
+            let start = VM_LAYOUT_CONSTANTS.available_start();
             let common_flpr = Box::new(CommonFreeListPageResource {
                 free_list: vm_map.create_freelist(start),
                 start,

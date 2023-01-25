@@ -7,7 +7,7 @@ use crate::util::ObjectReference;
 
 use crate::policy::sft::GCWorkerMutRef;
 use crate::util::conversions;
-use crate::util::heap::layout::vm_layout_constants::{AVAILABLE_BYTES, AVAILABLE_START};
+use crate::util::heap::layout::vm_layout_constants::VM_LAYOUT_CONSTANTS;
 use crate::util::metadata::side_metadata::SideMetadataContext;
 use crate::util::metadata::side_metadata::SideMetadataSanity;
 use crate::util::opaque_pointer::*;
@@ -175,19 +175,19 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
             _ => unimplemented!(),
         };
         assert!(
-            total_bytes <= AVAILABLE_BYTES,
+            total_bytes <= VM_LAYOUT_CONSTANTS.available_bytes(),
             "Initial requested memory ({} bytes) overflows the heap. Max heap size is {} bytes.",
             total_bytes,
-            AVAILABLE_BYTES
+            VM_LAYOUT_CONSTANTS.available_bytes()
         );
 
         // FIXME: This space assumes that it can use the entire heap range, which is definitely wrong.
         // https://github.com/mmtk/mmtk-core/issues/314
         let space = Self {
             name: args.name,
-            cursor: AtomicUsize::new(AVAILABLE_START.as_usize()),
-            limit: AVAILABLE_START + total_bytes,
-            start: AVAILABLE_START,
+            cursor: AtomicUsize::new(VM_LAYOUT_CONSTANTS.available_start().as_usize()),
+            limit: VM_LAYOUT_CONSTANTS.available_start() + total_bytes,
+            start: VM_LAYOUT_CONSTANTS.available_start(),
             extent: total_bytes,
             slow_path_zeroing,
             metadata: SideMetadataContext {
@@ -198,10 +198,11 @@ impl<VM: VMBinding> LockFreeImmortalSpace<VM> {
         };
 
         // Eagerly memory map the entire heap (also zero all the memory)
-        crate::util::memory::dzmmap_noreplace(AVAILABLE_START, total_bytes).unwrap();
+        crate::util::memory::dzmmap_noreplace(VM_LAYOUT_CONSTANTS.available_start(), total_bytes)
+            .unwrap();
         if space
             .metadata
-            .try_map_metadata_space(AVAILABLE_START, total_bytes)
+            .try_map_metadata_space(VM_LAYOUT_CONSTANTS.available_start(), total_bytes)
             .is_err()
         {
             // TODO(Javad): handle meta space allocation failure

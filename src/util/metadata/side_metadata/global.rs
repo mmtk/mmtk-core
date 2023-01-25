@@ -1129,7 +1129,7 @@ mod tests {
             let mut sanity = SideMetadataSanity::new();
             sanity.verify_metadata_context("TestPolicy", &context);
 
-            let data_addr = vm_layout_constants::HEAP_START;
+            let data_addr = vm_layout_constants::VM_LAYOUT_CONSTANTS.heap_start;
             let meta_addr = address_to_meta_address(&spec, data_addr);
             with_cleanup(
                 || {
