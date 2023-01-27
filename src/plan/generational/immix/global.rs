@@ -147,8 +147,8 @@ impl<VM: VMBinding> Plan for GenImmix<VM> {
             scheduler.schedule_common_work::<GenImmixNurseryGCWorkContext<VM>>(self);
         } else {
             crate::plan::immix::Immix::schedule_immix_full_heap_collection::<
-                GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
                 GenImmixMatureGCWorkContext<VM, TRACE_KIND_FAST>,
+                GenImmixMatureGCWorkContext<VM, TRACE_KIND_DEFRAG>,
             >(self, &self.immix, scheduler);
         }
     }
