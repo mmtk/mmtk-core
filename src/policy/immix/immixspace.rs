@@ -343,6 +343,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
             if !super::BLOCK_ONLY {
                 self.line_mark_state.fetch_add(1, Ordering::AcqRel);
+                if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
+                    self.line_mark_state
+                        .store(Line::RESET_MARK_STATE, Ordering::Release);
+                }
             }
         }
     }
@@ -354,10 +358,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
         if major_gc {
             // Update line_unavail_state for hole searching afte this GC.
             if !super::BLOCK_ONLY {
-                if self.line_mark_state.load(Ordering::Acquire) > Line::MAX_MARK_STATE {
-                    self.line_mark_state
-                        .store(Line::RESET_MARK_STATE, Ordering::Release);
-                }
                 self.line_unavail_state.store(
                     self.line_mark_state.load(Ordering::Acquire),
                     Ordering::Release,
