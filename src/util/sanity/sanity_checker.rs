@@ -184,7 +184,19 @@ impl<VM: VMBinding> ProcessEdgesWork for SanityGCProcessEdges<VM> {
             // FIXME steveb consider VM-specific integrity check on reference.
             assert!(object.is_sane(), "Invalid reference {:?}", object);
 
-            self.mmtk().plan.sanity_check_object(object);
+            // Let plan check object
+            assert!(
+                self.mmtk().plan.sanity_check_object(object),
+                "Invalid reference {:?}",
+                object
+            );
+
+            // Let VM check object
+            assert!(
+                VM::VMObjectModel::is_object_sane(object),
+                "Invalid reference {:?}",
+                object
+            );
 
             // Object is not "marked"
             sanity_checker.refs.insert(object); // "Mark" it

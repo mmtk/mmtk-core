@@ -243,46 +243,39 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
         self.immix.get_used_pages()
     }
 
-    fn sanity_check_object(&self, object: crate::util::ObjectReference) {
+    fn sanity_check_object(&self, object: crate::util::ObjectReference) -> bool {
         if self.is_current_gc_nursery() {
             if self.immix.immix_space.in_space(object) {
                 // Every object should be logged
                 if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                     .is_unlogged::<VM>(object, Ordering::SeqCst)
                 {
-                    self.get_spaces().iter().for_each(|s| {
-                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                    });
-                    panic!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                    error!("Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                    return false;
                 }
                 if !self
                     .immix
                     .immix_space
                     .is_marked_with_current_mark_state(object)
                 {
-                    self.get_spaces().iter().for_each(|s| {
-                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                    });
-                    panic!("Object {} is not marked (all objects that have been traced should be marked)", object);
+                    error!("Object {} is not marked (all objects that have been traced should be marked)", object);
+                    return false;
                 }
             } else if self.immix.common.los.in_space(object) {
                 // Every object should be logged
                 if !VM::VMObjectModel::GLOBAL_LOG_BIT_SPEC
                     .is_unlogged::<VM>(object, Ordering::SeqCst)
                 {
-                    self.get_spaces().iter().for_each(|s| {
-                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                    });
-                    panic!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                    error!("LOS Object {} is not unlogged (all objects that have been traced should be unlogged/mature)", object);
+                    return false;
                 }
                 if !self.immix.common.los.is_live(object) {
-                    self.get_spaces().iter().for_each(|s| {
-                        crate::policy::space::print_vm_map(*s, &mut std::io::stdout()).unwrap();
-                    });
-                    panic!("LOS Object {} is not marked", object);
+                    error!("LOS Object {} is not marked", object);
+                    return false;
                 }
             }
         }
+        true
     }
 }
 
