@@ -156,10 +156,26 @@ impl<VM: VMBinding> crate::policy::gc_work::PolicyTraceObject<VM> for ImmixSpace
         copy: Option<CopySemantics>,
         worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
+        debug_assert!(
+            !crate::plan::is_nursery_gc(VM::VMActivePlan::global()),
+            "Calling PolicyTraceObject on Immix in nursery GC"
+        );
         if KIND == TRACE_KIND_DEFRAG {
-            self.trace_object(queue, object, copy.unwrap(), worker)
+            if Block::containing::<VM>(object).is_defrag_source() {
+                debug_assert!(self.in_defrag());
+                // This should not be nursery collection. Nursery collection does not use PolicyTraceObject.
+                self.trace_object_with_opportunistic_copy(
+                    queue,
+                    object,
+                    copy.unwrap(),
+                    worker,
+                    false,
+                )
+            } else {
+                self.trace_object_without_moving(queue, object)
+            }
         } else if KIND == TRACE_KIND_FAST {
-            self.fast_trace_object(queue, object)
+            self.trace_object_without_moving(queue, object)
         } else {
             unreachable!()
         }
@@ -453,22 +469,10 @@ impl<VM: VMBinding> ImmixSpace<VM> {
 
     /// Trace and mark objects without evacuation.
     #[inline(always)]
-    pub fn fast_trace_object(
+    pub fn trace_object_without_moving(
         &self,
-        trace: &mut impl ObjectQueue,
+        queue: &mut impl ObjectQueue,
         object: ObjectReference,
-    ) -> ObjectReference {
-        self.trace_object_without_moving(trace, object)
-    }
-
-    /// Trace and mark objects. If the current object is in defrag block, then do evacuation as well.
-    #[inline(always)]
-    pub fn trace_object(
-        &self,
-        trace: &mut impl ObjectQueue,
-        object: ObjectReference,
-        semantics: CopySemantics,
-        worker: &mut GCWorker<VM>,
     ) -> ObjectReference {
         #[cfg(feature = "global_alloc_bit")]
         debug_assert!(
@@ -476,21 +480,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
             "{:x}: alloc bit not set",
             object
         );
-        if Block::containing::<VM>(object).is_defrag_source() {
-            debug_assert!(self.in_defrag());
-            self.trace_object_with_opportunistic_copy(trace, object, semantics, worker, false)
-        } else {
-            self.trace_object_without_moving(trace, object)
-        }
-    }
-
-    /// Trace and mark objects without evacuation.
-    #[inline(always)]
-    pub fn trace_object_without_moving(
-        &self,
-        queue: &mut impl ObjectQueue,
-        object: ObjectReference,
-    ) -> ObjectReference {
         if self.attempt_mark(object, self.mark_state) {
             // Mark block and lines
             if !super::BLOCK_ONLY {
@@ -521,6 +510,12 @@ impl<VM: VMBinding> ImmixSpace<VM> {
     ) -> ObjectReference {
         let copy_context = worker.get_copy_context_mut();
         debug_assert!(!super::BLOCK_ONLY);
+        #[cfg(feature = "global_alloc_bit")]
+        debug_assert!(
+            crate::util::alloc_bit::is_alloced::<VM>(object),
+            "{:x}: alloc bit not set",
+            object
+        );
         let forwarding_status = ForwardingWord::attempt_to_forward::<VM>(object);
         if ForwardingWord::state_is_forwarded_or_being_forwarded(forwarding_status) {
             // We lost the forwarding race as some other thread has set the forwarding word; wait
