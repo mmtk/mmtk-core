@@ -61,7 +61,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         BLOCK_SIZE
     }
 
-    fn alloc(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc");
         let result = align_allocation_no_fill::<VM>(self.cursor, align, offset);
         let new_cursor = result + size;
@@ -83,7 +83,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         }
     }
 
-    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: isize) -> Address {
+    fn alloc_slow_once(&mut self, size: usize, align: usize, offset: usize) -> Address {
         trace!("alloc_slow");
         self.acquire_block(size, align, offset, false)
     }
@@ -100,7 +100,7 @@ impl<VM: VMBinding> Allocator<VM> for BumpAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         need_poll: bool,
     ) -> Address {
         if need_poll {
@@ -156,7 +156,7 @@ impl<VM: VMBinding> BumpAllocator<VM> {
         &mut self,
         size: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         stress_test: bool,
     ) -> Address {
         let block_size = (size + BLOCK_MASK) & (!BLOCK_MASK);

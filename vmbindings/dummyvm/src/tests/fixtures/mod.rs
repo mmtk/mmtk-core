@@ -65,6 +65,8 @@ impl<T: FixtureContent> SerialFixture<T> {
     }
 }
 
+unsafe impl<T: FixtureContent> Sync for SerialFixture<T> {}
+
 pub struct SingleObject {
     pub objref: ObjectReference,
 }

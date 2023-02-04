@@ -3,6 +3,7 @@
 /// The allocator trait and allocation-related functions.
 pub(crate) mod allocator;
 pub use allocator::fill_alignment_gap;
+pub use allocator::get_maximum_aligned_size;
 pub use allocator::AllocationError;
 pub use allocator::Allocator;
 

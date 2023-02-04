@@ -72,7 +72,7 @@ impl<VM: VMBinding> GCWorkerCopyContext<VM> {
         original: ObjectReference,
         bytes: usize,
         align: usize,
-        offset: isize,
+        offset: usize,
         semantics: CopySemantics,
     ) -> Address {
         #[cfg(debug_assertions)]

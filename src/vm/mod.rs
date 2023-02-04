@@ -56,7 +56,7 @@ where
     type VMMemorySlice: edge_shape::MemorySlice<Edge = Self::VMEdge>;
 
     /// A value to fill in alignment gaps. This value can be used for debugging.
-    const ALIGNMENT_VALUE: usize = 0xdead_beef;
+    const ALIGNMENT_VALUE: u32 = 0xdead_beef;
     /// Allowed minimal alignment in bytes.
     const MIN_ALIGNMENT: usize = 1 << DEFAULT_LOG_MIN_ALIGNMENT;
     /// Allowed maximum alignment in bytes.

@@ -2,13 +2,13 @@
 
 use crate::api;
 use crate::DummyVM;
-use crate::tests::fixtures::{Fixture, MutatorFixture};
+use crate::tests::fixtures::{SerialFixture, MutatorFixture};
 use mmtk::plan::AllocationSemantics;
 use mmtk::vm::VMBinding;
 use log::info;
 
 lazy_static! {
-    static ref MUTATOR: Fixture<MutatorFixture> = Fixture::new();
+    static ref MUTATOR: SerialFixture<MutatorFixture> = SerialFixture::new();
 }
 
 #[test]
@@ -30,7 +30,7 @@ pub fn allocate_alignment() {
 #[test]
 pub fn allocate_offset() {
     MUTATOR.with_fixture(|fixture| {
-        const OFFSET: isize = 4;
+        const OFFSET: usize = 4;
         let min = DummyVM::MIN_ALIGNMENT;
         let max = DummyVM::MAX_ALIGNMENT;
         info!("Allowed alignment between {} and {}", min, max);

@@ -161,6 +161,8 @@ const MI_INTPTR_SHIFT: usize = crate::util::constants::LOG_BYTES_IN_ADDRESS as u
 const MI_INTPTR_SIZE: usize = 1 << MI_INTPTR_SHIFT;
 /// pointer size in bits
 const MI_INTPTR_BITS: usize = MI_INTPTR_SIZE * 8;
+/// Minimal alignment of cells
+pub(crate) const MI_CELL_ALIGN: usize = MI_INTPTR_SIZE;
 /// Number of bins in BlockLists. Reserve bin0 as an empty bin.
 pub(crate) const MI_BIN_FULL: usize = MAX_BIN + 1;
 /// The largest valid bin.
@@ -266,8 +268,10 @@ fn mi_wsize_from_size(size: usize) -> usize {
     (size + MI_INTPTR_SIZE - 1) / MI_INTPTR_SIZE
 }
 
-pub fn mi_bin<VM: VMBinding>(size: usize, align: usize) -> usize {
-    let size = allocator::get_maximum_aligned_size::<VM>(size, align);
+pub fn mi_bin<VM: VMBinding>(size: usize, align: usize, offset: usize) -> usize {
+    // Every MiMalloc cell is aligned to MI_INTPTR_SIZE
+    let size =
+        allocator::get_maximum_aligned_size_at_known_alignment(size, align, offset, MI_CELL_ALIGN);
     mi_bin_from_size(size)
 }
 
