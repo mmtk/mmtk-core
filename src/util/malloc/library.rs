@@ -37,7 +37,7 @@ mod jemalloc {
 #[cfg(feature = "malloc_mimalloc")]
 mod mimalloc {
     // Normal 4K page accounting
-    pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = 12;
+    pub const LOG_BYTES_IN_MALLOC_PAGE: u8 = crate::util::constants::LOG_BYTES_IN_PAGE;
     // ANSI C
     pub use mimalloc_sys::{
         mi_calloc as calloc, mi_free as free, mi_malloc as malloc, mi_realloc as realloc,
