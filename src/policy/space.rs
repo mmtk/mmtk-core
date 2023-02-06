@@ -308,8 +308,8 @@ pub trait Space<VM: VMBinding>: 'static + SFT + Sync + Downcast {
 #[allow(unused)]
 pub(crate) fn print_vm_map<VM: VMBinding>(
     space: &dyn Space<VM>,
-    out: &mut impl std::io::Write,
-) -> Result<(), std::io::Error> {
+    out: &mut impl std::fmt::Write,
+) -> Result<(), std::fmt::Error> {
     let common = space.common();
     write!(out, "{} ", common.name)?;
     if common.immortal {
