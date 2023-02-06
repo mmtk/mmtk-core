@@ -11,12 +11,14 @@ use crate::util::copy::CopyConfig;
 use crate::util::copy::CopySelector;
 use crate::util::copy::CopySemantics;
 use crate::util::metadata::side_metadata::SideMetadataContext;
+use crate::util::statistics::counter::EventCounter;
 use crate::vm::ObjectModel;
 use crate::vm::VMBinding;
 use crate::Plan;
 
 use atomic::Ordering;
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
 use mmtk_macros::PlanTraceObject;
 
@@ -29,6 +31,7 @@ pub struct StickyImmix<VM: VMBinding> {
     pub(in crate::plan::sticky::immix) immix: immix::Immix<VM>,
     gc_full_heap: AtomicBool,
     next_gc_full_heap: AtomicBool,
+    full_heap_gc_count: Arc<Mutex<EventCounter>>,
 }
 
 pub const STICKY_IMMIX_CONSTRAINTS: PlanConstraints = PlanConstraints {
@@ -199,6 +202,7 @@ impl<VM: VMBinding> Plan for StickyImmix<VM> {
             self.immix.immix_space.prepare(false);
             self.immix.common.los.prepare(false);
         } else {
+            self.full_heap_gc_count.lock().unwrap().inc();
             self.immix.prepare(tls);
         }
     }
@@ -302,16 +306,20 @@ impl<VM: VMBinding> StickyImmix<VM> {
                 &crate::plan::generational::new_generational_global_metadata_specs::<VM>(),
             ),
         };
+
+        let immix = immix::Immix::new_with_args(
+            plan_args,
+            crate::policy::immix::ImmixSpaceArgs {
+                log_object_when_traced: true,
+                reset_log_bit_in_major_gc: true,
+            },
+        );
+        let full_heap_gc_count = immix.base().stats.new_event_counter("majorGC", true, true);
         Self {
-            immix: immix::Immix::new_with_args(
-                plan_args,
-                crate::policy::immix::ImmixSpaceArgs {
-                    log_object_when_traced: true,
-                    reset_log_bit_in_major_gc: true,
-                },
-            ),
+            immix,
             gc_full_heap: AtomicBool::new(false),
             next_gc_full_heap: AtomicBool::new(false),
+            full_heap_gc_count,
         }
     }
 
