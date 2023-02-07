@@ -43,14 +43,14 @@ impl<VM: VMBinding> BucketQueue<VM> {
     }
 }
 
-// Allow type_complexity as Rust support for trait aliases is still experimental
-#[allow(clippy::type_complexity)]
+pub type BucketOpenCondition<VM> = Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>;
+
 pub struct WorkBucket<VM: VMBinding> {
     active: AtomicBool,
     queue: BucketQueue<VM>,
     prioritized_queue: Option<BucketQueue<VM>>,
     monitor: Arc<(Mutex<()>, Condvar)>,
-    can_open: Option<Box<dyn (Fn(&GCWorkScheduler<VM>) -> bool) + Send>>,
+    can_open: Option<BucketOpenCondition<VM>>,
     /// After this bucket is activated and all pending work packets (including the packets in this
     /// bucket) are drained, this work packet, if exists, will be added to this bucket.  When this
     /// happens, it will prevent opening subsequent work packets.
