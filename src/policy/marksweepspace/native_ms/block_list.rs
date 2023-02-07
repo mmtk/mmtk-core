@@ -167,7 +167,7 @@ pub(crate) const MI_BIN_FULL: usize = MAX_BIN + 1;
 pub(crate) const MAX_BIN: usize = 48;
 
 /// Largest object size allowed with our mimalloc implementation, in bytes
-pub(crate) const MI_LARGE_OBJ_SIZE_MAX: usize = Block::BYTES;
+pub(crate) const MI_LARGE_OBJ_SIZE_MAX: usize = crate::util::rust_util::min_of_usize(Block::BYTES, MAX_BIN_SIZE);
 /// Largest object size in words
 const MI_LARGE_OBJ_WSIZE_MAX: usize = MI_LARGE_OBJ_SIZE_MAX / MI_INTPTR_SIZE;
 /// The object size for the last bin. We should not try allocate objects larger than this with the allocator.
