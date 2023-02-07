@@ -140,7 +140,14 @@ jobs:
           sed -i 's/^#[[:space:]]mmtk/mmtk/g' mmtk/Cargo.toml
       - name: Overwrite MMTk core in Julia binding
         run: |
-          cp -r mmtk-core mmtk-julia/repos
+          mkdir -p mmtk-julia/repos/mmtk-core
+          cp -r mmtk-core/* mmtk-julia/repos/mmtk-core
+      - name: debug
+        run: |
+          ls mmtk-julia
+          ls mmtk-julia/repos
+          ls mmtk-julia/repos/mmtk-core
+          cat mmtk-julia/mmtk/Cargo.toml
       - name: Test
         run: |
           cd mmtk-julia
