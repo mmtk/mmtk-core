@@ -20,6 +20,8 @@
 # JIKESRVM_BINDING_REF=xxxxxx
 # V8_BINDING_REPO=xx/xx
 # V8_BINDING_REF=xxxxxx
+# JULIA_BINDING_REPO=xx/xx
+# JULIA_BINDING_REF=xxxxxx
 # ```
 
 name: Fetch Binding PR Info
