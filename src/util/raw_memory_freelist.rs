@@ -75,13 +75,13 @@ impl RawMemoryFreeList {
         (conversions::pages_to_bytes(self.pages_per_block as _) >> LOG_BYTES_IN_UNIT) as _
     }
     fn units_in_first_block(&self) -> i32 {
-        self.units_per_block() - (self.heads as i32) - 1
+        self.units_per_block() - self.heads - 1
     }
     pub fn default_block_size(units: i32, heads: i32) -> i32 {
         usize::min(Self::size_in_pages(units, heads) as _, 16) as _
     }
     pub fn size_in_pages(units: i32, heads: i32) -> i32 {
-        let map_size = ((units + heads + 1) as usize) << LOG_BYTES_IN_UNIT as usize;
+        let map_size = ((units + heads + 1) as usize) << LOG_BYTES_IN_UNIT;
         conversions::bytes_to_pages_up(map_size as _) as _
     }
 

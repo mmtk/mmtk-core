@@ -27,7 +27,7 @@ pub const BYTES_IN_CHUNK: usize = 1 << LOG_BYTES_IN_CHUNK;
 pub const CHUNK_MASK: usize = (1 << LOG_BYTES_IN_CHUNK) - 1;
 
 /** Coarsest unit of address space allocation, in pages */
-pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK as usize - LOG_BYTES_IN_PAGE as usize);
+pub const PAGES_IN_CHUNK: usize = 1 << (LOG_BYTES_IN_CHUNK - LOG_BYTES_IN_PAGE as usize);
 
 /** log_2 of the maximum number of chunks we need to track.  Only used in 32-bit layout.*/
 pub const LOG_MAX_CHUNKS: usize = LOG_ADDRESS_SPACE - LOG_BYTES_IN_CHUNK;
@@ -112,7 +112,7 @@ pub const LOG_MMAP_CHUNK_BYTES: usize = LOG_BYTES_IN_CHUNK;
 pub const MMAP_CHUNK_BYTES: usize = 1 << LOG_MMAP_CHUNK_BYTES;
 
 /** log_2 of the number of pages in a 64-bit space */
-pub const LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 as usize - LOG_BYTES_IN_PAGE as usize;
+pub const LOG_PAGES_IN_SPACE64: usize = LOG_SPACE_SIZE_64 - LOG_BYTES_IN_PAGE as usize;
 
 /** The number of pages in a 64-bit space */
 pub const PAGES_IN_SPACE64: usize = 1 << LOG_PAGES_IN_SPACE64;

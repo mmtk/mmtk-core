@@ -102,7 +102,7 @@ pub fn bytes_to_formatted_string(bytes: usize) -> String {
         num = new_num;
         i += 1;
     }
-    return format!("{}{}", num, UNITS.last().unwrap());
+    format!("{}{}", num, UNITS.last().unwrap())
 }
 
 #[cfg(test)]

@@ -182,7 +182,7 @@ impl Defrag {
             // Calculate the number of free lines in this bucket.
             let this_bucket_avail = spill_avail_histograms[threshold] as isize;
             // Update counters
-            limit -= this_bucket_avail as isize;
+            limit -= this_bucket_avail;
             required_lines += this_bucket_mark;
             // Stop scanning. Lines to evacuate exceeds the free to-space lines.
             if limit < required_lines {

@@ -43,6 +43,8 @@ impl<VM: VMBinding> BucketQueue<VM> {
     }
 }
 
+// Allow type_complexity as Rust support for trait aliases is still experimental
+#[allow(clippy::type_complexity)]
 pub struct WorkBucket<VM: VMBinding> {
     active: AtomicBool,
     queue: BucketQueue<VM>,
