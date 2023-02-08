@@ -51,6 +51,19 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
     fn name(&self) -> &str {
         self.get_name()
     }
+
+    fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
+        if !Block::containing::<VM>(object).is_defrag_source() {
+            return None;
+        }
+
+        if ForwardingWord::is_forwarded::<VM>(object) {
+            Some(ForwardingWord::read_forwarding_pointer::<VM>(object))
+        } else {
+            None
+        }
+    }
+
     fn is_live(&self, object: ObjectReference) -> bool {
         if !super::DEFRAG {
             // If defrag is disabled, we won't forward objects.
