@@ -811,6 +811,18 @@
 <span id="811">811</span>
 <span id="812">812</span>
 <span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::line::<span class="kw-2">*</span>;
 <span class="kw">use super</span>::{block::<span class="kw-2">*</span>, defrag::Defrag};
 <span class="kw">use </span><span class="kw">crate</span>::policy::gc_work::TraceKind;
@@ -986,6 +998,8 @@
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
                 </span><span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -996,6 +1010,8 @@
                 MetadataSpec::OnSide(Block::MARK_TABLE),
                 MetadataSpec::OnSide(ChunkMap::ALLOC_TABLE),
                 <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC,
+                <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC,
+                <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_POINTER_SPEC,
                 <span class="attribute">#[cfg(feature = <span class="string">&quot;object_pinning&quot;</span>)]
                 </span><span class="kw-2">*</span>VM::VMObjectModel::LOCAL_PINNING_BIT_SPEC,
             ]
@@ -1458,10 +1474,18 @@
     <span class="doccomment">/// Clear object mark table
     </span><span class="attribute">#[inline(always)]
     </span><span class="kw">fn </span>reset_object_mark(chunk: Chunk) {
-        <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
+        <span class="comment">// NOTE: We reset the mark bits because cyclic mark bit is currently not supported, yet.
+        // See `ImmixSpace::prepare`.
+        </span><span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_MARK_BIT_SPEC {
             side.bzero_metadata(chunk.start(), Chunk::BYTES);
         }
-    }
+        <span class="kw">if let </span>MetadataSpec::OnSide(side) = <span class="kw-2">*</span>VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC {
+            side.bzero_metadata(chunk.start(), Chunk::BYTES);
+        }
+        <span class="comment">// NOTE: We don&#39;t need to reset the forwarding pointer metadata because it is meaningless
+        // until the forwarding bits are also set, at which time we also write the forwarding
+        // pointer.
+    </span>}
 }
 
 <span class="kw">impl</span>&lt;VM: VMBinding&gt; GCWork&lt;VM&gt; <span class="kw">for </span>PrepareBlockState&lt;VM&gt; {
