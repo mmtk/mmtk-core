@@ -94,7 +94,7 @@ pub fn forward_object<VM: VMBinding>(
         write_forwarding_pointer::<VM>(object, new_object);
         VM::VMObjectModel::LOCAL_FORWARDING_BITS_SPEC.store_atomic::<VM, u8>(
             object,
-            FORWARDED as u8,
+            FORWARDED,
             None,
             Ordering::SeqCst,
         );
