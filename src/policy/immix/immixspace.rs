@@ -52,7 +52,6 @@ impl<VM: VMBinding> SFT for ImmixSpace<VM> {
         self.get_name()
     }
 
-    #[inline(always)]
     fn get_forwarded_object(&self, object: ObjectReference) -> Option<ObjectReference> {
         if !Block::containing::<VM>(object).is_defrag_source() {
             return None;
