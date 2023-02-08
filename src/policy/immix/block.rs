@@ -241,6 +241,9 @@ impl Block {
                         holes += 1;
                     }
 
+                    #[cfg(feature = "global_alloc_bit")]
+                    crate::util::alloc_bit::bzero_alloc_bit(line.start(), Line::BYTES);
+
                     #[cfg(feature = "immix_zero_on_release")]
                     crate::util::memory::zero(line.start(), Line::BYTES);
 

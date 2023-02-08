@@ -510,8 +510,6 @@ impl<VM: VMBinding> ImmixSpace<VM> {
                 Block::containing::<VM>(object).set_state(BlockState::Marked);
                 object
             } else {
-                #[cfg(feature = "global_alloc_bit")]
-                crate::util::alloc_bit::unset_alloc_bit::<VM>(object);
                 ForwardingWord::forward_object::<VM>(object, semantics, copy_context)
             };
             debug_assert_eq!(
