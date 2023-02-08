@@ -813,8 +813,6 @@
 <span id="811">811</span>
 <span id="812">812</span>
 <span id="813">813</span>
-<span id="814">814</span>
-<span id="815">815</span>
 </pre><pre class="rust"><code><span class="kw">use</span> <span class="ident"><span class="kw">super</span>::line</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="kw">super</span>::{<span class="ident">block</span>::<span class="kw-2">*</span>, <span class="ident">defrag::Defrag</span>};
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::policy::gc_work::TraceKind</span>;
@@ -1327,8 +1325,6 @@
                 <span class="ident">Block::containing</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>).<span class="ident">set_state</span>(<span class="ident">BlockState::Marked</span>);
                 <span class="ident">object</span>
             } <span class="kw">else</span> {
-                <span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">feature</span> <span class="op">=</span> <span class="string">&quot;global_alloc_bit&quot;</span>)]</span>
-                <span class="ident"><span class="kw">crate</span>::util::alloc_bit::unset_alloc_bit</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>);
                 <span class="ident">ForwardingWord::forward_object</span>::<span class="op">&lt;</span><span class="ident">VM</span><span class="op">&gt;</span>(<span class="ident">object</span>, <span class="ident">semantics</span>, <span class="ident">copy_context</span>)
             };
             <span class="macro">debug_assert_eq!</span>(
